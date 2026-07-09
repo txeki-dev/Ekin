@@ -1,9 +1,10 @@
-from PySide6.QtCore import Qt, QMimeData, QPoint, Signal
+from PySide6.QtCore import Qt, QMimeData, QPoint, Signal, QRect, QSize
 from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QWidget, QMenu, QApplication
+    QScrollArea, QWidget, QMenu, QApplication, QLayout, QSizePolicy
 )
 from PySide6.QtGui import QDrag, QPixmap, QPainter, QColor, QCursor
+from datetime import datetime
 import styles
 
 def hex_to_rgb(hex_str):
@@ -12,6 +13,85 @@ def hex_to_rgb(hex_str):
     if len(hex_str) == 3:
         hex_str = ''.join(c*2 for c in hex_str)
     return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
+
+
+class FlowLayout(QLayout):
+    """Layout que distribuye los widgets de izquierda a derecha y salta de línea si no caben."""
+    def __init__(self, parent=None, margin=0, spacing=4):
+        super().__init__(parent)
+        self.itemList = []
+        self.setContentsMargins(margin, margin, margin, margin)
+        self.setSpacing(spacing)
+
+    def __del__(self):
+        while self.count():
+            self.takeAt(0)
+
+    def addItem(self, item):
+        self.itemList.append(item)
+
+    def count(self):
+        return len(self.itemList)
+
+    def itemAt(self, index):
+        if 0 <= index < len(self.itemList):
+            return self.itemList[index]
+        return None
+
+    def takeAt(self, index):
+        if 0 <= index < len(self.itemList):
+            return self.itemList.pop(index)
+        return None
+
+    def expandingDirections(self):
+        return Qt.Orientations()
+
+    def hasHeightForWidth(self):
+        return True
+
+    def heightForWidth(self, width):
+        return self.doLayout(QRect(0, 0, width, 0), True)
+
+    def setGeometry(self, rect):
+        super().setGeometry(rect)
+        self.doLayout(rect, False)
+
+    def sizeHint(self):
+        return self.minimumSize()
+
+    def minimumSize(self):
+        size = QSize()
+        for item in self.itemList:
+            size = size.expandedTo(item.minimumSize())
+        m = self.contentsMargins()
+        size += QSize(m.left() + m.right(), m.top() + m.bottom())
+        return size
+
+    def doLayout(self, rect, testOnly):
+        left, top, right, bottom = self.getContentsMargins()
+        effectiveRect = rect.adjusted(+left, +top, -right, -bottom)
+        x = effectiveRect.x()
+        y = effectiveRect.y()
+        lineHeight = 0
+
+        spaceX = self.spacing()
+        spaceY = self.spacing()
+
+        for item in self.itemList:
+            nextX = x + item.sizeHint().width() + spaceX
+            if nextX - spaceX > effectiveRect.right() and lineHeight > 0:
+                x = effectiveRect.x()
+                y = y + lineHeight + spaceY
+                nextX = x + item.sizeHint().width() + spaceX
+                lineHeight = 0
+
+            if not testOnly:
+                item.setGeometry(QRect(QPoint(x, y), item.sizeHint()))
+
+            x = nextX
+            lineHeight = max(lineHeight, item.sizeHint().height())
+
+        return y + lineHeight - rect.y() + bottom
 
 
 class TaskCard(QFrame):
@@ -69,30 +149,77 @@ class TaskCard(QFrame):
         self.title_label.setWordWrap(True)
         layout.addWidget(self.title_label)
 
-        # Indicador de descripción y comentarios / diario
-        info_layout = QHBoxLayout()
-        info_layout.setSpacing(8)
+        # Layout vertical para la metadata (Etiquetas y Fecha)
+        self.meta_layout = QVBoxLayout()
+        self.meta_layout.setContentsMargins(0, 4, 0, 0)
+        self.meta_layout.setSpacing(6)
 
-        # Si hay etiqueta, la añadimos
-        self.tag_label = QLabel()
-        self.tag_label.setObjectName("TaskCardTag")
-        self.update_tag(self.task_data.get("tag_text"), self.task_data.get("tag_color"))
-        info_layout.addWidget(self.tag_label)
+        # Contenedor para múltiples etiquetas (Fila 1)
+        self.tags_container = QWidget()
+        self.tags_container.setStyleSheet("background: transparent; border: none;")
+        self.tags_layout = FlowLayout(self.tags_container, margin=0, spacing=4)
+        self.meta_layout.addWidget(self.tags_container)
+
+        # Contenedor para fecha de vencimiento (Fila 2)
+        self.due_container = QWidget()
+        self.due_container.setStyleSheet("background: transparent; border: none;")
+        self.due_layout = QHBoxLayout(self.due_container)
+        self.due_layout.setContentsMargins(0, 0, 0, 0)
+        self.due_layout.setSpacing(0)
         
-        # Spacer para empujar la etiqueta a la izquierda
-        info_layout.addStretch()
-        layout.addLayout(info_layout)
+        self.due_label = QLabel()
+        self.due_label.setObjectName("TaskCardDueDate")
+        self.due_layout.addWidget(self.due_label)
+        self.due_layout.addStretch()  # Empuja la fecha a la izquierda
+        self.meta_layout.addWidget(self.due_container)
 
-    def update_tag(self, text, color):
-        """Actualiza la etiqueta de la tarea en la interfaz."""
-        if text:
-            self.tag_label.setText(text.upper())
-            self.tag_label.setStyleSheet(
-                f"background-color: {color}; color: #ffffff; font-weight: bold; border-radius: 4px; padding: 2px 6px;"
-            )
-            self.tag_label.show()
+        layout.addLayout(self.meta_layout)
+
+        # Actualizar las etiquetas y vencimiento
+        self.update_tags_and_due(self.task_data.get("tags", []), self.task_data.get("due_date"))
+
+    def update_tags_and_due(self, tags, due_date):
+        """Limpia y dibuja las etiquetas actuales y la fecha de vencimiento."""
+        # Limpiar etiquetas anteriores
+        while self.tags_layout.count():
+            item = self.tags_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+
+        # Añadir las nuevas etiquetas
+        if tags:
+            for tag in tags:
+                lbl = QLabel(tag["text"].upper())
+                lbl.setStyleSheet(
+                    f"background-color: {tag['color']}; color: #ffffff; font-size: 9px; font-weight: bold; border-radius: 4px; padding: 2px 5px;"
+                )
+                self.tags_layout.addWidget(lbl)
+            self.tags_container.show()
         else:
-            self.tag_label.hide()
+            self.tags_container.hide()
+
+        # Mostrar/Ocultar fecha de vencimiento
+        if due_date:
+            try:
+                dt = datetime.strptime(due_date, "%Y-%m-%d")
+                formatted = dt.strftime("%d %b")  # Ej: "09 Jul"
+                
+                today = datetime.now().date()
+                is_overdue = dt.date() < today
+                
+                self.due_label.setText(f"📅 {formatted}")
+                if is_overdue:
+                    self.due_label.setStyleSheet("color: #ef4444; font-weight: bold; font-size: 10px; background-color: rgba(239, 68, 68, 0.15); border-radius: 4px; padding: 2px 4px;")
+                else:
+                    self.due_label.setStyleSheet("color: #94a3b8; font-size: 10px; background-color: rgba(148, 163, 184, 0.15); border-radius: 4px; padding: 2px 4px;")
+                self.due_container.show()
+            except Exception:
+                self.due_label.setText(f"📅 {due_date}")
+                self.due_label.setStyleSheet("color: #94a3b8; font-size: 10px;")
+                self.due_container.show()
+        else:
+            self.due_container.hide()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -215,6 +342,8 @@ class ColumnWidget(QFrame):
     add_task_requested = Signal(int)     # column_id
     edit_column_requested = Signal(int) # column_id
     delete_column_requested = Signal(int) # column_id
+    move_column_requested = Signal(int)  # column_id
+    copy_column_requested = Signal(int)  # column_id
 
     def __init__(self, column_data, parent=None):
         super().__init__(parent)
@@ -254,7 +383,34 @@ class ColumnWidget(QFrame):
         self.menu_btn.setFixedWidth(24)
         self.menu_btn.setFixedHeight(24)
         self.menu_btn.setCursor(Qt.PointingHandCursor)
-        self.menu_btn.setStyleSheet("background: transparent; border: none; font-size: 14px; font-weight: bold;")
+        self.menu_btn.setToolTip("Opciones de columna")
+        
+        # Estilo del botón a juego con el marco y color de la columna
+        try:
+            r, g, b = hex_to_rgb(self.column_data["color"])
+        except Exception:
+            r, g, b = 59, 130, 246
+            
+        color = self.column_data["color"]
+        self.menu_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: rgba({r}, {g}, {b}, 0.1);
+                border: 1.2px solid rgba({r}, {g}, {b}, 0.45);
+                border-radius: 4px;
+                color: {color};
+                font-size: 14px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: rgba({r}, {g}, {b}, 0.25);
+                border-color: {color};
+                color: #ffffff;
+            }}
+            QPushButton:pressed {{
+                background-color: rgba({r}, {g}, {b}, 0.4);
+            }}
+        """)
+        
         self.menu_btn.clicked.connect(self.show_column_menu)
         header_layout.addWidget(self.menu_btn)
 
@@ -312,7 +468,7 @@ class ColumnWidget(QFrame):
             """)
 
     def show_column_menu(self):
-        """Muestra el menú contextual de la columna para editarla o borrarla."""
+        """Muestra el menú contextual de la columna para editarla, moverla, copiarla o borrarla."""
         menu = QMenu(self)
         # Aplicar el tema oscuro al menú
         menu.setStyleSheet(f"""
@@ -331,11 +487,18 @@ class ColumnWidget(QFrame):
         """)
         
         edit_action = menu.addAction("✏️ Editar Columna")
+        move_action = menu.addAction("📦 Mover a otro tablero...")
+        copy_action = menu.addAction("📋 Copiar a otro tablero...")
+        menu.addSeparator()
         delete_action = menu.addAction("🗑️ Eliminar Columna")
         
         action = menu.exec(QCursor.pos())
         if action == edit_action:
             self.edit_column_requested.emit(self.column_id)
+        elif action == move_action:
+            self.move_column_requested.emit(self.column_id)
+        elif action == copy_action:
+            self.copy_column_requested.emit(self.column_id)
         elif action == delete_action:
             self.delete_column_requested.emit(self.column_id)
 

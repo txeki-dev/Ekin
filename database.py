@@ -60,6 +60,12 @@ def init_db(db_path=DB_NAME):
             )
         """)
         
+        # Migración: Verificar si la columna 'due_date' existe en 'tasks'
+        cursor.execute("PRAGMA table_info(tasks)")
+        tasks_columns = [row[1] for row in cursor.fetchall()]
+        if "due_date" not in tasks_columns:
+            cursor.execute("ALTER TABLE tasks ADD COLUMN due_date TEXT")
+        
         # Tabla de logs/diario (task_logs)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS task_logs (
@@ -70,6 +76,28 @@ def init_db(db_path=DB_NAME):
                 FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
             )
         """)
+
+        # Migración/Creación: Tabla para múltiples etiquetas (task_tags)
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='task_tags';")
+        table_exists = cursor.fetchone()
+        if not table_exists:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS task_tags (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id INTEGER NOT NULL,
+                    text TEXT NOT NULL,
+                    color TEXT NOT NULL DEFAULT '#6b7280',
+                    FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+                )
+            """)
+            # Migrar tags antiguos individuales a la nueva tabla
+            cursor.execute("SELECT id, tag_text, tag_color FROM tasks WHERE tag_text IS NOT NULL AND tag_text != '';")
+            rows = cursor.fetchall()
+            for row in rows:
+                cursor.execute(
+                    "INSERT INTO task_tags (task_id, text, color) VALUES (?, ?, ?)",
+                    (row["id"], row["tag_text"], row["tag_color"])
+                )
         conn.commit()
 
 # --- OPERACIONES DE TABLEROS (BOARDS) ---
@@ -155,7 +183,7 @@ def delete_column(column_id, db_path=DB_NAME):
 
 # --- OPERACIONES DE TAREAS (TASKS) ---
 
-def create_task(column_id, title, description="", tag_text="", tag_color="#6b7280", db_path=DB_NAME):
+def create_task(column_id, title, description="", tag_text="", tag_color="#6b7280", due_date=None, db_path=DB_NAME):
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         # Obtener la posición máxima actual de tareas en esta columna
@@ -164,9 +192,9 @@ def create_task(column_id, title, description="", tag_text="", tag_color="#6b728
         next_pos = max_pos + 1
         
         cursor.execute(
-            """INSERT INTO tasks (column_id, title, description, tag_text, tag_color, position)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (column_id, title, description, tag_text, tag_color, next_pos)
+            """INSERT INTO tasks (column_id, title, description, tag_text, tag_color, position, due_date)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (column_id, title, description, tag_text, tag_color, next_pos, due_date)
         )
         conn.commit()
         return cursor.lastrowid
@@ -175,31 +203,57 @@ def get_tasks(column_id, db_path=DB_NAME):
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute(
-            """SELECT id, column_id, title, description, tag_text, tag_color, position, created_at, updated_at
+            """SELECT id, column_id, title, description, tag_text, tag_color, position, created_at, updated_at, due_date
                FROM tasks WHERE column_id = ? ORDER BY position ASC""",
             (column_id,)
         )
-        return [dict(row) for row in cursor.fetchall()]
+        tasks = [dict(row) for row in cursor.fetchall()]
+        for t in tasks:
+            cursor.execute("SELECT text, color FROM task_tags WHERE task_id = ? ORDER BY id ASC", (t["id"],))
+            t["tags"] = [dict(r) for r in cursor.fetchall()]
+        return tasks
 
 def get_task(task_id, db_path=DB_NAME):
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute(
-            """SELECT id, column_id, title, description, tag_text, tag_color, position, created_at, updated_at
+            """SELECT id, column_id, title, description, tag_text, tag_color, position, created_at, updated_at, due_date
                FROM tasks WHERE id = ?""",
             (task_id,)
         )
         row = cursor.fetchone()
-        return dict(row) if row else None
+        if row:
+            t = dict(row)
+            cursor.execute("SELECT text, color FROM task_tags WHERE task_id = ? ORDER BY id ASC", (t["id"],))
+            t["tags"] = [dict(r) for r in cursor.fetchall()]
+            return t
+        return None
 
-def update_task(task_id, title, description, tag_text, tag_color, db_path=DB_NAME):
+def update_task(task_id, title, description, tag_text, tag_color, due_date, db_path=DB_NAME):
     with get_connection(db_path) as conn:
         conn.execute(
             """UPDATE tasks 
-               SET title = ?, description = ?, tag_text = ?, tag_color = ?, updated_at = CURRENT_TIMESTAMP
+               SET title = ?, description = ?, tag_text = ?, tag_color = ?, due_date = ?, updated_at = CURRENT_TIMESTAMP
                WHERE id = ?""",
-            (title, description, tag_text, tag_color, task_id)
+            (title, description, tag_text, tag_color, due_date, task_id)
         )
+        conn.commit()
+
+def get_task_tags(task_id, db_path=DB_NAME):
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, text, color FROM task_tags WHERE task_id = ? ORDER BY id ASC", (task_id,))
+        return [dict(row) for row in cursor.fetchall()]
+
+def set_task_tags(task_id, tags_list, db_path=DB_NAME):
+    """Establece las etiquetas para una tarea, eliminando las anteriores."""
+    with get_connection(db_path) as conn:
+        conn.execute("DELETE FROM task_tags WHERE task_id = ?", (task_id,))
+        for tag in tags_list:
+            conn.execute(
+                "INSERT INTO task_tags (task_id, text, color) VALUES (?, ?, ?)",
+                (task_id, tag["text"], tag["color"])
+            )
         conn.commit()
 
 def update_task_position(task_id, new_column_id, new_position, db_path=DB_NAME):
@@ -272,3 +326,157 @@ def delete_log(log_id, db_path=DB_NAME):
                 (task_id,)
             )
         conn.commit()
+
+# --- OPERACIONES AVANZADAS DE COLUMNAS (MOVER Y COPIAR A OTROS TABLEROS) ---
+
+def move_column_to_board(column_id, target_board_id, db_path=DB_NAME):
+    """Mueve una columna a otro tablero y la coloca al final de su lista de columnas."""
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        # Obtener la posición máxima actual en el tablero de destino
+        cursor.execute("SELECT COALESCE(MAX(position), -1) FROM columns WHERE board_id = ?", (target_board_id,))
+        max_pos = cursor.fetchone()[0]
+        next_pos = max_pos + 1
+        
+        # Actualizar la columna con el nuevo board_id y posición
+        cursor.execute(
+            "UPDATE columns SET board_id = ?, position = ? WHERE id = ?",
+            (target_board_id, next_pos, column_id)
+        )
+        conn.commit()
+
+def copy_column_to_board(column_id, target_board_id, db_path=DB_NAME):
+    """Crea una copia de la columna en el tablero de destino, incluyendo todas sus tareas y logs."""
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        
+        # 1. Obtener detalles de la columna origen
+        cursor.execute("SELECT name, color FROM columns WHERE id = ?", (column_id,))
+        col_row = cursor.fetchone()
+        if not col_row:
+            return None
+        col_name, col_color = col_row["name"], col_row["color"]
+        
+        # 2. Obtener la posición máxima en el tablero de destino
+        cursor.execute("SELECT COALESCE(MAX(position), -1) FROM columns WHERE board_id = ?", (target_board_id,))
+        max_pos = cursor.fetchone()[0]
+        next_pos = max_pos + 1
+        
+        # 3. Insertar la nueva columna
+        cursor.execute(
+            "INSERT INTO columns (board_id, name, color, position) VALUES (?, ?, ?, ?)",
+            (target_board_id, col_name, col_color, next_pos)
+        )
+        new_column_id = cursor.lastrowid
+        
+        # 4. Obtener todas las tareas de la columna de origen
+        cursor.execute(
+            """SELECT id, title, description, tag_text, tag_color, position, due_date 
+               FROM tasks WHERE column_id = ? ORDER BY position ASC""",
+            (column_id,)
+        )
+        tasks = [dict(row) for row in cursor.fetchall()]
+        
+        # 5. Duplicar cada tarea, sus logs y etiquetas
+        for task in tasks:
+            old_task_id = task["id"]
+            
+            cursor.execute(
+                """INSERT INTO tasks (column_id, title, description, tag_text, tag_color, position, due_date)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (new_column_id, task["title"], task["description"], task["tag_text"], task["tag_color"], task["position"], task["due_date"])
+            )
+            new_task_id = cursor.lastrowid
+            
+            # Duplicar etiquetas
+            cursor.execute("SELECT text, color FROM task_tags WHERE task_id = ?", (old_task_id,))
+            tags = [dict(row) for row in cursor.fetchall()]
+            for tag in tags:
+                cursor.execute(
+                    "INSERT INTO task_tags (task_id, text, color) VALUES (?, ?, ?)",
+                    (new_task_id, tag["text"], tag["color"])
+                )
+            
+            # Obtener logs de la tarea de origen
+            cursor.execute(
+                "SELECT content, created_at FROM task_logs WHERE task_id = ? ORDER BY id ASC",
+                (old_task_id,)
+            )
+            logs = [dict(row) for row in cursor.fetchall()]
+            
+            # Insertar los logs duplicando el contenido y la fecha original
+            for log in logs:
+                cursor.execute(
+                    "INSERT INTO task_logs (task_id, content, created_at) VALUES (?, ?, ?)",
+                    (new_task_id, log["content"], log["created_at"])
+                )
+                
+        conn.commit()
+        return new_column_id
+
+def copy_board(board_id, new_name, new_color, db_path=DB_NAME):
+    """Crea una copia de un tablero entero, incluyendo sus columnas, tareas y logs."""
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        
+        # 1. Crear el nuevo tablero
+        cursor.execute("INSERT INTO boards (name, color) VALUES (?, ?)", (new_name, new_color))
+        new_board_id = cursor.lastrowid
+        
+        # 2. Obtener todas las columnas del tablero de origen
+        cursor.execute("SELECT id, name, color, position FROM columns WHERE board_id = ? ORDER BY position ASC", (board_id,))
+        columns = [dict(row) for row in cursor.fetchall()]
+        
+        for col in columns:
+            old_col_id = col["id"]
+            
+            # Crear nueva columna en el nuevo tablero
+            cursor.execute(
+                "INSERT INTO columns (board_id, name, color, position) VALUES (?, ?, ?, ?)",
+                (new_board_id, col["name"], col["color"], col["position"])
+            )
+            new_col_id = cursor.lastrowid
+            
+            # 3. Obtener todas las tareas de la columna de origen
+            cursor.execute(
+                """SELECT id, title, description, tag_text, tag_color, position, due_date 
+                   FROM tasks WHERE column_id = ? ORDER BY position ASC""",
+                (old_col_id,)
+            )
+            tasks = [dict(row) for row in cursor.fetchall()]
+            
+            for task in tasks:
+                old_task_id = task["id"]
+                
+                # Crear nueva tarea
+                cursor.execute(
+                    """INSERT INTO tasks (column_id, title, description, tag_text, tag_color, position, due_date)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (new_col_id, task["title"], task["description"], task["tag_text"], task["tag_color"], task["position"], task["due_date"])
+                )
+                new_task_id = cursor.lastrowid
+                
+                # Duplicar etiquetas
+                cursor.execute("SELECT text, color FROM task_tags WHERE task_id = ?", (old_task_id,))
+                tags = [dict(row) for row in cursor.fetchall()]
+                for tag in tags:
+                    cursor.execute(
+                        "INSERT INTO task_tags (task_id, text, color) VALUES (?, ?, ?)",
+                        (new_task_id, tag["text"], tag["color"])
+                    )
+                
+                # 4. Obtener todos los logs de la tarea de origen
+                cursor.execute(
+                    "SELECT content, created_at FROM task_logs WHERE task_id = ? ORDER BY id ASC",
+                    (old_task_id,)
+                )
+                logs = [dict(row) for row in cursor.fetchall()]
+                
+                for log in logs:
+                    cursor.execute(
+                        "INSERT INTO task_logs (task_id, content, created_at) VALUES (?, ?, ?)",
+                        (new_task_id, log["content"], log["created_at"])
+                    )
+                    
+        conn.commit()
+        return new_board_id

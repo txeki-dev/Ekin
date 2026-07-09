@@ -1,7 +1,8 @@
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QInputDialog, QMessageBox, QDialog, QLineEdit, QColorDialog
+    QScrollArea, QInputDialog, QMessageBox, QDialog, QLineEdit, QColorDialog,
+    QComboBox
 )
 import database
 import styles
@@ -84,6 +85,68 @@ class ColumnEditDialog(QDialog):
         return self.name_input.text().strip(), self.color
 
 
+class BoardSelectionDialog(QDialog):
+    """Diálogo para seleccionar un tablero de destino para mover o copiar una columna."""
+    def __init__(self, title, action_text, exclude_board_id=None, db_path=database.DB_NAME, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setFixedSize(320, 150)
+        self.db_path = db_path
+        self.exclude_board_id = exclude_board_id
+        
+        self.selected_board_id = None
+        
+        self.init_ui(action_text)
+        
+    def init_ui(self, action_text):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(15, 15, 15, 15)
+        
+        layout.addWidget(QLabel("<b>Selecciona el tablero de destino:</b>"))
+        
+        self.board_combo = QComboBox()
+        # Consultar tableros
+        boards = database.get_boards(self.db_path)
+        
+        self.available_boards = []
+        for b in boards:
+            if b["id"] != self.exclude_board_id:
+                self.available_boards.append(b)
+                self.board_combo.addItem(b["name"])
+                
+        layout.addWidget(self.board_combo)
+        layout.addStretch()
+        
+        # Botones
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        
+        self.ok_btn = QPushButton(action_text)
+        self.ok_btn.setObjectName("PrimaryButton")
+        self.ok_btn.clicked.connect(self.accept_selection)
+        btn_layout.addWidget(self.ok_btn)
+        
+        self.cancel_btn = QPushButton("Cancelar")
+        self.cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(self.cancel_btn)
+        
+        layout.addLayout(btn_layout)
+        
+        if not self.available_boards:
+            self.ok_btn.setEnabled(False)
+            self.board_combo.setEnabled(False)
+            self.board_combo.addItem("No hay otros tableros")
+            
+    def accept_selection(self):
+        index = self.board_combo.currentIndex()
+        if index >= 0 and index < len(self.available_boards):
+            self.selected_board_id = self.available_boards[index]["id"]
+            self.accept()
+        else:
+            self.reject()
+
+
 def hex_to_rgb(hex_str):
     """Convierte un color hexadecimal en formato string a una tupla RGB (r, g, b)."""
     hex_str = hex_str.lstrip('#')
@@ -93,6 +156,8 @@ def hex_to_rgb(hex_str):
 
 
 class BoardViewWidget(QFrame):
+    toggle_sidebar_requested = Signal()
+
     def __init__(self, db_path=database.DB_NAME, parent=None):
         super().__init__(parent)
         self.db_path = db_path
@@ -106,6 +171,50 @@ class BoardViewWidget(QFrame):
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
+
+        # 0. Cabecera del Tablero (Board Header Bar)
+        self.board_header = QWidget()
+        self.board_header.setObjectName("BoardHeaderBar")
+        self.board_header.setFixedHeight(50)
+        self.board_header.setStyleSheet(f"""
+            #BoardHeaderBar {{
+                background-color: {styles.COLORS['bg_sidebar']};
+                border-bottom: 1.5px solid {styles.COLORS['border']};
+            }}
+        """)
+        header_layout = QHBoxLayout(self.board_header)
+        header_layout.setContentsMargins(15, 0, 15, 0)
+        header_layout.setSpacing(10)
+
+        # Botón para colapsar/desplegar la barra lateral
+        self.toggle_sidebar_btn = QPushButton("☰")
+        self.toggle_sidebar_btn.setFixedSize(32, 32)
+        self.toggle_sidebar_btn.setCursor(Qt.PointingHandCursor)
+        self.toggle_sidebar_btn.setToolTip("Mostrar/Ocultar barra lateral")
+        self.toggle_sidebar_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                border: 1px solid {styles.COLORS['border']};
+                border-radius: 6px;
+                font-size: 15px;
+                color: #f8fafc;
+            }}
+            QPushButton:hover {{
+                background-color: {styles.COLORS['bg_card']};
+                border-color: {styles.COLORS['accent_blue']};
+            }}
+        """)
+        self.toggle_sidebar_btn.clicked.connect(self.toggle_sidebar_requested.emit)
+        header_layout.addWidget(self.toggle_sidebar_btn)
+
+        # Título del Tablero
+        self.board_title_label = QLabel("Mi Tablero")
+        self.board_title_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #f8fafc;")
+        header_layout.addWidget(self.board_title_label)
+        header_layout.addStretch()
+
+        self.main_layout.addWidget(self.board_header)
+        self.board_header.hide()
 
         # 1. Contenedor de bienvenida (se muestra si no hay tableros)
         self.welcome_widget = QWidget()
@@ -158,13 +267,15 @@ class BoardViewWidget(QFrame):
         if board_id == -1:
             # Mostrar pantalla de bienvenida
             self.board_scroll_area.hide()
+            self.board_header.hide()
             self.welcome_widget.show()
             self.clear_columns_layout()
             self.setStyleSheet("")
             return
 
-        # Ocultar bienvenida y mostrar scroll area
+        # Ocultar bienvenida y mostrar scroll area y cabecera
         self.welcome_widget.hide()
+        self.board_header.show()
         self.board_scroll_area.show()
         
         self.clear_columns_layout()
@@ -199,6 +310,8 @@ class BoardViewWidget(QFrame):
             col_widget.add_task_requested.connect(self.add_task)
             col_widget.edit_column_requested.connect(self.edit_column)
             col_widget.delete_column_requested.connect(self.delete_column)
+            col_widget.move_column_requested.connect(self.move_column)
+            col_widget.copy_column_requested.connect(self.copy_column)
 
             # Cargar tareas de la columna
             tasks = database.get_tasks(col_data["id"], self.db_path)
@@ -292,6 +405,64 @@ class BoardViewWidget(QFrame):
         )
         if confirm == QMessageBox.Yes:
             database.delete_column(column_id, self.db_path)
+            self.load_board(self.board_id)
+
+    def move_column(self, column_id):
+        """Mueve una columna a otro tablero tras pedir confirmación y selección."""
+        col_widget = self.column_widgets.get(column_id)
+        if not col_widget:
+            return
+            
+        dialog = BoardSelectionDialog(
+            "Mover Columna",
+            "Mover",
+            exclude_board_id=self.board_id,
+            db_path=self.db_path,
+            parent=self
+        )
+        
+        if dialog.exec() == QDialog.Accepted and dialog.selected_board_id is not None:
+            target_board_id = dialog.selected_board_id
+            target_board = database.get_board(target_board_id, self.db_path)
+            board_name = target_board["name"] if target_board else "el tablero seleccionado"
+            
+            database.move_column_to_board(column_id, target_board_id, self.db_path)
+            
+            QMessageBox.information(
+                self,
+                "Columna Mover",
+                f"La columna '{col_widget.column_data['name']}' ha sido movida con éxito a '{board_name}'."
+            )
+            
+            self.load_board(self.board_id)
+
+    def copy_column(self, column_id):
+        """Crea una copia de la columna en otro tablero seleccionado."""
+        col_widget = self.column_widgets.get(column_id)
+        if not col_widget:
+            return
+            
+        dialog = BoardSelectionDialog(
+            "Copiar Columna",
+            "Copiar",
+            exclude_board_id=self.board_id,
+            db_path=self.db_path,
+            parent=self
+        )
+        
+        if dialog.exec() == QDialog.Accepted and dialog.selected_board_id is not None:
+            target_board_id = dialog.selected_board_id
+            target_board = database.get_board(target_board_id, self.db_path)
+            board_name = target_board["name"] if target_board else "el tablero seleccionado"
+            
+            database.copy_column_to_board(column_id, target_board_id, self.db_path)
+            
+            QMessageBox.information(
+                self,
+                "Columna Copiada",
+                f"La columna '{col_widget.column_data['name']}' y todas sus tareas/logs han sido copiadas con éxito a '{board_name}'."
+            )
+            
             self.load_board(self.board_id)
 
     # --- ACCIONES DE TAREAS ---

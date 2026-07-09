@@ -214,7 +214,7 @@ class SidebarWidget(QFrame):
         self.add_btn.clicked.connect(self.add_board)
         btn_layout.addWidget(self.add_btn)
 
-        # Fila de acciones (Editar y Borrar)
+        # Fila de acciones (Editar, Copiar y Borrar)
         action_layout = QHBoxLayout()
         action_layout.setSpacing(6)
 
@@ -222,6 +222,11 @@ class SidebarWidget(QFrame):
         self.edit_btn.setCursor(Qt.PointingHandCursor)
         self.edit_btn.clicked.connect(self.edit_board)
         action_layout.addWidget(self.edit_btn)
+
+        self.copy_btn = QPushButton("📋 Copiar")
+        self.copy_btn.setCursor(Qt.PointingHandCursor)
+        self.copy_btn.clicked.connect(self.copy_board)
+        action_layout.addWidget(self.copy_btn)
 
         self.delete_btn = QPushButton("🗑️ Borrar")
         self.delete_btn.setObjectName("DangerButton")
@@ -316,6 +321,25 @@ class SidebarWidget(QFrame):
             name, color = dialog.get_data()
             database.update_board(self.active_board_id, name, color, self.db_path)
             self.reload_boards(select_board_id=self.active_board_id)
+            self.board_changed.emit()
+
+    def copy_board(self):
+        """Abre el diálogo para copiar el tablero activo con un nuevo nombre."""
+        if not self.active_board_id or self.active_board_id not in self.board_buttons:
+            return
+
+        active_btn = self.board_buttons[self.active_board_id]
+        
+        dialog = BoardEditDialog(
+            "Copiar Tablero",
+            name=f"{active_btn.name} - Copia",
+            color=active_btn.color,
+            parent=self
+        )
+        if dialog.exec() == QDialog.Accepted:
+            name, color = dialog.get_data()
+            new_board_id = database.copy_board(self.active_board_id, name, color, self.db_path)
+            self.reload_boards(select_board_id=new_board_id)
             self.board_changed.emit()
 
     def delete_board(self):

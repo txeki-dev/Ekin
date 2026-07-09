@@ -61,6 +61,9 @@ class MainWindow(QMainWindow):
         # Si cambia algo en los tableros, recargamos el estado
         self.sidebar.board_changed.connect(self.on_board_changed)
 
+        # Conectar señal de colapso de la barra lateral
+        self.board_view.toggle_sidebar_requested.connect(self.toggle_sidebar)
+
         # Cargar tablero seleccionado inicial (se maneja automáticamente por reload_boards() en la sidebar)
         if self.sidebar.active_board_id:
             self.board_view.load_board(self.sidebar.active_board_id)
@@ -70,6 +73,10 @@ class MainWindow(QMainWindow):
         # Si no queda ningún tablero activo
         if self.sidebar.active_board_id is None:
             self.board_view.load_board(-1)
+
+    def toggle_sidebar(self):
+        """Muestra u oculta la barra lateral."""
+        self.sidebar.setVisible(not self.sidebar.isVisible())
 
     def check_onboarding(self):
         """Verifica si es la primera vez que se abre la app y crea datos de ejemplo."""

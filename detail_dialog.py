@@ -1,8 +1,8 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QDate
 from PySide6.QtWidgets import (
     QDialog, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QTextEdit, QPlainTextEdit, QPushButton, QScrollArea, QWidget,
-    QColorDialog, QMessageBox
+    QColorDialog, QMessageBox, QCheckBox, QDateEdit
 )
 from PySide6.QtGui import QKeySequence, QColor, QShortcut
 from datetime import datetime
@@ -78,7 +78,7 @@ class TaskDetailDialog(QDialog):
         super().__init__(parent)
         self.task_id = task_id
         self.db_path = db_path
-        self.tag_color = "#6b7280"  # Color por defecto
+        self.current_tags = []      # Lista de diccionarios {'text': '...', 'color': '...'}
         self.task_deleted = False  # Indica si se borró la tarea desde este diálogo
         
         self.setWindowTitle("Detalles de la Tarea")
@@ -114,37 +114,50 @@ class TaskDetailDialog(QDialog):
         self.desc_input.setPlaceholderText("Añade detalles sobre esta tarea...")
         left_layout.addWidget(self.desc_input)
 
-        # 3. Etiqueta (Tag y Color)
-        tag_section = QWidget()
-        tag_layout = QHBoxLayout(tag_section)
-        tag_layout.setContentsMargins(0, 0, 0, 0)
-        tag_layout.setSpacing(10)
-
-        # Campo de texto de la etiqueta
-        tag_text_widget = QWidget()
-        tag_text_layout = QVBoxLayout(tag_text_widget)
-        tag_text_layout.setContentsMargins(0, 0, 0, 0)
-        tag_text_layout.setSpacing(4)
-        tag_text_layout.addWidget(QLabel("🏷️ <b>Etiqueta (Status/Prioridad)</b>"))
-        self.tag_text_input = QLineEdit()
-        self.tag_text_input.setPlaceholderText("Ej. Alta, En progreso, Idea")
-        tag_text_layout.addWidget(self.tag_text_input)
-        tag_layout.addWidget(tag_text_widget, 3)
-
-        # Botón selector de color de la etiqueta
-        tag_color_widget = QWidget()
-        tag_color_layout = QVBoxLayout(tag_color_widget)
-        tag_color_layout.setContentsMargins(0, 0, 0, 0)
-        tag_color_layout.setSpacing(4)
-        tag_color_layout.addWidget(QLabel("🎨 <b>Color Etiqueta</b>"))
+        # 3. Fecha de Vencimiento
+        due_section = QWidget()
+        due_layout = QHBoxLayout(due_section)
+        due_layout.setContentsMargins(0, 0, 0, 0)
+        due_layout.setSpacing(10)
         
-        self.color_picker_btn = QPushButton("🎨 Seleccionar")
-        self.color_picker_btn.setCursor(Qt.PointingHandCursor)
-        self.color_picker_btn.clicked.connect(self.select_tag_color)
-        tag_color_layout.addWidget(self.color_picker_btn)
-        tag_layout.addWidget(tag_color_widget, 1)
+        due_layout.addWidget(QLabel("📅 <b>Vencimiento:</b>"))
+        
+        self.due_enable_chk = QCheckBox("Habilitar")
+        self.due_enable_chk.setCursor(Qt.PointingHandCursor)
+        self.due_enable_chk.stateChanged.connect(lambda state: self.due_date_edit.setEnabled(self.due_enable_chk.isChecked()))
+        due_layout.addWidget(self.due_enable_chk)
+        
+        self.due_date_edit = QDateEdit()
+        self.due_date_edit.setCalendarPopup(True)
+        self.due_date_edit.setDate(QDate.currentDate())
+        self.due_date_edit.setDisplayFormat("yyyy-MM-dd")
+        self.due_date_edit.setEnabled(False)
+        due_layout.addWidget(self.due_date_edit)
+        due_layout.addStretch()
+        
+        left_layout.addWidget(due_section)
 
-        left_layout.addWidget(tag_section)
+        # 4. Sección de Etiquetas Múltiples
+        tags_section = QWidget()
+        tags_layout = QVBoxLayout(tags_section)
+        tags_layout.setContentsMargins(0, 0, 0, 0)
+        tags_layout.setSpacing(4)
+        
+        tags_layout.addWidget(QLabel("🏷️ <b>Etiquetas:</b>"))
+        
+        self.tags_container_widget = QWidget()
+        self.tags_container_layout = QHBoxLayout(self.tags_container_widget)
+        self.tags_container_layout.setContentsMargins(0, 0, 0, 0)
+        self.tags_container_layout.setSpacing(6)
+        self.tags_container_layout.setAlignment(Qt.AlignLeft)
+        tags_layout.addWidget(self.tags_container_widget)
+        
+        self.add_tag_btn = QPushButton("➕ Nueva Etiqueta")
+        self.add_tag_btn.setCursor(Qt.PointingHandCursor)
+        self.add_tag_btn.clicked.connect(self.add_tag_pill_dialog)
+        tags_layout.addWidget(self.add_tag_btn)
+        
+        left_layout.addWidget(tags_section)
         left_layout.addStretch()
 
         # Botones de Acción de la Tarea (Guardar, Eliminar, Cerrar)
@@ -245,47 +258,169 @@ class TaskDetailDialog(QDialog):
 
         self.title_input.setText(task["title"])
         self.desc_input.setHtml(task["description"] or "")
-        self.tag_text_input.setText(task["tag_text"] or "")
-        self.tag_color = task["tag_color"] or "#6b7280"
-        self.update_color_button_style()
+        
+        # Cargar fecha de vencimiento
+        due_date = task.get("due_date")
+        if due_date:
+            self.due_enable_chk.setChecked(True)
+            self.due_date_edit.setEnabled(True)
+            self.due_date_edit.setDate(QDate.fromString(due_date, "yyyy-MM-dd"))
+        else:
+            self.due_enable_chk.setChecked(False)
+            self.due_date_edit.setEnabled(False)
+            self.due_date_edit.setDate(QDate.currentDate())
+
+        # Cargar etiquetas
+        self.current_tags = task.get("tags", [])
+        self.render_tags()
 
         # Cargar los logs
         self.reload_logs()
 
-    def select_tag_color(self):
-        """Abre un diálogo de color para personalizar la etiqueta."""
-        initial_color = QColor(self.tag_color)
-        color = QColorDialog.getColor(initial_color, self, "Seleccionar Color de Etiqueta")
-        if color.isValid():
-            self.tag_color = color.name()
-            self.update_color_button_style()
+    def render_tags(self):
+        """Dibuja las etiquetas en el contenedor horizontal."""
+        # Limpiar
+        while self.tags_container_layout.count():
+            item = self.tags_container_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
 
-    def update_color_button_style(self):
-        """Actualiza el fondo del botón de color para reflejar la selección actual."""
-        self.color_picker_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {self.tag_color};
-                color: #ffffff;
-                font-weight: bold;
-                border: 1px solid {styles.COLORS['border']};
-            }}
-            QPushButton:hover {{
-                background-color: {self.tag_color};
-                border-color: #ffffff;
-            }}
-        """)
+        # Renderizar cada etiqueta como una píldora con un botón de eliminar
+        for index, tag in enumerate(self.current_tags):
+            pill = QFrame()
+            pill.setObjectName("TagPillFrame")
+            pill.setStyleSheet(f"""
+                #TagPillFrame {{
+                    background-color: {tag['color']};
+                    border-radius: 4px;
+                }}
+            """)
+            pill_layout = QHBoxLayout(pill)
+            pill_layout.setContentsMargins(6, 2, 6, 2)
+            pill_layout.setSpacing(4)
+
+            lbl = QLabel(tag["text"].upper())
+            lbl.setStyleSheet("color: #ffffff; font-size: 9px; font-weight: bold; background: transparent; border: none;")
+            pill_layout.addWidget(lbl)
+
+            del_btn = QPushButton("×")
+            del_btn.setFixedSize(14, 14)
+            del_btn.setCursor(Qt.PointingHandCursor)
+            del_btn.setStyleSheet("""
+                QPushButton {
+                    background: transparent;
+                    border: none;
+                    color: #ffffff;
+                    font-weight: bold;
+                    font-size: 10px;
+                }
+                QPushButton:hover {
+                    color: #ef4444;
+                    background-color: rgba(255, 255, 255, 0.2);
+                    border-radius: 2px;
+                }
+            """)
+            # Usar captura de índice en lambda
+            del_btn.clicked.connect(lambda checked=False, idx=index: self.delete_tag_at(idx))
+            pill_layout.addWidget(del_btn)
+
+            self.tags_container_layout.addWidget(pill)
+
+    def delete_tag_at(self, index):
+        """Elimina una etiqueta localmente y re-renderiza."""
+        if 0 <= index < len(self.current_tags):
+            self.current_tags.pop(index)
+            self.render_tags()
+
+    def add_tag_pill_dialog(self):
+        """Muestra un diálogo modal para añadir una nueva etiqueta."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Nueva Etiqueta")
+        dialog.setFixedSize(260, 150)
+
+        layout = QVBoxLayout(dialog)
+        layout.setSpacing(10)
+        layout.setContentsMargins(15, 15, 15, 15)
+
+        layout.addWidget(QLabel("<b>Texto de la Etiqueta:</b>"))
+        text_input = QLineEdit()
+        text_input.setPlaceholderText("Ej. Alta, Bug, Refactor...")
+        layout.addWidget(text_input)
+
+        # Selector de color
+        color_layout = QHBoxLayout()
+        color_layout.addWidget(QLabel("<b>Color:</b>"))
+
+        color_btn = QPushButton()
+        color_btn.setFixedSize(30, 20)
+        color_btn.setCursor(Qt.PointingHandCursor)
+        selected_color = ["#6b7280"]
+
+        def update_style():
+            color_btn.setStyleSheet(f"background-color: {selected_color[0]}; border: 1px solid {styles.COLORS['border']}; border-radius: 4px;")
+
+        update_style()
+
+        def choose_color():
+            color = QColorDialog.getColor(QColor(selected_color[0]), dialog, "Seleccionar Color")
+            if color.isValid():
+                selected_color[0] = color.name()
+                update_style()
+
+        color_btn.clicked.connect(choose_color)
+        color_layout.addWidget(color_btn)
+        color_layout.addStretch()
+        layout.addLayout(color_layout)
+
+        # Botones de confirmación
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        
+        ok_btn = QPushButton("Añadir")
+        ok_btn.setObjectName("PrimaryButton")
+        ok_btn.clicked.connect(dialog.accept)
+        btn_layout.addWidget(ok_btn)
+
+        cancel_btn = QPushButton("Cancelar")
+        cancel_btn.clicked.connect(dialog.reject)
+        btn_layout.addWidget(cancel_btn)
+        
+        layout.addLayout(btn_layout)
+
+        if dialog.exec() == QDialog.Accepted:
+            text = text_input.text().strip()
+            if text:
+                self.current_tags.append({"text": text, "color": selected_color[0]})
+                self.render_tags()
 
     def save_changes(self):
-        """Guarda el título, descripción, etiqueta y color de la tarea."""
+        """Guarda el título, descripción, etiquetas y fecha de vencimiento."""
         title = self.title_input.text().strip()
         if not title:
             QMessageBox.warning(self, "Atención", "El título de la tarea no puede estar vacío.")
             return
 
         description = self.desc_input.toHtml()
-        tag_text = self.tag_text_input.text().strip()
-        
-        database.update_task(self.task_id, title, description, tag_text, self.tag_color, self.db_path)
+
+        # Obtener fecha de vencimiento
+        due_date = None
+        if self.due_enable_chk.isChecked():
+            due_date = self.due_date_edit.date().toString("yyyy-MM-dd")
+
+        # Mantener compatibilidad con columnas tag_text y tag_color antiguas
+        primary_tag_text = ""
+        primary_tag_color = "#6b7280"
+        if self.current_tags:
+            primary_tag_text = self.current_tags[0]["text"]
+            primary_tag_color = self.current_tags[0]["color"]
+
+        # Guardar tarea principal
+        database.update_task(self.task_id, title, description, primary_tag_text, primary_tag_color, due_date, self.db_path)
+
+        # Guardar múltiples etiquetas
+        database.set_task_tags(self.task_id, self.current_tags, self.db_path)
+
         self.accept()
 
     def delete_task(self):
