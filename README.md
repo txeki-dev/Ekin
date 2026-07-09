@@ -6,9 +6,12 @@ Ekin Kanban is a sleek, resource-friendly, and offline-first personal Kanban boa
 
 ## ✨ Key Features
 - **Offline-First & Serverless**: Runs entirely on your local machine using SQLite. Your data never leaves your computer.
-- **Ultra-lightweight**: Operates with a minimal memory footprint (< 60MB RAM idle) compared to heavy electron-based alternatives.
+- **Ultra-lightweight**: Operates with a minimal memory footprint (< 60MB RAM idle) compared to heavy Electron-based alternatives.
 - **Fluid Drag & Drop**: Native, smooth mouse controls to drag tasks across columns or reorder them.
-- **Task Journaling (Diario)**: A vertical, scrollable timestamped diary inside each task card, perfect for keeping track of daily progress logs.
+- **Task Journaling (Diario)**: A vertical, scrollable, timestamped diary inside each task card, perfect for keeping track of developer progress logs.
+- **Due Dates & Multiple Tags**: Assign due dates using an interactive calendar popup and add multiple custom-colored tag pills to each task.
+- **Collapsible Sidebar**: Hide or reveal the sidebar using the toggle (`☰`) button in the board header to maximize work space.
+- **Column & Board Copying/Moving**: Easily move or copy columns to other boards, or copy complete boards with all sub-tasks, tags, and diaries.
 - **Modern Slate Design**: Out-of-the-box support for a premium dark mode UI, customizable colors for columns, boards, and tags.
 
 ---
@@ -90,16 +93,22 @@ The database (`ekin_board.db`) is automatically initialized on the first run, an
 ### 1. Managing Boards (Sidebar)
 * Use the **Sidebar (left panel)** to switch between different projects or workspaces.
 * Click **➕ Nuevo Tablero** to create a board. You can name it and choose a unique background accent color.
-* Select a board and click **✏️ Editar** to rename or recolor it, or click **🗑️ Borrar** to remove it along with all columns and tasks inside.
+* Select a board and click **✏️ Editar** to rename or recolor it, or click **🗑️ Borrar** to remove it.
+* You can clone an entire board (including its columns, tasks, tags, and diaries) by clicking **✏️ Editar** and selecting the Copy/Clone options.
 
 ### 2. Organizing Columns & Tasks
-* Inside a board, click **➕ Nueva Columna** to create stage headers (e.g., "To-Do", "In Progress", "Done"). You can edit columns at any time by clicking the three dots (**⋮**) in their header.
+* Inside a board, click **➕ Nueva Columna** to create stage headers (e.g., "To-Do", "In Progress", "Done").
+* **Column Actions**: Click the three dots (**⋮**) in a column header to edit its name/color, delete it, **move** it to another board, or **copy** (clone) it and its tasks to another board.
 * Click **➕ Añadir Tarea** at the bottom of any column to quickly add a card.
 * **Drag & Drop**: Click and hold a task card to drag it to another column or change its vertical position.
 
-### 3. Writing in the Developer Diary (Diario)
+### 3. Detail View, Multiple Tags & Due Dates
 * Click on a task card to open the **Detail View**.
-* On the **left panel**, you can change the title, description (supporting Rich Text / HTML), and add a tag pill (like "High Priority" or "Research") with custom colors.
+* On the **left panel**:
+  - Change the task title and rich text description.
+  - Set a **due date** using the calendar popup widget.
+  - Add **multiple tags** with custom colors using the tag list manager.
 * On the **right panel (Diario)**, type notes or updates about what you did, and press `Ctrl + Enter` (or click **✍️ Añadir al Diario**) to post it. Each note is saved with an automatic date and time stamp.
 * Click the red cross (**×**) on any note if you need to remove it.
 * Click **💾 Guardar Cambios** to apply your updates, or click **🗑️ Eliminar** to delete the entire task.
+* Collapse the sidebar using the **☰** button in the top left header bar to maximize workspace size.
