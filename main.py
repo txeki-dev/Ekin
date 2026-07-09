@@ -1,6 +1,8 @@
 import sys
+import os
+import subprocess
 from PySide6.QtWidgets import QApplication, QMainWindow, QSplitter, QWidget, QHBoxLayout, QMessageBox
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QIcon
 import database
 import styles
@@ -20,6 +22,9 @@ class MainWindow(QMainWindow):
         self.check_onboarding()
 
         self.init_ui()
+
+        # Comprobar actualizaciones tras 1 segundo
+        QTimer.singleShot(1000, self.check_for_updates)
 
     def init_ui(self):
         # Widget y layout central
@@ -77,6 +82,66 @@ class MainWindow(QMainWindow):
     def toggle_sidebar(self):
         """Muestra u oculta la barra lateral."""
         self.sidebar.setVisible(not self.sidebar.isVisible())
+
+    def check_for_updates(self):
+        """Verifica de forma silenciosa si hay actualizaciones en el repo de GitHub."""
+        try:
+            startupinfo = None
+            if os.name == 'nt':
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0  # Ocultar ventana de comandos de cmd
+                
+            # 1. Ejecutar git fetch para actualizar referencias de forma silenciosa
+            subprocess.run(
+                ["git", "fetch", "origin"],
+                startupinfo=startupinfo,
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            # 2. Ejecutar git status -uno para ver el estado local vs remoto
+            result = subprocess.run(
+                ["git", "status", "-uno"],
+                startupinfo=startupinfo,
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            # Si la salida contiene "behind", significa que estamos desactualizados
+            if "behind" in result.stdout:
+                confirm = QMessageBox.question(
+                    self,
+                    "Actualización Disponible",
+                    "Hay una nueva versión de Ekin Kanban en GitHub.\n¿Deseas descargarla y reiniciar la aplicación ahora?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.Yes
+                )
+                
+                if confirm == QMessageBox.Yes:
+                    # Ejecutar git pull origin main para descargar cambios
+                    subprocess.run(
+                        ["git", "pull", "origin", "main"],
+                        startupinfo=startupinfo,
+                        capture_output=True,
+                        text=True,
+                        timeout=15
+                    )
+                    
+                    QMessageBox.information(
+                        self,
+                        "Actualizado",
+                        "La aplicación se ha actualizado con éxito. Se reiniciará ahora."
+                    )
+                    
+                    # Reiniciar el script actual de python
+                    os.execv(sys.executable, [sys.executable] + sys.argv)
+                    sys.exit(0)
+        except Exception as e:
+            # Fallar en silencio si no hay conexión o no es una instalación Git
+            print(f"Error al comprobar actualizaciones: {e}")
 
     def check_onboarding(self):
         """Verifica si es la primera vez que se abre la app y crea datos de ejemplo."""
