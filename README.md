@@ -15,49 +15,71 @@ Ekin Kanban is a sleek, resource-friendly, and offline-first personal Kanban boa
 
 ## 🛠️ Setup & Installation
 
+Ekin Kanban can be installed automatically on Windows in one step, or manually on any platform.
+
 ### Prerequisites
-Make sure you have **Python 3.10** or higher installed on your system. You can check your version by running:
-```bash
-python --version
+Before installing, ensure you have **Python 3.10+** and **Git** installed on your system and added to your system PATH.
+* [Download Python](https://www.python.org/downloads/)
+* [Download Git](https://git-scm.com/downloads)
+
+---
+
+### 🚀 Easy Installation (Windows - One Click)
+
+Open **PowerShell** and run the following command to download and execute the automatic installer:
+
+```powershell
+irm https://raw.githubusercontent.com/txeki-dev/Ekin/main/install.ps1 | iex
 ```
 
-### Installation Steps
+**What the installer does:**
+1. Clones this repository into `~/EkinKanban` (your home directory).
+2. Sets up a local Python virtual environment (`venv`).
+3. Installs `PySide6` (the GUI library).
+4. Generates a silent launcher script (`lanzar.bat`).
+5. **Creates a shortcut on your Desktop** labeled **Ekin Kanban** to launch the app instantly without showing background terminal windows.
 
-1. **Download or Clone** the project files to a folder on your computer.
-2. **Open a terminal/command prompt** and navigate to the project directory:
-   ```powershell
-   cd "C:\Users\sergi\Documents\Txek Systems\Ekin"
+---
+
+### 💻 Manual Installation (All Platforms)
+
+If you prefer to install it manually or are using macOS/Linux:
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/txeki-dev/Ekin.git
+   cd Ekin
    ```
-3. **Create a Python Virtual Environment**:
+2. **Create a virtual environment**:
    ```bash
    python -m venv venv
    ```
-4. **Activate the Virtual Environment**:
-   - **Windows (PowerShell)**:
-     ```powershell
-     .\venv\Scripts\Activate.ps1
-     ```
-   - **Windows (Command Prompt - CMD)**:
-     ```cmd
-     .\venv\Scripts\activate.bat
-     ```
-   - **macOS / Linux**:
-     ```bash
-     source venv/bin/activate
-     ```
-5. **Install PySide6 (Qt for Python)**:
+3. **Activate the environment**:
+   - **Windows (PowerShell)**: `.\venv\Scripts\Activate.ps1`
+   - **Windows (CMD)**: `.\venv\Scripts\activate.bat`
+   - **macOS / Linux**: `source venv/bin/activate`
+4. **Install dependencies**:
    ```bash
    pip install PySide6
    ```
 
 ---
 
+## 🔄 Automatic Updates
+
+When you open Ekin Kanban, the application automatically performs a quick, silent check against this GitHub repository in the background. 
+
+If there is a newer version available on the `main` branch, a prompt will ask: 
+> *“Hay una nueva versión de Ekin Kanban en GitHub. ¿Deseas descargarla y reiniciar la aplicación ahora?”*
+
+Clicking **Yes** will pull the updates automatically and restart the app on the spot.
+
+---
+
 ## 🚀 Running Ekin Kanban
 
-Once you have installed the dependency, you can launch the application by running:
-```bash
-python main.py
-```
+* **Windows**: Double-click the **Ekin Kanban** shortcut on your Desktop, or run `lanzar.bat` in the application folder.
+* **Manual/Other Platforms**: Run `python main.py` inside your active virtual environment.
 
 The database (`ekin_board.db`) is automatically initialized on the first run, and a demo board with onboarding columns and cards is generated for you.
 
