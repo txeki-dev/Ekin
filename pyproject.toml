@@ -1,0 +1,21 @@
+[project]
+name = "ekin-kanban"
+version = "0.1.0"
+description = "Ekin Kanban - Sleek, offline-first personal Kanban board with per-task journaling"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "PolyForm-Noncommercial-1.0.0" }
+dependencies = [
+    "PySide6>=6.6.0,<7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[tool.setuptools]
+py-modules = ["main", "database", "board_view", "detail_dialog", "sidebar", "styles", "widgets"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

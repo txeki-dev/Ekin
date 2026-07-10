@@ -63,8 +63,26 @@ If you prefer to install it manually or are using macOS/Linux:
    - **macOS / Linux**: `source venv/bin/activate`
 4. **Install dependencies**:
    ```bash
-   pip install PySide6
+   pip install -e .
    ```
+
+---
+
+## 🧪 Development & Testing
+
+For development, install the optional `dev` dependencies (includes `pytest`):
+
+```bash
+pip install -e ".[dev]"
+```
+
+Run the test suite before opening a pull request:
+
+```bash
+pytest
+```
+
+The tests exercise `database.py` against temporary, isolated SQLite databases (no risk to your local `ekin_board.db`).
 
 ---
 
