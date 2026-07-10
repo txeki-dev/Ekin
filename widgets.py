@@ -6,13 +6,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QDrag, QPixmap, QPainter, QColor, QCursor
 from datetime import datetime
 import styles
-
-def hex_to_rgb(hex_str):
-    """Convierte un color hexadecimal en formato string a una tupla RGB (r, g, b)."""
-    hex_str = hex_str.lstrip('#')
-    if len(hex_str) == 3:
-        hex_str = ''.join(c*2 for c in hex_str)
-    return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
+from styles import hex_to_rgb
 
 
 class FlowLayout(QLayout):
