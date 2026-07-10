@@ -1,6 +1,6 @@
 [project]
 name = "ekin-kanban"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Ekin Kanban - Sleek, offline-first personal Kanban board with per-task journaling"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,7 +15,10 @@ dev = [
 ]
 
 [tool.setuptools]
-py-modules = ["main", "database", "board_view", "detail_dialog", "sidebar", "styles", "widgets"]
+py-modules = ["main", "database", "board_view", "detail_dialog", "sidebar", "styles", "widgets", "version"]
+
+[tool.setuptools.dynamic]
+version = { attr = "version.__version__" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -8,11 +8,12 @@ import database
 import styles
 from sidebar import SidebarWidget
 from board_view import BoardViewWidget
+from version import __version__
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Ekin Kanban - Trello Lite")
+        self.setWindowTitle(f"Ekin Kanban - Trello Lite v{__version__}")
         self.setWindowIcon(QIcon("ekin_icon.png"))
         self.resize(1100, 700)
         self.setMinimumSize(850, 500)
