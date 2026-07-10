@@ -8,11 +8,12 @@ import database
 import styles
 from sidebar import SidebarWidget
 from board_view import BoardViewWidget
+from version import __version__
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Ekin Kanban - Trello Lite")
+        self.setWindowTitle(f"Ekin Kanban - Trello Lite v{__version__}")
         self.setWindowIcon(QIcon("ekin_icon.png"))
         self.resize(1100, 700)
         self.setMinimumSize(850, 500)
@@ -176,11 +177,21 @@ class MainWindow(QMainWindow):
 
 
 def main():
+    if os.name == 'nt':
+        # En Windows, pythonw.exe agrupa la ventana bajo su propio icono genérico en la
+        # barra de tareas a menos que el proceso declare un AppUserModelID propio.
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("EkinKanban.TrelloLite")
+        except Exception:
+            pass
+
     app = QApplication(sys.argv)
-    
+    app.setWindowIcon(QIcon("ekin_icon.png"))
+
     # Aplicar hoja de estilos QSS global
     app.setStyleSheet(styles.QSS)
-    
+
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
