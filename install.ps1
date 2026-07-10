@@ -56,7 +56,7 @@ try {
     $Shortcut = $WshShell.CreateShortcut((Join-Path $DesktopPath "Ekin Kanban.lnk"))
     $Shortcut.TargetPath = (Join-Path $installDir "lanzar.bat")
     $Shortcut.WorkingDirectory = $installDir
-    $Shortcut.IconLocation = (Join-Path $installDir "ekin_icon.png")
+    $Shortcut.IconLocation = (Join-Path $installDir "ekin_icon.ico")
     $Shortcut.Description = "Ekin Kanban Board"
     $Shortcut.Save()
     Write-Host "✨ Acceso directo creado con éxito en tu Escritorio." -ForegroundColor Green

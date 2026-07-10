@@ -177,11 +177,21 @@ class MainWindow(QMainWindow):
 
 
 def main():
+    if os.name == 'nt':
+        # En Windows, pythonw.exe agrupa la ventana bajo su propio icono genérico en la
+        # barra de tareas a menos que el proceso declare un AppUserModelID propio.
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("EkinKanban.TrelloLite")
+        except Exception:
+            pass
+
     app = QApplication(sys.argv)
-    
+    app.setWindowIcon(QIcon("ekin_icon.png"))
+
     # Aplicar hoja de estilos QSS global
     app.setStyleSheet(styles.QSS)
-    
+
     window = MainWindow()
     window.show()
     sys.exit(app.exec())

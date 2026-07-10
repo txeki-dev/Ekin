@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Desktop shortcut created by `install.ps1` now uses a proper multi-resolution `ekin_icon.ico`
+  instead of a `.png` (Windows `.lnk` shortcuts don't render `.png` icons reliably, causing the
+  generic file icon to show instead).
+- Set an explicit Windows `AppUserModelID` on startup so the running app is not grouped under
+  `pythonw.exe`'s generic icon in the taskbar.
+
 ## [0.1.0] - 2026-07-10
 
 ### Added
