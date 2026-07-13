@@ -116,17 +116,18 @@ The database (`ekin_board.db`) is automatically initialized on the first run, an
 
 ### 2. Organizing Columns & Tasks
 * Inside a board, click **➕ Nueva Columna** to create stage headers (e.g., "To-Do", "In Progress", "Done").
-* **Column Actions**: Click the three dots (**⋮**) in a column header to edit its name/color, delete it, **move** it to another board, or **copy** (clone) it and its tasks to another board.
+* **Reorder or move columns**: click and drag a column by its **title** to reorder it within the board, or drop it onto another board's button in the sidebar to move it there.
+* **Column Actions**: Click the three dots (**⋮**) in a column header to edit its name/color, delete it, or **copy** (clone) it and its tasks to another board.
 * Click **➕ Añadir Tarea** at the bottom of any column to quickly add a card.
 * **Drag & Drop**: Click and hold a task card to drag it to another column or change its vertical position.
 
-### 3. Detail View, Multiple Tags & Due Dates
+### 3. Detail View, Structured Tags & Due Dates
 * Click on a task card to open the **Detail View**.
 * On the **left panel**:
-  - Change the task title and rich text description.
+  - Change the task title and description, using the small toolbar for **bold**, *italic*, and bullet-list formatting.
   - Set a **due date** using the calendar popup widget.
-  - Add **multiple tags** with custom colors using the tag list manager.
-* On the **right panel (Diario)**, type notes or updates about what you did, and press `Ctrl + Enter` (or click **✍️ Añadir al Diario**) to post it. Each note is saved with an automatic date and time stamp.
+  - Click **➕ Asignar Etiqueta** to add a tag as a **Category: Value** pair (e.g. "Prioridad: Alta"), with its own color. Reusing an existing value keeps its color consistent everywhere it's used; typing a new one creates it on the fly.
+* On the **right panel (Diario)**, type notes or updates about what you did (with the same bold/italic/bullet formatting toolbar), and press `Ctrl + Enter` (or click **✍️ Añadir al Diario**) to post it. Each note is saved with an automatic date and time stamp.
 * Click the red cross (**×**) on any note if you need to remove it.
 * Click **💾 Guardar Cambios** to apply your updates, or click **🗑️ Eliminar** to delete the entire task.
 * Collapse the sidebar using the **☰** button in the top left header bar to maximize workspace size.

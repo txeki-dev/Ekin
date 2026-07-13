@@ -113,10 +113,13 @@ def test_get_task_includes_tags(db_path):
     board_id = database.create_board("Board", db_path=db_path)
     col_id = database.create_column(board_id, "Col", db_path=db_path)
     task_id = database.create_task(col_id, "Tarea", db_path=db_path)
-    database.set_task_tags(task_id, [{"text": "Bug", "color": "#ff0000"}], db_path=db_path)
+    tag_value_id = database.get_or_create_tag_value("Estado", "Bug", "#ff0000", db_path=db_path)
+    database.set_task_tags(task_id, [tag_value_id], db_path=db_path)
 
     task = database.get_task(task_id, db_path)
-    assert task["tags"] == [{"text": "Bug", "color": "#ff0000"}]
+    assert task["tags"] == [
+        {"tag_value_id": tag_value_id, "category": "Estado", "value": "Bug", "color": "#ff0000"}
+    ]
 
 
 def test_update_task(db_path):
@@ -149,12 +152,42 @@ def test_set_task_tags_replaces_previous_tags(db_path):
     col_id = database.create_column(board_id, "Col", db_path=db_path)
     task_id = database.create_task(col_id, "Tarea", db_path=db_path)
 
-    database.set_task_tags(task_id, [{"text": "Uno", "color": "#111111"}], db_path=db_path)
-    database.set_task_tags(task_id, [{"text": "Dos", "color": "#222222"}], db_path=db_path)
+    uno_id = database.get_or_create_tag_value("Prioridad", "Uno", "#111111", db_path=db_path)
+    dos_id = database.get_or_create_tag_value("Prioridad", "Dos", "#222222", db_path=db_path)
+
+    database.set_task_tags(task_id, [uno_id], db_path=db_path)
+    database.set_task_tags(task_id, [dos_id], db_path=db_path)
 
     tags = database.get_task_tags(task_id, db_path)
     assert len(tags) == 1
-    assert tags[0]["text"] == "Dos"
+    assert tags[0]["value"] == "Dos"
+
+
+# --- Tag categories & values (catálogo de etiquetas estructuradas) ---
+
+def test_get_or_create_tag_value_is_idempotent(db_path):
+    id1 = database.get_or_create_tag_value("Prioridad", "Alta", "#ef4444", db_path=db_path)
+    id2 = database.get_or_create_tag_value("prioridad", "alta", "#000000", db_path=db_path)
+
+    assert id1 == id2
+    # El color original se conserva; no se sobrescribe en la segunda llamada
+    tag = database.get_tag_value(id1, db_path)
+    assert tag["color"] == "#ef4444"
+    assert tag["category"] == "Prioridad"
+    assert tag["value"] == "Alta"
+
+
+def test_get_tag_categories_and_values(db_path):
+    database.get_or_create_tag_value("Prioridad", "Alta", "#ef4444", db_path=db_path)
+    database.get_or_create_tag_value("Prioridad", "Baja", "#22c55e", db_path=db_path)
+    database.get_or_create_tag_value("Estado", "Bloqueado", "#f97316", db_path=db_path)
+
+    categories = database.get_tag_categories(db_path)
+    assert [c["name"] for c in categories] == ["Estado", "Prioridad"]
+
+    prioridad = next(c for c in categories if c["name"] == "Prioridad")
+    values = database.get_tag_values(prioridad["id"], db_path)
+    assert sorted(v["value"] for v in values) == ["Alta", "Baja"]
 
 
 # --- Task positions (drag & drop) ---
@@ -228,7 +261,8 @@ def test_copy_column_to_board_duplicates_tasks_tags_and_logs(db_path):
     board_b = database.create_board("B", db_path=db_path)
     col_id = database.create_column(board_a, "Col", "#ababab", db_path=db_path)
     task_id = database.create_task(col_id, "Tarea", db_path=db_path)
-    database.set_task_tags(task_id, [{"text": "Tag", "color": "#123456"}], db_path=db_path)
+    tag_value_id = database.get_or_create_tag_value("Estado", "Tag", "#123456", db_path=db_path)
+    database.set_task_tags(task_id, [tag_value_id], db_path=db_path)
     database.create_log(task_id, "nota", db_path=db_path)
 
     new_col_id = database.copy_column_to_board(col_id, board_b, db_path=db_path)
@@ -244,7 +278,10 @@ def test_copy_column_to_board_duplicates_tasks_tags_and_logs(db_path):
     assert len(copied_tasks) == 1
     assert copied_tasks[0]["id"] != task_id
     assert copied_tasks[0]["title"] == "Tarea"
-    assert copied_tasks[0]["tags"] == [{"text": "Tag", "color": "#123456"}]
+    # La copia comparte la misma etiqueta del catálogo (no se duplica la definición)
+    assert copied_tasks[0]["tags"] == [
+        {"tag_value_id": tag_value_id, "category": "Estado", "value": "Tag", "color": "#123456"}
+    ]
 
     copied_logs = database.get_logs(copied_tasks[0]["id"], db_path)
     assert [l["content"] for l in copied_logs] == ["nota"]
@@ -254,7 +291,8 @@ def test_copy_board_duplicates_full_hierarchy(db_path):
     board_id = database.create_board("Original", "#654321", db_path=db_path)
     col_id = database.create_column(board_id, "Col", db_path=db_path)
     task_id = database.create_task(col_id, "Tarea", db_path=db_path)
-    database.set_task_tags(task_id, [{"text": "Tag", "color": "#111111"}], db_path=db_path)
+    tag_value_id = database.get_or_create_tag_value("Estado", "Tag", "#111111", db_path=db_path)
+    database.set_task_tags(task_id, [tag_value_id], db_path=db_path)
     database.create_log(task_id, "nota", db_path=db_path)
 
     new_board_id = database.copy_board(board_id, "Copia", "#654321", db_path=db_path)
@@ -267,7 +305,9 @@ def test_copy_board_duplicates_full_hierarchy(db_path):
     new_tasks = database.get_tasks(new_columns[0]["id"], db_path)
     assert len(new_tasks) == 1
     assert new_tasks[0]["id"] != task_id
-    assert new_tasks[0]["tags"] == [{"text": "Tag", "color": "#111111"}]
+    assert new_tasks[0]["tags"] == [
+        {"tag_value_id": tag_value_id, "category": "Estado", "value": "Tag", "color": "#111111"}
+    ]
 
     new_logs = database.get_logs(new_tasks[0]["id"], db_path)
     assert [l["content"] for l in new_logs] == ["nota"]

@@ -98,6 +98,62 @@ def init_db(db_path=DB_NAME):
                     "INSERT INTO task_tags (task_id, text, color) VALUES (?, ?, ?)",
                     (row["id"], row["tag_text"], row["tag_color"])
                 )
+
+        # Tablas para el sistema de etiquetas estructuradas (Categoría: Valor)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS tag_categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS tag_values (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category_id INTEGER NOT NULL,
+                value TEXT NOT NULL,
+                color TEXT NOT NULL DEFAULT '#6b7280',
+                UNIQUE(category_id, value),
+                FOREIGN KEY(category_id) REFERENCES tag_categories(id) ON DELETE CASCADE
+            )
+        """)
+
+        # Migración: enlazar task_tags con tag_values en vez de usar texto/color libres
+        cursor.execute("PRAGMA table_info(task_tags)")
+        task_tags_columns = [row[1] for row in cursor.fetchall()]
+        if "tag_value_id" not in task_tags_columns:
+            cursor.execute(
+                "ALTER TABLE task_tags ADD COLUMN tag_value_id INTEGER REFERENCES tag_values(id) ON DELETE CASCADE"
+            )
+
+            # Migrar las etiquetas de texto libre ya existentes a una categoría "General"
+            cursor.execute("SELECT id, task_id, text, color FROM task_tags WHERE tag_value_id IS NULL")
+            legacy_rows = cursor.fetchall()
+            if legacy_rows:
+                cursor.execute("INSERT OR IGNORE INTO tag_categories (name) VALUES ('General')")
+                cursor.execute("SELECT id FROM tag_categories WHERE name = 'General'")
+                general_category_id = cursor.fetchone()[0]
+
+                value_cache = {}
+                for row in legacy_rows:
+                    cache_key = (row["text"].strip().lower(), row["color"])
+                    if cache_key not in value_cache:
+                        cursor.execute(
+                            "SELECT id FROM tag_values WHERE category_id = ? AND LOWER(value) = LOWER(?)",
+                            (general_category_id, row["text"])
+                        )
+                        existing = cursor.fetchone()
+                        if existing:
+                            value_cache[cache_key] = existing["id"]
+                        else:
+                            cursor.execute(
+                                "INSERT INTO tag_values (category_id, value, color) VALUES (?, ?, ?)",
+                                (general_category_id, row["text"], row["color"])
+                            )
+                            value_cache[cache_key] = cursor.lastrowid
+                    cursor.execute(
+                        "UPDATE task_tags SET tag_value_id = ? WHERE id = ?",
+                        (value_cache[cache_key], row["id"])
+                    )
         conn.commit()
 
 # --- OPERACIONES DE TABLEROS (BOARDS) ---
@@ -209,8 +265,7 @@ def get_tasks(column_id, db_path=DB_NAME):
         )
         tasks = [dict(row) for row in cursor.fetchall()]
         for t in tasks:
-            cursor.execute("SELECT text, color FROM task_tags WHERE task_id = ? ORDER BY id ASC", (t["id"],))
-            t["tags"] = [dict(r) for r in cursor.fetchall()]
+            t["tags"] = get_task_tags(t["id"], db_path)
         return tasks
 
 def get_task(task_id, db_path=DB_NAME):
@@ -224,8 +279,7 @@ def get_task(task_id, db_path=DB_NAME):
         row = cursor.fetchone()
         if row:
             t = dict(row)
-            cursor.execute("SELECT text, color FROM task_tags WHERE task_id = ? ORDER BY id ASC", (t["id"],))
-            t["tags"] = [dict(r) for r in cursor.fetchall()]
+            t["tags"] = get_task_tags(t["id"], db_path)
             return t
         return None
 
@@ -242,19 +296,90 @@ def update_task(task_id, title, description, tag_text, tag_color, due_date, db_p
 def get_task_tags(task_id, db_path=DB_NAME):
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, text, color FROM task_tags WHERE task_id = ? ORDER BY id ASC", (task_id,))
+        cursor.execute(
+            """SELECT tv.id AS tag_value_id, tc.name AS category, tv.value AS value, tv.color AS color
+               FROM task_tags tt
+               JOIN tag_values tv ON tt.tag_value_id = tv.id
+               JOIN tag_categories tc ON tv.category_id = tc.id
+               WHERE tt.task_id = ?
+               ORDER BY tt.id ASC""",
+            (task_id,)
+        )
         return [dict(row) for row in cursor.fetchall()]
 
-def set_task_tags(task_id, tags_list, db_path=DB_NAME):
-    """Establece las etiquetas para una tarea, eliminando las anteriores."""
+def set_task_tags(task_id, tag_value_ids, db_path=DB_NAME):
+    """Establece las etiquetas (ids de tag_values) asignadas a una tarea, eliminando las anteriores."""
     with get_connection(db_path) as conn:
         conn.execute("DELETE FROM task_tags WHERE task_id = ?", (task_id,))
-        for tag in tags_list:
+        for tag_value_id in tag_value_ids:
             conn.execute(
-                "INSERT INTO task_tags (task_id, text, color) VALUES (?, ?, ?)",
-                (task_id, tag["text"], tag["color"])
+                "INSERT INTO task_tags (task_id, tag_value_id, text, color) VALUES (?, ?, '', '#6b7280')",
+                (task_id, tag_value_id)
             )
         conn.commit()
+
+# --- OPERACIONES DE CATEGORÍAS Y VALORES DE ETIQUETAS (TAG_CATEGORIES / TAG_VALUES) ---
+
+def get_tag_categories(db_path=DB_NAME):
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name FROM tag_categories ORDER BY name ASC")
+        return [dict(row) for row in cursor.fetchall()]
+
+def get_tag_values(category_id, db_path=DB_NAME):
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, category_id, value, color FROM tag_values WHERE category_id = ? ORDER BY value ASC",
+            (category_id,)
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+def get_tag_value(tag_value_id, db_path=DB_NAME):
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT tv.id AS tag_value_id, tc.name AS category, tv.value AS value, tv.color AS color
+               FROM tag_values tv
+               JOIN tag_categories tc ON tv.category_id = tc.id
+               WHERE tv.id = ?""",
+            (tag_value_id,)
+        )
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+def get_or_create_tag_value(category_name, value_text, color, db_path=DB_NAME):
+    """Obtiene el id de una etiqueta (categoría + valor), creando la categoría y/o el valor si no existen.
+    Si el valor ya existe, se conserva su color original: el color solo se aplica al crear un valor nuevo."""
+    category_name = category_name.strip()
+    value_text = value_text.strip()
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT id FROM tag_categories WHERE LOWER(name) = LOWER(?)", (category_name,))
+        row = cursor.fetchone()
+        if row:
+            category_id = row["id"]
+        else:
+            cursor.execute("INSERT INTO tag_categories (name) VALUES (?)", (category_name,))
+            category_id = cursor.lastrowid
+
+        cursor.execute(
+            "SELECT id FROM tag_values WHERE category_id = ? AND LOWER(value) = LOWER(?)",
+            (category_id, value_text)
+        )
+        row = cursor.fetchone()
+        if row:
+            tag_value_id = row["id"]
+        else:
+            cursor.execute(
+                "INSERT INTO tag_values (category_id, value, color) VALUES (?, ?, ?)",
+                (category_id, value_text, color)
+            )
+            tag_value_id = cursor.lastrowid
+
+        conn.commit()
+        return tag_value_id
 
 def update_task_position(task_id, new_column_id, new_position, db_path=DB_NAME):
     with get_connection(db_path) as conn:
@@ -388,15 +513,18 @@ def copy_column_to_board(column_id, target_board_id, db_path=DB_NAME):
             )
             new_task_id = cursor.lastrowid
             
-            # Duplicar etiquetas
-            cursor.execute("SELECT text, color FROM task_tags WHERE task_id = ?", (old_task_id,))
-            tags = [dict(row) for row in cursor.fetchall()]
-            for tag in tags:
+            # Duplicar etiquetas (enlazando a las mismas tag_values compartidas del catálogo)
+            cursor.execute(
+                "SELECT tag_value_id FROM task_tags WHERE task_id = ? AND tag_value_id IS NOT NULL",
+                (old_task_id,)
+            )
+            tag_value_ids = [row["tag_value_id"] for row in cursor.fetchall()]
+            for tag_value_id in tag_value_ids:
                 cursor.execute(
-                    "INSERT INTO task_tags (task_id, text, color) VALUES (?, ?, ?)",
-                    (new_task_id, tag["text"], tag["color"])
+                    "INSERT INTO task_tags (task_id, tag_value_id, text, color) VALUES (?, ?, '', '#6b7280')",
+                    (new_task_id, tag_value_id)
                 )
-            
+
             # Obtener logs de la tarea de origen
             cursor.execute(
                 "SELECT content, created_at FROM task_logs WHERE task_id = ? ORDER BY id ASC",
@@ -456,13 +584,16 @@ def copy_board(board_id, new_name, new_color, db_path=DB_NAME):
                 )
                 new_task_id = cursor.lastrowid
                 
-                # Duplicar etiquetas
-                cursor.execute("SELECT text, color FROM task_tags WHERE task_id = ?", (old_task_id,))
-                tags = [dict(row) for row in cursor.fetchall()]
-                for tag in tags:
+                # Duplicar etiquetas (enlazando a las mismas tag_values compartidas del catálogo)
+                cursor.execute(
+                    "SELECT tag_value_id FROM task_tags WHERE task_id = ? AND tag_value_id IS NOT NULL",
+                    (old_task_id,)
+                )
+                tag_value_ids = [row["tag_value_id"] for row in cursor.fetchall()]
+                for tag_value_id in tag_value_ids:
                     cursor.execute(
-                        "INSERT INTO task_tags (task_id, text, color) VALUES (?, ?, ?)",
-                        (new_task_id, tag["text"], tag["color"])
+                        "INSERT INTO task_tags (task_id, tag_value_id, text, color) VALUES (?, ?, '', '#6b7280')",
+                        (new_task_id, tag_value_id)
                     )
                 
                 # 4. Obtener todos los logs de la tarea de origen

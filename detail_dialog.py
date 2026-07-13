@@ -1,13 +1,77 @@
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtWidgets import (
     QDialog, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QTextEdit, QPlainTextEdit, QPushButton, QScrollArea, QWidget,
-    QColorDialog, QMessageBox, QCheckBox, QDateEdit
+    QTextEdit, QPushButton, QScrollArea, QWidget,
+    QColorDialog, QMessageBox, QCheckBox, QDateEdit, QComboBox
 )
-from PySide6.QtGui import QKeySequence, QColor, QShortcut
+from PySide6.QtGui import (
+    QKeySequence, QColor, QShortcut, QFont, QTextCharFormat, QTextListFormat
+)
 from datetime import datetime
 import database
 import styles
+
+
+class RichTextToolbar(QWidget):
+    """Barra de formato básica (negrita, cursiva, viñetas) para un QTextEdit."""
+    def __init__(self, text_edit, parent=None):
+        super().__init__(parent)
+        self.text_edit = text_edit
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+
+        self.bold_btn = QPushButton("N")
+        self.bold_btn.setToolTip("Negrita")
+        self.bold_btn.setCheckable(True)
+        self.bold_btn.setFixedSize(26, 24)
+        self.bold_btn.setStyleSheet("font-weight: bold;")
+        self.bold_btn.clicked.connect(self.toggle_bold)
+        layout.addWidget(self.bold_btn)
+
+        self.italic_btn = QPushButton("K")
+        self.italic_btn.setToolTip("Cursiva")
+        self.italic_btn.setCheckable(True)
+        self.italic_btn.setFixedSize(26, 24)
+        self.italic_btn.setStyleSheet("font-style: italic;")
+        self.italic_btn.clicked.connect(self.toggle_italic)
+        layout.addWidget(self.italic_btn)
+
+        self.bullet_btn = QPushButton("• ≡")
+        self.bullet_btn.setToolTip("Lista con viñetas")
+        self.bullet_btn.setFixedSize(34, 24)
+        self.bullet_btn.clicked.connect(self.toggle_bullets)
+        layout.addWidget(self.bullet_btn)
+
+        layout.addStretch()
+
+        self.text_edit.cursorPositionChanged.connect(self.sync_buttons)
+
+    def toggle_bold(self):
+        fmt = QTextCharFormat()
+        fmt.setFontWeight(QFont.Bold if self.bold_btn.isChecked() else QFont.Normal)
+        self.text_edit.mergeCurrentCharFormat(fmt)
+        self.text_edit.setFocus()
+
+    def toggle_italic(self):
+        fmt = QTextCharFormat()
+        fmt.setFontItalic(self.italic_btn.isChecked())
+        self.text_edit.mergeCurrentCharFormat(fmt)
+        self.text_edit.setFocus()
+
+    def toggle_bullets(self):
+        cursor = self.text_edit.textCursor()
+        list_format = QTextListFormat()
+        list_format.setStyle(QTextListFormat.ListDisc)
+        cursor.createList(list_format)
+        self.text_edit.setFocus()
+
+    def sync_buttons(self):
+        fmt = self.text_edit.currentCharFormat()
+        self.bold_btn.setChecked(fmt.fontWeight() == QFont.Bold)
+        self.italic_btn.setChecked(fmt.fontItalic())
+
 
 class LogEntryWidget(QFrame):
     """Representa una única entrada en el diario/chat de la tarea."""
@@ -73,6 +137,107 @@ class LogEntryWidget(QFrame):
         layout.addWidget(content_label)
 
 
+class TagAssignDialog(QDialog):
+    """Diálogo para asignar una etiqueta estructurada (Categoría: Valor) a una tarea.
+    Permite reutilizar categorías/valores ya existentes en el catálogo o crear nuevos sobre la marcha."""
+    def __init__(self, db_path, parent=None):
+        super().__init__(parent)
+        self.db_path = db_path
+        self.setWindowTitle("Asignar Etiqueta")
+        self.setFixedSize(300, 230)
+
+        self.selected_color = "#6b7280"
+        self.categories = database.get_tag_categories(self.db_path)
+        self.current_values = []
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+        layout.setContentsMargins(15, 15, 15, 15)
+
+        layout.addWidget(QLabel("<b>Categoría</b> (ej. Prioridad, Estado...):"))
+        self.category_combo = QComboBox()
+        self.category_combo.setEditable(True)
+        self.category_combo.addItems([c["name"] for c in self.categories])
+        self.category_combo.setCurrentText("")
+        self.category_combo.editTextChanged.connect(self.on_category_changed)
+        layout.addWidget(self.category_combo)
+
+        layout.addWidget(QLabel("<b>Valor</b> (ej. Alta, Bloqueado...):"))
+        self.value_combo = QComboBox()
+        self.value_combo.setEditable(True)
+        self.value_combo.editTextChanged.connect(self.on_value_changed)
+        layout.addWidget(self.value_combo)
+
+        color_layout = QHBoxLayout()
+        color_layout.addWidget(QLabel("<b>Color:</b>"))
+        self.color_btn = QPushButton()
+        self.color_btn.setFixedSize(30, 20)
+        self.color_btn.setCursor(Qt.PointingHandCursor)
+        self.color_btn.clicked.connect(self.choose_color)
+        self.update_color_btn_style()
+        color_layout.addWidget(self.color_btn)
+        self.color_hint_label = QLabel("")
+        self.color_hint_label.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 10px;")
+        color_layout.addWidget(self.color_hint_label)
+        color_layout.addStretch()
+        layout.addLayout(color_layout)
+
+        layout.addStretch()
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        ok_btn = QPushButton("Añadir")
+        ok_btn.setObjectName("PrimaryButton")
+        ok_btn.clicked.connect(self.validate_and_accept)
+        btn_layout.addWidget(ok_btn)
+        cancel_btn = QPushButton("Cancelar")
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+    def on_category_changed(self, text):
+        category = next((c for c in self.categories if c["name"].lower() == text.strip().lower()), None)
+        self.value_combo.clear()
+        if category:
+            self.current_values = database.get_tag_values(category["id"], self.db_path)
+            self.value_combo.addItems([v["value"] for v in self.current_values])
+        else:
+            self.current_values = []
+        self.value_combo.setCurrentText("")
+
+    def on_value_changed(self, text):
+        match = next((v for v in self.current_values if v["value"].lower() == text.strip().lower()), None)
+        if match:
+            # Un valor ya existente conserva su color de catálogo (consistencia entre tareas)
+            self.selected_color = match["color"]
+            self.color_btn.setEnabled(False)
+            self.color_hint_label.setText("Color existente")
+        else:
+            self.color_btn.setEnabled(True)
+            self.color_hint_label.setText("Nuevo valor")
+        self.update_color_btn_style()
+
+    def choose_color(self):
+        color = QColorDialog.getColor(QColor(self.selected_color), self, "Seleccionar Color")
+        if color.isValid():
+            self.selected_color = color.name()
+            self.update_color_btn_style()
+
+    def update_color_btn_style(self):
+        self.color_btn.setStyleSheet(
+            f"background-color: {self.selected_color}; border: 1px solid {styles.COLORS['border']}; border-radius: 4px;"
+        )
+
+    def validate_and_accept(self):
+        if not self.category_combo.currentText().strip() or not self.value_combo.currentText().strip():
+            QMessageBox.warning(self, "Atención", "Debes indicar una categoría y un valor para la etiqueta.")
+            return
+        self.accept()
+
+    def get_data(self):
+        return self.category_combo.currentText().strip(), self.value_combo.currentText().strip(), self.selected_color
+
+
 class TaskDetailDialog(QDialog):
     def __init__(self, task_id, db_path=database.DB_NAME, parent=None):
         super().__init__(parent)
@@ -112,6 +277,7 @@ class TaskDetailDialog(QDialog):
         left_layout.addWidget(QLabel("📄 <b>Descripción / Notas</b>"))
         self.desc_input = QTextEdit()
         self.desc_input.setPlaceholderText("Añade detalles sobre esta tarea...")
+        left_layout.addWidget(RichTextToolbar(self.desc_input))
         left_layout.addWidget(self.desc_input)
 
         # 3. Fecha de Vencimiento
@@ -152,9 +318,9 @@ class TaskDetailDialog(QDialog):
         self.tags_container_layout.setAlignment(Qt.AlignLeft)
         tags_layout.addWidget(self.tags_container_widget)
         
-        self.add_tag_btn = QPushButton("➕ Nueva Etiqueta")
+        self.add_tag_btn = QPushButton("➕ Asignar Etiqueta")
         self.add_tag_btn.setCursor(Qt.PointingHandCursor)
-        self.add_tag_btn.clicked.connect(self.add_tag_pill_dialog)
+        self.add_tag_btn.clicked.connect(self.assign_tag_dialog)
         tags_layout.addWidget(self.add_tag_btn)
         
         left_layout.addWidget(tags_section)
@@ -222,9 +388,10 @@ class TaskDetailDialog(QDialog):
         input_layout.setContentsMargins(0, 0, 0, 0)
         input_layout.setSpacing(6)
 
-        self.log_input = QPlainTextEdit()
+        self.log_input = QTextEdit()
         self.log_input.setPlaceholderText("Escribe una nota o actualización en el diario... (Ctrl+Enter para guardar)")
-        self.log_input.setFixedHeight(70)
+        self.log_input.setFixedHeight(90)
+        input_layout.addWidget(RichTextToolbar(self.log_input))
         input_layout.addWidget(self.log_input)
 
         log_btn_layout = QHBoxLayout()
@@ -300,7 +467,7 @@ class TaskDetailDialog(QDialog):
             pill_layout.setContentsMargins(6, 2, 6, 2)
             pill_layout.setSpacing(4)
 
-            lbl = QLabel(tag["text"].upper())
+            lbl = QLabel(f"{tag['category']}: {tag['value']}".upper())
             lbl.setStyleSheet("color: #ffffff; font-size: 9px; font-weight: bold; background: transparent; border: none;")
             pill_layout.addWidget(lbl)
 
@@ -333,66 +500,20 @@ class TaskDetailDialog(QDialog):
             self.current_tags.pop(index)
             self.render_tags()
 
-    def add_tag_pill_dialog(self):
-        """Muestra un diálogo modal para añadir una nueva etiqueta."""
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Nueva Etiqueta")
-        dialog.setFixedSize(260, 150)
+    def assign_tag_dialog(self):
+        """Muestra el diálogo para asignar una etiqueta estructurada (Categoría: Valor) a la tarea."""
+        dialog = TagAssignDialog(self.db_path, self)
+        if dialog.exec() != QDialog.Accepted:
+            return
 
-        layout = QVBoxLayout(dialog)
-        layout.setSpacing(10)
-        layout.setContentsMargins(15, 15, 15, 15)
+        category_name, value_text, color = dialog.get_data()
+        tag_value_id = database.get_or_create_tag_value(category_name, value_text, color, self.db_path)
 
-        layout.addWidget(QLabel("<b>Texto de la Etiqueta:</b>"))
-        text_input = QLineEdit()
-        text_input.setPlaceholderText("Ej. Alta, Bug, Refactor...")
-        layout.addWidget(text_input)
+        if any(tag["tag_value_id"] == tag_value_id for tag in self.current_tags):
+            return  # Ya estaba asignada
 
-        # Selector de color
-        color_layout = QHBoxLayout()
-        color_layout.addWidget(QLabel("<b>Color:</b>"))
-
-        color_btn = QPushButton()
-        color_btn.setFixedSize(30, 20)
-        color_btn.setCursor(Qt.PointingHandCursor)
-        selected_color = ["#6b7280"]
-
-        def update_style():
-            color_btn.setStyleSheet(f"background-color: {selected_color[0]}; border: 1px solid {styles.COLORS['border']}; border-radius: 4px;")
-
-        update_style()
-
-        def choose_color():
-            color = QColorDialog.getColor(QColor(selected_color[0]), dialog, "Seleccionar Color")
-            if color.isValid():
-                selected_color[0] = color.name()
-                update_style()
-
-        color_btn.clicked.connect(choose_color)
-        color_layout.addWidget(color_btn)
-        color_layout.addStretch()
-        layout.addLayout(color_layout)
-
-        # Botones de confirmación
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
-        
-        ok_btn = QPushButton("Añadir")
-        ok_btn.setObjectName("PrimaryButton")
-        ok_btn.clicked.connect(dialog.accept)
-        btn_layout.addWidget(ok_btn)
-
-        cancel_btn = QPushButton("Cancelar")
-        cancel_btn.clicked.connect(dialog.reject)
-        btn_layout.addWidget(cancel_btn)
-        
-        layout.addLayout(btn_layout)
-
-        if dialog.exec() == QDialog.Accepted:
-            text = text_input.text().strip()
-            if text:
-                self.current_tags.append({"text": text, "color": selected_color[0]})
-                self.render_tags()
+        self.current_tags.append(database.get_tag_value(tag_value_id, self.db_path))
+        self.render_tags()
 
     def save_changes(self):
         """Guarda el título, descripción, etiquetas y fecha de vencimiento."""
@@ -408,18 +529,13 @@ class TaskDetailDialog(QDialog):
         if self.due_enable_chk.isChecked():
             due_date = self.due_date_edit.date().toString("yyyy-MM-dd")
 
-        # Mantener compatibilidad con columnas tag_text y tag_color antiguas
-        primary_tag_text = ""
-        primary_tag_color = "#6b7280"
-        if self.current_tags:
-            primary_tag_text = self.current_tags[0]["text"]
-            primary_tag_color = self.current_tags[0]["color"]
+        # Guardar tarea principal (las columnas tag_text/tag_color quedan sin uso: las etiquetas
+        # estructuradas viven en task_tags/tag_values)
+        database.update_task(self.task_id, title, description, "", "#6b7280", due_date, self.db_path)
 
-        # Guardar tarea principal
-        database.update_task(self.task_id, title, description, primary_tag_text, primary_tag_color, due_date, self.db_path)
-
-        # Guardar múltiples etiquetas
-        database.set_task_tags(self.task_id, self.current_tags, self.db_path)
+        # Guardar las etiquetas asignadas
+        tag_value_ids = [tag["tag_value_id"] for tag in self.current_tags]
+        database.set_task_tags(self.task_id, tag_value_ids, self.db_path)
 
         self.accept()
 
@@ -457,11 +573,10 @@ class TaskDetailDialog(QDialog):
 
     def add_log_entry(self):
         """Crea una nueva entrada de diario con el texto del input."""
-        content = self.log_input.toPlainText().strip()
-        if not content:
+        if not self.log_input.toPlainText().strip():
             return  # No añadir logs vacíos
 
-        database.create_log(self.task_id, content, self.db_path)
+        database.create_log(self.task_id, self.log_input.toHtml(), self.db_path)
         self.log_input.clear()
         
         # En vez de recargar todo, recargamos para asegurar sincronización limpia

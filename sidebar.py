@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QWidget, QMessageBox, QDialog, QLineEdit, QColorDialog
 )
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QPixmap
 import database
 import styles
 from styles import hex_to_rgb
@@ -12,6 +12,7 @@ from styles import hex_to_rgb
 class BoardButton(QFrame):
     """Widget personalizado para representar un botón de tablero en la barra lateral."""
     clicked = Signal(int)  # Emite el board_id cuando se pulsa
+    column_dropped = Signal(int, int)  # column_id, target_board_id (al soltar una columna arrastrada)
 
     def __init__(self, board_id, name, color, active=False, parent=None):
         super().__init__(parent)
@@ -19,10 +20,11 @@ class BoardButton(QFrame):
         self.name = name
         self.color = color
         self.active = active
-        
+
         self.setCursor(Qt.PointingHandCursor)
         self.setFixedHeight(40)
-        
+        self.setAcceptDrops(True)
+
         self.init_ui()
 
     def init_ui(self):
@@ -75,6 +77,34 @@ class BoardButton(QFrame):
         if event.button() == Qt.LeftButton:
             self.clicked.emit(self.board_id)
         super().mousePressEvent(event)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasFormat("application/x-ekin-column-id"):
+            event.acceptProposedAction()
+            self.setStyleSheet(f"""
+                QFrame {{
+                    background-color: rgba(59, 130, 246, 0.25);
+                    border: 2px dashed {styles.COLORS['accent_blue']};
+                    border-radius: 6px;
+                    color: #f8fafc;
+                }}
+            """)
+        else:
+            event.ignore()
+
+    def dragLeaveEvent(self, event):
+        self.update_style()
+        super().dragLeaveEvent(event)
+
+    def dropEvent(self, event):
+        mime = event.mimeData()
+        if mime.hasFormat("application/x-ekin-column-id"):
+            column_id = int(mime.data("application/x-ekin-column-id").data().decode("utf-8"))
+            event.acceptProposedAction()
+            self.update_style()
+            self.column_dropped.emit(column_id, self.board_id)
+        else:
+            event.ignore()
 
 
 class BoardEditDialog(QDialog):
@@ -172,11 +202,27 @@ class SidebarWidget(QFrame):
         layout.setContentsMargins(10, 20, 10, 10)
         layout.setSpacing(15)
 
-        # Título del panel
-        title_label = QLabel("EKIN KANBAN")
+        # Título del panel (logo + nombre)
+        title_container = QWidget()
+        title_layout = QHBoxLayout(title_container)
+        title_layout.setContentsMargins(0, 0, 0, 0)
+        title_layout.setSpacing(8)
+        title_layout.addStretch()
+
+        logo_label = QLabel()
+        logo_pixmap = QPixmap("ekin_icon.png")
+        if not logo_pixmap.isNull():
+            logo_label.setPixmap(
+                logo_pixmap.scaled(28, 28, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            )
+        title_layout.addWidget(logo_label)
+
+        title_label = QLabel("EKIN")
         title_label.setObjectName("SidebarTitle")
-        title_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(title_label)
+        title_layout.addWidget(title_label)
+
+        title_layout.addStretch()
+        layout.addWidget(title_container)
 
         subtitle_label = QLabel("Mis Tableros")
         subtitle_label.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-weight: bold; margin-left: 8px;")
@@ -265,11 +311,19 @@ class SidebarWidget(QFrame):
             
             btn = BoardButton(board_id, board["name"], board["color"], active=is_active, parent=self)
             btn.clicked.connect(self.select_board)
+            btn.column_dropped.connect(self.handle_column_dropped)
             self.boards_layout.addWidget(btn)
             self.board_buttons[board_id] = btn
 
         # Emitir la selección del tablero activo para que la vista del tablero se cargue
         self.board_selected.emit(self.active_board_id)
+
+    def handle_column_dropped(self, column_id, target_board_id):
+        """Mueve una columna arrastrada desde el tablero activo hasta el botón de otro tablero."""
+        if target_board_id == self.active_board_id:
+            return
+        database.move_column_to_board(column_id, target_board_id, self.db_path)
+        self.reload_boards(select_board_id=self.active_board_id)
 
     def select_board(self, board_id):
         """Cambia el tablero activo, actualiza los estilos visuales de los botones y emite la señal."""
