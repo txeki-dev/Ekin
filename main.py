@@ -1,13 +1,20 @@
 import sys
 import os
 import subprocess
-from PySide6.QtWidgets import QApplication, QMainWindow, QSplitter, QWidget, QHBoxLayout, QMessageBox
+from datetime import date
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QSplitter, QWidget, QHBoxLayout, QMessageBox,
+    QStackedWidget, QSystemTrayIcon, QMenu
+)
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QIcon
 import database
 import styles
 from sidebar import SidebarWidget
 from board_view import BoardViewWidget
+from calendar_view import CalendarViewWidget
+from detail_dialog import TaskDetailDialog
+import ics_export
 from version import __version__
 
 class MainWindow(QMainWindow):
@@ -22,7 +29,18 @@ class MainWindow(QMainWindow):
         database.init_db()
         self.check_onboarding()
 
+        # Contenido del último .ics sincronizado (para no reescribir si no cambió nada)
+        self._last_synced_ics = None
+
         self.init_ui()
+
+        # Bandeja del sistema + notificaciones nativas de Windows
+        self._last_notified = None
+        self.setup_tray()
+        QTimer.singleShot(1500, self.notify_due_today)
+        self._notify_timer = QTimer(self)
+        self._notify_timer.timeout.connect(self._maybe_notify_new_day)
+        self._notify_timer.start(60 * 60 * 1000)  # revisión horaria (por cambio de día)
 
         # Comprobar actualizaciones tras 1 segundo
         QTimer.singleShot(1000, self.check_for_updates)
@@ -51,24 +69,40 @@ class MainWindow(QMainWindow):
         self.sidebar = SidebarWidget(database.DB_NAME, self)
         splitter.addWidget(self.sidebar)
 
-        # 2. Vista de tablero (BoardView)
+        # 2. Área central conmutable: vista de tablero <-> vista de calendario
         self.board_view = BoardViewWidget(database.DB_NAME, self)
-        splitter.addWidget(self.board_view)
+        self.calendar_view = CalendarViewWidget(database.DB_NAME, self)
+
+        self.center_stack = QStackedWidget()
+        self.center_stack.addWidget(self.board_view)     # índice 0
+        self.center_stack.addWidget(self.calendar_view)  # índice 1
+        splitter.addWidget(self.center_stack)
 
         # Proporciones iniciales: 20% para el sidebar, 80% para el tablero
         splitter.setSizes([220, 880])
         splitter.setCollapsible(0, False)  # Evita colapsar completamente el sidebar por arrastre
-        
+
         main_layout.addWidget(splitter)
 
         # Conectar señales entre sidebar y board_view
         self.sidebar.board_selected.connect(self.board_view.load_board)
-        
+
         # Si cambia algo en los tableros, recargamos el estado
         self.sidebar.board_changed.connect(self.on_board_changed)
 
         # Conectar señal de colapso de la barra lateral
         self.board_view.toggle_sidebar_requested.connect(self.toggle_sidebar)
+
+        # Campana de vencimientos y vista de calendario
+        self.sidebar.open_calendar_requested.connect(self.show_calendar_view)
+        self.sidebar.open_task_requested.connect(self.on_notification_task)
+        self.calendar_view.close_requested.connect(self.show_board_view)
+        self.calendar_view.task_activated.connect(self.on_calendar_task)
+
+        # Cuando el tablero (re)carga datos, refrescar campana, calendario y el .ics sincronizado
+        self.board_view.data_changed.connect(self.sidebar.refresh_notifications)
+        self.board_view.data_changed.connect(self.calendar_view.refresh)
+        self.board_view.data_changed.connect(self.sync_ics)
 
         # Cargar tablero seleccionado inicial (se maneja automáticamente por reload_boards() en la sidebar)
         if self.sidebar.active_board_id:
@@ -79,6 +113,112 @@ class MainWindow(QMainWindow):
         # Si no queda ningún tablero activo
         if self.sidebar.active_board_id is None:
             self.board_view.load_board(-1)
+
+    # --- Conmutación entre vista de tablero y calendario ---
+
+    def show_calendar_view(self):
+        self.calendar_view.refresh()
+        self.center_stack.setCurrentWidget(self.calendar_view)
+
+    def show_board_view(self):
+        self.center_stack.setCurrentWidget(self.board_view)
+
+    def _open_task_detail(self, task_id):
+        """Abre el diálogo de detalle de una tarea."""
+        dialog = TaskDetailDialog(task_id, database.DB_NAME, self)
+        dialog.exec()
+
+    def on_notification_task(self, task_id, board_id):
+        """Desde la campana: ir al tablero de la tarea, mostrarlo y abrir su detalle."""
+        self.show_board_view()
+        if board_id and self.sidebar.active_board_id != board_id:
+            self.sidebar.select_board(board_id)
+        self._open_task_detail(task_id)
+        # Refrescar la vista actual y los indicadores tras posibles cambios
+        if self.sidebar.active_board_id:
+            self.board_view.load_board(self.sidebar.active_board_id)
+        self.sidebar.refresh_notifications()
+
+    def on_calendar_task(self, task_id, board_id):
+        """Desde el calendario: abrir el detalle y quedarnos en el calendario."""
+        self._open_task_detail(task_id)
+        self.calendar_view.refresh()
+        self.sidebar.refresh_notifications()
+        self.sync_ics()
+
+    def sync_ics(self):
+        """Si hay una ruta de sincronización configurada, reescribe el .ics (feed suscribible).
+        Solo escribe cuando el contenido ha cambiado, para no generar subidas redundantes
+        en carpetas de Dropbox/OneDrive/Drive."""
+        path = database.get_setting("ics_sync_path", "")
+        if not path:
+            return
+        try:
+            content = ics_export.build_ics(database.DB_NAME)
+            if content == self._last_synced_ics:
+                return
+            with open(path, "w", encoding="utf-8", newline="") as f:
+                f.write(content)
+            self._last_synced_ics = content
+        except Exception as exc:
+            print(f"Error al sincronizar el .ics: {exc}")
+
+    # --- Bandeja del sistema y notificaciones ---
+
+    def setup_tray(self):
+        """Crea el icono de bandeja (habilita toasts nativos de Windows)."""
+        self.tray = QSystemTrayIcon(QIcon("ekin_icon.png"), self)
+        self.tray.setToolTip("Ekin Kanban")
+
+        menu = QMenu()
+        open_action = menu.addAction("Abrir Ekin")
+        open_action.triggered.connect(self.show_and_raise)
+        menu.addSeparator()
+        quit_action = menu.addAction("Salir")
+        quit_action.triggered.connect(QApplication.quit)
+        self.tray.setContextMenu(menu)
+
+        self.tray.activated.connect(self._on_tray_activated)
+        self.tray.messageClicked.connect(self._on_toast_clicked)
+        self.tray.show()
+
+    def _on_tray_activated(self, reason):
+        if reason == QSystemTrayIcon.ActivationReason.Trigger or \
+           reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+            self.show_and_raise()
+
+    def _on_toast_clicked(self):
+        self.show_and_raise()
+        self.sidebar.show_notifications()
+
+    def show_and_raise(self):
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def notify_due_today(self):
+        """Muestra un toast de Windows con las tareas que vencen hoy (si las hay)."""
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            return
+        today = date.today().isoformat()
+        tasks = database.get_scheduled_tasks(today, today)
+        self._last_notified = date.today()
+        if not tasks:
+            return
+        titles = ", ".join(t["title"] for t in tasks[:5])
+        if len(tasks) > 5:
+            titles += "…"
+        self.tray.showMessage(
+            f"Ekin — {len(tasks)} tarea(s) vencen hoy",
+            titles,
+            QSystemTrayIcon.MessageIcon.Information,
+            8000
+        )
+
+    def _maybe_notify_new_day(self):
+        """Con la revisión horaria, notifica de nuevo si ha cambiado el día."""
+        if self._last_notified != date.today():
+            self.notify_due_today()
 
     def toggle_sidebar(self):
         """Muestra u oculta la barra lateral."""

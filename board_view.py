@@ -196,6 +196,7 @@ class BoardSelectionDialog(QDialog):
 
 class BoardViewWidget(QFrame):
     toggle_sidebar_requested = Signal()
+    data_changed = Signal()  # Emitida tras (re)cargar el tablero, para refrescar campana/calendario
 
     def __init__(self, db_path=database.DB_NAME, parent=None):
         super().__init__(parent)
@@ -311,6 +312,7 @@ class BoardViewWidget(QFrame):
             self.welcome_widget.show()
             self.clear_columns_layout()
             self.setStyleSheet("")
+            self.data_changed.emit()
             return
 
         # Ocultar bienvenida y mostrar scroll area y cabecera
@@ -387,8 +389,10 @@ class BoardViewWidget(QFrame):
         add_col_btn.setCursor(Qt.PointingHandCursor)
         add_col_btn.clicked.connect(self.add_column)
         add_col_layout.addWidget(add_col_btn)
-        
+
         self.columns_layout.addWidget(self.add_column_card)
+
+        self.data_changed.emit()
 
     def clear_columns_layout(self):
         """Limpia todos los widgets del layout de columnas."""

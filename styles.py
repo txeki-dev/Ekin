@@ -305,4 +305,129 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
     border: 1px solid {COLORS["border"]};
     border-radius: 6px;
 }}
+
+/* --- Barra de utilidades de la Sidebar (reloj + campana + calendario) --- */
+#UtilityBar {{
+    background-color: {COLORS["bg_main"]};
+    border: 1px solid {COLORS["border"]};
+    border-radius: 8px;
+}}
+
+#ClockLabel {{
+    color: {COLORS["text_muted"]};
+    font-size: 12px;
+    font-weight: bold;
+    background: transparent;
+    border: none;
+}}
+
+#UtilityIconButton {{
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 0px;
+    font-size: 15px;
+}}
+
+#UtilityIconButton:hover {{
+    background-color: {COLORS["bg_card"]};
+    border-color: {COLORS["border"]};
+}}
+
+#UtilityIconButton:pressed {{
+    background-color: {COLORS["bg_sidebar"]};
+}}
+
+#BellBadge {{
+    background-color: {COLORS["danger"]};
+    color: #ffffff;
+    font-size: 9px;
+    font-weight: bold;
+    border-radius: 7px;
+    border: 1px solid {COLORS["bg_main"]};
+}}
+
+/* --- Popup de vencimientos --- */
+#NotificationsPopup {{
+    background-color: {COLORS["bg_sidebar"]};
+    border: 1px solid {COLORS["border"]};
+    border-radius: 8px;
+}}
+
+#NotificationItem {{
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 6px 8px;
+    text-align: left;
+    font-weight: 500;
+}}
+
+#NotificationItem:hover {{
+    background-color: {COLORS["bg_card"]};
+    border-color: {COLORS["accent_blue"]};
+}}
+
+/* --- Vista de Calendario --- */
+#CalendarView {{
+    background-color: {COLORS["bg_main"]};
+}}
+
+#CalendarMonthLabel {{
+    font-size: 18px;
+    font-weight: bold;
+    color: {COLORS["text_main"]};
+}}
+
+#WeekdayHeader {{
+    color: {COLORS["text_muted"]};
+    font-size: 11px;
+    font-weight: bold;
+    padding-bottom: 2px;
+}}
+
+#CalNavButton {{
+    background-color: {COLORS["bg_card"]};
+    border: 1px solid {COLORS["border"]};
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: bold;
+    padding: 0px;
+}}
+
+#CalNavButton:hover {{
+    background-color: {COLORS["accent_blue"]};
+    border-color: {COLORS["accent_blue"]};
+    color: #ffffff;
+}}
+
+#DayCell {{
+    background-color: {COLORS["bg_column"]};
+    border: 1px solid {COLORS["border"]};
+    border-radius: 8px;
+}}
+
+#DayNumber {{
+    color: {COLORS["text_muted"]};
+    font-size: 11px;
+    font-weight: bold;
+    background: transparent;
+    border: none;
+}}
+
+#CalendarChip {{
+    background-color: {COLORS["bg_card"]};
+    border: none;
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 10px;
+    font-weight: 500;
+    text-align: left;
+    color: {COLORS["text_main"]};
+}}
+
+#CalendarChip:hover {{
+    background-color: {COLORS["accent_blue"]};
+    color: #ffffff;
+}}
 """

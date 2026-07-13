@@ -1,12 +1,96 @@
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QTimer, QPoint
 from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QWidget, QMessageBox, QDialog, QLineEdit, QColorDialog
 )
-from PySide6.QtGui import QColor, QPixmap
+from PySide6.QtGui import QColor, QPixmap, QIcon
+from datetime import date, datetime, timedelta
 import database
 import styles
 from styles import hex_to_rgb
+
+# Nombres cortos en español para el reloj (evita depender de la locale del sistema)
+_DIAS = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
+_MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+
+
+def _swatch_icon(color, size=12):
+    """Pequeño icono cuadrado del color indicado (para listar tareas por tablero)."""
+    pix = QPixmap(size, size)
+    pix.fill(QColor(color))
+    return QIcon(pix)
+
+
+class NotificationsPopup(QDialog):
+    """Popup emergente con las tareas cuyo vencimiento es hoy o mañana, agrupadas.
+    Al pulsar una tarea emite `task_activated(task_id, board_id)`."""
+    task_activated = Signal(int, int)
+
+    def __init__(self, tasks, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.Popup)
+        self.setObjectName("NotificationsPopup")
+        self.setFixedWidth(310)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(6)
+
+        header = QLabel("🔔  Vencimientos próximos")
+        header.setStyleSheet("font-weight: bold; font-size: 13px; background: transparent;")
+        layout.addWidget(header)
+
+        if not tasks:
+            empty = QLabel("No hay tareas que venzan hoy ni mañana. ✅")
+            empty.setWordWrap(True)
+            empty.setStyleSheet(f"color: {styles.COLORS['text_muted']}; padding: 8px 2px; background: transparent;")
+            layout.addWidget(empty)
+            return
+
+        today = date.today().isoformat()
+        tomorrow = (date.today() + timedelta(days=1)).isoformat()
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setStyleSheet("background: transparent; border: none;")
+        scroll.setMaximumHeight(360)
+        content = QWidget()
+        content.setStyleSheet("background: transparent;")
+        vbox = QVBoxLayout(content)
+        vbox.setContentsMargins(0, 0, 0, 0)
+        vbox.setSpacing(4)
+        vbox.setAlignment(Qt.AlignTop)
+
+        self._add_group(vbox, "HOY", [t for t in tasks if t["due_date"] == today])
+        self._add_group(vbox, "MAÑANA", [t for t in tasks if t["due_date"] == tomorrow])
+
+        scroll.setWidget(content)
+        layout.addWidget(scroll)
+
+    def _add_group(self, vbox, label, tasks):
+        if not tasks:
+            return
+        group_label = QLabel(label)
+        group_label.setStyleSheet(
+            f"color: {styles.COLORS['text_muted']}; font-size: 10px; font-weight: bold;"
+            " margin-top: 4px; background: transparent;"
+        )
+        vbox.addWidget(group_label)
+        for t in tasks:
+            btn = QPushButton(t["title"] or "(sin título)")
+            btn.setObjectName("NotificationItem")
+            btn.setIcon(_swatch_icon(t["board_color"]))
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setToolTip(f"{t['board_name']} · vence {t['due_date']}")
+            btn.clicked.connect(
+                lambda _=False, tid=t["id"], bid=t["board_id"]: self._activate(tid, bid)
+            )
+            vbox.addWidget(btn)
+
+    def _activate(self, task_id, board_id):
+        self.task_activated.emit(task_id, board_id)
+        self.accept()
 
 
 class BoardButton(QFrame):
@@ -184,18 +268,26 @@ class BoardEditDialog(QDialog):
 
 
 class SidebarWidget(QFrame):
-    board_selected = Signal(int)  # Emite el board_id seleccionado
-    board_changed = Signal()      # Emite cuando se añade/edita/borra un tablero
+    board_selected = Signal(int)          # Emite el board_id seleccionado
+    board_changed = Signal()              # Emite cuando se añade/edita/borra un tablero
+    open_calendar_requested = Signal()    # Emite al pulsar el botón de calendario
+    open_task_requested = Signal(int, int)  # (task_id, board_id) desde la campana
 
     def __init__(self, db_path=database.DB_NAME, parent=None):
         super().__init__(parent)
         self.db_path = db_path
         self.active_board_id = None
         self.board_buttons = {}  # Guarda referencia a {board_id: BoardButton}
-        
+
         self.setObjectName("SidebarFrame")
         self.init_ui()
         self.reload_boards()
+
+        # Reloj: refresco periódico de la fecha/hora
+        self._update_clock()
+        self._clock_timer = QTimer(self)
+        self._clock_timer.timeout.connect(self._update_clock)
+        self._clock_timer.start(10000)  # cada 10 s (precisión de minuto de sobra)
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -223,6 +315,9 @@ class SidebarWidget(QFrame):
 
         title_layout.addStretch()
         layout.addWidget(title_container)
+
+        # --- Barra de utilidades: reloj + campana de vencimientos + calendario ---
+        layout.addWidget(self._build_utility_bar())
 
         subtitle_label = QLabel("Mis Tableros")
         subtitle_label.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-weight: bold; margin-left: 8px;")
@@ -277,6 +372,80 @@ class SidebarWidget(QFrame):
         btn_layout.addLayout(action_layout)
         layout.addLayout(btn_layout)
 
+    def _build_utility_bar(self):
+        """Barra con reloj (fecha/hora), campana de vencimientos y acceso al calendario."""
+        bar = QFrame()
+        bar.setObjectName("UtilityBar")
+        bar_layout = QHBoxLayout(bar)
+        bar_layout.setContentsMargins(10, 6, 8, 6)
+        bar_layout.setSpacing(6)
+
+        self.clock_label = QLabel("")
+        self.clock_label.setObjectName("ClockLabel")
+        bar_layout.addWidget(self.clock_label)
+        bar_layout.addStretch()
+
+        # Campana con badge de conteo superpuesto
+        bell_container = QWidget()
+        bell_container.setFixedSize(34, 28)
+        self.bell_btn = QPushButton("🔔", bell_container)
+        self.bell_btn.setObjectName("UtilityIconButton")
+        self.bell_btn.setGeometry(0, 0, 34, 28)
+        self.bell_btn.setCursor(Qt.PointingHandCursor)
+        self.bell_btn.setToolTip("Tareas que vencen hoy o mañana")
+        self.bell_btn.clicked.connect(self.show_notifications)
+
+        self.bell_badge = QLabel("0", bell_container)
+        self.bell_badge.setObjectName("BellBadge")
+        self.bell_badge.setAlignment(Qt.AlignCenter)
+        self.bell_badge.setFixedSize(15, 15)
+        self.bell_badge.move(19, -1)
+        self.bell_badge.hide()
+        bar_layout.addWidget(bell_container)
+
+        self.calendar_btn = QPushButton("📅")
+        self.calendar_btn.setObjectName("UtilityIconButton")
+        self.calendar_btn.setFixedSize(34, 28)
+        self.calendar_btn.setCursor(Qt.PointingHandCursor)
+        self.calendar_btn.setToolTip("Abrir vista de calendario")
+        self.calendar_btn.clicked.connect(self.open_calendar_requested.emit)
+        bar_layout.addWidget(self.calendar_btn)
+
+        return bar
+
+    def _update_clock(self):
+        now = datetime.now()
+        text = f"{_DIAS[now.weekday()]} {now.day} {_MESES[now.month - 1]} · {now.strftime('%H:%M')}"
+        self.clock_label.setText(text)
+
+    def get_due_soon(self):
+        """Tareas de todos los tableros que vencen hoy o mañana."""
+        today = date.today()
+        tomorrow = today + timedelta(days=1)
+        return database.get_scheduled_tasks(today.isoformat(), tomorrow.isoformat(), db_path=self.db_path)
+
+    def refresh_notifications(self):
+        """Actualiza el badge de la campana según los vencimientos hoy/mañana."""
+        if not hasattr(self, "bell_badge"):
+            return
+        count = len(self.get_due_soon())
+        if count > 0:
+            self.bell_badge.setText(str(count) if count < 10 else "9+")
+            self.bell_badge.show()
+        else:
+            self.bell_badge.hide()
+
+    def show_notifications(self):
+        """Muestra el popup de vencimientos anclado bajo la campana."""
+        popup = NotificationsPopup(self.get_due_soon(), self)
+        popup.task_activated.connect(self._on_notification_task)
+        pos = self.bell_btn.mapToGlobal(QPoint(0, self.bell_btn.height() + 4))
+        popup.move(pos)
+        popup.exec()
+
+    def _on_notification_task(self, task_id, board_id):
+        self.open_task_requested.emit(task_id, board_id)
+
     def reload_boards(self, select_board_id=None):
         """Vuelve a cargar la lista de tableros como widgets personalizados desde la base de datos."""
         # Limpiar contenedor anterior
@@ -292,6 +461,7 @@ class SidebarWidget(QFrame):
         if not boards:
             self.active_board_id = None
             self.board_selected.emit(-1)
+            self.refresh_notifications()
             return
 
         # Si no hay un id seleccionado específico pero había uno activo, intentamos mantenerlo
@@ -317,6 +487,7 @@ class SidebarWidget(QFrame):
 
         # Emitir la selección del tablero activo para que la vista del tablero se cargue
         self.board_selected.emit(self.active_board_id)
+        self.refresh_notifications()
 
     def handle_column_dropped(self, column_id, target_board_id):
         """Mueve una columna arrastrada desde el tablero activo hasta el botón de otro tablero."""

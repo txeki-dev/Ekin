@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-13
+
+### Added
+- Sidebar utility bar with a live date/time clock, a deadline **bell**, and a **calendar** button.
+- Deadline bell: a popup listing tasks due **today or tomorrow across all boards**, grouped by day,
+  with a count badge on the bell. Clicking a task jumps to its board and opens the card.
+- Native **Windows notifications** (via a system-tray icon) for tasks due today, plus a tray menu
+  (Open / Quit) and double-click-to-restore.
+- **Monthly calendar view** (toggled from the sidebar) showing tasks by due date, with month
+  navigation, a "Hoy" shortcut, and per-task chips that open the card; **✖ Cerrar** returns to the
+  board and **⚙ Ajustes** configures sync.
+- **Calendar sync via iCalendar (.ics)**: a one-off export plus an **auto-updated feed** that Ekin
+  keeps current and you subscribe to from Google Calendar, Apple Calendar or Outlook. Events carry a
+  stable per-task `UID` with `SEQUENCE`/`LAST-MODIFIED`, and the file is deterministic (it only
+  changes when task data changes) to avoid spurious re-uploads in cloud-synced folders.
+- `app_settings` key/value table to persist the `.ics` sync path.
+- README guide: "Syncing Your Due Dates with Google Calendar, Apple & Outlook".
+
+### Changed
+- New database helpers: `get_scheduled_tasks`, `get_task_board_id`, `get_setting`/`set_setting`.
+  These (and the new scheduled query) resolve `DB_NAME` at call time, so the module's DB path is
+  actually overridable instead of being frozen at import.
+- `board_view` now emits a `data_changed` signal after (re)loading, which keeps the deadline bell,
+  the calendar view, and the synced `.ics` file in sync automatically.
+
 ## [0.2.0] - 2026-07-13
 
 ### Added

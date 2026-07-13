@@ -117,6 +117,14 @@ def init_db(db_path=DB_NAME):
             )
         """)
 
+        # Ajustes de la aplicación (clave/valor): ruta de sincronización .ics, etc.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )
+        """)
+
         # Migración: enlazar task_tags con tag_values en vez de usar texto/color libres
         cursor.execute("PRAGMA table_info(task_tags)")
         task_tags_columns = [row[1] for row in cursor.fetchall()]
@@ -454,6 +462,81 @@ def delete_tag_value(tag_value_id, db_path=DB_NAME):
     with get_connection(db_path) as conn:
         conn.execute("DELETE FROM tag_values WHERE id = ?", (tag_value_id,))
         conn.commit()
+
+# --- CONSULTAS DE VENCIMIENTOS Y CALENDARIO ---
+
+def get_scheduled_tasks(start_date=None, end_date=None, board_id=None, db_path=None):
+    """Devuelve las tareas con fecha de vencimiento (due_date) junto con su tablero.
+
+    Filtros opcionales:
+      - start_date / end_date: rango inclusivo en formato 'YYYY-MM-DD'.
+      - board_id: limitar a un tablero concreto.
+    Cada elemento incluye sus etiquetas. Ordenado por fecha, tablero y posición.
+    """
+    db_path = db_path or DB_NAME
+    query = [
+        "SELECT t.id, t.title, t.description, t.due_date, t.column_id, t.updated_at,",
+        "       c.board_id AS board_id, b.name AS board_name, b.color AS board_color",
+        "FROM tasks t",
+        "JOIN columns c ON t.column_id = c.id",
+        "JOIN boards b ON c.board_id = b.id",
+        "WHERE t.due_date IS NOT NULL AND t.due_date != ''",
+    ]
+    params = []
+    if start_date is not None:
+        query.append("AND t.due_date >= ?")
+        params.append(start_date)
+    if end_date is not None:
+        query.append("AND t.due_date <= ?")
+        params.append(end_date)
+    if board_id is not None:
+        query.append("AND c.board_id = ?")
+        params.append(board_id)
+    query.append("ORDER BY t.due_date ASC, b.name ASC, t.position ASC")
+
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("\n".join(query), params)
+        tasks = [dict(row) for row in cursor.fetchall()]
+    for t in tasks:
+        t["tags"] = get_task_tags(t["id"], db_path)
+    return tasks
+
+# --- AJUSTES DE LA APLICACIÓN (clave/valor) ---
+
+def get_setting(key, default=None, db_path=None):
+    """Devuelve el valor de un ajuste, o `default` si no está definido."""
+    db_path = db_path or DB_NAME
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM app_settings WHERE key = ?", (key,))
+        row = cursor.fetchone()
+        return row["value"] if row else default
+
+def set_setting(key, value, db_path=None):
+    """Crea o actualiza un ajuste de la aplicación."""
+    db_path = db_path or DB_NAME
+    with get_connection(db_path) as conn:
+        conn.execute(
+            "INSERT INTO app_settings (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, value)
+        )
+        conn.commit()
+
+def get_task_board_id(task_id, db_path=None):
+    """Devuelve el board_id al que pertenece una tarea (o None si no existe)."""
+    db_path = db_path or DB_NAME
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT c.board_id FROM tasks t
+               JOIN columns c ON t.column_id = c.id
+               WHERE t.id = ?""",
+            (task_id,)
+        )
+        row = cursor.fetchone()
+        return row["board_id"] if row else None
 
 def update_task_position(task_id, new_column_id, new_position, db_path=DB_NAME):
     with get_connection(db_path) as conn:

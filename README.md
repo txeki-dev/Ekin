@@ -14,6 +14,8 @@ Ekin Kanban is a sleek, resource-friendly, and offline-first personal Kanban boa
 - **Fluid Drag & Drop**: Native, smooth mouse controls to drag tasks across columns or reorder them.
 - **Task Journaling (Diario)**: A vertical, scrollable, timestamped diary inside each task card, perfect for keeping track of developer progress logs.
 - **Due Dates & Multiple Tags**: Assign due dates using an interactive calendar popup and add multiple custom-colored tag pills to each task.
+- **Calendar View & Reminders**: A monthly calendar of your due dates, a deadline **bell** for tasks due today or tomorrow across all boards, and native **Windows notifications** for what's due today.
+- **Calendar Sync (iCalendar)**: Keep an always-updated `.ics` feed that you can **subscribe** to from Google Calendar, Apple Calendar, or Outlook — additions, edits, and deletions all propagate.
 - **Collapsible Sidebar**: Hide or reveal the sidebar using the toggle (`☰`) button in the board header to maximize work space.
 - **Column & Board Copying/Moving**: Easily move or copy columns to other boards, or copy complete boards with all sub-tasks, tags, and diaries.
 - **Modern Slate Design**: Out-of-the-box support for a premium dark mode UI, customizable colors for columns, boards, and tags.
@@ -135,3 +137,40 @@ The database (`ekin_board.db`) is automatically initialized on the first run, an
 * Click the red cross (**×**) on any note if you need to remove it.
 * Click **💾 Guardar Cambios** to apply your updates, or click **🗑️ Eliminar** to delete the entire task.
 * Collapse the sidebar using the **☰** button in the top left header bar to maximize workspace size.
+
+### 4. Calendar, Reminders & Notifications
+At the top of the sidebar there is a small utility bar:
+* 🕐 A live **date & time** clock.
+* 🔔 A **deadline bell** with a count badge: click it to see the tasks (from **all** boards) whose due date is **today or tomorrow**, grouped by day. Click any of them to jump straight to its board and open the card.
+* 📅 A **calendar button** that switches the main area to a **monthly calendar view**. Navigate months with `‹ › / Hoy`, click a task chip to open its card, and use **✖ Cerrar** to return to the board or **⚙ Ajustes** to configure calendar sync (see below).
+
+When the app starts (and once per day thereafter), Ekin also shows a **native Windows notification** listing the cards that are due today. Ekin lives in the system tray while running — double-click the tray icon to bring the window back.
+
+---
+
+## 📅 Syncing Your Due Dates with Google Calendar, Apple & Outlook
+
+Ekin turns every task that has a due date into an **all-day event** in a standard **iCalendar (`.ics`)** file. There are two ways to use it, reached from **Calendario → ⚙ Ajustes**:
+
+* **⬇ Exportar copia…** — a one-off snapshot you can *import*. Simple, but it's a fixed photo: later changes and deletions are **not** reflected, and re-importing can create duplicates in some apps.
+* **📂 Elegir archivo… (recommended)** — Ekin keeps a single `.ics` **always up to date** (it rewrites it whenever tasks change). You **subscribe** to that file once, and additions/edits/deletions then propagate automatically, with no duplicates.
+
+### Setting up an auto-updating subscription
+1. In Ekin, open **Calendario → ⚙ Ajustes → 📂 Elegir archivo…** and save the `.ics` **inside a cloud-synced folder** (Dropbox, Google Drive, or OneDrive), e.g. `Google Drive/Ekin/ekin.ics`. Ekin keeps it fresh; your cloud client uploads it.
+2. Get a **public, direct-download URL** for that file (this is the step people get wrong — the plain "share" link points to an HTML preview page, which calendars can't read):
+   * **Google Drive** — share the file as **"Anyone with the link → Viewer"**, then build the direct URL from the file ID (the part between `/d/` and `/view`):
+     ```
+     Share link:  https://drive.google.com/file/d/FILE_ID/view?usp=sharing
+     Use instead: https://drive.google.com/uc?export=download&id=FILE_ID
+     ```
+   * **Dropbox** — copy the share link and change its trailing `?dl=0` to **`?dl=1`**.
+   * **Tip:** open your final URL in a private/incognito window — you should see raw text starting with `BEGIN:VCALENDAR`. If you get a login page or an HTML preview, the URL or the sharing permission is wrong.
+3. Subscribe from your calendar app using that URL:
+   * **Google Calendar** (web): *Other calendars* → **+** → **From URL** → paste → **Add calendar**.
+   * **Apple / iOS**: *File → New Calendar Subscription* (Mac), or open the URL on iOS.
+   * **Outlook**: *Add calendar → Subscribe from web*.
+
+### What to expect
+* The calendar **appears within a minute or two** if the URL is valid. If it shows up empty or errors out, it's the URL/permissions — **not** a matter of waiting.
+* **Refresh cadence:** subscribed calendars are re-fetched by the *provider*, not by Ekin. **Google refreshes external URLs slowly — every several hours, up to ~24 h — and this can't be forced.** **Apple Calendar** lets you pick the refresh interval (as fast as every few minutes) against the *same* URL if you want quicker updates.
+* **Sanity check without waiting a day:** add a dated task in Ekin, confirm the local `.ics` updated, and confirm the direct URL (in incognito) shows the new event. If both do, the Ekin → cloud half works instantly; only the provider's refresh is slow.

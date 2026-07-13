@@ -156,3 +156,6 @@ $RECYCLE.BIN/
 ekin_board.db
 *.db
 *.db-journal
+
+# Generated calendar exports (iCalendar)
+*.ics
