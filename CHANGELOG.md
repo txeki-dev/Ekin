@@ -10,17 +10,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 - Drag columns by their title to reorder them within a board, or drop them onto another board's
   button in the sidebar to move them there — replacing the old "Move to another board..." dialog.
-- Structured tags: instead of freeform per-tag text, tags are now a Category + Value pair (e.g.
-  "Prioridad: Alta") drawn from a reusable catalog. Picking an existing value reuses its color;
-  typing a new one creates it on the fly. Rendered as "CATEGORÍA: VALOR" pills everywhere.
+- Structured, permanent tags: tags are a reusable Category + Value pair (e.g. "Prioridad: Alta"),
+  rendered as "CATEGORÍA: VALOR" pills everywhere. A task holds a single value per tag; clicking a
+  pill in the task detail edits its value in place, or sets it to "Ninguno" to hide/remove it (the
+  card only shows tags that have a value). A dedicated tag manager lets you create/rename/delete
+  tags and pre-define each one's palette of values with colors; assigning picks from that catalog.
 - Basic rich text formatting (bold, italic, bullet lists) for both the task description and the
-  diary/chat entries, via a small toolbar above each editor.
+  diary/chat entries, via a small toolbar above each editor. The Bold/Italic buttons are properly
+  styled with an active-state highlight and stay in sync with the native Ctrl+B / Ctrl+I shortcuts.
+  Typing `* `, `- ` or `+ ` at the start of a line auto-creates a bullet list (and `1. ` / `1) ` a
+  numbered list); pressing Enter on an empty item exits the list.
 - Sidebar header now shows the Ekin logo next to "EKIN" instead of plain "EKIN KANBAN" text.
 
 ### Changed
 - `database.set_task_tags()` now takes a list of tag-value ids instead of `{"text", "color"}`
-  dicts; `get_task_tags()`/`get_tasks()`/`get_task()` return `{"tag_value_id", "category", "value",
-  "color"}`. Existing freeform tags are migrated automatically into a "General" category on upgrade.
+  dicts; `get_task_tags()`/`get_tasks()`/`get_task()`/`get_tag_value()` return `{"tag_value_id",
+  "category_id", "category", "value", "color"}`. Existing freeform tags are migrated automatically
+  into a "General" category on upgrade.
+- Tag catalog is now managed explicitly: added `create_tag_category`/`rename_tag_category`/
+  `delete_tag_category`, `create_tag_value`/`update_tag_value`/`delete_tag_value`, and
+  `value_exists_in_category` in `database.py`. Values and colors are defined up front in the tag
+  manager rather than created on the fly while assigning.
 - Diary entries are now stored as rich HTML (from the new formatting toolbar) instead of plain text.
 
 ### Fixed

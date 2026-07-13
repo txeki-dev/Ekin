@@ -297,7 +297,8 @@ def get_task_tags(task_id, db_path=DB_NAME):
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute(
-            """SELECT tv.id AS tag_value_id, tc.name AS category, tv.value AS value, tv.color AS color
+            """SELECT tv.id AS tag_value_id, tc.id AS category_id, tc.name AS category,
+                      tv.value AS value, tv.color AS color
                FROM task_tags tt
                JOIN tag_values tv ON tt.tag_value_id = tv.id
                JOIN tag_categories tc ON tv.category_id = tc.id
@@ -339,7 +340,8 @@ def get_tag_value(tag_value_id, db_path=DB_NAME):
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute(
-            """SELECT tv.id AS tag_value_id, tc.name AS category, tv.value AS value, tv.color AS color
+            """SELECT tv.id AS tag_value_id, tc.id AS category_id, tc.name AS category,
+                      tv.value AS value, tv.color AS color
                FROM tag_values tv
                JOIN tag_categories tc ON tv.category_id = tc.id
                WHERE tv.id = ?""",
@@ -380,6 +382,78 @@ def get_or_create_tag_value(category_name, value_text, color, db_path=DB_NAME):
 
         conn.commit()
         return tag_value_id
+
+# --- GESTIÓN DEL CATÁLOGO DE ETIQUETAS PERMANENTES (categorías y sus valores) ---
+
+def create_tag_category(name, db_path=DB_NAME):
+    """Crea una etiqueta permanente (categoría). Si ya existe (sin distinguir mayúsculas),
+    devuelve el id existente en lugar de duplicarla."""
+    name = name.strip()
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM tag_categories WHERE LOWER(name) = LOWER(?)", (name,))
+        row = cursor.fetchone()
+        if row:
+            return row["id"]
+        cursor.execute("INSERT INTO tag_categories (name) VALUES (?)", (name,))
+        conn.commit()
+        return cursor.lastrowid
+
+def rename_tag_category(category_id, new_name, db_path=DB_NAME):
+    with get_connection(db_path) as conn:
+        conn.execute("UPDATE tag_categories SET name = ? WHERE id = ?", (new_name.strip(), category_id))
+        conn.commit()
+
+def delete_tag_category(category_id, db_path=DB_NAME):
+    """Elimina una etiqueta permanente. En cascada borra sus valores y las asignaciones a tareas."""
+    with get_connection(db_path) as conn:
+        conn.execute("DELETE FROM tag_categories WHERE id = ?", (category_id,))
+        conn.commit()
+
+def create_tag_value(category_id, value, color, db_path=DB_NAME):
+    """Añade un valor (con color) a una etiqueta permanente. Devuelve su id."""
+    value = value.strip()
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO tag_values (category_id, value, color) VALUES (?, ?, ?)",
+            (category_id, value, color)
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+def value_exists_in_category(category_id, value, exclude_value_id=None, db_path=DB_NAME):
+    """Indica si ya existe un valor (comparación sin mayúsculas) en la categoría dada.
+    exclude_value_id permite ignorar un valor concreto (útil al renombrar)."""
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        if exclude_value_id is None:
+            cursor.execute(
+                "SELECT 1 FROM tag_values WHERE category_id = ? AND LOWER(value) = LOWER(?)",
+                (category_id, value.strip())
+            )
+        else:
+            cursor.execute(
+                "SELECT 1 FROM tag_values WHERE category_id = ? AND LOWER(value) = LOWER(?) AND id != ?",
+                (category_id, value.strip(), exclude_value_id)
+            )
+        return cursor.fetchone() is not None
+
+def update_tag_value(tag_value_id, value, color, db_path=DB_NAME):
+    """Actualiza el texto y/o color de un valor. Afecta a todas las tareas que lo usen
+    (comportamiento esperado en una etiqueta permanente)."""
+    with get_connection(db_path) as conn:
+        conn.execute(
+            "UPDATE tag_values SET value = ?, color = ? WHERE id = ?",
+            (value.strip(), color, tag_value_id)
+        )
+        conn.commit()
+
+def delete_tag_value(tag_value_id, db_path=DB_NAME):
+    """Elimina un valor. En cascada se retira de las tareas que lo tuvieran asignado."""
+    with get_connection(db_path) as conn:
+        conn.execute("DELETE FROM tag_values WHERE id = ?", (tag_value_id,))
+        conn.commit()
 
 def update_task_position(task_id, new_column_id, new_position, db_path=DB_NAME):
     with get_connection(db_path) as conn:

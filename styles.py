@@ -192,6 +192,33 @@ QPushButton:pressed {{
     color: {COLORS["text_main"]};
 }}
 
+/* --- Botones de la Barra de Formato de Texto (Negrita, Cursiva, Viñetas) --- */
+#FormatButton {{
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 0px;
+    color: {COLORS["text_muted"]};
+    font-size: 15px;
+}}
+
+#FormatButton:hover {{
+    background-color: {COLORS["bg_card"]};
+    border-color: {COLORS["border"]};
+    color: {COLORS["text_main"]};
+}}
+
+#FormatButton:checked {{
+    background-color: {COLORS["accent_blue"]};
+    border-color: {COLORS["accent_blue"]};
+    color: #ffffff;
+}}
+
+#FormatButton:pressed {{
+    background-color: {COLORS["accent_hover"]};
+    color: #ffffff;
+}}
+
 /* --- Inputs (QLineEdit, QTextEdit) --- */
 QLineEdit, QTextEdit, QPlainTextEdit {{
     background-color: {COLORS["bg_main"]};
@@ -270,5 +297,12 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
 #LogContent {{
     font-size: 12.5px;
     color: {COLORS["text_main"]};
+}}
+
+/* --- Filas de valores en el Gestor de Etiquetas --- */
+#TagValueRow {{
+    background-color: {COLORS["bg_card"]};
+    border: 1px solid {COLORS["border"]};
+    border-radius: 6px;
 }}
 """
