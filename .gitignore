@@ -3,6 +3,9 @@ context.md
 diary.md
 diary_archive.md
 
+# Personal notes (local-only recipes / cheat-sheets)
+versioning.md
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
