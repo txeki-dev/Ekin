@@ -1,0 +1,68 @@
+name: Release on version bump
+
+# Whenever main is updated, read version.py. If there is no git tag for that version
+# yet, create the tag + a GitHub Release with notes pulled from CHANGELOG.md.
+# version.py stays the single, human-controlled source of truth: bump it when you cut
+# a release (alongside moving CHANGELOG [Unreleased] -> the new version), and this
+# workflow publishes it. It only creates tags/releases — it never commits back to main,
+# so there is no risk of a push loop.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history + tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version from version.py
+        id: ver
+        run: |
+          VERSION=$(python3 -c "import re, pathlib; print(re.search(r'__version__\s*=\s*[\"\x27]([^\"\x27]+)[\"\x27]', pathlib.Path('version.py').read_text()).group(1))")
+          if [ -z "$VERSION" ]; then
+            echo "Could not parse version from version.py" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Detected version: $VERSION"
+
+      - name: Skip if tag already exists
+        id: check
+        run: |
+          if git rev-parse -q --verify "refs/tags/v${{ steps.ver.outputs.version }}" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Tag v${{ steps.ver.outputs.version }} already exists — nothing to release."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build release notes from CHANGELOG
+        if: steps.check.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          python3 .github/scripts/extract_release_notes.py "$VERSION" > RELEASE_NOTES.md
+          if [ ! -s RELEASE_NOTES.md ]; then
+            printf 'Release v%s\n\nSee [CHANGELOG.md](CHANGELOG.md) for details.\n' "$VERSION" > RELEASE_NOTES.md
+          fi
+          echo "----- release notes -----"
+          cat RELEASE_NOTES.md
+
+      - name: Create tag and GitHub Release
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          gh release create "v$VERSION" \
+            --target "$GITHUB_SHA" \
+            --title "v$VERSION" \
+            --notes-file RELEASE_NOTES.md

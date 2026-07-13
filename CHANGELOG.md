@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-13
+
 ### Added
 - Drag columns by their title to reorder them within a board, or drop them onto another board's
   button in the sidebar to move them there — replacing the old "Move to another board..." dialog.
