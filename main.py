@@ -164,11 +164,13 @@ class MainWindow(QMainWindow):
                 "- Cambiar el título\n"
                 "- Añadir una descripción\n"
                 "- Configurar etiquetas personalizadas\n"
-                "- Registrar tus avances en el Diario personal (a la derecha)",
-                "Prioridad Alta",
-                "#ef4444"
+                "- Registrar tus avances en el Diario personal (a la derecha)"
             )
-            
+
+            # Asignar una etiqueta de ejemplo (Categoría: Valor)
+            priority_tag_id = database.get_or_create_tag_value("Prioridad", "Alta", "#ef4444")
+            database.set_task_tags(task_id, [priority_tag_id])
+
             # Añadir una nota de diario inicial a la tarea
             database.create_log(
                 task_id,

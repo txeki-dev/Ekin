@@ -10,6 +10,52 @@ from styles import hex_to_rgb
 from widgets import ColumnWidget, TaskCard
 from detail_dialog import TaskDetailDialog
 
+
+class BoardColumnsArea(QWidget):
+    """Contenedor horizontal de columnas que acepta soltar una columna arrastrada para reordenarla."""
+    column_reordered = Signal(int, int)  # column_id, target_position
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasFormat("application/x-ekin-column-id"):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasFormat("application/x-ekin-column-id"):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        mime = event.mimeData()
+        if not mime.hasFormat("application/x-ekin-column-id"):
+            event.ignore()
+            return
+
+        column_id = int(mime.data("application/x-ekin-column-id").data().decode("utf-8"))
+        event.acceptProposedAction()
+
+        drop_x = event.position().x()
+        target_pos = 0
+        layout = self.layout()
+
+        for i in range(layout.count()):
+            widget = layout.itemAt(i).widget()
+            if widget and isinstance(widget, ColumnWidget):
+                col_middle = widget.x() + (widget.width() / 2)
+                if drop_x < col_middle:
+                    target_pos = i
+                    break
+                else:
+                    target_pos = i + 1
+
+        self.column_reordered.emit(column_id, target_pos)
+
 class ColumnEditDialog(QDialog):
     """Diálogo para crear o editar una columna (nombre y color)."""
     def __init__(self, title="Editar Columna", name="", color="#3b82f6", parent=None):
@@ -238,15 +284,16 @@ class BoardViewWidget(QFrame):
         self.board_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.board_scroll_area.setStyleSheet("background-color: transparent; border: none;")
         
-        self.board_content = QWidget()
+        self.board_content = BoardColumnsArea()
         self.board_content.setObjectName("BoardViewContent")
         self.board_content.setStyleSheet("background-color: transparent;")
-        
+        self.board_content.column_reordered.connect(self.handle_column_drop)
+
         self.columns_layout = QHBoxLayout(self.board_content)
         self.columns_layout.setContentsMargins(15, 15, 15, 15)
         self.columns_layout.setSpacing(15)
         self.columns_layout.setAlignment(Qt.AlignLeft)
-        
+
         self.board_scroll_area.setWidget(self.board_content)
         self.main_layout.addWidget(self.board_scroll_area)
         
@@ -303,7 +350,6 @@ class BoardViewWidget(QFrame):
             col_widget.add_task_requested.connect(self.add_task)
             col_widget.edit_column_requested.connect(self.edit_column)
             col_widget.delete_column_requested.connect(self.delete_column)
-            col_widget.move_column_requested.connect(self.move_column)
             col_widget.copy_column_requested.connect(self.copy_column)
 
             # Cargar tareas de la columna
@@ -400,34 +446,27 @@ class BoardViewWidget(QFrame):
             database.delete_column(column_id, self.db_path)
             self.load_board(self.board_id)
 
-    def move_column(self, column_id):
-        """Mueve una columna a otro tablero tras pedir confirmación y selección."""
-        col_widget = self.column_widgets.get(column_id)
-        if not col_widget:
+    def handle_column_drop(self, column_id, target_position):
+        """Reordena las columnas del tablero actual tras arrastrar una por su título."""
+        columns = database.get_columns(self.board_id, self.db_path)
+
+        moved_column = None
+        for c in columns:
+            if c["id"] == column_id:
+                moved_column = c
+                columns.remove(c)
+                break
+
+        if not moved_column:
             return
-            
-        dialog = BoardSelectionDialog(
-            "Mover Columna",
-            "Mover",
-            exclude_board_id=self.board_id,
-            db_path=self.db_path,
-            parent=self
-        )
-        
-        if dialog.exec() == QDialog.Accepted and dialog.selected_board_id is not None:
-            target_board_id = dialog.selected_board_id
-            target_board = database.get_board(target_board_id, self.db_path)
-            board_name = target_board["name"] if target_board else "el tablero seleccionado"
-            
-            database.move_column_to_board(column_id, target_board_id, self.db_path)
-            
-            QMessageBox.information(
-                self,
-                "Columna Mover",
-                f"La columna '{col_widget.column_data['name']}' ha sido movida con éxito a '{board_name}'."
-            )
-            
-            self.load_board(self.board_id)
+
+        insert_idx = min(max(0, target_position), len(columns))
+        columns.insert(insert_idx, moved_column)
+
+        updates = [(c["id"], i) for i, c in enumerate(columns)]
+        database.update_column_positions(updates, self.db_path)
+
+        self.load_board(self.board_id)
 
     def copy_column(self, column_id):
         """Crea una copia de la columna en otro tablero seleccionado."""

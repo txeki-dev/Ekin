@@ -181,10 +181,10 @@ class TaskCard(QFrame):
             if w:
                 w.deleteLater()
 
-        # Añadir las nuevas etiquetas
+        # Añadir las nuevas etiquetas, con formato "Categoría: Valor"
         if tags:
             for tag in tags:
-                lbl = QLabel(tag["text"].upper())
+                lbl = QLabel(f"{tag['category']}: {tag['value']}".upper())
                 lbl.setStyleSheet(
                     f"background-color: {tag['color']}; color: #ffffff; font-size: 9px; font-weight: bold; border-radius: 4px; padding: 2px 5px;"
                 )
@@ -330,13 +330,53 @@ class TaskListArea(QWidget):
             event.ignore()
 
 
+class DraggableColumnTitle(QLabel):
+    """QLabel del título de columna que permite iniciar un arrastre para reordenarla o moverla a otro tablero."""
+    def __init__(self, text, column_widget, parent=None):
+        super().__init__(text, parent)
+        self.column_widget = column_widget
+        self.drag_start_position = QPoint()
+        self.setCursor(Qt.OpenHandCursor)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.drag_start_position = event.position().toPoint()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if not (event.buttons() & Qt.LeftButton):
+            return
+        if (event.position().toPoint() - self.drag_start_position).manhattanLength() < QApplication.startDragDistance():
+            return
+
+        drag = QDrag(self)
+        mime_data = QMimeData()
+        mime_data.setData("application/x-ekin-column-id", str(self.column_widget.column_id).encode("utf-8"))
+        mime_data.setData(
+            "application/x-ekin-column-source-board-id",
+            str(self.column_widget.column_data["board_id"]).encode("utf-8")
+        )
+        drag.setMimeData(mime_data)
+
+        pixmap = QPixmap(self.column_widget.size())
+        pixmap.fill(Qt.transparent)
+        self.column_widget.render(pixmap)
+        drag.setPixmap(pixmap)
+        drag.setHotSpot(self.mapTo(self.column_widget, event.position().toPoint()))
+
+        self.column_widget.hide()
+        drop_action = drag.exec(Qt.MoveAction)
+
+        if drop_action == Qt.IgnoreAction:
+            self.column_widget.show()
+
+
 class ColumnWidget(QFrame):
     # Señales reenviadas
     task_dropped = Signal(int, int, int) # task_id, column_id, position
     add_task_requested = Signal(int)     # column_id
     edit_column_requested = Signal(int) # column_id
     delete_column_requested = Signal(int) # column_id
-    move_column_requested = Signal(int)  # column_id
     copy_column_requested = Signal(int)  # column_id
 
     def __init__(self, column_data, parent=None):
@@ -366,9 +406,10 @@ class ColumnWidget(QFrame):
         header_layout.setContentsMargins(6, 4, 6, 4)
         header_layout.setSpacing(4)
 
-        # Nombre de la columna
-        self.title_label = QLabel(self.column_data["name"])
+        # Nombre de la columna (arrastrable para reordenar o mover a otro tablero)
+        self.title_label = DraggableColumnTitle(self.column_data["name"], self)
         self.title_label.setObjectName("ColumnTitle")
+        self.title_label.setToolTip("Arrastra para reordenar o mover esta columna a otro tablero")
         header_layout.addWidget(self.title_label)
         header_layout.addStretch()
 
@@ -481,16 +522,13 @@ class ColumnWidget(QFrame):
         """)
         
         edit_action = menu.addAction("✏️ Editar Columna")
-        move_action = menu.addAction("📦 Mover a otro tablero...")
         copy_action = menu.addAction("📋 Copiar a otro tablero...")
         menu.addSeparator()
         delete_action = menu.addAction("🗑️ Eliminar Columna")
-        
+
         action = menu.exec(QCursor.pos())
         if action == edit_action:
             self.edit_column_requested.emit(self.column_id)
-        elif action == move_action:
-            self.move_column_requested.emit(self.column_id)
         elif action == copy_action:
             self.copy_column_requested.emit(self.column_id)
         elif action == delete_action:
