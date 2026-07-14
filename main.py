@@ -42,6 +42,13 @@ class MainWindow(QMainWindow):
         self._notify_timer.timeout.connect(self._maybe_notify_new_day)
         self._notify_timer.start(60 * 60 * 1000)  # revisión horaria (por cambio de día)
 
+        # Reescritura de seguridad del .ics cada 5 min mientras la app está abierta.
+        # sync_ics() solo escribe si el contenido ha cambiado, así que es una red de
+        # seguridad barata frente a cualquier cambio que no pasara por load_board.
+        self._sync_timer = QTimer(self)
+        self._sync_timer.timeout.connect(self.sync_ics)
+        self._sync_timer.start(5 * 60 * 1000)
+
         # Comprobar actualizaciones tras 1 segundo
         QTimer.singleShot(1000, self.check_for_updates)
 
