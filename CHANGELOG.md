@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-14
+
 ### Added
 - Safety-net timer that re-writes the synced `.ics` every 5 minutes while the app is open (in
   addition to the existing change-driven writes). It only writes when the content actually changed,
