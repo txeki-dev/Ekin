@@ -117,8 +117,10 @@ def test_get_task_includes_tags(db_path):
     database.set_task_tags(task_id, [tag_value_id], db_path=db_path)
 
     task = database.get_task(task_id, db_path)
+    estado_cat_id = next(c["id"] for c in database.get_tag_categories(db_path) if c["name"] == "Estado")
     assert task["tags"] == [
-        {"tag_value_id": tag_value_id, "category": "Estado", "value": "Bug", "color": "#ff0000"}
+        {"tag_value_id": tag_value_id, "category_id": estado_cat_id,
+         "category": "Estado", "value": "Bug", "color": "#ff0000"}
     ]
 
 
@@ -279,8 +281,10 @@ def test_copy_column_to_board_duplicates_tasks_tags_and_logs(db_path):
     assert copied_tasks[0]["id"] != task_id
     assert copied_tasks[0]["title"] == "Tarea"
     # La copia comparte la misma etiqueta del catálogo (no se duplica la definición)
+    estado_cat_id = next(c["id"] for c in database.get_tag_categories(db_path) if c["name"] == "Estado")
     assert copied_tasks[0]["tags"] == [
-        {"tag_value_id": tag_value_id, "category": "Estado", "value": "Tag", "color": "#123456"}
+        {"tag_value_id": tag_value_id, "category_id": estado_cat_id,
+         "category": "Estado", "value": "Tag", "color": "#123456"}
     ]
 
     copied_logs = database.get_logs(copied_tasks[0]["id"], db_path)
@@ -305,8 +309,10 @@ def test_copy_board_duplicates_full_hierarchy(db_path):
     new_tasks = database.get_tasks(new_columns[0]["id"], db_path)
     assert len(new_tasks) == 1
     assert new_tasks[0]["id"] != task_id
+    estado_cat_id = next(c["id"] for c in database.get_tag_categories(db_path) if c["name"] == "Estado")
     assert new_tasks[0]["tags"] == [
-        {"tag_value_id": tag_value_id, "category": "Estado", "value": "Tag", "color": "#111111"}
+        {"tag_value_id": tag_value_id, "category_id": estado_cat_id,
+         "category": "Estado", "value": "Tag", "color": "#111111"}
     ]
 
     new_logs = database.get_logs(new_tasks[0]["id"], db_path)
@@ -314,3 +320,70 @@ def test_copy_board_duplicates_full_hierarchy(db_path):
 
     # El tablero original sigue intacto
     assert len(database.get_columns(board_id, db_path)) == 1
+
+
+# --- get_task_tags_bulk ---
+
+def test_get_task_tags_bulk_matches_single_and_groups(db_path):
+    board_id = database.create_board("B", db_path=db_path)
+    col_id = database.create_column(board_id, "Col", db_path=db_path)
+    t1 = database.create_task(col_id, "T1", db_path=db_path)
+    t2 = database.create_task(col_id, "T2", db_path=db_path)
+    t3 = database.create_task(col_id, "T3", db_path=db_path)  # sin etiquetas
+    alta = database.get_or_create_tag_value("Prioridad", "Alta", "#ef4444", db_path=db_path)
+    area = database.get_or_create_tag_value("Área", "Backend", "#3b82f6", db_path=db_path)
+    database.set_task_tags(t1, [alta, area], db_path=db_path)
+    database.set_task_tags(t2, [alta], db_path=db_path)
+
+    bulk = database.get_task_tags_bulk([t1, t2, t3], db_path)
+    # Idéntico a la consulta individual, para cada tarea
+    for tid in (t1, t2, t3):
+        assert bulk[tid] == database.get_task_tags(tid, db_path)
+    assert bulk[t3] == []
+    # Entrada vacía es segura
+    assert database.get_task_tags_bulk([], db_path) == {}
+
+
+# --- get_scheduled_tasks / get_task_board_id ---
+
+def test_get_scheduled_tasks_filters_by_range_and_board(db_path):
+    b1 = database.create_board("B1", db_path=db_path)
+    c1 = database.create_column(b1, "Col", db_path=db_path)
+    b2 = database.create_board("B2", db_path=db_path)
+    c2 = database.create_column(b2, "Col", db_path=db_path)
+
+    database.create_task(c1, "Sin fecha", db_path=db_path)
+    t_low = database.create_task(c1, "2026-01-10", due_date="2026-01-10", db_path=db_path)
+    t_mid = database.create_task(c2, "2026-01-15", due_date="2026-01-15", db_path=db_path)
+    t_high = database.create_task(c1, "2026-01-30", due_date="2026-01-30", db_path=db_path)
+
+    # Solo las que tienen fecha, ordenadas ascendentemente
+    allsched = database.get_scheduled_tasks(db_path=db_path)
+    assert [t["id"] for t in allsched] == [t_low, t_mid, t_high]
+    assert allsched[0]["board_name"] == "B1" and allsched[0]["board_color"]
+
+    # Rango inclusivo
+    mid = database.get_scheduled_tasks("2026-01-11", "2026-01-20", db_path=db_path)
+    assert [t["id"] for t in mid] == [t_mid]
+
+    # Filtro por tablero
+    only_b1 = database.get_scheduled_tasks(board_id=b1, db_path=db_path)
+    assert {t["id"] for t in only_b1} == {t_low, t_high}
+
+
+def test_get_task_board_id(db_path):
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "Col", db_path=db_path)
+    t = database.create_task(c, "T", db_path=db_path)
+    assert database.get_task_board_id(t, db_path) == b
+    assert database.get_task_board_id(999999, db_path) is None
+
+
+# --- app_settings (get_setting / set_setting) ---
+
+def test_settings_get_default_set_and_upsert(db_path):
+    assert database.get_setting("missing", "fallback", db_path) == "fallback"
+    database.set_setting("ics_sync_path", "/a/b.ics", db_path)
+    assert database.get_setting("ics_sync_path", "", db_path) == "/a/b.ics"
+    database.set_setting("ics_sync_path", "/c/d.ics", db_path)  # upsert, no duplica
+    assert database.get_setting("ics_sync_path", "", db_path) == "/c/d.ics"

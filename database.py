@@ -272,9 +272,10 @@ def get_tasks(column_id, db_path=DB_NAME):
             (column_id,)
         )
         tasks = [dict(row) for row in cursor.fetchall()]
-        for t in tasks:
-            t["tags"] = get_task_tags(t["id"], db_path)
-        return tasks
+    tags_by_task = get_task_tags_bulk([t["id"] for t in tasks], db_path)
+    for t in tasks:
+        t["tags"] = tags_by_task.get(t["id"], [])
+    return tasks
 
 def get_task(task_id, db_path=DB_NAME):
     with get_connection(db_path) as conn:
@@ -315,6 +316,35 @@ def get_task_tags(task_id, db_path=DB_NAME):
             (task_id,)
         )
         return [dict(row) for row in cursor.fetchall()]
+
+def get_task_tags_bulk(task_ids, db_path=None):
+    """Devuelve {task_id: [etiquetas]} para varias tareas en UNA sola consulta.
+
+    Evita el patrón N+1 (una conexión/consulta por tarea) al cargar tableros,
+    el calendario o la campana. Cada etiqueta tiene la misma forma que en
+    get_task_tags (sin incluir task_id)."""
+    db_path = db_path or DB_NAME
+    result = {tid: [] for tid in task_ids}
+    if not task_ids:
+        return result
+    placeholders = ",".join("?" * len(task_ids))
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""SELECT tt.task_id AS task_id, tv.id AS tag_value_id, tc.id AS category_id,
+                       tc.name AS category, tv.value AS value, tv.color AS color
+                FROM task_tags tt
+                JOIN tag_values tv ON tt.tag_value_id = tv.id
+                JOIN tag_categories tc ON tv.category_id = tc.id
+                WHERE tt.task_id IN ({placeholders})
+                ORDER BY tt.task_id ASC, tt.id ASC""",
+            list(task_ids)
+        )
+        for row in cursor.fetchall():
+            data = dict(row)
+            task_id = data.pop("task_id")
+            result.setdefault(task_id, []).append(data)
+    return result
 
 def set_task_tags(task_id, tag_value_ids, db_path=DB_NAME):
     """Establece las etiquetas (ids de tag_values) asignadas a una tarea, eliminando las anteriores."""
@@ -498,8 +528,9 @@ def get_scheduled_tasks(start_date=None, end_date=None, board_id=None, db_path=N
         cursor = conn.cursor()
         cursor.execute("\n".join(query), params)
         tasks = [dict(row) for row in cursor.fetchall()]
+    tags_by_task = get_task_tags_bulk([t["id"] for t in tasks], db_path)
     for t in tasks:
-        t["tags"] = get_task_tags(t["id"], db_path)
+        t["tags"] = tags_by_task.get(t["id"], [])
     return tasks
 
 # --- AJUSTES DE LA APLICACIÓN (clave/valor) ---

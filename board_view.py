@@ -325,6 +325,7 @@ class BoardViewWidget(QFrame):
         # Obtener información del tablero (incluyendo el color)
         board_info = database.get_board(board_id, self.db_path)
         if board_info:
+            self.board_title_label.setText(board_info["name"])
             board_color = board_info["color"]
             try:
                 r, g, b = hex_to_rgb(board_color)

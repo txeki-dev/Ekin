@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- The board header now shows the selected board's real name instead of a static "Mi Tablero".
+
+### Changed
+- Tag loading is batched to remove an N+1 query: `get_tasks` and `get_scheduled_tasks` now fetch all
+  tags in a single query via the new `get_task_tags_bulk()` helper (cheaper board/calendar/bell loads).
+- Test suite aligned with the current tag shape (`category_id`) and extended with coverage for the
+  scheduled-task queries, `app_settings`, `get_task_board_id`, and bulk tag loading.
+
 ## [0.3.1] - 2026-07-14
 
 ### Added
