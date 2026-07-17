@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-07-17
+
 ### Fixed
 - The board header now shows the selected board's real name instead of a static "Mi Tablero".
 
