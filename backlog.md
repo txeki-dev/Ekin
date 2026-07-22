@@ -19,13 +19,12 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 
 ## 🧹 Code quality & tech debt (found, not yet fixed)
 
-- [ ] **`db_path=DB_NAME` default binding is frozen at import.** ~35 `database.py` functions bind the
-  default at definition time, so reassigning `database.DB_NAME` is silently ignored (only the 4 newest
-  helpers resolve it at call time). Make them all `db_path=None` → `db_path or DB_NAME`, **or** inject
-  the DB path explicitly everywhere (e.g. a small `Database` object). Removes a latent footgun and
-  makes the whole layer testable against temp DBs without monkeypatching. **(P1 — consistency)**
-- [ ] **`TaskListArea.layout` shadows `QWidget.layout()`** (`widgets.py`). It works, but overriding a
-  Qt method with an attribute is fragile. Rename to `list_layout`. **(P2)**
+- [x] **`db_path=DB_NAME` default binding is frozen at import.** *(Done in v0.4.0.)* All 38
+  `database.py` functions now use `db_path=None` → `db_path or DB_NAME`, resolving at call time.
+  Reassigning `database.DB_NAME` is honored everywhere; proven by `test_db_name_is_resolved_at_call_time`.
+  **(P1 — consistency)**
+- [x] **`TaskListArea.layout` shadows `QWidget.layout()`** (`widgets.py`). *(Done in v0.4.0.)* Renamed
+  to `list_layout`. **(P2)**
 - [ ] **Connections are never explicitly closed.** `with get_connection() as conn:` only manages the
   transaction, not closing; CPython refcounting closes them promptly so it's not a real leak, but a
   closing context manager (or a shared connection) would be more robust and faster. **(P2 — perf)**
@@ -35,12 +34,12 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 - [ ] **Duplicated inline stylesheets.** The dark `QMenu` theme, colored swatch buttons and several
   ad-hoc styles are repeated across `widgets.py`/`board_view.py`/`detail_dialog.py`. Centralize in
   `styles.py` via object names. **(P3)**
-- [ ] **Dead `#TaskCardDueDate` object name** — set on the due-date label but has no QSS rule (styled
-  inline instead). Either add the rule or drop the name. **(P3)**
-- [ ] **iCalendar line folding** — continuation lines can be 1 octet over the 75-octet limit (the
-  leading space isn't counted). Harmless for real clients, but tighten for strict RFC 5545. **(P3)**
-- [ ] **Same-column drag reorder** includes the hidden dragged card in the drop-index calc, which can
-  produce an off-by-one when dropping below the original slot. Exclude the dragged card. **(P2 — bug)**
+- [x] **Dead `#TaskCardDueDate` object name** *(Done in v0.4.0.)* — dropped the unused name (label is
+  styled inline). **(P3)**
+- [x] **iCalendar line folding** *(Done in v0.4.0.)* — continuations now cap at 74 content octets so
+  the folded line (incl. the leading space) stays ≤75; unit-tested. **(P3)**
+- [x] **Same-column drag reorder off-by-one** *(Done in v0.4.0.)* — the dragged card is excluded from
+  the drop-index calc (`widgets.compute_drop_index`), with a regression test. **(P2 — bug)**
 - [ ] **Auto-updater uses `git pull`** (`main.py`) — requires git + a clean tree on the user's machine.
   Consider updating from GitHub Release assets (ties into packaging, below). **(P2)**
 
@@ -48,7 +47,8 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 
 ## 🧪 Testing & tooling
 
-- [ ] Tests for `ics_export` (escaping, folding, `SEQUENCE`/`LAST-MODIFIED`, all-day `DTSTART/DTEND`).
+- [x] Tests for `ics_export` (escaping, folding, `SEQUENCE`/`LAST-MODIFIED`, all-day `DTSTART/DTEND`).
+  *(Done in v0.4.0 — `tests/test_ics_export.py`.)*
 - [ ] Headless (offscreen) smoke tests for the Qt widgets (calendar grid, bell popup, settings dialog).
 - [ ] CI workflow running `pytest` on push/PR (currently only the release workflow exists).
 - [ ] `ruff`/`flake8` lint + formatting check in CI.
@@ -58,12 +58,14 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 ## 🚀 Feature backlog for new releases
 
 ### Reminders & calendar (build on 0.3.x)
-- [ ] **Overdue in the bell** — surface past-due tasks (own "Atrasadas" group), not just today/tomorrow.
+- [x] **Overdue in the bell** *(Done in v0.4.0)* — past-due tasks now surface in their own "ATRASADAS"
+  group above today/tomorrow, included in the badge count.
 - [ ] **Time-of-day due + `VALARM`** — optional time on due dates, and reminder alarms in the `.ics`.
-- [ ] **Calendar: drag a task to change its due date**, and a **week/day view**.
+- [x] **Calendar: drag a task to change its due date** *(Done in v0.4.0)*. — a **week/day view** is
+  still pending.
 - [ ] **Calendar: filter by board** + a board color legend.
-- [ ] **"Subscribe in Google" helper** in Ajustes — store the public feed URL and a button that opens
-  Google's *add-by-URL* page and copies the URL (the manual step users trip on).
+- [x] **"Subscribe in Google" helper** in Ajustes *(Done in v0.4.0)* — stores the public feed URL
+  (`ics_public_url`) and a button that copies it and opens Google's *add-by-URL* page.
 - [ ] **Per-board `.ics` feeds** so each board can be a separate subscribable calendar.
 
 ### Task power features
@@ -75,7 +77,8 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 - [ ] **Keyboard shortcuts** — `Esc` to close dialogs, `Ctrl+N` new task, `Ctrl+F` search, arrow nav.
 
 ### Data & safety
-- [ ] **Automatic DB backups** — copy `ekin_board.db` → `.bak` on startup (rotate a few).
+- [x] **Automatic DB backups** *(Done in v0.4.0)* — `backups.py` writes a consistent SQLite snapshot
+  to `backups/` on startup and keeps the 5 most recent.
 - [ ] **Export/report** — dump boards to JSON/CSV or a Markdown project report.
 - [ ] **Board archiving** (hide without deleting).
 
@@ -94,7 +97,8 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 
 ## 🗺️ Suggested next steps
 1. ~~**0.3.2 (patch)** — ship the forensic fixes above.~~ ✅ Released.
-2. **0.4.0** — reminders polish: overdue-in-bell + calendar drag-to-reschedule + "Subscribe in Google"
-   helper; plus automatic DB backups (high value, low effort).
-3. **0.5.0** — global search + subtasks/checklists.
-4. **Ongoing tech debt** — normalize `db_path` handling and add the CI/lint workflow.
+2. ~~**0.4.0** — reminders polish: overdue-in-bell + calendar drag-to-reschedule + "Subscribe in
+   Google" helper; plus automatic DB backups; plus the P1 `db_path` normalization.~~ ✅ Released 2026-07-22.
+3. **0.5.0 (next)** — global search + subtasks/checklists.
+4. **Ongoing tech debt** — CI `pytest`/lint workflow; connection-closing context manager;
+   `data_changed` only on real mutations; centralize duplicated stylesheets.

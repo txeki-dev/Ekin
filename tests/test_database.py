@@ -1,3 +1,4 @@
+import os
 import sqlite3
 import database
 
@@ -135,6 +136,21 @@ def test_update_task(db_path):
     assert task["title"] == "Editada"
     assert task["description"] == "desc"
     assert task["due_date"] == "2026-08-01"
+
+
+def test_update_task_due_date_sets_and_clears(db_path):
+    board_id = database.create_board("Board", db_path=db_path)
+    col_id = database.create_column(board_id, "Col", db_path=db_path)
+    task_id = database.create_task(col_id, "Tarea", due_date="2026-01-01", db_path=db_path)
+
+    database.update_task_due_date(task_id, "2026-02-02", db_path=db_path)
+    assert database.get_task(task_id, db_path)["due_date"] == "2026-02-02"
+
+    # No toca el resto de campos
+    assert database.get_task(task_id, db_path)["title"] == "Tarea"
+
+    database.update_task_due_date(task_id, None, db_path=db_path)
+    assert database.get_task(task_id, db_path)["due_date"] is None
 
 
 def test_delete_task(db_path):
@@ -387,3 +403,19 @@ def test_settings_get_default_set_and_upsert(db_path):
     assert database.get_setting("ics_sync_path", "", db_path) == "/a/b.ics"
     database.set_setting("ics_sync_path", "/c/d.ics", db_path)  # upsert, no duplica
     assert database.get_setting("ics_sync_path", "", db_path) == "/c/d.ics"
+
+
+# --- db_path se resuelve en tiempo de llamada (no congelado al importar) ---
+
+def test_db_name_is_resolved_at_call_time(tmp_path, monkeypatch):
+    """Reasignar database.DB_NAME debe ser respetado por TODAS las funciones cuando
+    se llaman sin db_path explícito (el arreglo P1). monkeypatch lo restaura al final."""
+    target = str(tmp_path / "reassigned.db")
+    monkeypatch.setattr(database, "DB_NAME", target)
+
+    database.init_db()                    # sin db_path -> usa el nuevo DB_NAME
+    board_id = database.create_board("X")  # sin db_path
+    boards = database.get_boards()         # sin db_path
+
+    assert [b["id"] for b in boards] == [board_id]
+    assert os.path.exists(target)          # el archivo se creó en la ruta reasignada

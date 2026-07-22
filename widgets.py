@@ -88,6 +88,21 @@ class FlowLayout(QLayout):
         return y + lineHeight - rect.y() + bottom
 
 
+def compute_drop_index(cards_geom, drop_y, dragged_id):
+    """Índice de inserción para una tarjeta soltada en `drop_y`.
+
+    `cards_geom` es una lista de `(task_id, y, height)` en orden visual. Se EXCLUYE la
+    tarjeta arrastrada (`dragged_id`), que está oculta durante el arrastre: su hueco no
+    debe contar. El índice resultante vive en el mismo espacio (sin la tarjeta movida)
+    que usa `BoardViewWidget.handle_task_drop`, evitando el off-by-one al soltar por
+    debajo de la posición original dentro de la misma columna."""
+    cards = [(tid, y, h) for (tid, y, h) in cards_geom if tid != dragged_id]
+    for idx, (tid, y, h) in enumerate(cards):
+        if drop_y < y + h / 2:
+            return idx
+    return len(cards)
+
+
 class TaskCard(QFrame):
     # Emitido cuando se hace click en la tarjeta (y no se ha arrastrado)
     clicked = Signal(int)  # task_id
@@ -161,8 +176,9 @@ class TaskCard(QFrame):
         self.due_layout.setContentsMargins(0, 0, 0, 0)
         self.due_layout.setSpacing(0)
         
+        # La fecha se estiliza en línea (según esté vencida o no), así que no lleva
+        # objectName: no existe regla QSS para #TaskCardDueDate.
         self.due_label = QLabel()
-        self.due_label.setObjectName("TaskCardDueDate")
         self.due_layout.addWidget(self.due_label)
         self.due_layout.addStretch()  # Empuja la fecha a la izquierda
         self.meta_layout.addWidget(self.due_container)
@@ -279,11 +295,12 @@ class TaskListArea(QWidget):
         super().__init__(parent)
         self.column_id = column_id
         self.setAcceptDrops(True)
-        
-        self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(4, 4, 4, 10)
-        self.layout.setSpacing(8)
-        self.layout.setAlignment(Qt.AlignTop)
+
+        # Nota: no llamar a este atributo `layout`; ensombrecería QWidget.layout().
+        self.list_layout = QVBoxLayout(self)
+        self.list_layout.setContentsMargins(4, 4, 4, 10)
+        self.list_layout.setSpacing(8)
+        self.list_layout.setAlignment(Qt.AlignTop)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasFormat("application/x-ekin-task-id"):
@@ -308,23 +325,18 @@ class TaskListArea(QWidget):
             task_id = int(mime.data("application/x-ekin-task-id").data().decode("utf-8"))
             event.acceptProposedAction()
             self.drag_left.emit()
-            
-            # Calcular la posición de inserción en base al eje Y
+
+            # Calcular la posición de inserción en base al eje Y. La lógica (excluyendo la
+            # tarjeta arrastrada, que está oculta) vive en compute_drop_index para poder
+            # probarla de forma determinista.
             drop_y = event.position().y()
-            target_pos = 0
-            
-            # Iterar sobre las tarjetas existentes en el layout para ver dónde encajar la nueva
-            for i in range(self.layout.count()):
-                widget = self.layout.itemAt(i).widget()
-                if widget and isinstance(widget, TaskCard):
-                    # Si el drop se hizo por encima de la mitad de esta tarjeta
-                    card_middle = widget.y() + (widget.height() / 2)
-                    if drop_y < card_middle:
-                        target_pos = i
-                        break
-                    else:
-                        target_pos = i + 1
-            
+            cards_geom = []
+            for i in range(self.list_layout.count()):
+                w = self.list_layout.itemAt(i).widget()
+                if isinstance(w, TaskCard):
+                    cards_geom.append((w.task_id, w.y(), w.height()))
+
+            target_pos = compute_drop_index(cards_geom, drop_y, task_id)
             self.task_dropped.emit(task_id, self.column_id, target_pos)
         else:
             event.ignore()
@@ -537,12 +549,12 @@ class ColumnWidget(QFrame):
     def clear_tasks(self):
         """Elimina todos los widgets de tarea de la columna."""
         # Limpiar el layout
-        while self.list_area.layout.count():
-            item = self.list_area.layout.takeAt(0)
+        while self.list_area.list_layout.count():
+            item = self.list_area.list_layout.takeAt(0)
             widget = item.widget()
             if widget:
                 widget.deleteLater()
 
     def add_task_card(self, card_widget):
         """Añade una tarjeta de tarea a la columna."""
-        self.list_area.layout.addWidget(card_widget)
+        self.list_area.list_layout.addWidget(card_widget)

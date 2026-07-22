@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QIcon
 import database
+import backups
 import styles
 from sidebar import SidebarWidget
 from board_view import BoardViewWidget
@@ -25,6 +26,14 @@ class MainWindow(QMainWindow):
         self.resize(1100, 700)
         self.setMinimumSize(850, 500)
         
+        # Copia de seguridad automática ANTES de inicializar (así se guarda una
+        # instantánea previa a cualquier migración de esquema). No-op en el primer
+        # arranque, cuando la base de datos aún no existe.
+        try:
+            backups.backup_database(database.DB_NAME)
+        except Exception as exc:
+            print(f"No se pudo crear la copia de seguridad: {exc}")
+
         # Inicializar base de datos
         database.init_db()
         self.check_onboarding()
@@ -105,6 +114,9 @@ class MainWindow(QMainWindow):
         self.sidebar.open_task_requested.connect(self.on_notification_task)
         self.calendar_view.close_requested.connect(self.show_board_view)
         self.calendar_view.task_activated.connect(self.on_calendar_task)
+        # Reprogramar una tarea arrastrándola en el calendario refresca campana y .ics
+        self.calendar_view.data_changed.connect(self.sidebar.refresh_notifications)
+        self.calendar_view.data_changed.connect(self.sync_ics)
 
         # Cuando el tablero (re)carga datos, refrescar campana, calendario y el .ics sincronizado
         self.board_view.data_changed.connect(self.sidebar.refresh_notifications)

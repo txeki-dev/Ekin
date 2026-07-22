@@ -157,5 +157,9 @@ ekin_board.db
 *.db
 *.db-journal
 
+# Automatic database backups (created at startup)
+backups/
+*.bak
+
 # Generated calendar exports (iCalendar)
 *.ics

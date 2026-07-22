@@ -22,7 +22,7 @@ def _swatch_icon(color, size=12):
 
 
 class NotificationsPopup(QDialog):
-    """Popup emergente con las tareas cuyo vencimiento es hoy o mañana, agrupadas.
+    """Popup emergente con las tareas atrasadas o que vencen hoy o mañana, agrupadas.
     Al pulsar una tarea emite `task_activated(task_id, board_id)`."""
     task_activated = Signal(int, int)
 
@@ -36,12 +36,12 @@ class NotificationsPopup(QDialog):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(6)
 
-        header = QLabel("🔔  Vencimientos próximos")
+        header = QLabel("🔔  Vencimientos")
         header.setStyleSheet("font-weight: bold; font-size: 13px; background: transparent;")
         layout.addWidget(header)
 
         if not tasks:
-            empty = QLabel("No hay tareas que venzan hoy ni mañana. ✅")
+            empty = QLabel("No hay tareas atrasadas ni próximas. ✅")
             empty.setWordWrap(True)
             empty.setStyleSheet(f"color: {styles.COLORS['text_muted']}; padding: 8px 2px; background: transparent;")
             layout.addWidget(empty)
@@ -62,18 +62,22 @@ class NotificationsPopup(QDialog):
         vbox.setSpacing(4)
         vbox.setAlignment(Qt.AlignTop)
 
+        # Atrasadas = con fecha anterior a hoy. Se muestran arriba y en tono de alerta.
+        self._add_group(vbox, "ATRASADAS", [t for t in tasks if t["due_date"] < today],
+                        color=styles.COLORS["danger"])
         self._add_group(vbox, "HOY", [t for t in tasks if t["due_date"] == today])
         self._add_group(vbox, "MAÑANA", [t for t in tasks if t["due_date"] == tomorrow])
 
         scroll.setWidget(content)
         layout.addWidget(scroll)
 
-    def _add_group(self, vbox, label, tasks):
+    def _add_group(self, vbox, label, tasks, color=None):
         if not tasks:
             return
+        color = color or styles.COLORS['text_muted']
         group_label = QLabel(label)
         group_label.setStyleSheet(
-            f"color: {styles.COLORS['text_muted']}; font-size: 10px; font-weight: bold;"
+            f"color: {color}; font-size: 10px; font-weight: bold;"
             " margin-top: 4px; background: transparent;"
         )
         vbox.addWidget(group_label)
@@ -392,7 +396,7 @@ class SidebarWidget(QFrame):
         self.bell_btn.setObjectName("UtilityIconButton")
         self.bell_btn.setGeometry(0, 0, 34, 28)
         self.bell_btn.setCursor(Qt.PointingHandCursor)
-        self.bell_btn.setToolTip("Tareas que vencen hoy o mañana")
+        self.bell_btn.setToolTip("Tareas atrasadas o que vencen hoy o mañana")
         self.bell_btn.clicked.connect(self.show_notifications)
 
         self.bell_badge = QLabel("0", bell_container)
@@ -418,17 +422,19 @@ class SidebarWidget(QFrame):
         text = f"{_DIAS[now.weekday()]} {now.day} {_MESES[now.month - 1]} · {now.strftime('%H:%M')}"
         self.clock_label.setText(text)
 
-    def get_due_soon(self):
-        """Tareas de todos los tableros que vencen hoy o mañana."""
-        today = date.today()
-        tomorrow = today + timedelta(days=1)
-        return database.get_scheduled_tasks(today.isoformat(), tomorrow.isoformat(), db_path=self.db_path)
+    def get_pending_notifications(self):
+        """Tareas de todos los tableros que están atrasadas o vencen hoy o mañana.
+
+        Devuelve todo lo que tenga fecha de vencimiento <= mañana: la campana lo
+        agrupa en ATRASADAS / HOY / MAÑANA."""
+        tomorrow = date.today() + timedelta(days=1)
+        return database.get_scheduled_tasks(end_date=tomorrow.isoformat(), db_path=self.db_path)
 
     def refresh_notifications(self):
-        """Actualiza el badge de la campana según los vencimientos hoy/mañana."""
+        """Actualiza el badge de la campana según atrasadas + vencimientos hoy/mañana."""
         if not hasattr(self, "bell_badge"):
             return
-        count = len(self.get_due_soon())
+        count = len(self.get_pending_notifications())
         if count > 0:
             self.bell_badge.setText(str(count) if count < 10 else "9+")
             self.bell_badge.show()
@@ -437,7 +443,7 @@ class SidebarWidget(QFrame):
 
     def show_notifications(self):
         """Muestra el popup de vencimientos anclado bajo la campana."""
-        popup = NotificationsPopup(self.get_due_soon(), self)
+        popup = NotificationsPopup(self.get_pending_notifications(), self)
         popup.task_activated.connect(self._on_notification_task)
         pos = self.bell_btn.mapToGlobal(QPoint(0, self.bell_btn.height() + 4))
         popup.move(pos)

@@ -14,8 +14,9 @@ Ekin Kanban is a sleek, resource-friendly, and offline-first personal Kanban boa
 - **Fluid Drag & Drop**: Native, smooth mouse controls to drag tasks across columns or reorder them.
 - **Task Journaling (Diario)**: A vertical, scrollable, timestamped diary inside each task card, perfect for keeping track of developer progress logs.
 - **Due Dates & Multiple Tags**: Assign due dates using an interactive calendar popup and add multiple custom-colored tag pills to each task.
-- **Calendar View & Reminders**: A monthly calendar of your due dates, a deadline **bell** for tasks due today or tomorrow across all boards, and native **Windows notifications** for what's due today.
-- **Calendar Sync (iCalendar)**: Keep an always-updated `.ics` feed that you can **subscribe** to from Google Calendar, Apple Calendar, or Outlook — additions, edits, and deletions all propagate.
+- **Calendar View & Reminders**: A monthly calendar of your due dates (**drag a task chip to another day to reschedule it**), a deadline **bell** that groups **overdue**, today's, and tomorrow's tasks across all boards, and native **Windows notifications** for what's due today.
+- **Calendar Sync (iCalendar)**: Keep an always-updated `.ics` feed that you can **subscribe** to from Google Calendar, Apple Calendar, or Outlook — additions, edits, and deletions all propagate. A **"Subscribe in Google"** helper copies your feed URL and opens Google's add-by-URL page for you.
+- **Automatic Backups**: On every startup Ekin snapshots your database into a `backups/` folder (keeping the most recent few) before applying any changes — a cheap safety net against accidents.
 - **Collapsible Sidebar**: Hide or reveal the sidebar using the toggle (`☰`) button in the board header to maximize work space.
 - **Column & Board Copying/Moving**: Easily move or copy columns to other boards, or copy complete boards with all sub-tasks, tags, and diaries.
 - **Modern Slate Design**: Out-of-the-box support for a premium dark mode UI, customizable colors for columns, boards, and tags.
@@ -88,7 +89,7 @@ Run the test suite before opening a pull request:
 pytest
 ```
 
-The tests exercise `database.py` against temporary, isolated SQLite databases (no risk to your local `ekin_board.db`).
+The tests exercise `database.py`, the iCalendar exporter (`ics_export.py`), automatic backups (`backups.py`), and the task drop-index logic against temporary, isolated SQLite databases (no risk to your local `ekin_board.db`).
 
 ---
 
@@ -141,10 +142,12 @@ The database (`ekin_board.db`) is automatically initialized on the first run, an
 ### 4. Calendar, Reminders & Notifications
 At the top of the sidebar there is a small utility bar:
 * 🕐 A live **date & time** clock.
-* 🔔 A **deadline bell** with a count badge: click it to see the tasks (from **all** boards) whose due date is **today or tomorrow**, grouped by day. Click any of them to jump straight to its board and open the card.
-* 📅 A **calendar button** that switches the main area to a **monthly calendar view**. Navigate months with `‹ › / Hoy`, click a task chip to open its card, and use **✖ Cerrar** to return to the board or **⚙ Ajustes** to configure calendar sync (see below).
+* 🔔 A **deadline bell** with a count badge: click it to see the tasks (from **all** boards) grouped into **ATRASADAS** (overdue), **HOY** (today) and **MAÑANA** (tomorrow). Click any of them to jump straight to its board and open the card.
+* 📅 A **calendar button** that switches the main area to a **monthly calendar view**. Navigate months with `‹ › / Hoy`, click a task chip to open its card, **drag a chip onto another day to change its due date**, and use **✖ Cerrar** to return to the board or **⚙ Ajustes** to configure calendar sync (see below).
 
 When the app starts (and once per day thereafter), Ekin also shows a **native Windows notification** listing the cards that are due today. Ekin lives in the system tray while running — double-click the tray icon to bring the window back.
+
+Every time Ekin starts it also writes an automatic **backup** of your database into a `backups/` folder next to `ekin_board.db` (the five most recent are kept), so an accidental delete is never fatal.
 
 ---
 
@@ -166,7 +169,7 @@ Ekin turns every task that has a due date into an **all-day event** in a standar
    * **Dropbox** — copy the share link and change its trailing `?dl=0` to **`?dl=1`**.
    * **Tip:** open your final URL in a private/incognito window — you should see raw text starting with `BEGIN:VCALENDAR`. If you get a login page or an HTML preview, the URL or the sharing permission is wrong.
 3. Subscribe from your calendar app using that URL:
-   * **Google Calendar** (web): *Other calendars* → **+** → **From URL** → paste → **Add calendar**.
+   * **Google Calendar** (web): paste your public URL into the **🌐 Suscribirse en Google Calendar** box in **⚙ Ajustes** and click **➕ Suscribirse en Google** — Ekin saves the URL, copies it to your clipboard and opens Google's *add-by-URL* page, where you just paste (`Ctrl+V`) and click **Add calendar**. (Manual path: *Other calendars* → **+** → **From URL**.)
    * **Apple / iOS**: *File → New Calendar Subscription* (Mac), or open the URL on iOS.
    * **Outlook**: *Add calendar → Subscribe from web*.
 

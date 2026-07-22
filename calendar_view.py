@@ -3,12 +3,12 @@ y permite exportar a iCalendar (.ics) desde su diálogo de Ajustes."""
 import calendar as _cal
 from datetime import date
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QMimeData, QPoint, QUrl
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
-    QFrame, QDialog, QFileDialog, QMessageBox, QSizePolicy
+    QFrame, QDialog, QFileDialog, QMessageBox, QSizePolicy, QApplication, QLineEdit
 )
-from PySide6.QtGui import QColor, QPixmap, QIcon
+from PySide6.QtGui import QColor, QPixmap, QIcon, QDrag, QDesktopServices
 
 import database
 import styles
@@ -25,14 +25,55 @@ def _swatch_icon(color, size=11):
     return QIcon(pix)
 
 
+_CAL_TASK_MIME = "application/x-ekin-cal-task-id"
+
+
+class CalendarChip(QPushButton):
+    """Chip de tarea en el calendario. Se puede pulsar (abrir) o arrastrar a otro día
+    para cambiar su fecha de vencimiento."""
+    def __init__(self, task_id, label, parent=None):
+        super().__init__(label, parent)
+        self.task_id = task_id
+        self._drag_start = QPoint()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._drag_start = event.position().toPoint()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if not (event.buttons() & Qt.LeftButton):
+            return super().mouseMoveEvent(event)
+        if (event.position().toPoint() - self._drag_start).manhattanLength() < QApplication.startDragDistance():
+            return super().mouseMoveEvent(event)
+
+        drag = QDrag(self)
+        mime = QMimeData()
+        mime.setData(_CAL_TASK_MIME, str(self.task_id).encode("utf-8"))
+        drag.setMimeData(mime)
+
+        pixmap = QPixmap(self.size())
+        pixmap.fill(Qt.transparent)
+        self.render(pixmap)
+        drag.setPixmap(pixmap)
+        drag.setHotSpot(event.position().toPoint())
+
+        drag.exec(Qt.MoveAction)
+
+
 class DayCell(QFrame):
-    """Celda de un día del calendario: número + chips de tareas que vencen ese día."""
+    """Celda de un día del calendario: número + chips de tareas que vencen ese día.
+    Acepta soltar un chip arrastrado para reprogramar su fecha de vencimiento."""
     task_clicked = Signal(int, int)  # task_id, board_id
+    task_rescheduled = Signal(int, str)  # task_id, nueva_fecha_iso
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("DayCell")
         self.setMinimumHeight(78)
+        self.setAcceptDrops(True)
+        self.cell_date = None       # date del día (None para celdas vacías)
+        self._base_style = ""       # estilo actual, para restaurar tras el resalte de arrastre
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(5, 4, 5, 4)
         self._layout.setSpacing(2)
@@ -42,7 +83,11 @@ class DayCell(QFrame):
         self.day_label.setObjectName("DayNumber")
         self._layout.addWidget(self.day_label)
 
-    def set_day(self, day_number, tasks, is_today=False):
+    def _apply_style(self, style):
+        self._base_style = style
+        self.setStyleSheet(style)
+
+    def set_day(self, day_number, tasks, is_today=False, cell_date=None):
         # Vaciar los chips previos (se conserva la etiqueta del día en el índice 0)
         while self._layout.count() > 1:
             item = self._layout.takeAt(1)
@@ -50,22 +95,24 @@ class DayCell(QFrame):
             if widget:
                 widget.deleteLater()
 
+        self.cell_date = cell_date
+
         if day_number is None:
             self.day_label.setText("")
-            self.setStyleSheet(
-                f"#DayCell {{ background-color: transparent; border: 1px solid transparent; border-radius: 8px; }}"
+            self._apply_style(
+                "#DayCell { background-color: transparent; border: 1px solid transparent; border-radius: 8px; }"
             )
             return
 
         self.day_label.setText(str(day_number))
         if is_today:
-            self.setStyleSheet(
+            self._apply_style(
                 f"#DayCell {{ background-color: rgba(59,130,246,0.18);"
                 f" border: 1.5px solid {styles.COLORS['accent_blue']}; border-radius: 8px; }}"
                 f"#DayNumber {{ color: {styles.COLORS['accent_blue']}; font-weight: bold; }}"
             )
         else:
-            self.setStyleSheet(
+            self._apply_style(
                 f"#DayCell {{ background-color: {styles.COLORS['bg_column']};"
                 f" border: 1px solid {styles.COLORS['border']}; border-radius: 8px; }}"
                 f"#DayNumber {{ color: {styles.COLORS['text_muted']}; font-weight: bold; }}"
@@ -75,11 +122,11 @@ class DayCell(QFrame):
         for t in tasks[:max_show]:
             title = t["title"] or "(sin título)"
             label = title if len(title) <= 20 else title[:19] + "…"
-            chip = QPushButton(label)
+            chip = CalendarChip(t["id"], label)
             chip.setObjectName("CalendarChip")
             chip.setIcon(_swatch_icon(t["board_color"]))
             chip.setCursor(Qt.PointingHandCursor)
-            chip.setToolTip(f"{t['board_name']} · {title}")
+            chip.setToolTip(f"{t['board_name']} · {title}\nArrastra a otro día para reprogramar")
             # Evita que un título largo ensanche la columna
             chip.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
             chip.clicked.connect(
@@ -94,11 +141,43 @@ class DayCell(QFrame):
             )
             self._layout.addWidget(more)
 
+    def dragEnterEvent(self, event):
+        if self.cell_date is not None and event.mimeData().hasFormat(_CAL_TASK_MIME):
+            event.acceptProposedAction()
+            self.setStyleSheet(
+                f"#DayCell {{ background-color: rgba(59,130,246,0.30);"
+                f" border: 1.5px dashed {styles.COLORS['accent_blue']}; border-radius: 8px; }}"
+                f"#DayNumber {{ color: {styles.COLORS['accent_blue']}; font-weight: bold; }}"
+            )
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if self.cell_date is not None and event.mimeData().hasFormat(_CAL_TASK_MIME):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragLeaveEvent(self, event):
+        self.setStyleSheet(self._base_style)
+        super().dragLeaveEvent(event)
+
+    def dropEvent(self, event):
+        mime = event.mimeData()
+        self.setStyleSheet(self._base_style)
+        if self.cell_date is not None and mime.hasFormat(_CAL_TASK_MIME):
+            task_id = int(mime.data(_CAL_TASK_MIME).data().decode("utf-8"))
+            event.acceptProposedAction()
+            self.task_rescheduled.emit(task_id, self.cell_date.isoformat())
+        else:
+            event.ignore()
+
 
 class CalendarViewWidget(QWidget):
     """Vista mensual completa. Sustituye a la vista de tablero cuando está activa."""
     close_requested = Signal()
     task_activated = Signal(int, int)  # task_id, board_id
+    data_changed = Signal()            # tras reprogramar una tarea (refresca campana/.ics)
 
     def __init__(self, db_path=database.DB_NAME, parent=None):
         super().__init__(parent)
@@ -174,6 +253,7 @@ class CalendarViewWidget(QWidget):
             for dow in range(7):
                 cell = DayCell()
                 cell.task_clicked.connect(self.task_activated.emit)
+                cell.task_rescheduled.connect(self._on_task_rescheduled)
                 grid.addWidget(cell, week + 1, dow)
                 self.cells.append(cell)
 
@@ -206,9 +286,17 @@ class CalendarViewWidget(QWidget):
                     day_number,
                     by_day.get(cell_date.isoformat(), []),
                     is_today=(cell_date == today),
+                    cell_date=cell_date,
                 )
             else:
                 cell.set_day(None, [])
+
+    def _on_task_rescheduled(self, task_id, iso_date):
+        """Cambia la fecha de vencimiento de una tarea arrastrada a otro día."""
+        database.update_task_due_date(task_id, iso_date, self.db_path)
+        self.refresh()
+        # Avisar a la app para refrescar la campana y reescribir el .ics sincronizado.
+        self.data_changed.emit()
 
     def prev_month(self):
         self.month -= 1
@@ -303,6 +391,41 @@ class CalendarSettingsDialog(QDialog):
 
         layout.addWidget(sync_frame)
 
+        # --- Suscribirse en Google (pegar la URL pública del feed .ics) ---
+        google_frame = QFrame()
+        google_frame.setObjectName("GoogleFrame")
+        google_frame.setStyleSheet(
+            f"#GoogleFrame {{ background-color: {styles.COLORS['bg_column']};"
+            f" border: 1px solid {styles.COLORS['border']}; border-radius: 8px; }}"
+        )
+        google_layout = QVBoxLayout(google_frame)
+        google_layout.setContentsMargins(12, 12, 12, 12)
+        google_layout.setSpacing(8)
+
+        google_title = QLabel("🌐 <b>Suscribirse en Google Calendar</b>")
+        google_layout.addWidget(google_title)
+
+        google_desc = QLabel(
+            "Sube el archivo .ics a una carpeta pública (Google Drive / Dropbox / OneDrive) "
+            "y pega aquí su <b>URL pública</b>. Ekin la guarda, la copia al portapapeles y abre "
+            "la página de Google para <b>añadir un calendario por URL</b> (el paso manual que suele fallar)."
+        )
+        google_desc.setWordWrap(True)
+        google_desc.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 12px;")
+        google_layout.addWidget(google_desc)
+
+        self.public_url_input = QLineEdit(database.get_setting("ics_public_url", "", self.db_path))
+        self.public_url_input.setPlaceholderText("https://…/ekin_calendario.ics")
+        google_layout.addWidget(self.public_url_input)
+
+        self.subscribe_btn = QPushButton("➕  Suscribirse en Google")
+        self.subscribe_btn.setObjectName("PrimaryButton")
+        self.subscribe_btn.setCursor(Qt.PointingHandCursor)
+        self.subscribe_btn.clicked.connect(self.subscribe_google)
+        google_layout.addWidget(self.subscribe_btn)
+
+        layout.addWidget(google_frame)
+
         steps = QLabel(
             "<b>Suscribirse</b> (se mantiene sincronizado):"
             "<ul>"
@@ -371,6 +494,28 @@ class CalendarSettingsDialog(QDialog):
     def disable_sync(self):
         database.set_setting("ics_sync_path", "", self.db_path)
         self._refresh_sync_label()
+
+    def subscribe_google(self):
+        """Guarda la URL pública, la copia al portapapeles y abre 'Añadir por URL' de Google."""
+        url = self.public_url_input.text().strip()
+        if not url:
+            QMessageBox.warning(
+                self, "URL vacía",
+                "Pega primero la URL pública de tu archivo .ics (el enlace compartido de la carpeta "
+                "en la nube donde lo sincronizas)."
+            )
+            return
+        database.set_setting("ics_public_url", url, self.db_path)
+        QApplication.clipboard().setText(url)
+        QDesktopServices.openUrl(
+            QUrl("https://calendar.google.com/calendar/u/0/r/settings/addbyurl")
+        )
+        QMessageBox.information(
+            self, "Suscripción en Google",
+            "He copiado la URL al portapapeles y abierto Google Calendar.\n\n"
+            "En la página que se abre: pega la URL (Ctrl+V) en «Añadir por URL» y pulsa "
+            "«Añadir calendario». A partir de ahí, Google se mantiene al día con tus cambios."
+        )
 
     def export_once(self):
         default_name = f"ekin_calendario_{date.today().isoformat()}.ics"

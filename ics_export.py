@@ -55,24 +55,31 @@ def _sequence_and_modified(updated_at):
 
 
 def _fold_line(line):
-    """Pliega líneas a 75 octetos con continuación por espacio (RFC 5545 §3.1)."""
+    """Pliega líneas a 75 octetos con continuación por espacio (RFC 5545 §3.1).
+
+    La primera línea física admite 75 octetos. Cada continuación va precedida de un
+    espacio que TAMBIÉN cuenta para el límite de 75, así que su contenido se limita a
+    74 octetos (de lo contrario la línea plegada quedaría en 76, un octeto por encima)."""
     encoded = line.encode("utf-8")
     if len(encoded) <= 75:
         return line
     pieces = []
-    while len(encoded) > 75:
-        cut = 75
+    limit = 75
+    while len(encoded) > limit:
+        cut = limit
         # No partir un carácter UTF-8 multibyte
         while cut > 0 and (encoded[cut] & 0xC0) == 0x80:
             cut -= 1
         pieces.append(encoded[:cut])
         encoded = encoded[cut:]
+        limit = 74  # las continuaciones reservan 1 octeto para el espacio inicial
     pieces.append(encoded)
     return "\r\n ".join(p.decode("utf-8") for p in pieces)
 
 
-def build_ics(db_path=database.DB_NAME):
+def build_ics(db_path=None):
     """Construye el contenido .ics (texto) con todas las tareas que tienen due_date."""
+    db_path = db_path or database.DB_NAME
     tasks = database.get_scheduled_tasks(db_path=db_path)
     now_utc = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
@@ -128,8 +135,9 @@ def build_ics(db_path=database.DB_NAME):
     return "\r\n".join(_fold_line(line) for line in lines) + "\r\n"
 
 
-def export_ics(path, db_path=database.DB_NAME):
+def export_ics(path, db_path=None):
     """Escribe el archivo .ics en `path`. Devuelve el número de eventos exportados."""
+    db_path = db_path or database.DB_NAME
     content = build_ics(db_path=db_path)
     with open(path, "w", encoding="utf-8", newline="") as f:
         f.write(content)

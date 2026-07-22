@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-22
+
+### Added
+- **Overdue tasks in the deadline bell.** The bell popup now shows an **"ATRASADAS"** group
+  (highlighted) for tasks past their due date, above **HOY** and **MAÑANA**, and the count badge
+  includes them. Backed by querying everything due on or before tomorrow.
+- **Drag a task in the calendar to reschedule it.** Calendar chips are draggable; dropping one on
+  another day updates that task's due date (new `database.update_task_due_date`) and re-syncs the
+  bell and the `.ics` feed automatically.
+- **"Subscribe in Google" helper in Ajustes.** A field for the public `.ics` URL plus a button that
+  saves it (`ics_public_url` setting), copies it to the clipboard and opens Google Calendar's
+  *add-by-URL* page — automating the manual step users trip on.
+- **Automatic database backups on startup.** New `backups.py` writes a consistent SQLite snapshot to
+  a `backups/` folder before any schema migration runs, keeping the 5 most recent. No-op on first run.
+
+### Changed
+- **`database.py` `db_path` handling is now uniform.** All ~38 data-access functions resolve
+  `db_path` at call time (`db_path=None` -> `db_path or DB_NAME`) instead of freezing `DB_NAME` at
+  import. Reassigning `database.DB_NAME` is now honored everywhere, and the whole layer is testable
+  against temporary databases without monkeypatching. `ics_export.build_ics/export_ics` too.
+- Renamed `TaskListArea.layout` to `list_layout` so it no longer shadows `QWidget.layout()`.
+
+### Fixed
+- **Same-column drag reorder off-by-one.** The hidden dragged card was counted when computing the
+  drop index, mismatching the target list (which excludes the moved card) and misplacing a card
+  dropped below its original slot. The index is now computed in the non-dragged card space
+  (extracted to `widgets.compute_drop_index`, unit-tested).
+- **iCalendar line folding** could emit continuation lines 1 octet over the 75-octet RFC 5545 limit
+  (the leading continuation space wasn't counted); continuations are now capped at 74 content octets.
+- Removed a dead `#TaskCardDueDate` object name that had no QSS rule (the label is styled inline).
+
 ## [0.3.2] - 2026-07-17
 
 ### Fixed
