@@ -757,6 +757,51 @@ class TaskDetailDialog(QDialog):
         tags_layout.addLayout(tag_btns_row)
         
         left_layout.addWidget(tags_section)
+
+        # 5. Subtareas / Checklist
+        subtasks_section = QWidget()
+        subtasks_outer = QVBoxLayout(subtasks_section)
+        subtasks_outer.setContentsMargins(0, 0, 0, 0)
+        subtasks_outer.setSpacing(4)
+
+        subtasks_header = QHBoxLayout()
+        subtasks_header.setSpacing(6)
+        subtasks_header.addWidget(QLabel("☑️ <b>Subtareas</b>"))
+        subtasks_header.addStretch()
+        self.subtasks_progress_label = QLabel("")
+        self.subtasks_progress_label.setStyleSheet(
+            f"color: {styles.COLORS['text_muted']}; font-size: 11px;"
+        )
+        subtasks_header.addWidget(self.subtasks_progress_label)
+        subtasks_outer.addLayout(subtasks_header)
+
+        subtasks_scroll = QScrollArea()
+        subtasks_scroll.setWidgetResizable(True)
+        subtasks_scroll.setFrameShape(QFrame.NoFrame)
+        subtasks_scroll.setStyleSheet("background: transparent; border: none;")
+        subtasks_scroll.setMaximumHeight(130)
+        self.subtasks_container = QWidget()
+        self.subtasks_container.setStyleSheet("background: transparent;")
+        self.subtasks_layout = QVBoxLayout(self.subtasks_container)
+        self.subtasks_layout.setContentsMargins(0, 0, 0, 0)
+        self.subtasks_layout.setSpacing(2)
+        self.subtasks_layout.setAlignment(Qt.AlignTop)
+        subtasks_scroll.setWidget(self.subtasks_container)
+        subtasks_outer.addWidget(subtasks_scroll)
+
+        add_sub_row = QHBoxLayout()
+        add_sub_row.setSpacing(6)
+        self.new_subtask_input = QLineEdit()
+        self.new_subtask_input.setPlaceholderText("Nueva subtarea…")
+        self.new_subtask_input.returnPressed.connect(self.add_subtask)
+        add_sub_row.addWidget(self.new_subtask_input)
+        self.add_subtask_btn = QPushButton("➕ Añadir")
+        self.add_subtask_btn.setCursor(Qt.PointingHandCursor)
+        self.add_subtask_btn.clicked.connect(self.add_subtask)
+        add_sub_row.addWidget(self.add_subtask_btn)
+        subtasks_outer.addLayout(add_sub_row)
+
+        left_layout.addWidget(subtasks_section)
         left_layout.addStretch()
 
         # Botones de Acción de la Tarea (Guardar, Eliminar, Cerrar)
@@ -873,6 +918,9 @@ class TaskDetailDialog(QDialog):
         # Cargar etiquetas
         self.current_tags = task.get("tags", [])
         self.render_tags()
+
+        # Cargar subtareas (checklist)
+        self.reload_subtasks()
 
         # Cargar los logs
         self.reload_logs()
@@ -1054,6 +1102,95 @@ class TaskDetailDialog(QDialog):
             database.delete_task(self.task_id, self.db_path)
             self.task_deleted = True
             self.accept()
+
+    # --- Subtareas / checklist (se persisten al instante, como los logs) ---
+
+    def reload_subtasks(self):
+        """Limpia y vuelve a pintar el checklist de la tarea desde la base de datos."""
+        while self.subtasks_layout.count():
+            item = self.subtasks_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+
+        subtasks = database.get_subtasks(self.task_id, self.db_path)
+        if not subtasks:
+            hint = QLabel("Sin subtareas todavía.")
+            hint.setStyleSheet(
+                f"color: {styles.COLORS['text_muted']}; font-size: 11px; font-style: italic;"
+            )
+            self.subtasks_layout.addWidget(hint)
+        else:
+            for sub in subtasks:
+                self.subtasks_layout.addWidget(self._build_subtask_row(sub))
+        self._update_subtask_progress(subtasks)
+
+    def _build_subtask_row(self, sub):
+        row = QWidget()
+        row.setStyleSheet("background: transparent;")
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(6)
+
+        chk = QCheckBox()
+        chk.setChecked(bool(sub["done"]))
+        chk.setCursor(Qt.PointingHandCursor)
+        # `clicked` (no `toggled`) para que el setChecked programático del reload no reentre.
+        chk.clicked.connect(lambda checked, sid=sub["id"]: self.toggle_subtask(sid, checked))
+        row_layout.addWidget(chk)
+
+        title_edit = QLineEdit(sub["title"])
+        title_edit.setFrame(False)
+        if sub["done"]:
+            title_edit.setStyleSheet("background: transparent; border: none; color: #64748b;")
+        else:
+            title_edit.setStyleSheet("background: transparent; border: none;")
+        title_edit.editingFinished.connect(
+            lambda sid=sub["id"], le=title_edit: self.rename_subtask(sid, le.text())
+        )
+        row_layout.addWidget(title_edit, 1)
+
+        del_btn = QPushButton("×")
+        del_btn.setFixedSize(18, 18)
+        del_btn.setCursor(Qt.PointingHandCursor)
+        del_btn.setToolTip("Eliminar subtarea")
+        del_btn.clicked.connect(lambda _=False, sid=sub["id"]: self.remove_subtask(sid))
+        row_layout.addWidget(del_btn)
+        return row
+
+    def add_subtask(self):
+        text = self.new_subtask_input.text().strip()
+        if not text:
+            return
+        database.create_subtask(self.task_id, text, self.db_path)
+        self.new_subtask_input.clear()
+        self.reload_subtasks()
+
+    def toggle_subtask(self, subtask_id, checked):
+        database.set_subtask_done(subtask_id, checked, self.db_path)
+        self.reload_subtasks()  # refresca tachado + progreso
+
+    def rename_subtask(self, subtask_id, text):
+        text = text.strip()
+        if not text:
+            self.reload_subtasks()  # título vacío: restaura el anterior
+            return
+        database.update_subtask_title(subtask_id, text, self.db_path)
+
+    def remove_subtask(self, subtask_id):
+        database.delete_subtask(subtask_id, self.db_path)
+        self.reload_subtasks()
+
+    def _update_subtask_progress(self, subtasks=None):
+        if subtasks is None:
+            subtasks = database.get_subtasks(self.task_id, self.db_path)
+        total = len(subtasks)
+        done = sum(1 for s in subtasks if s["done"])
+        if total == 0:
+            self.subtasks_progress_label.setText("")
+        else:
+            pct = int(done / total * 100)
+            self.subtasks_progress_label.setText(f"{done}/{total} · {pct}%")
 
     def reload_logs(self):
         """Limpia y vuelve a cargar todos los logs/entradas del diario."""

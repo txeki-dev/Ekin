@@ -419,3 +419,95 @@ def test_db_name_is_resolved_at_call_time(tmp_path, monkeypatch):
 
     assert [b["id"] for b in boards] == [board_id]
     assert os.path.exists(target)          # el archivo se creó en la ruta reasignada
+
+
+# --- Subtareas / checklist ---
+
+def _task(db_path):
+    board_id = database.create_board("B", db_path=db_path)
+    col_id = database.create_column(board_id, "C", db_path=db_path)
+    return database.create_task(col_id, "T", db_path=db_path)
+
+
+def test_create_and_get_subtasks_ordered(db_path):
+    task_id = _task(db_path)
+    s1 = database.create_subtask(task_id, "Uno", db_path=db_path)
+    s2 = database.create_subtask(task_id, "Dos", db_path=db_path)
+    subs = database.get_subtasks(task_id, db_path=db_path)
+    assert [s["id"] for s in subs] == [s1, s2]
+    assert [s["position"] for s in subs] == [0, 1]
+    assert all(s["done"] == 0 for s in subs)
+
+
+def test_set_subtask_done_toggles(db_path):
+    task_id = _task(db_path)
+    s1 = database.create_subtask(task_id, "Uno", db_path=db_path)
+    database.set_subtask_done(s1, True, db_path=db_path)
+    assert database.get_subtasks(task_id, db_path=db_path)[0]["done"] == 1
+    database.set_subtask_done(s1, False, db_path=db_path)
+    assert database.get_subtasks(task_id, db_path=db_path)[0]["done"] == 0
+
+
+def test_update_subtask_title_and_delete(db_path):
+    task_id = _task(db_path)
+    s1 = database.create_subtask(task_id, "Original", db_path=db_path)
+    database.update_subtask_title(s1, "Renombrada", db_path=db_path)
+    assert database.get_subtasks(task_id, db_path=db_path)[0]["title"] == "Renombrada"
+    database.delete_subtask(s1, db_path=db_path)
+    assert database.get_subtasks(task_id, db_path=db_path) == []
+
+
+def test_delete_task_cascades_subtasks(db_path):
+    task_id = _task(db_path)
+    database.create_subtask(task_id, "Uno", db_path=db_path)
+    database.delete_task(task_id, db_path=db_path)
+    assert database.get_subtasks(task_id, db_path=db_path) == []
+
+
+def test_get_subtasks_progress_bulk(db_path):
+    t1 = _task(db_path)
+    board_id = database.create_board("B2", db_path=db_path)
+    col2 = database.create_column(board_id, "C2", db_path=db_path)
+    t2 = database.create_task(col2, "T2", db_path=db_path)
+    t3 = database.create_task(col2, "T3", db_path=db_path)  # sin subtareas
+
+    a = database.create_subtask(t1, "a", db_path=db_path)
+    database.create_subtask(t1, "b", db_path=db_path)
+    database.set_subtask_done(a, True, db_path=db_path)
+    database.create_subtask(t2, "c", db_path=db_path)
+
+    progress = database.get_subtasks_progress_bulk([t1, t2, t3], db_path=db_path)
+    assert progress[t1] == (1, 2)
+    assert progress[t2] == (0, 1)
+    assert t3 not in progress                       # sin subtareas -> ausente
+    assert database.get_subtasks_progress_bulk([], db_path=db_path) == {}
+
+
+def test_get_tasks_exposes_subtask_progress(db_path):
+    board_id = database.create_board("B", db_path=db_path)
+    col_id = database.create_column(board_id, "C", db_path=db_path)
+    t_with = database.create_task(col_id, "con", db_path=db_path)
+    t_without = database.create_task(col_id, "sin", db_path=db_path)
+    d = database.create_subtask(t_with, "x", db_path=db_path)
+    database.create_subtask(t_with, "y", db_path=db_path)
+    database.set_subtask_done(d, True, db_path=db_path)
+
+    by_id = {t["id"]: t for t in database.get_tasks(col_id, db_path=db_path)}
+    assert (by_id[t_with]["subtasks_done"], by_id[t_with]["subtasks_total"]) == (1, 2)
+    assert (by_id[t_without]["subtasks_done"], by_id[t_without]["subtasks_total"]) == (0, 0)
+
+
+def test_copy_board_duplicates_subtasks(db_path):
+    board_id = database.create_board("Orig", db_path=db_path)
+    col_id = database.create_column(board_id, "C", db_path=db_path)
+    task_id = database.create_task(col_id, "T", db_path=db_path)
+    done = database.create_subtask(task_id, "hecha", db_path=db_path)
+    database.create_subtask(task_id, "pendiente", db_path=db_path)
+    database.set_subtask_done(done, True, db_path=db_path)
+
+    new_board_id = database.copy_board(board_id, "Copia", "#654321", db_path=db_path)
+    new_col = database.get_columns(new_board_id, db_path=db_path)[0]
+    new_task = database.get_tasks(new_col["id"], db_path=db_path)[0]
+
+    copied = database.get_subtasks(new_task["id"], db_path=db_path)
+    assert [(s["title"], s["done"]) for s in copied] == [("hecha", 1), ("pendiente", 0)]
