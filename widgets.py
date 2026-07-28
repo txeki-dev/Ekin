@@ -1,9 +1,9 @@
 from PySide6.QtCore import Qt, QMimeData, QPoint, Signal, QRect, QSize
 from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QWidget, QMenu, QApplication, QLayout, QSizePolicy
+    QScrollArea, QWidget, QMenu, QApplication, QLayout
 )
-from PySide6.QtGui import QDrag, QPixmap, QPainter, QColor, QCursor
+from PySide6.QtGui import QDrag, QPixmap, QCursor
 from datetime import datetime
 import styles
 from styles import hex_to_rgb

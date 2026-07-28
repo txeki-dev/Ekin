@@ -312,8 +312,8 @@ class MainWindow(QMainWindow):
             
             # Crear columnas de ejemplo
             todo_id = database.create_column(board_id, "Pendientes", "#60a5fa")  # Azul claro
-            prog_id = database.create_column(board_id, "En Progreso", "#fbbf24")  # Amarillo/Ambar
-            done_id = database.create_column(board_id, "Completado", "#34d399")   # Verde esmeralda
+            database.create_column(board_id, "En Progreso", "#fbbf24")  # Amarillo/Ambar
+            database.create_column(board_id, "Completado", "#34d399")   # Verde esmeralda
             
             # Crear una tarea de ejemplo
             task_id = database.create_task(

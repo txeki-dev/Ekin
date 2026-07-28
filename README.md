@@ -1,5 +1,6 @@
 # Ekin Kanban (Trello Lite)
 
+[![CI](https://github.com/txeki-dev/Ekin/actions/workflows/ci.yml/badge.svg)](https://github.com/txeki-dev/Ekin/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/txeki-dev/Ekin?label=release&sort=semver)](https://github.com/txeki-dev/Ekin/releases/latest)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-PolyForm--Noncommercial-lightgrey)](LICENSE)
@@ -83,9 +84,11 @@ For development, install the optional `dev` dependencies (includes `pytest`):
 pip install -e ".[dev]"
 ```
 
-Run the test suite before opening a pull request:
+Run the linter and test suite before opening a pull request (the CI workflow runs the same checks on
+every push to `main` and every PR, across Python 3.10–3.12):
 
 ```bash
+ruff check .
 pytest
 ```
 

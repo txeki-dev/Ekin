@@ -234,8 +234,8 @@ def test_create_log_and_get_logs_ordered(db_path):
     log2 = database.create_log(task_id, "Segundo", db_path=db_path)
 
     logs = database.get_logs(task_id, db_path)
-    assert [l["id"] for l in logs] == [log1, log2]
-    assert [l["content"] for l in logs] == ["Primero", "Segundo"]
+    assert [lg["id"] for lg in logs] == [log1, log2]
+    assert [lg["content"] for lg in logs] == ["Primero", "Segundo"]
 
 
 def test_create_log_updates_task_updated_at(db_path):
@@ -304,7 +304,7 @@ def test_copy_column_to_board_duplicates_tasks_tags_and_logs(db_path):
     ]
 
     copied_logs = database.get_logs(copied_tasks[0]["id"], db_path)
-    assert [l["content"] for l in copied_logs] == ["nota"]
+    assert [lg["content"] for lg in copied_logs] == ["nota"]
 
 
 def test_copy_board_duplicates_full_hierarchy(db_path):
@@ -332,7 +332,7 @@ def test_copy_board_duplicates_full_hierarchy(db_path):
     ]
 
     new_logs = database.get_logs(new_tasks[0]["id"], db_path)
-    assert [l["content"] for l in new_logs] == ["nota"]
+    assert [lg["content"] for lg in new_logs] == ["nota"]
 
     # El tablero original sigue intacto
     assert len(database.get_columns(board_id, db_path)) == 1

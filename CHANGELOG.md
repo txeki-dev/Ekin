@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **CI workflow** (`.github/workflows/ci.yml`): runs `ruff` and `pytest` (Python 3.10–3.12, with the
+  Qt system libraries PySide6 needs on Linux) on every push to `main` and on pull requests.
+- `ruff` as a dev dependency with a high-signal lint config (`E4/E7/E9/F`); cleaned up the handful of
+  unused imports / variables it surfaced.
+
 ## [0.4.0] - 2026-07-22
 
 ### Added

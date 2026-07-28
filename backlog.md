@@ -50,8 +50,10 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 - [x] Tests for `ics_export` (escaping, folding, `SEQUENCE`/`LAST-MODIFIED`, all-day `DTSTART/DTEND`).
   *(Done in v0.4.0 — `tests/test_ics_export.py`.)*
 - [ ] Headless (offscreen) smoke tests for the Qt widgets (calendar grid, bell popup, settings dialog).
-- [ ] CI workflow running `pytest` on push/PR (currently only the release workflow exists).
-- [ ] `ruff`/`flake8` lint + formatting check in CI.
+- [x] CI workflow running `pytest` on push/PR *(Done — `.github/workflows/ci.yml`, matrix py3.10–3.12
+  with the Qt system libs; `test` job).*
+- [x] `ruff` lint check in CI *(Done — `lint` job; ruleset `E4/E7/E9/F` in `[tool.ruff.lint]`, baseline
+  clean).*
 
 ---
 

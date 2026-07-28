@@ -11,7 +11,6 @@ from PySide6.QtGui import (
 )
 from datetime import datetime
 import re
-import sqlite3
 import database
 import styles
 
