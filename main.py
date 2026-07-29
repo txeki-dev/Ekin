@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QStackedWidget, QSystemTrayIcon, QMenu
 )
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QShortcut, QKeySequence
 import database
 import backups
 import styles
@@ -15,6 +15,7 @@ from sidebar import SidebarWidget
 from board_view import BoardViewWidget
 from calendar_view import CalendarViewWidget
 from detail_dialog import TaskDetailDialog
+from search_dialog import SearchDialog
 import ics_export
 from version import __version__
 
@@ -57,6 +58,10 @@ class MainWindow(QMainWindow):
         self._sync_timer = QTimer(self)
         self._sync_timer.timeout.connect(self.sync_ics)
         self._sync_timer.start(5 * 60 * 1000)
+
+        # Atajo global de búsqueda (Ctrl+F)
+        self._search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
+        self._search_shortcut.activated.connect(self.show_search)
 
         # Comprobar actualizaciones tras 1 segundo
         QTimer.singleShot(1000, self.check_for_updates)
@@ -111,6 +116,7 @@ class MainWindow(QMainWindow):
 
         # Campana de vencimientos y vista de calendario
         self.sidebar.open_calendar_requested.connect(self.show_calendar_view)
+        self.sidebar.open_search_requested.connect(self.show_search)
         self.sidebar.open_task_requested.connect(self.on_notification_task)
         self.calendar_view.close_requested.connect(self.show_board_view)
         self.calendar_view.task_activated.connect(self.on_calendar_task)
@@ -141,6 +147,12 @@ class MainWindow(QMainWindow):
 
     def show_board_view(self):
         self.center_stack.setCurrentWidget(self.board_view)
+
+    def show_search(self):
+        """Abre el diálogo de búsqueda global; al elegir un resultado salta a su tarjeta."""
+        dialog = SearchDialog(database.DB_NAME, self)
+        dialog.task_activated.connect(self.on_notification_task)
+        dialog.exec()
 
     def _open_task_detail(self, task_id):
         """Abre el diálogo de detalle de una tarea."""

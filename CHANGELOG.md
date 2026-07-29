@@ -7,13 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-29
+
 ### Added
-- **Subtasks / checklists inside a task** (toward 0.5.0). Each task detail dialog has a checklist
-  section — add, tick, rename and delete items — that persists immediately. Board cards show a
-  **`☑ done/total`** progress badge (green when complete). New `subtasks` table + `database` helpers
-  (`create_subtask`, `get_subtasks`, `set_subtask_done`, `update_subtask_title`, `delete_subtask`,
+- **Subtasks / checklists inside a task.** Each task detail dialog has a checklist section — add,
+  tick, rename and delete items — that persists immediately. Board cards show a **`☑ done/total`**
+  progress badge (green when complete). New `subtasks` table + `database` helpers (`create_subtask`,
+  `get_subtasks`, `set_subtask_done`, `update_subtask_title`, `delete_subtask`,
   `get_subtasks_progress_bulk`); `get_tasks` exposes `subtasks_done`/`subtasks_total`; copying a
   column/board carries subtasks; deleting a task cascades them.
+- **Global search & filter.** A 🔍 button in the sidebar (and **Ctrl+F**) opens a search dialog that
+  filters tasks across all boards by **text** (title/description), **board**, **tag**, and
+  **only-with-due-date**; clicking a result jumps to its card. New `database.search_tasks()`.
 - **CI workflow** (`.github/workflows/ci.yml`): runs `ruff` and `pytest` (Python 3.10–3.12, with the
   Qt system libraries PySide6 needs on Linux) on every push to `main` and on pull requests.
 - `ruff` as a dev dependency with a high-signal lint config (`E4/E7/E9/F`); cleaned up the handful of

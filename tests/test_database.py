@@ -511,3 +511,46 @@ def test_copy_board_duplicates_subtasks(db_path):
 
     copied = database.get_subtasks(new_task["id"], db_path=db_path)
     assert [(s["title"], s["done"]) for s in copied] == [("hecha", 1), ("pendiente", 0)]
+
+
+# --- Búsqueda global (search_tasks) ---
+
+def test_search_matches_title_and_description(db_path):
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    t_title = database.create_task(c, "Comprar leche", db_path=db_path)
+    t_desc = database.create_task(c, "Otra", description="recordar la LECHE del super", db_path=db_path)
+    database.create_task(c, "Nada que ver", db_path=db_path)
+
+    ids = {t["id"] for t in database.search_tasks("leche", db_path=db_path)}
+    assert ids == {t_title, t_desc}          # coincide en título y en descripción, sin distinguir mayúsculas
+    assert database.search_tasks("inexistente", db_path=db_path) == []
+
+
+def test_search_filter_by_board(db_path):
+    b1 = database.create_board("B1", db_path=db_path)
+    c1 = database.create_column(b1, "C", db_path=db_path)
+    b2 = database.create_board("B2", db_path=db_path)
+    c2 = database.create_column(b2, "C", db_path=db_path)
+    t1 = database.create_task(c1, "tarea x", db_path=db_path)
+    database.create_task(c2, "tarea x", db_path=db_path)
+
+    res = database.search_tasks("tarea", board_id=b1, db_path=db_path)
+    assert [t["id"] for t in res] == [t1]
+    assert res[0]["board_name"] == "B1" and res[0]["board_color"]
+
+
+def test_search_filter_by_tag_and_only_due(db_path):
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    tagged = database.create_task(c, "con tag", due_date="2026-09-01", db_path=db_path)
+    database.create_task(c, "sin tag", db_path=db_path)
+    tv = database.get_or_create_tag_value("Prioridad", "Alta", "#ef4444", db_path=db_path)
+    database.set_task_tags(tagged, [tv], db_path=db_path)
+
+    by_tag = database.search_tasks(tag_value_id=tv, db_path=db_path)
+    assert [t["id"] for t in by_tag] == [tagged]
+    assert by_tag[0]["tags"][0]["value"] == "Alta"    # resultados enriquecidos con etiquetas
+
+    only_due = {t["id"] for t in database.search_tasks(only_due=True, db_path=db_path)}
+    assert only_due == {tagged}

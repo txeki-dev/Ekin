@@ -275,7 +275,8 @@ class SidebarWidget(QFrame):
     board_selected = Signal(int)          # Emite el board_id seleccionado
     board_changed = Signal()              # Emite cuando se añade/edita/borra un tablero
     open_calendar_requested = Signal()    # Emite al pulsar el botón de calendario
-    open_task_requested = Signal(int, int)  # (task_id, board_id) desde la campana
+    open_search_requested = Signal()      # Emite al pulsar el botón de búsqueda
+    open_task_requested = Signal(int, int)  # (task_id, board_id) desde la campana o la búsqueda
 
     def __init__(self, db_path=database.DB_NAME, parent=None):
         super().__init__(parent)
@@ -406,6 +407,14 @@ class SidebarWidget(QFrame):
         self.bell_badge.move(19, -1)
         self.bell_badge.hide()
         bar_layout.addWidget(bell_container)
+
+        self.search_btn = QPushButton("🔍")
+        self.search_btn.setObjectName("UtilityIconButton")
+        self.search_btn.setFixedSize(34, 28)
+        self.search_btn.setCursor(Qt.PointingHandCursor)
+        self.search_btn.setToolTip("Buscar tareas (Ctrl+F)")
+        self.search_btn.clicked.connect(self.open_search_requested.emit)
+        bar_layout.addWidget(self.search_btn)
 
         self.calendar_btn = QPushButton("📅")
         self.calendar_btn.setObjectName("UtilityIconButton")
