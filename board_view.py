@@ -345,24 +345,28 @@ class BoardViewWidget(QFrame):
         columns = database.get_columns(board_id, self.db_path)
         
         for col_data in columns:
-            col_widget = ColumnWidget(col_data, self)
-            col_widget.setFixedWidth(280)  # Ancho estándar para columnas Kanban
-            
+            # Cargar las tareas primero: hace falta el contador para la vista plegada.
+            tasks = database.get_tasks(col_data["id"], self.db_path)
+            col_data["task_count"] = len(tasks)
+
+            col_widget = ColumnWidget(col_data, self)  # fija su propio ancho según collapsed
+
             # Conectar señales
             col_widget.task_dropped.connect(self.handle_task_drop)
             col_widget.add_task_requested.connect(self.add_task)
             col_widget.edit_column_requested.connect(self.edit_column)
             col_widget.delete_column_requested.connect(self.delete_column)
             col_widget.copy_column_requested.connect(self.copy_column)
+            col_widget.collapse_toggle_requested.connect(self.handle_column_collapse)
 
-            # Cargar tareas de la columna
-            tasks = database.get_tasks(col_data["id"], self.db_path)
-            for task_data in tasks:
-                card = TaskCard(task_data, self)
-                if board_info:
-                    card.set_card_style(board_color)
-                card.clicked.connect(self.open_task_details)
-                col_widget.add_task_card(card)
+            # Solo montamos las tarjetas si la columna está desplegada
+            if not col_data.get("collapsed"):
+                for task_data in tasks:
+                    card = TaskCard(task_data, self)
+                    if board_info:
+                        card.set_card_style(board_color)
+                    card.clicked.connect(self.open_task_details)
+                    col_widget.add_task_card(card)
 
             self.columns_layout.addWidget(col_widget)
             self.column_widgets[col_data["id"]] = col_widget
@@ -450,6 +454,13 @@ class BoardViewWidget(QFrame):
         if confirm == QMessageBox.Yes:
             database.delete_column(column_id, self.db_path)
             self.load_board(self.board_id)
+
+    def handle_column_collapse(self, column_id):
+        """Pliega o despliega una columna (persiste el estado) y recarga el tablero."""
+        col_widget = self.column_widgets.get(column_id)
+        new_state = not (col_widget.collapsed if col_widget else False)
+        database.set_column_collapsed(column_id, new_state, self.db_path)
+        self.load_board(self.board_id)
 
     def handle_column_drop(self, column_id, target_position):
         """Reordena las columnas del tablero actual tras arrastrar una por su título."""

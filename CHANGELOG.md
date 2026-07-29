@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-07-29
+
+### Added
+- **Nested, collapsible subtasks.** A subtask can now hold sub‑subtasks (`subtasks.parent_id`); each
+  item is editable/deletable at both levels, a ▸/▾ toggle folds a subtask's children, and **＋** adds a
+  sub‑subtask. Done items now show a **strikethrough**. Nesting is preserved when copying a column/board.
+- **Collapsible board columns.** A **«** button collapses a column to a narrow strip (expand **»**,
+  task count, vertical name) to save horizontal space; the collapsed state is saved per column
+  (`columns.collapsed`).
+- **Editor: Tab nests bullets.** Pressing **Tab** inside a bullet indents it into a sub‑bullet
+  (**Shift+Tab** un‑nests), with the glyph changing by depth (● ○ ▪); numbered lists keep their style.
+- **Calendar sync: Outlook & Apple/iCloud.** The Ajustes subscribe helper now has **Google / Outlook /
+  Apple·iCloud** buttons (Apple copies a `webcal://` link) plus a detailed per‑provider guide; the
+  README sync section documents all three in full.
+
+### Changed
+- **Italic is now Ctrl+K** in the description/diary editors (matching *Cursiva* in Spanish MS Word);
+  the built‑in Ctrl+I no longer toggles italic.
+
+### Fixed
+- **Windows taskbar icon.** The window/app/tray icon is resolved by absolute path and prefers the
+  multi‑resolution `ekin_icon.ico`, so launching from the desktop shortcut (a different working
+  directory) no longer falls back to Python's generic taskbar icon.
+- Fixed a latent `db_path`/`parent_id` argument mix‑up in the checklist's add flow, surfaced by the
+  new nested‑subtask signature.
+
 ## [0.5.0] - 2026-07-29
 
 ### Added

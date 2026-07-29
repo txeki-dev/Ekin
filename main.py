@@ -19,11 +19,25 @@ from search_dialog import SearchDialog
 import ics_export
 from version import __version__
 
+# Directorio de la app: los iconos deben resolverse por ruta ABSOLUTA. Con ruta relativa,
+# al lanzar desde el acceso directo (con otro directorio de trabajo) QIcon no carga el
+# archivo y Windows cae al icono genérico de python en la barra de tareas.
+_APP_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def app_icon():
+    """Icono de la app. Prefiere el .ico multi-resolución (mejor para la barra de tareas)."""
+    ico = os.path.join(_APP_DIR, "ekin_icon.ico")
+    if os.path.exists(ico):
+        return QIcon(ico)
+    return QIcon(os.path.join(_APP_DIR, "ekin_icon.png"))
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"Ekin Kanban - Trello Lite v{__version__}")
-        self.setWindowIcon(QIcon("ekin_icon.png"))
+        self.setWindowIcon(app_icon())
         self.resize(1100, 700)
         self.setMinimumSize(850, 500)
         
@@ -198,7 +212,7 @@ class MainWindow(QMainWindow):
 
     def setup_tray(self):
         """Crea el icono de bandeja (habilita toasts nativos de Windows)."""
-        self.tray = QSystemTrayIcon(QIcon("ekin_icon.png"), self)
+        self.tray = QSystemTrayIcon(app_icon(), self)
         self.tray.setToolTip("Ekin Kanban")
 
         menu = QMenu()
@@ -360,7 +374,7 @@ def main():
             pass
 
     app = QApplication(sys.argv)
-    app.setWindowIcon(QIcon("ekin_icon.png"))
+    app.setWindowIcon(app_icon())
 
     # Aplicar hoja de estilos QSS global
     app.setStyleSheet(styles.QSS)

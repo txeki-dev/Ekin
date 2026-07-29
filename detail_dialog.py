@@ -29,6 +29,29 @@ class MarkdownTextEdit(QTextEdit):
 
     def keyPressEvent(self, event):
         cursor = self.textCursor()
+        ctrl = bool(event.modifiers() & Qt.ControlModifier)
+
+        # --- Cursiva con Ctrl+K (como «Cursiva» en Word en español) ---
+        if ctrl and event.key() == Qt.Key_K:
+            fmt = QTextCharFormat()
+            fmt.setFontItalic(not self.fontItalic())
+            self.mergeCurrentCharFormat(fmt)
+            event.accept()
+            return
+        # Neutralizar el Ctrl+I nativo: la cursiva ahora es Ctrl+K
+        if ctrl and event.key() == Qt.Key_I:
+            event.accept()
+            return
+
+        # --- Tab / Shift+Tab dentro de una lista: anidar / desanidar la viñeta ---
+        if event.key() == Qt.Key_Tab and cursor.block().textList() is not None and not cursor.hasSelection():
+            self._change_list_indent(+1)
+            event.accept()
+            return
+        if event.key() == Qt.Key_Backtab and cursor.block().textList() is not None:
+            self._change_list_indent(-1)
+            event.accept()
+            return
 
         # --- Espacio: intentar convertir el marcador en una lista ---
         if event.key() == Qt.Key_Space and not cursor.hasSelection():
@@ -86,6 +109,36 @@ class MarkdownTextEdit(QTextEdit):
         cursor.endEditBlock()
         self.setTextCursor(cursor)
 
+    @staticmethod
+    def _style_for_indent(current_style, indent):
+        """Elige el símbolo de viñeta según el nivel de anidamiento (las listas
+        numeradas conservan su estilo)."""
+        ordered = current_style in (
+            QTextListFormat.ListDecimal, QTextListFormat.ListLowerAlpha,
+            QTextListFormat.ListUpperAlpha, QTextListFormat.ListLowerRoman,
+            QTextListFormat.ListUpperRoman,
+        )
+        if ordered:
+            return current_style
+        bullets = [QTextListFormat.ListDisc, QTextListFormat.ListCircle, QTextListFormat.ListSquare]
+        return bullets[(max(1, indent) - 1) % len(bullets)]
+
+    def _change_list_indent(self, delta):
+        """Aumenta (Tab) o reduce (Shift+Tab) el nivel de anidamiento de la viñeta actual."""
+        cursor = self.textCursor()
+        current = cursor.currentList()
+        if current is None:
+            return
+        fmt = current.format()
+        new_indent = max(1, fmt.indent() + delta)
+        cursor.beginEditBlock()
+        new_fmt = QTextListFormat()
+        new_fmt.setIndent(new_indent)
+        new_fmt.setStyle(self._style_for_indent(fmt.style(), new_indent))
+        cursor.createList(new_fmt)
+        cursor.endEditBlock()
+        self.setTextCursor(cursor)
+
 
 class RichTextToolbar(QWidget):
     """Barra de formato básica (negrita, cursiva, viñetas) para un QTextEdit."""
@@ -111,7 +164,7 @@ class RichTextToolbar(QWidget):
 
         self.italic_btn = QPushButton("I")
         self.italic_btn.setObjectName("FormatButton")
-        self.italic_btn.setToolTip("Cursiva (Ctrl+I)")
+        self.italic_btn.setToolTip("Cursiva (Ctrl+K)")
         self.italic_btn.setCheckable(True)
         self.italic_btn.setCursor(Qt.PointingHandCursor)
         self.italic_btn.setFixedSize(28, 26)
@@ -668,6 +721,7 @@ class TaskDetailDialog(QDialog):
         self.db_path = db_path
         self.current_tags = []      # Lista de diccionarios {'text': '...', 'color': '...'}
         self.task_deleted = False  # Indica si se borró la tarea desde este diálogo
+        self._collapsed = {}       # {subtask_id: bool} estado de plegado de cada subtarea
         
         self.setWindowTitle("Detalles de la Tarea")
         self.resize(800, 550)
@@ -1106,7 +1160,8 @@ class TaskDetailDialog(QDialog):
     # --- Subtareas / checklist (se persisten al instante, como los logs) ---
 
     def reload_subtasks(self):
-        """Limpia y vuelve a pintar el checklist de la tarea desde la base de datos."""
+        """Repinta el checklist como árbol de dos niveles (subtareas -> subsubtareas),
+        respetando el estado de plegado de cada subtarea."""
         while self.subtasks_layout.count():
             item = self.subtasks_layout.takeAt(0)
             w = item.widget()
@@ -1114,6 +1169,12 @@ class TaskDetailDialog(QDialog):
                 w.deleteLater()
 
         subtasks = database.get_subtasks(self.task_id, self.db_path)
+        top = [s for s in subtasks if s["parent_id"] is None]
+        children = {}
+        for s in subtasks:
+            if s["parent_id"] is not None:
+                children.setdefault(s["parent_id"], []).append(s)
+
         if not subtasks:
             hint = QLabel("Sin subtareas todavía.")
             hint.setStyleSheet(
@@ -1121,50 +1182,110 @@ class TaskDetailDialog(QDialog):
             )
             self.subtasks_layout.addWidget(hint)
         else:
-            for sub in subtasks:
-                self.subtasks_layout.addWidget(self._build_subtask_row(sub))
+            for parent in top:
+                kids = children.get(parent["id"], [])
+                self.subtasks_layout.addWidget(self._build_top_row(parent, kids))
+                if kids and not self._collapsed.get(parent["id"], False):
+                    for kid in kids:
+                        self.subtasks_layout.addWidget(self._build_child_row(kid))
         self._update_subtask_progress(subtasks)
 
-    def _build_subtask_row(self, sub):
-        row = QWidget()
-        row.setStyleSheet("background: transparent;")
-        row_layout = QHBoxLayout(row)
-        row_layout.setContentsMargins(0, 0, 0, 0)
-        row_layout.setSpacing(6)
-
+    def _subtask_checkbox(self, sub):
         chk = QCheckBox()
         chk.setChecked(bool(sub["done"]))
         chk.setCursor(Qt.PointingHandCursor)
         # `clicked` (no `toggled`) para que el setChecked programático del reload no reentre.
         chk.clicked.connect(lambda checked, sid=sub["id"]: self.toggle_subtask(sid, checked))
-        row_layout.addWidget(chk)
+        return chk
 
-        title_edit = QLineEdit(sub["title"])
-        title_edit.setFrame(False)
+    def _subtask_title_edit(self, sub):
+        le = QLineEdit(sub["title"])
+        le.setFrame(False)
         if sub["done"]:
-            title_edit.setStyleSheet("background: transparent; border: none; color: #64748b;")
+            le.setStyleSheet("background: transparent; border: none; color: #64748b;")
+            font = le.font()
+            font.setStrikeOut(True)   # tachado claro cuando está hecha
+            le.setFont(font)
         else:
-            title_edit.setStyleSheet("background: transparent; border: none;")
-        title_edit.editingFinished.connect(
-            lambda sid=sub["id"], le=title_edit: self.rename_subtask(sid, le.text())
+            le.setStyleSheet("background: transparent; border: none;")
+        le.editingFinished.connect(
+            lambda sid=sub["id"], w=le: self.rename_subtask(sid, w.text())
         )
-        row_layout.addWidget(title_edit, 1)
+        return le
 
-        del_btn = QPushButton("×")
-        del_btn.setFixedSize(18, 18)
-        del_btn.setCursor(Qt.PointingHandCursor)
-        del_btn.setToolTip("Eliminar subtarea")
-        del_btn.clicked.connect(lambda _=False, sid=sub["id"]: self.remove_subtask(sid))
-        row_layout.addWidget(del_btn)
+    def _subtask_delete_btn(self, sub):
+        b = QPushButton("×")
+        b.setFixedSize(18, 18)
+        b.setCursor(Qt.PointingHandCursor)
+        b.setToolTip("Eliminar")
+        b.clicked.connect(lambda _=False, sid=sub["id"]: self.remove_subtask(sid))
+        return b
+
+    def _build_top_row(self, sub, kids):
+        row = QWidget()
+        row.setStyleSheet("background: transparent;")
+        h = QHBoxLayout(row)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(4)
+
+        toggle = QPushButton()
+        toggle.setFixedSize(18, 18)
+        toggle.setStyleSheet("QPushButton { background: transparent; border: none; color: #94a3b8; }")
+        if kids:
+            collapsed = self._collapsed.get(sub["id"], False)
+            toggle.setText("▸" if collapsed else "▾")
+            toggle.setCursor(Qt.PointingHandCursor)
+            toggle.setToolTip("Plegar/desplegar subsubtareas")
+            toggle.clicked.connect(lambda _=False, sid=sub["id"]: self.toggle_collapse(sid))
+        else:
+            toggle.setEnabled(False)     # sin hijos: sin flecha
+        h.addWidget(toggle)
+
+        h.addWidget(self._subtask_checkbox(sub))
+        h.addWidget(self._subtask_title_edit(sub), 1)
+
+        add_child = QPushButton("＋")
+        add_child.setFixedSize(18, 18)
+        add_child.setCursor(Qt.PointingHandCursor)
+        add_child.setToolTip("Añadir subsubtarea")
+        add_child.clicked.connect(lambda _=False, sid=sub["id"]: self.add_sub_subtask(sid))
+        h.addWidget(add_child)
+
+        h.addWidget(self._subtask_delete_btn(sub))
         return row
+
+    def _build_child_row(self, sub):
+        row = QWidget()
+        row.setStyleSheet("background: transparent;")
+        h = QHBoxLayout(row)
+        h.setContentsMargins(24, 0, 0, 0)   # sangría bajo el padre
+        h.setSpacing(4)
+        bullet = QLabel("•")
+        bullet.setStyleSheet("color: #64748b; background: transparent;")
+        h.addWidget(bullet)
+        h.addWidget(self._subtask_checkbox(sub))
+        h.addWidget(self._subtask_title_edit(sub), 1)
+        h.addWidget(self._subtask_delete_btn(sub))
+        return row
+
+    def toggle_collapse(self, subtask_id):
+        self._collapsed[subtask_id] = not self._collapsed.get(subtask_id, False)
+        self.reload_subtasks()
 
     def add_subtask(self):
         text = self.new_subtask_input.text().strip()
         if not text:
             return
-        database.create_subtask(self.task_id, text, self.db_path)
+        database.create_subtask(self.task_id, text, db_path=self.db_path)
         self.new_subtask_input.clear()
         self.reload_subtasks()
+
+    def add_sub_subtask(self, parent_id):
+        text, ok = QInputDialog.getText(self, "Nueva subsubtarea", "Título de la subsubtarea:")
+        if ok and text.strip():
+            database.create_subtask(self.task_id, text.strip(), parent_id=parent_id, db_path=self.db_path)
+            self._collapsed[parent_id] = False   # asegurar que se vea recién creada
+            self.reload_subtasks()
 
     def toggle_subtask(self, subtask_id, checked):
         database.set_subtask_done(subtask_id, checked, self.db_path)

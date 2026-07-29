@@ -6,7 +6,8 @@ from datetime import date
 from PySide6.QtCore import Qt, Signal, QMimeData, QPoint, QUrl
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
-    QFrame, QDialog, QFileDialog, QMessageBox, QSizePolicy, QApplication, QLineEdit
+    QFrame, QDialog, QFileDialog, QMessageBox, QSizePolicy, QApplication, QLineEdit,
+    QScrollArea
 )
 from PySide6.QtGui import QColor, QPixmap, QIcon, QDrag, QDesktopServices
 
@@ -391,56 +392,78 @@ class CalendarSettingsDialog(QDialog):
 
         layout.addWidget(sync_frame)
 
-        # --- Suscribirse en Google (pegar la URL pública del feed .ics) ---
-        google_frame = QFrame()
-        google_frame.setObjectName("GoogleFrame")
-        google_frame.setStyleSheet(
-            f"#GoogleFrame {{ background-color: {styles.COLORS['bg_column']};"
+        # --- Suscribirse en tu calendario (pegar la URL pública del feed .ics) ---
+        subscribe_frame = QFrame()
+        subscribe_frame.setObjectName("SubscribeFrame")
+        subscribe_frame.setStyleSheet(
+            f"#SubscribeFrame {{ background-color: {styles.COLORS['bg_column']};"
             f" border: 1px solid {styles.COLORS['border']}; border-radius: 8px; }}"
         )
-        google_layout = QVBoxLayout(google_frame)
-        google_layout.setContentsMargins(12, 12, 12, 12)
-        google_layout.setSpacing(8)
+        subscribe_layout = QVBoxLayout(subscribe_frame)
+        subscribe_layout.setContentsMargins(12, 12, 12, 12)
+        subscribe_layout.setSpacing(8)
 
-        google_title = QLabel("🌐 <b>Suscribirse en Google Calendar</b>")
-        google_layout.addWidget(google_title)
+        subscribe_title = QLabel("🌐 <b>Suscribirse en tu calendario</b>")
+        subscribe_layout.addWidget(subscribe_title)
 
-        google_desc = QLabel(
+        subscribe_desc = QLabel(
             "Sube el archivo .ics a una carpeta pública (Google Drive / Dropbox / OneDrive) "
-            "y pega aquí su <b>URL pública</b>. Ekin la guarda, la copia al portapapeles y abre "
-            "la página de Google para <b>añadir un calendario por URL</b> (el paso manual que suele fallar)."
+            "y pega aquí su <b>URL pública</b>. Ekin la guarda y, según el botón, la copia al "
+            "portapapeles y abre la página del proveedor para <b>añadir un calendario por URL</b> "
+            "(el paso manual que suele fallar). Guía detallada abajo."
         )
-        google_desc.setWordWrap(True)
-        google_desc.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 12px;")
-        google_layout.addWidget(google_desc)
+        subscribe_desc.setWordWrap(True)
+        subscribe_desc.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 12px;")
+        subscribe_layout.addWidget(subscribe_desc)
 
         self.public_url_input = QLineEdit(database.get_setting("ics_public_url", "", self.db_path))
         self.public_url_input.setPlaceholderText("https://…/ekin_calendario.ics")
-        google_layout.addWidget(self.public_url_input)
+        subscribe_layout.addWidget(self.public_url_input)
 
-        self.subscribe_btn = QPushButton("➕  Suscribirse en Google")
+        provider_btns = QHBoxLayout()
+        provider_btns.setSpacing(6)
+        self.subscribe_btn = QPushButton("Google")
         self.subscribe_btn.setObjectName("PrimaryButton")
         self.subscribe_btn.setCursor(Qt.PointingHandCursor)
+        self.subscribe_btn.setToolTip("Copiar la URL y abrir «Añadir por URL» de Google Calendar")
         self.subscribe_btn.clicked.connect(self.subscribe_google)
-        google_layout.addWidget(self.subscribe_btn)
+        provider_btns.addWidget(self.subscribe_btn)
 
-        layout.addWidget(google_frame)
+        self.subscribe_outlook_btn = QPushButton("Outlook")
+        self.subscribe_outlook_btn.setCursor(Qt.PointingHandCursor)
+        self.subscribe_outlook_btn.setToolTip("Copiar la URL y abrir «Suscribirse desde la web» de Outlook")
+        self.subscribe_outlook_btn.clicked.connect(self.subscribe_outlook)
+        provider_btns.addWidget(self.subscribe_outlook_btn)
 
-        steps = QLabel(
-            "<b>Suscribirse</b> (se mantiene sincronizado):"
-            "<ul>"
-            "<li><b>Google</b>: Otros calendarios → Desde una URL (necesita enlace público del archivo).</li>"
-            "<li><b>Apple/iOS</b>: Archivo → Nueva suscripción de calendario (admite archivo local en Mac).</li>"
-            "<li><b>Outlook</b>: Agregar calendario → Suscribirse desde la web.</li>"
-            "</ul>"
-            "<b>Importar</b> una copia puntual es una foto fija: no refleja cambios ni borrados."
-        )
+        self.subscribe_apple_btn = QPushButton("Apple / iCloud")
+        self.subscribe_apple_btn.setCursor(Qt.PointingHandCursor)
+        self.subscribe_apple_btn.setToolTip("Copiar la URL como enlace webcal:// para iPhone/Mac")
+        self.subscribe_apple_btn.clicked.connect(self.subscribe_apple)
+        provider_btns.addWidget(self.subscribe_apple_btn)
+        provider_btns.addStretch()
+        subscribe_layout.addLayout(provider_btns)
+
+        layout.addWidget(subscribe_frame)
+
+        # Guía detallada por proveedor (en un área con scroll para no alargar el diálogo)
+        steps = QLabel(self._provider_guide_html())
         steps.setTextFormat(Qt.RichText)
         steps.setWordWrap(True)
+        steps.setOpenExternalLinks(True)
         steps.setStyleSheet("font-size: 12px;")
-        layout.addWidget(steps)
-
-        layout.addStretch()
+        steps_scroll = QScrollArea()
+        steps_scroll.setWidgetResizable(True)
+        steps_scroll.setFrameShape(QFrame.NoFrame)
+        steps_scroll.setStyleSheet("background: transparent; border: none;")
+        steps_scroll.setMinimumHeight(150)
+        steps_wrap = QWidget()
+        steps_wrap.setStyleSheet("background: transparent;")
+        steps_wrap_layout = QVBoxLayout(steps_wrap)
+        steps_wrap_layout.setContentsMargins(2, 2, 2, 2)
+        steps_wrap_layout.addWidget(steps)
+        steps_wrap_layout.addStretch()
+        steps_scroll.setWidget(steps_wrap)
+        layout.addWidget(steps_scroll, 1)
 
         btns = QHBoxLayout()
         export_btn = QPushButton("⬇  Exportar copia…")
@@ -495,8 +518,8 @@ class CalendarSettingsDialog(QDialog):
         database.set_setting("ics_sync_path", "", self.db_path)
         self._refresh_sync_label()
 
-    def subscribe_google(self):
-        """Guarda la URL pública, la copia al portapapeles y abre 'Añadir por URL' de Google."""
+    def _subscribe_url(self):
+        """Valida y persiste la URL pública. Devuelve la URL, o None si está vacía."""
         url = self.public_url_input.text().strip()
         if not url:
             QMessageBox.warning(
@@ -504,17 +527,93 @@ class CalendarSettingsDialog(QDialog):
                 "Pega primero la URL pública de tu archivo .ics (el enlace compartido de la carpeta "
                 "en la nube donde lo sincronizas)."
             )
-            return
+            return None
         database.set_setting("ics_public_url", url, self.db_path)
+        return url
+
+    def subscribe_google(self):
+        """Guarda la URL, la copia al portapapeles y abre 'Añadir por URL' de Google."""
+        url = self._subscribe_url()
+        if not url:
+            return
         QApplication.clipboard().setText(url)
         QDesktopServices.openUrl(
             QUrl("https://calendar.google.com/calendar/u/0/r/settings/addbyurl")
         )
         QMessageBox.information(
-            self, "Suscripción en Google",
-            "He copiado la URL al portapapeles y abierto Google Calendar.\n\n"
-            "En la página que se abre: pega la URL (Ctrl+V) en «Añadir por URL» y pulsa "
-            "«Añadir calendario». A partir de ahí, Google se mantiene al día con tus cambios."
+            self, "Google Calendar",
+            "He copiado la URL al portapapeles y abierto Google Calendar (en el ordenador; "
+            "la app de móvil no permite añadir por URL).\n\n"
+            "1. Menú lateral izquierdo → «Otros calendarios» → «+» → «Desde una URL».\n"
+            "2. Pega la URL (Ctrl+V) y pulsa «Añadir calendario».\n\n"
+            "Nota: Google recarga los calendarios por URL de forma lenta (cada varias horas, "
+            "hasta ~24 h) y no se puede forzar."
+        )
+
+    def subscribe_outlook(self):
+        """Guarda la URL, la copia y abre «Suscribirse desde la web» de Outlook.com."""
+        url = self._subscribe_url()
+        if not url:
+            return
+        QApplication.clipboard().setText(url)
+        QDesktopServices.openUrl(QUrl("https://outlook.live.com/calendar/0/addcalendar"))
+        QMessageBox.information(
+            self, "Outlook Calendar",
+            "He copiado la URL al portapapeles y abierto Outlook en el navegador.\n\n"
+            "1. En Outlook.com: «Agregar calendario» → «Suscribirse desde la web».\n"
+            "   (En Outlook de trabajo/Microsoft 365 la ruta es outlook.office.com → misma opción.)\n"
+            "2. Pega la URL (Ctrl+V), ponle un nombre y color, y pulsa «Importar»/«Suscribirse».\n\n"
+            "El Outlook de escritorio (clásico) también admite: Inicio → «Abrir calendario» → "
+            "«De Internet…» y pegar la URL."
+        )
+
+    def subscribe_apple(self):
+        """Copia la URL como enlace webcal:// para pegar en iPhone/iPad/Mac (iCloud)."""
+        url = self._subscribe_url()
+        if not url:
+            return
+        webcal = url.replace("https://", "webcal://").replace("http://", "webcal://")
+        QApplication.clipboard().setText(webcal)
+        QMessageBox.information(
+            self, "Apple / iCloud",
+            "He copiado la URL como enlace <b>webcal://</b> al portapapeles (así iOS/macOS la "
+            "reconocen como suscripción). Pégala aquí:\n\n"
+            "• iPhone/iPad: Ajustes → Calendario → Cuentas → Añadir cuenta → Otra → "
+            "«Añadir calendario suscrito» → pega el enlace → Siguiente.\n"
+            "• Mac (app Calendario): Archivo → «Nueva suscripción de calendario…» → pega el enlace → "
+            "Suscribirse; ahí puedes fijar la frecuencia de actualización (incluso cada pocos minutos).\n\n"
+            "La suscripción se guarda en iCloud y se ve en todos tus dispositivos Apple."
+        )
+
+    @staticmethod
+    def _provider_guide_html():
+        """Guía detallada de suscripción por proveedor (texto del diálogo de Ajustes)."""
+        return (
+            "<b>📋 Cómo suscribirte (se mantiene sincronizado, sin duplicados)</b>"
+            "<p><b>0) Consigue una URL pública y directa del .ics.</b> Guarda el archivo en una "
+            "carpeta de la nube y comparte el enlace <i>directo al archivo</i> (no a una página de "
+            "vista previa):"
+            "<ul>"
+            "<li><b>Google Drive</b>: compartir «Cualquiera con el enlace». El enlace normal apunta a "
+            "una vista HTML; usa la forma de descarga directa "
+            "<code>https://drive.google.com/uc?export=download&id=ID_DEL_ARCHIVO</code>.</li>"
+            "<li><b>Dropbox</b>: copia el enlace y cambia el final <code>?dl=0</code> por "
+            "<code>?dl=1</code>.</li>"
+            "<li><b>OneDrive</b>: «Compartir» → «Cualquier persona con el vínculo» → copia el enlace.</li>"
+            "</ul>"
+            "Ábrela en una ventana de incógnito: debes ver texto que empieza por "
+            "<code>BEGIN:VCALENDAR</code>. Si ves un login o una vista previa, el enlace no sirve.</p>"
+            "<p><b>🟦 Google Calendar</b> (solo en el ordenador): menú lateral → «Otros calendarios» → "
+            "«+» → «Desde una URL» → pega la URL → «Añadir calendario». Refresco lento (varias horas).</p>"
+            "<p><b>🟧 Outlook</b>: en <i>Outlook.com/365 (web)</i> → «Agregar calendario» → «Suscribirse "
+            "desde la web» → pega la URL → nombre/color → «Importar». En <i>Outlook de escritorio</i> → "
+            "Inicio → «Abrir calendario» → «De Internet…» → pega la URL.</p>"
+            "<p><b>🍎 Apple / iCloud</b> (usa un enlace <code>webcal://</code>): "
+            "<i>iPhone/iPad</i> → Ajustes → Calendario → Cuentas → Añadir cuenta → Otra → «Añadir "
+            "calendario suscrito» → pega el enlace. <i>Mac</i> → app Calendario → Archivo → «Nueva "
+            "suscripción de calendario…» → pega el enlace (puedes elegir cada cuánto se actualiza).</p>"
+            "<p><b>⚠️ Suscribir ≠ Importar.</b> «Importar» una copia es una foto fija: no refleja "
+            "cambios ni borrados y puede duplicar eventos. Suscríbete a la URL para que se actualice solo.</p>"
         )
 
     def export_once(self):
