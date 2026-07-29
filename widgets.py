@@ -174,13 +174,16 @@ class TaskCard(QFrame):
         self.due_container.setStyleSheet("background: transparent; border: none;")
         self.due_layout = QHBoxLayout(self.due_container)
         self.due_layout.setContentsMargins(0, 0, 0, 0)
-        self.due_layout.setSpacing(0)
-        
+        self.due_layout.setSpacing(6)
+
         # La fecha se estiliza en línea (según esté vencida o no), así que no lleva
         # objectName: no existe regla QSS para #TaskCardDueDate.
         self.due_label = QLabel()
         self.due_layout.addWidget(self.due_label)
-        self.due_layout.addStretch()  # Empuja la fecha a la izquierda
+        # Badge de progreso del checklist (☑ hechas/total)
+        self.subtasks_label = QLabel()
+        self.due_layout.addWidget(self.subtasks_label)
+        self.due_layout.addStretch()  # Empuja los badges a la izquierda
         self.meta_layout.addWidget(self.due_container)
 
         layout.addLayout(self.meta_layout)
@@ -214,20 +217,40 @@ class TaskCard(QFrame):
             try:
                 dt = datetime.strptime(due_date, "%Y-%m-%d")
                 formatted = dt.strftime("%d %b")  # Ej: "09 Jul"
-                
+
                 today = datetime.now().date()
                 is_overdue = dt.date() < today
-                
+
                 self.due_label.setText(f"📅 {formatted}")
                 if is_overdue:
                     self.due_label.setStyleSheet("color: #ef4444; font-weight: bold; font-size: 10px; background-color: rgba(239, 68, 68, 0.15); border-radius: 4px; padding: 2px 4px;")
                 else:
                     self.due_label.setStyleSheet("color: #94a3b8; font-size: 10px; background-color: rgba(148, 163, 184, 0.15); border-radius: 4px; padding: 2px 4px;")
-                self.due_container.show()
             except Exception:
                 self.due_label.setText(f"📅 {due_date}")
                 self.due_label.setStyleSheet("color: #94a3b8; font-size: 10px;")
-                self.due_container.show()
+            self.due_label.show()
+        else:
+            self.due_label.hide()
+
+        # Badge de progreso del checklist (☑ hechas/total); verde cuando está completo
+        done = self.task_data.get("subtasks_done", 0)
+        total = self.task_data.get("subtasks_total", 0)
+        if total > 0:
+            complete = done >= total
+            color = "#22c55e" if complete else "#94a3b8"
+            bg = "rgba(34, 197, 94, 0.15)" if complete else "rgba(148, 163, 184, 0.15)"
+            self.subtasks_label.setText(f"☑ {done}/{total}")
+            self.subtasks_label.setStyleSheet(
+                f"color: {color}; font-size: 10px; background-color: {bg}; border-radius: 4px; padding: 2px 4px;"
+            )
+            self.subtasks_label.show()
+        else:
+            self.subtasks_label.hide()
+
+        # El contenedor de metadatos se muestra si hay fecha o subtareas
+        if due_date or total > 0:
+            self.due_container.show()
         else:
             self.due_container.hide()
 

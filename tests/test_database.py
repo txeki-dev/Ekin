@@ -419,3 +419,138 @@ def test_db_name_is_resolved_at_call_time(tmp_path, monkeypatch):
 
     assert [b["id"] for b in boards] == [board_id]
     assert os.path.exists(target)          # el archivo se creó en la ruta reasignada
+
+
+# --- Subtareas / checklist ---
+
+def _task(db_path):
+    board_id = database.create_board("B", db_path=db_path)
+    col_id = database.create_column(board_id, "C", db_path=db_path)
+    return database.create_task(col_id, "T", db_path=db_path)
+
+
+def test_create_and_get_subtasks_ordered(db_path):
+    task_id = _task(db_path)
+    s1 = database.create_subtask(task_id, "Uno", db_path=db_path)
+    s2 = database.create_subtask(task_id, "Dos", db_path=db_path)
+    subs = database.get_subtasks(task_id, db_path=db_path)
+    assert [s["id"] for s in subs] == [s1, s2]
+    assert [s["position"] for s in subs] == [0, 1]
+    assert all(s["done"] == 0 for s in subs)
+
+
+def test_set_subtask_done_toggles(db_path):
+    task_id = _task(db_path)
+    s1 = database.create_subtask(task_id, "Uno", db_path=db_path)
+    database.set_subtask_done(s1, True, db_path=db_path)
+    assert database.get_subtasks(task_id, db_path=db_path)[0]["done"] == 1
+    database.set_subtask_done(s1, False, db_path=db_path)
+    assert database.get_subtasks(task_id, db_path=db_path)[0]["done"] == 0
+
+
+def test_update_subtask_title_and_delete(db_path):
+    task_id = _task(db_path)
+    s1 = database.create_subtask(task_id, "Original", db_path=db_path)
+    database.update_subtask_title(s1, "Renombrada", db_path=db_path)
+    assert database.get_subtasks(task_id, db_path=db_path)[0]["title"] == "Renombrada"
+    database.delete_subtask(s1, db_path=db_path)
+    assert database.get_subtasks(task_id, db_path=db_path) == []
+
+
+def test_delete_task_cascades_subtasks(db_path):
+    task_id = _task(db_path)
+    database.create_subtask(task_id, "Uno", db_path=db_path)
+    database.delete_task(task_id, db_path=db_path)
+    assert database.get_subtasks(task_id, db_path=db_path) == []
+
+
+def test_get_subtasks_progress_bulk(db_path):
+    t1 = _task(db_path)
+    board_id = database.create_board("B2", db_path=db_path)
+    col2 = database.create_column(board_id, "C2", db_path=db_path)
+    t2 = database.create_task(col2, "T2", db_path=db_path)
+    t3 = database.create_task(col2, "T3", db_path=db_path)  # sin subtareas
+
+    a = database.create_subtask(t1, "a", db_path=db_path)
+    database.create_subtask(t1, "b", db_path=db_path)
+    database.set_subtask_done(a, True, db_path=db_path)
+    database.create_subtask(t2, "c", db_path=db_path)
+
+    progress = database.get_subtasks_progress_bulk([t1, t2, t3], db_path=db_path)
+    assert progress[t1] == (1, 2)
+    assert progress[t2] == (0, 1)
+    assert t3 not in progress                       # sin subtareas -> ausente
+    assert database.get_subtasks_progress_bulk([], db_path=db_path) == {}
+
+
+def test_get_tasks_exposes_subtask_progress(db_path):
+    board_id = database.create_board("B", db_path=db_path)
+    col_id = database.create_column(board_id, "C", db_path=db_path)
+    t_with = database.create_task(col_id, "con", db_path=db_path)
+    t_without = database.create_task(col_id, "sin", db_path=db_path)
+    d = database.create_subtask(t_with, "x", db_path=db_path)
+    database.create_subtask(t_with, "y", db_path=db_path)
+    database.set_subtask_done(d, True, db_path=db_path)
+
+    by_id = {t["id"]: t for t in database.get_tasks(col_id, db_path=db_path)}
+    assert (by_id[t_with]["subtasks_done"], by_id[t_with]["subtasks_total"]) == (1, 2)
+    assert (by_id[t_without]["subtasks_done"], by_id[t_without]["subtasks_total"]) == (0, 0)
+
+
+def test_copy_board_duplicates_subtasks(db_path):
+    board_id = database.create_board("Orig", db_path=db_path)
+    col_id = database.create_column(board_id, "C", db_path=db_path)
+    task_id = database.create_task(col_id, "T", db_path=db_path)
+    done = database.create_subtask(task_id, "hecha", db_path=db_path)
+    database.create_subtask(task_id, "pendiente", db_path=db_path)
+    database.set_subtask_done(done, True, db_path=db_path)
+
+    new_board_id = database.copy_board(board_id, "Copia", "#654321", db_path=db_path)
+    new_col = database.get_columns(new_board_id, db_path=db_path)[0]
+    new_task = database.get_tasks(new_col["id"], db_path=db_path)[0]
+
+    copied = database.get_subtasks(new_task["id"], db_path=db_path)
+    assert [(s["title"], s["done"]) for s in copied] == [("hecha", 1), ("pendiente", 0)]
+
+
+# --- Búsqueda global (search_tasks) ---
+
+def test_search_matches_title_and_description(db_path):
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    t_title = database.create_task(c, "Comprar leche", db_path=db_path)
+    t_desc = database.create_task(c, "Otra", description="recordar la LECHE del super", db_path=db_path)
+    database.create_task(c, "Nada que ver", db_path=db_path)
+
+    ids = {t["id"] for t in database.search_tasks("leche", db_path=db_path)}
+    assert ids == {t_title, t_desc}          # coincide en título y en descripción, sin distinguir mayúsculas
+    assert database.search_tasks("inexistente", db_path=db_path) == []
+
+
+def test_search_filter_by_board(db_path):
+    b1 = database.create_board("B1", db_path=db_path)
+    c1 = database.create_column(b1, "C", db_path=db_path)
+    b2 = database.create_board("B2", db_path=db_path)
+    c2 = database.create_column(b2, "C", db_path=db_path)
+    t1 = database.create_task(c1, "tarea x", db_path=db_path)
+    database.create_task(c2, "tarea x", db_path=db_path)
+
+    res = database.search_tasks("tarea", board_id=b1, db_path=db_path)
+    assert [t["id"] for t in res] == [t1]
+    assert res[0]["board_name"] == "B1" and res[0]["board_color"]
+
+
+def test_search_filter_by_tag_and_only_due(db_path):
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    tagged = database.create_task(c, "con tag", due_date="2026-09-01", db_path=db_path)
+    database.create_task(c, "sin tag", db_path=db_path)
+    tv = database.get_or_create_tag_value("Prioridad", "Alta", "#ef4444", db_path=db_path)
+    database.set_task_tags(tagged, [tv], db_path=db_path)
+
+    by_tag = database.search_tasks(tag_value_id=tv, db_path=db_path)
+    assert [t["id"] for t in by_tag] == [tagged]
+    assert by_tag[0]["tags"][0]["value"] == "Alta"    # resultados enriquecidos con etiquetas
+
+    only_due = {t["id"] for t in database.search_tasks(only_due=True, db_path=db_path)}
+    assert only_due == {tagged}

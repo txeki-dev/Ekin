@@ -14,6 +14,8 @@ Ekin Kanban is a sleek, resource-friendly, and offline-first personal Kanban boa
 - **Ultra-lightweight**: Operates with a minimal memory footprint (< 60MB RAM idle) compared to heavy Electron-based alternatives.
 - **Fluid Drag & Drop**: Native, smooth mouse controls to drag tasks across columns or reorder them.
 - **Task Journaling (Diario)**: A vertical, scrollable, timestamped diary inside each task card, perfect for keeping track of developer progress logs.
+- **Subtasks / Checklists**: Break a task into a checklist — add, tick, rename and delete items; the card shows a **`☑ done/total`** progress badge (green when complete).
+- **Global Search & Filter**: A 🔍 button (or **Ctrl+F**) searches every board by title/description and filters by board, tag, or due date; click a result to jump straight to its card.
 - **Due Dates & Multiple Tags**: Assign due dates using an interactive calendar popup and add multiple custom-colored tag pills to each task.
 - **Calendar View & Reminders**: A monthly calendar of your due dates (**drag a task chip to another day to reschedule it**), a deadline **bell** that groups **overdue**, today's, and tomorrow's tasks across all boards, and native **Windows notifications** for what's due today.
 - **Calendar Sync (iCalendar)**: Keep an always-updated `.ics` feed that you can **subscribe** to from Google Calendar, Apple Calendar, or Outlook — additions, edits, and deletions all propagate. A **"Subscribe in Google"** helper copies your feed URL and opens Google's add-by-URL page for you.
@@ -137,6 +139,7 @@ The database (`ekin_board.db`) is automatically initialized on the first run, an
   - Change the task title and description, using the small toolbar for **bold**, *italic*, and bullet-list formatting.
   - Set a **due date** using the calendar popup widget.
   - Click **➕ Asignar Etiqueta** to add a tag as a **Category: Value** pair (e.g. "Prioridad: Alta"), with its own color. Reusing an existing value keeps its color consistent everywhere it's used; typing a new one creates it on the fly.
+  - Use the **☑️ Subtareas** checklist to break the task into steps: type in the box and press Enter (or **➕ Añadir**), tick items as you finish them, click a title to rename it, or **×** to remove it. Changes save instantly, and the card shows a **`☑ done/total`** progress badge.
 * On the **right panel (Diario)**, type notes or updates about what you did (with the same bold/italic/bullet formatting toolbar), and press `Ctrl + Enter` (or click **✍️ Añadir al Diario**) to post it. Each note is saved with an automatic date and time stamp.
 * Click the red cross (**×**) on any note if you need to remove it.
 * Click **💾 Guardar Cambios** to apply your updates, or click **🗑️ Eliminar** to delete the entire task.
@@ -146,6 +149,7 @@ The database (`ekin_board.db`) is automatically initialized on the first run, an
 At the top of the sidebar there is a small utility bar:
 * 🕐 A live **date & time** clock.
 * 🔔 A **deadline bell** with a count badge: click it to see the tasks (from **all** boards) grouped into **ATRASADAS** (overdue), **HOY** (today) and **MAÑANA** (tomorrow). Click any of them to jump straight to its board and open the card.
+* 🔍 A **search button** (or **Ctrl+F** anywhere) that opens global search: filter tasks across every board by text (title/description), board, tag, and "only with a due date", then click a result to jump to its card.
 * 📅 A **calendar button** that switches the main area to a **monthly calendar view**. Navigate months with `‹ › / Hoy`, click a task chip to open its card, **drag a chip onto another day to change its due date**, and use **✖ Cerrar** to return to the board or **⚙ Ajustes** to configure calendar sync (see below).
 
 When the app starts (and once per day thereafter), Ekin also shows a **native Windows notification** listing the cards that are due today. Ekin lives in the system tray while running — double-click the tray icon to bring the window back.

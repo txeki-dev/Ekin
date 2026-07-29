@@ -125,6 +125,18 @@ def init_db(db_path=None):
             )
         """)
 
+        # Subtareas / checklist dentro de una tarea (done: 0/1, ordenadas por position)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS subtasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                done INTEGER NOT NULL DEFAULT 0,
+                position INTEGER NOT NULL,
+                FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+            )
+        """)
+
         # Migración: enlazar task_tags con tag_values en vez de usar texto/color libres
         cursor.execute("PRAGMA table_info(task_tags)")
         task_tags_columns = [row[1] for row in cursor.fetchall()]
@@ -284,9 +296,13 @@ def get_tasks(column_id, db_path=None):
             (column_id,)
         )
         tasks = [dict(row) for row in cursor.fetchall()]
-    tags_by_task = get_task_tags_bulk([t["id"] for t in tasks], db_path)
+    task_ids = [t["id"] for t in tasks]
+    tags_by_task = get_task_tags_bulk(task_ids, db_path)
+    progress_by_task = get_subtasks_progress_bulk(task_ids, db_path)
     for t in tasks:
         t["tags"] = tags_by_task.get(t["id"], [])
+        done, total = progress_by_task.get(t["id"], (0, 0))
+        t["subtasks_done"], t["subtasks_total"] = done, total
     return tasks
 
 def get_task(task_id, db_path=None):
@@ -326,6 +342,85 @@ def update_task_due_date(task_id, due_date, db_path=None):
             (due_date, task_id)
         )
         conn.commit()
+
+# --- SUBTAREAS / CHECKLIST ---
+
+def create_subtask(task_id, title, db_path=None):
+    """Añade una subtarea al final del checklist de una tarea. Devuelve su id."""
+    db_path = db_path or DB_NAME
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COALESCE(MAX(position), -1) FROM subtasks WHERE task_id = ?", (task_id,))
+        next_pos = cursor.fetchone()[0] + 1
+        cursor.execute(
+            "INSERT INTO subtasks (task_id, title, done, position) VALUES (?, ?, 0, ?)",
+            (task_id, title, next_pos)
+        )
+        conn.execute("UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", (task_id,))
+        conn.commit()
+        return cursor.lastrowid
+
+def get_subtasks(task_id, db_path=None):
+    """Devuelve las subtareas de una tarea, ordenadas por posición. `done` es 0/1."""
+    db_path = db_path or DB_NAME
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, task_id, title, done, position FROM subtasks WHERE task_id = ? ORDER BY position ASC",
+            (task_id,)
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+def set_subtask_done(subtask_id, done, db_path=None):
+    """Marca/desmarca una subtarea. Actualiza el updated_at de la tarea madre."""
+    db_path = db_path or DB_NAME
+    with get_connection(db_path) as conn:
+        conn.execute("UPDATE subtasks SET done = ? WHERE id = ?", (1 if done else 0, subtask_id))
+        conn.execute(
+            "UPDATE tasks SET updated_at = CURRENT_TIMESTAMP "
+            "WHERE id = (SELECT task_id FROM subtasks WHERE id = ?)",
+            (subtask_id,)
+        )
+        conn.commit()
+
+def update_subtask_title(subtask_id, title, db_path=None):
+    """Renombra una subtarea."""
+    db_path = db_path or DB_NAME
+    with get_connection(db_path) as conn:
+        conn.execute("UPDATE subtasks SET title = ? WHERE id = ?", (title, subtask_id))
+        conn.commit()
+
+def delete_subtask(subtask_id, db_path=None):
+    """Elimina una subtarea del checklist."""
+    db_path = db_path or DB_NAME
+    with get_connection(db_path) as conn:
+        conn.execute("DELETE FROM subtasks WHERE id = ?", (subtask_id,))
+        conn.commit()
+
+def get_subtasks_progress_bulk(task_ids, db_path=None):
+    """Devuelve {task_id: (hechas, total)} para varias tareas en UNA sola consulta.
+
+    Evita el patrón N+1 al pintar el tablero (badge de progreso en las tarjetas).
+    Las tareas sin subtareas no aparecen en el diccionario (usar .get con (0, 0))."""
+    db_path = db_path or DB_NAME
+    result = {}
+    if not task_ids:
+        return result
+    placeholders = ",".join("?" * len(task_ids))
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""SELECT task_id,
+                       SUM(CASE WHEN done = 1 THEN 1 ELSE 0 END) AS done_count,
+                       COUNT(*) AS total
+                FROM subtasks
+                WHERE task_id IN ({placeholders})
+                GROUP BY task_id""",
+            list(task_ids)
+        )
+        for row in cursor.fetchall():
+            result[row["task_id"]] = (row["done_count"], row["total"])
+    return result
 
 def get_task_tags(task_id, db_path=None):
     db_path = db_path or DB_NAME
@@ -571,6 +666,52 @@ def get_scheduled_tasks(start_date=None, end_date=None, board_id=None, db_path=N
         t["tags"] = tags_by_task.get(t["id"], [])
     return tasks
 
+# --- BÚSQUEDA GLOBAL DE TAREAS ---
+
+def search_tasks(text="", board_id=None, tag_value_id=None, only_due=False, db_path=None):
+    """Busca tareas en todos los tableros (o en uno) con filtros opcionales.
+
+    - text: subcadena en el título o la descripción (sin distinguir mayúsculas).
+    - board_id: limitar a un tablero.
+    - tag_value_id: solo tareas que tengan esa etiqueta (Categoría: Valor).
+    - only_due: solo tareas con fecha de vencimiento.
+    Devuelve dicts enriquecidos con tablero, columna y etiquetas, ordenados por
+    tablero y título. Cada elemento incluye board_id/board_name/board_color para
+    poder saltar a la tarjeta desde los resultados."""
+    db_path = db_path or DB_NAME
+    query = [
+        "SELECT DISTINCT t.id, t.title, t.description, t.due_date, t.column_id, t.updated_at,",
+        "       c.board_id AS board_id, b.name AS board_name, b.color AS board_color,",
+        "       c.name AS column_name",
+        "FROM tasks t",
+        "JOIN columns c ON t.column_id = c.id",
+        "JOIN boards b ON c.board_id = b.id",
+    ]
+    params = []
+    if tag_value_id is not None:
+        query.append("JOIN task_tags tt ON tt.task_id = t.id AND tt.tag_value_id = ?")
+        params.append(tag_value_id)
+    query.append("WHERE 1 = 1")
+    if text:
+        query.append("AND (t.title LIKE ? OR t.description LIKE ?)")
+        like = f"%{text}%"
+        params.extend([like, like])
+    if board_id is not None:
+        query.append("AND c.board_id = ?")
+        params.append(board_id)
+    if only_due:
+        query.append("AND t.due_date IS NOT NULL AND t.due_date != ''")
+    query.append("ORDER BY b.name ASC, t.title ASC")
+
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("\n".join(query), params)
+        tasks = [dict(row) for row in cursor.fetchall()]
+    tags_by_task = get_task_tags_bulk([t["id"] for t in tasks], db_path)
+    for t in tasks:
+        t["tags"] = tags_by_task.get(t["id"], [])
+    return tasks
+
 # --- AJUSTES DE LA APLICACIÓN (clave/valor) ---
 
 def get_setting(key, default=None, db_path=None):
@@ -772,7 +913,18 @@ def copy_column_to_board(column_id, target_board_id, db_path=None):
                     "INSERT INTO task_logs (task_id, content, created_at) VALUES (?, ?, ?)",
                     (new_task_id, log["content"], log["created_at"])
                 )
-                
+
+            # Duplicar subtareas (checklist), conservando estado done y orden
+            cursor.execute(
+                "SELECT title, done, position FROM subtasks WHERE task_id = ? ORDER BY position ASC",
+                (old_task_id,)
+            )
+            for sub in cursor.fetchall():
+                cursor.execute(
+                    "INSERT INTO subtasks (task_id, title, done, position) VALUES (?, ?, ?, ?)",
+                    (new_task_id, sub["title"], sub["done"], sub["position"])
+                )
+
         conn.commit()
         return new_column_id
 
@@ -843,6 +995,17 @@ def copy_board(board_id, new_name, new_color, db_path=None):
                         "INSERT INTO task_logs (task_id, content, created_at) VALUES (?, ?, ?)",
                         (new_task_id, log["content"], log["created_at"])
                     )
-                    
+
+                # Duplicar subtareas (checklist), conservando estado done y orden
+                cursor.execute(
+                    "SELECT title, done, position FROM subtasks WHERE task_id = ? ORDER BY position ASC",
+                    (old_task_id,)
+                )
+                for sub in cursor.fetchall():
+                    cursor.execute(
+                        "INSERT INTO subtasks (task_id, title, done, position) VALUES (?, ?, ?, ?)",
+                        (new_task_id, sub["title"], sub["done"], sub["position"])
+                    )
+
         conn.commit()
         return new_board_id

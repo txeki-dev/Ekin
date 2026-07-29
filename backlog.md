@@ -71,8 +71,10 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 - [ ] **Per-board `.ics` feeds** so each board can be a separate subscribable calendar.
 
 ### Task power features
-- [ ] **Global search & filter** (by title, tag, due, board).
-- [ ] **Subtasks / checklists** inside a card.
+- [x] **Global search & filter** (by title, tag, due, board) *(implemented — branch
+  `feat/0.5.0-subtasks`; 🔍 sidebar button + Ctrl+F; ships with 0.5.0)*.
+- [x] **Subtasks / checklists** inside a card *(implemented — branch `feat/0.5.0-subtasks`, PR pending
+  review/merge; ships with 0.5.0)*.
 - [ ] **Recurring tasks** (daily/weekly/monthly).
 - [ ] **Attachments / links** on cards.
 - [ ] **Undo/redo** for destructive actions (delete task/column/board).
