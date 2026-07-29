@@ -29,6 +29,29 @@ class MarkdownTextEdit(QTextEdit):
 
     def keyPressEvent(self, event):
         cursor = self.textCursor()
+        ctrl = bool(event.modifiers() & Qt.ControlModifier)
+
+        # --- Cursiva con Ctrl+K (como «Cursiva» en Word en español) ---
+        if ctrl and event.key() == Qt.Key_K:
+            fmt = QTextCharFormat()
+            fmt.setFontItalic(not self.fontItalic())
+            self.mergeCurrentCharFormat(fmt)
+            event.accept()
+            return
+        # Neutralizar el Ctrl+I nativo: la cursiva ahora es Ctrl+K
+        if ctrl and event.key() == Qt.Key_I:
+            event.accept()
+            return
+
+        # --- Tab / Shift+Tab dentro de una lista: anidar / desanidar la viñeta ---
+        if event.key() == Qt.Key_Tab and cursor.block().textList() is not None and not cursor.hasSelection():
+            self._change_list_indent(+1)
+            event.accept()
+            return
+        if event.key() == Qt.Key_Backtab and cursor.block().textList() is not None:
+            self._change_list_indent(-1)
+            event.accept()
+            return
 
         # --- Espacio: intentar convertir el marcador en una lista ---
         if event.key() == Qt.Key_Space and not cursor.hasSelection():
@@ -86,6 +109,36 @@ class MarkdownTextEdit(QTextEdit):
         cursor.endEditBlock()
         self.setTextCursor(cursor)
 
+    @staticmethod
+    def _style_for_indent(current_style, indent):
+        """Elige el símbolo de viñeta según el nivel de anidamiento (las listas
+        numeradas conservan su estilo)."""
+        ordered = current_style in (
+            QTextListFormat.ListDecimal, QTextListFormat.ListLowerAlpha,
+            QTextListFormat.ListUpperAlpha, QTextListFormat.ListLowerRoman,
+            QTextListFormat.ListUpperRoman,
+        )
+        if ordered:
+            return current_style
+        bullets = [QTextListFormat.ListDisc, QTextListFormat.ListCircle, QTextListFormat.ListSquare]
+        return bullets[(max(1, indent) - 1) % len(bullets)]
+
+    def _change_list_indent(self, delta):
+        """Aumenta (Tab) o reduce (Shift+Tab) el nivel de anidamiento de la viñeta actual."""
+        cursor = self.textCursor()
+        current = cursor.currentList()
+        if current is None:
+            return
+        fmt = current.format()
+        new_indent = max(1, fmt.indent() + delta)
+        cursor.beginEditBlock()
+        new_fmt = QTextListFormat()
+        new_fmt.setIndent(new_indent)
+        new_fmt.setStyle(self._style_for_indent(fmt.style(), new_indent))
+        cursor.createList(new_fmt)
+        cursor.endEditBlock()
+        self.setTextCursor(cursor)
+
 
 class RichTextToolbar(QWidget):
     """Barra de formato básica (negrita, cursiva, viñetas) para un QTextEdit."""
@@ -111,7 +164,7 @@ class RichTextToolbar(QWidget):
 
         self.italic_btn = QPushButton("I")
         self.italic_btn.setObjectName("FormatButton")
-        self.italic_btn.setToolTip("Cursiva (Ctrl+I)")
+        self.italic_btn.setToolTip("Cursiva (Ctrl+K)")
         self.italic_btn.setCheckable(True)
         self.italic_btn.setCursor(Qt.PointingHandCursor)
         self.italic_btn.setFixedSize(28, 26)
