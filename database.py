@@ -125,17 +125,26 @@ def init_db(db_path=None):
             )
         """)
 
-        # Subtareas / checklist dentro de una tarea (done: 0/1, ordenadas por position)
+        # Subtareas / checklist dentro de una tarea (done: 0/1, ordenadas por position).
+        # parent_id permite anidar (subtarea -> subsubtarea); NULL = subtarea de primer nivel.
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS subtasks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 task_id INTEGER NOT NULL,
+                parent_id INTEGER,
                 title TEXT NOT NULL,
                 done INTEGER NOT NULL DEFAULT 0,
                 position INTEGER NOT NULL,
-                FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+                FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+                FOREIGN KEY(parent_id) REFERENCES subtasks(id) ON DELETE CASCADE
             )
         """)
+
+        # Migración: añadir parent_id a bases de datos de la 0.5.0 (subtareas planas)
+        cursor.execute("PRAGMA table_info(subtasks)")
+        subtasks_columns = [row[1] for row in cursor.fetchall()]
+        if "parent_id" not in subtasks_columns:
+            cursor.execute("ALTER TABLE subtasks ADD COLUMN parent_id INTEGER")
 
         # Migración: enlazar task_tags con tag_values en vez de usar texto/color libres
         cursor.execute("PRAGMA table_info(task_tags)")
@@ -345,28 +354,42 @@ def update_task_due_date(task_id, due_date, db_path=None):
 
 # --- SUBTAREAS / CHECKLIST ---
 
-def create_subtask(task_id, title, db_path=None):
-    """Añade una subtarea al final del checklist de una tarea. Devuelve su id."""
+def create_subtask(task_id, title, parent_id=None, db_path=None):
+    """Añade una subtarea al final del checklist. Con `parent_id` crea una subsubtarea
+    anidada bajo esa subtarea. La posición es relativa a sus hermanas. Devuelve su id."""
     db_path = db_path or DB_NAME
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT COALESCE(MAX(position), -1) FROM subtasks WHERE task_id = ?", (task_id,))
+        if parent_id is None:
+            cursor.execute(
+                "SELECT COALESCE(MAX(position), -1) FROM subtasks WHERE task_id = ? AND parent_id IS NULL",
+                (task_id,)
+            )
+        else:
+            cursor.execute(
+                "SELECT COALESCE(MAX(position), -1) FROM subtasks WHERE task_id = ? AND parent_id = ?",
+                (task_id, parent_id)
+            )
         next_pos = cursor.fetchone()[0] + 1
         cursor.execute(
-            "INSERT INTO subtasks (task_id, title, done, position) VALUES (?, ?, 0, ?)",
-            (task_id, title, next_pos)
+            "INSERT INTO subtasks (task_id, parent_id, title, done, position) VALUES (?, ?, ?, 0, ?)",
+            (task_id, parent_id, title, next_pos)
         )
         conn.execute("UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", (task_id,))
         conn.commit()
         return cursor.lastrowid
 
 def get_subtasks(task_id, db_path=None):
-    """Devuelve las subtareas de una tarea, ordenadas por posición. `done` es 0/1."""
+    """Devuelve TODAS las subtareas de una tarea (ambos niveles) como lista plana con
+    `parent_id`, ordenada por nivel y posición. `done` es 0/1. La UI reconstruye el árbol
+    agrupando por `parent_id` (NULL = primer nivel)."""
     db_path = db_path or DB_NAME
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, task_id, title, done, position FROM subtasks WHERE task_id = ? ORDER BY position ASC",
+            """SELECT id, task_id, parent_id, title, done, position
+               FROM subtasks WHERE task_id = ?
+               ORDER BY (parent_id IS NOT NULL), parent_id, position ASC""",
             (task_id,)
         )
         return [dict(row) for row in cursor.fetchall()]
@@ -391,9 +414,13 @@ def update_subtask_title(subtask_id, title, db_path=None):
         conn.commit()
 
 def delete_subtask(subtask_id, db_path=None):
-    """Elimina una subtarea del checklist."""
+    """Elimina una subtarea y (explícitamente) sus subsubtareas anidadas.
+
+    En BD nuevas el FK `parent_id` cascada solo; en las migradas de 0.5.0 la columna se
+    añadió por ALTER sin FK, así que borramos los hijos a mano para que sea consistente."""
     db_path = db_path or DB_NAME
     with get_connection(db_path) as conn:
+        conn.execute("DELETE FROM subtasks WHERE parent_id = ?", (subtask_id,))
         conn.execute("DELETE FROM subtasks WHERE id = ?", (subtask_id,))
         conn.commit()
 
@@ -914,16 +941,21 @@ def copy_column_to_board(column_id, target_board_id, db_path=None):
                     (new_task_id, log["content"], log["created_at"])
                 )
 
-            # Duplicar subtareas (checklist), conservando estado done y orden
+            # Duplicar subtareas (checklist) conservando anidamiento (parent_id), done y orden.
+            # Se insertan primero las de primer nivel para poder remapear los parent_id.
             cursor.execute(
-                "SELECT title, done, position FROM subtasks WHERE task_id = ? ORDER BY position ASC",
+                """SELECT id, parent_id, title, done, position FROM subtasks
+                   WHERE task_id = ? ORDER BY (parent_id IS NOT NULL), parent_id, position ASC""",
                 (old_task_id,)
             )
+            sub_id_map = {}
             for sub in cursor.fetchall():
+                new_parent = sub_id_map.get(sub["parent_id"]) if sub["parent_id"] is not None else None
                 cursor.execute(
-                    "INSERT INTO subtasks (task_id, title, done, position) VALUES (?, ?, ?, ?)",
-                    (new_task_id, sub["title"], sub["done"], sub["position"])
+                    "INSERT INTO subtasks (task_id, parent_id, title, done, position) VALUES (?, ?, ?, ?, ?)",
+                    (new_task_id, new_parent, sub["title"], sub["done"], sub["position"])
                 )
+                sub_id_map[sub["id"]] = cursor.lastrowid
 
         conn.commit()
         return new_column_id
@@ -996,16 +1028,20 @@ def copy_board(board_id, new_name, new_color, db_path=None):
                         (new_task_id, log["content"], log["created_at"])
                     )
 
-                # Duplicar subtareas (checklist), conservando estado done y orden
+                # Duplicar subtareas (checklist) conservando anidamiento (parent_id), done y orden.
                 cursor.execute(
-                    "SELECT title, done, position FROM subtasks WHERE task_id = ? ORDER BY position ASC",
+                    """SELECT id, parent_id, title, done, position FROM subtasks
+                       WHERE task_id = ? ORDER BY (parent_id IS NOT NULL), parent_id, position ASC""",
                     (old_task_id,)
                 )
+                sub_id_map = {}
                 for sub in cursor.fetchall():
+                    new_parent = sub_id_map.get(sub["parent_id"]) if sub["parent_id"] is not None else None
                     cursor.execute(
-                        "INSERT INTO subtasks (task_id, title, done, position) VALUES (?, ?, ?, ?)",
-                        (new_task_id, sub["title"], sub["done"], sub["position"])
+                        "INSERT INTO subtasks (task_id, parent_id, title, done, position) VALUES (?, ?, ?, ?, ?)",
+                        (new_task_id, new_parent, sub["title"], sub["done"], sub["position"])
                     )
+                    sub_id_map[sub["id"]] = cursor.lastrowid
 
         conn.commit()
         return new_board_id

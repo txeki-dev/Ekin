@@ -513,6 +513,49 @@ def test_copy_board_duplicates_subtasks(db_path):
     assert [(s["title"], s["done"]) for s in copied] == [("hecha", 1), ("pendiente", 0)]
 
 
+def test_nested_subtasks_positions_progress_and_cascade(db_path):
+    t = _task(db_path)
+    parent = database.create_subtask(t, "Padre", db_path=db_path)
+    child1 = database.create_subtask(t, "Hijo 1", parent_id=parent, db_path=db_path)
+    child2 = database.create_subtask(t, "Hijo 2", parent_id=parent, db_path=db_path)
+    top2 = database.create_subtask(t, "Otro padre", db_path=db_path)
+
+    by_id = {s["id"]: s for s in database.get_subtasks(t, db_path=db_path)}
+    assert by_id[parent]["parent_id"] is None and by_id[top2]["parent_id"] is None
+    assert by_id[child1]["parent_id"] == parent and by_id[child2]["parent_id"] == parent
+    # posición relativa a las hermanas del mismo padre
+    assert (by_id[parent]["position"], by_id[top2]["position"]) == (0, 1)
+    assert (by_id[child1]["position"], by_id[child2]["position"]) == (0, 1)
+
+    # el progreso cuenta ambos niveles (4 en total)
+    database.set_subtask_done(child1, True, db_path=db_path)
+    assert database.get_subtasks_progress_bulk([t], db_path=db_path)[t] == (1, 4)
+
+    # borrar el padre elimina sus hijos, no al otro padre de primer nivel
+    database.delete_subtask(parent, db_path=db_path)
+    assert {s["id"] for s in database.get_subtasks(t, db_path=db_path)} == {top2}
+
+
+def test_copy_board_preserves_subtask_nesting(db_path):
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    t = database.create_task(c, "T", db_path=db_path)
+    parent = database.create_subtask(t, "Padre", db_path=db_path)
+    database.create_subtask(t, "Hijo", parent_id=parent, db_path=db_path)
+
+    nb = database.copy_board(b, "Copia", "#123456", db_path=db_path)
+    ncol = database.get_columns(nb, db_path=db_path)[0]
+    ntask = database.get_tasks(ncol["id"], db_path=db_path)[0]
+    subs = database.get_subtasks(ntask["id"], db_path=db_path)
+
+    assert len(subs) == 2
+    new_parent = next(s for s in subs if s["parent_id"] is None)
+    new_child = next(s for s in subs if s["parent_id"] is not None)
+    assert (new_parent["title"], new_child["title"]) == ("Padre", "Hijo")
+    # el hijo copiado apunta al padre COPIADO, no al original
+    assert new_child["parent_id"] == new_parent["id"] and new_parent["id"] != parent
+
+
 # --- Búsqueda global (search_tasks) ---
 
 def test_search_matches_title_and_description(db_path):
