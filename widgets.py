@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QWidget, QMenu, QApplication, QLayout
 )
-from PySide6.QtGui import QDrag, QPixmap, QCursor
+from PySide6.QtGui import QDrag, QPixmap, QCursor, QPainter, QColor
 from datetime import datetime
 import styles
 from styles import hex_to_rgb
@@ -406,6 +406,32 @@ class DraggableColumnTitle(QLabel):
             self.column_widget.show()
 
 
+class VerticalLabel(QLabel):
+    """Etiqueta con el texto girado 90° (nombre de una columna plegada)."""
+    def __init__(self, text="", color=None, parent=None):
+        super().__init__(text, parent)
+        self._color = color or "#e2e8f0"
+        self.setStyleSheet("background: transparent; border: none;")
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setPen(QColor(self._color))
+        painter.setFont(self.font())
+        painter.translate(self.width(), 0)
+        painter.rotate(90)
+        painter.drawText(QRect(0, 0, self.height(), self.width()),
+                         int(Qt.AlignLeft | Qt.AlignVCenter), self.text())
+        painter.end()
+
+    def sizeHint(self):
+        s = super().sizeHint()
+        return QSize(s.height(), s.width())
+
+    def minimumSizeHint(self):
+        s = super().minimumSizeHint()
+        return QSize(s.height(), s.width())
+
+
 class ColumnWidget(QFrame):
     # Señales reenviadas
     task_dropped = Signal(int, int, int) # task_id, column_id, position
@@ -413,56 +439,34 @@ class ColumnWidget(QFrame):
     edit_column_requested = Signal(int) # column_id
     delete_column_requested = Signal(int) # column_id
     copy_column_requested = Signal(int)  # column_id
+    collapse_toggle_requested = Signal(int)  # column_id (plegar/desplegar)
+
+    COLLAPSED_WIDTH = 46
+    EXPANDED_WIDTH = 280
 
     def __init__(self, column_data, parent=None):
         super().__init__(parent)
         self.column_data = column_data
         self.column_id = column_data["id"]
-        
+        self.collapsed = bool(column_data.get("collapsed", 0))
+
         self.setObjectName("ColumnContainer")
         self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setFixedWidth(self.COLLAPSED_WIDTH if self.collapsed else self.EXPANDED_WIDTH)
         self.init_ui()
 
-    def init_ui(self):
-        # Layout principal de la columna (Vertical)
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(8, 8, 8, 8)
-        main_layout.setSpacing(8)
-
-        # 1. Cabecera de la columna
-        header_widget = QWidget()
-        header_widget.setObjectName("ColumnHeaderBar")
-        # Aplicamos el color de borde superior correspondiente al color de la columna
-        header_widget.setStyleSheet(
-            f"#ColumnHeaderBar {{ border-bottom: 3px solid {self.column_data['color']}; padding-bottom: 4px; }}"
-        )
-        
-        header_layout = QHBoxLayout(header_widget)
-        header_layout.setContentsMargins(6, 4, 6, 4)
-        header_layout.setSpacing(4)
-
-        # Nombre de la columna (arrastrable para reordenar o mover a otro tablero)
-        self.title_label = DraggableColumnTitle(self.column_data["name"], self)
-        self.title_label.setObjectName("ColumnTitle")
-        self.title_label.setToolTip("Arrastra para reordenar o mover esta columna a otro tablero")
-        header_layout.addWidget(self.title_label)
-        header_layout.addStretch()
-
-        # Botón de menú para editar/borrar la columna
-        self.menu_btn = QPushButton("⋮")
-        self.menu_btn.setFixedWidth(24)
-        self.menu_btn.setFixedHeight(24)
-        self.menu_btn.setCursor(Qt.PointingHandCursor)
-        self.menu_btn.setToolTip("Opciones de columna")
-        
-        # Estilo del botón a juego con el marco y color de la columna
+    def _column_icon_button(self, text, tooltip):
+        """Pequeño botón cuadrado de icono a juego con el color de la columna."""
+        btn = QPushButton(text)
+        btn.setFixedSize(24, 24)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setToolTip(tooltip)
         try:
             r, g, b = hex_to_rgb(self.column_data["color"])
         except Exception:
             r, g, b = 59, 130, 246
-            
         color = self.column_data["color"]
-        self.menu_btn.setStyleSheet(f"""
+        btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: rgba({r}, {g}, {b}, 0.1);
                 border: 1.2px solid rgba({r}, {g}, {b}, 0.45);
@@ -476,11 +480,76 @@ class ColumnWidget(QFrame):
                 border-color: {color};
                 color: #ffffff;
             }}
-            QPushButton:pressed {{
-                background-color: rgba({r}, {g}, {b}, 0.4);
-            }}
+            QPushButton:pressed {{ background-color: rgba({r}, {g}, {b}, 0.4); }}
         """)
-        
+        return btn
+
+    def init_ui(self):
+        if self.collapsed:
+            self._init_collapsed_ui()
+        else:
+            self._init_expanded_ui()
+
+    def _init_collapsed_ui(self):
+        """Columna plegada: tira estrecha con botón de desplegar, contador y nombre vertical."""
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(4, 8, 4, 8)
+        layout.setSpacing(8)
+        layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
+
+        expand_btn = self._column_icon_button("»", "Desplegar columna")
+        expand_btn.clicked.connect(lambda: self.collapse_toggle_requested.emit(self.column_id))
+        layout.addWidget(expand_btn, 0, Qt.AlignHCenter)
+
+        count = self.column_data.get("task_count", 0)
+        count_label = QLabel(str(count))
+        count_label.setAlignment(Qt.AlignHCenter)
+        count_label.setToolTip(f"{count} tarea(s)")
+        count_label.setStyleSheet(
+            f"color: {styles.COLORS['text_muted']}; font-size: 12px; font-weight: bold; background: transparent;"
+        )
+        layout.addWidget(count_label, 0, Qt.AlignHCenter)
+
+        name_label = VerticalLabel(self.column_data["name"], self.column_data["color"])
+        f = name_label.font()
+        f.setBold(True)
+        name_label.setFont(f)
+        layout.addWidget(name_label, 1, Qt.AlignHCenter)
+
+        self.set_column_style(dragging=False)
+
+    def _init_expanded_ui(self):
+        # Layout principal de la columna (Vertical)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(8, 8, 8, 8)
+        main_layout.setSpacing(8)
+
+        # 1. Cabecera de la columna
+        header_widget = QWidget()
+        header_widget.setObjectName("ColumnHeaderBar")
+        # Aplicamos el color de borde superior correspondiente al color de la columna
+        header_widget.setStyleSheet(
+            f"#ColumnHeaderBar {{ border-bottom: 3px solid {self.column_data['color']}; padding-bottom: 4px; }}"
+        )
+
+        header_layout = QHBoxLayout(header_widget)
+        header_layout.setContentsMargins(6, 4, 6, 4)
+        header_layout.setSpacing(4)
+
+        # Nombre de la columna (arrastrable para reordenar o mover a otro tablero)
+        self.title_label = DraggableColumnTitle(self.column_data["name"], self)
+        self.title_label.setObjectName("ColumnTitle")
+        self.title_label.setToolTip("Arrastra para reordenar o mover esta columna a otro tablero")
+        header_layout.addWidget(self.title_label)
+        header_layout.addStretch()
+
+        # Botón para plegar la columna
+        collapse_btn = self._column_icon_button("«", "Plegar columna")
+        collapse_btn.clicked.connect(lambda: self.collapse_toggle_requested.emit(self.column_id))
+        header_layout.addWidget(collapse_btn)
+
+        # Botón de menú para editar/borrar la columna
+        self.menu_btn = self._column_icon_button("⋮", "Opciones de columna")
         self.menu_btn.clicked.connect(self.show_column_menu)
         header_layout.addWidget(self.menu_btn)
 
@@ -491,18 +560,18 @@ class ColumnWidget(QFrame):
         scroll_area.setObjectName("TaskListArea")
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        
+
         # El contenedor interno que acepta drops
         self.list_area = TaskListArea(self.column_id)
         self.list_area.task_dropped.connect(self.task_dropped.emit)
-        
+
         # Aplicar el estilo dinámico inicial a la columna
         self.set_column_style(dragging=False)
-        
+
         # Efecto visual al arrastrar sobre esta columna usando su propio color
         self.list_area.drag_entered.connect(lambda: self.set_column_style(dragging=True))
         self.list_area.drag_left.connect(lambda: self.set_column_style(dragging=False))
-        
+
         scroll_area.setWidget(self.list_area)
         main_layout.addWidget(scroll_area)
 
@@ -579,5 +648,7 @@ class ColumnWidget(QFrame):
                 widget.deleteLater()
 
     def add_task_card(self, card_widget):
-        """Añade una tarjeta de tarea a la columna."""
+        """Añade una tarjeta de tarea a la columna (no-op si está plegada)."""
+        if not hasattr(self, "list_area"):
+            return
         self.list_area.list_layout.addWidget(card_widget)

@@ -40,9 +40,16 @@ def init_db(db_path=None):
                 name TEXT NOT NULL,
                 color TEXT NOT NULL DEFAULT '#3b82f6',
                 position INTEGER NOT NULL,
+                collapsed INTEGER NOT NULL DEFAULT 0,
                 FOREIGN KEY(board_id) REFERENCES boards(id) ON DELETE CASCADE
             )
         """)
+
+        # Migración: añadir 'collapsed' (columna plegada) a BD anteriores
+        cursor.execute("PRAGMA table_info(columns)")
+        columns_cols = [row[1] for row in cursor.fetchall()]
+        if "collapsed" not in columns_cols:
+            cursor.execute("ALTER TABLE columns ADD COLUMN collapsed INTEGER NOT NULL DEFAULT 0")
         
         # Tabla de tareas (tasks)
         cursor.execute("""
@@ -245,7 +252,7 @@ def get_columns(board_id, db_path=None):
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, board_id, name, color, position FROM columns WHERE board_id = ? ORDER BY position ASC",
+            "SELECT id, board_id, name, color, position, collapsed FROM columns WHERE board_id = ? ORDER BY position ASC",
             (board_id,)
         )
         return [dict(row) for row in cursor.fetchall()]
@@ -257,6 +264,13 @@ def update_column(column_id, name, color, db_path=None):
             "UPDATE columns SET name = ?, color = ? WHERE id = ?",
             (name, color, column_id)
         )
+        conn.commit()
+
+def set_column_collapsed(column_id, collapsed, db_path=None):
+    """Pliega (collapsed=1) o despliega (0) una columna del tablero."""
+    db_path = db_path or DB_NAME
+    with get_connection(db_path) as conn:
+        conn.execute("UPDATE columns SET collapsed = ? WHERE id = ?", (1 if collapsed else 0, column_id))
         conn.commit()
 
 def update_column_positions(column_positions, db_path=None):

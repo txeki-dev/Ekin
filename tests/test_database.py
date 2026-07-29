@@ -79,6 +79,16 @@ def test_update_column(db_path):
     assert col["color"] == "#222222"
 
 
+def test_set_column_collapsed(db_path):
+    board_id = database.create_board("Board", db_path=db_path)
+    col_id = database.create_column(board_id, "Col", db_path=db_path)
+    assert database.get_columns(board_id, db_path)[0]["collapsed"] == 0
+    database.set_column_collapsed(col_id, True, db_path=db_path)
+    assert database.get_columns(board_id, db_path)[0]["collapsed"] == 1
+    database.set_column_collapsed(col_id, False, db_path=db_path)
+    assert database.get_columns(board_id, db_path)[0]["collapsed"] == 0
+
+
 def test_update_column_positions_reorders(db_path):
     board_id = database.create_board("Board", db_path=db_path)
     c1 = database.create_column(board_id, "Uno", db_path=db_path)
