@@ -174,11 +174,23 @@ Ekin turns every task that has a due date into an **all-day event** in a standar
      Use instead: https://drive.google.com/uc?export=download&id=FILE_ID
      ```
    * **Dropbox** — copy the share link and change its trailing `?dl=0` to **`?dl=1`**.
+   * **OneDrive** — **Share** → **Anyone with the link** → copy the link.
    * **Tip:** open your final URL in a private/incognito window — you should see raw text starting with `BEGIN:VCALENDAR`. If you get a login page or an HTML preview, the URL or the sharing permission is wrong.
-3. Subscribe from your calendar app using that URL:
-   * **Google Calendar** (web): paste your public URL into the **🌐 Suscribirse en Google Calendar** box in **⚙ Ajustes** and click **➕ Suscribirse en Google** — Ekin saves the URL, copies it to your clipboard and opens Google's *add-by-URL* page, where you just paste (`Ctrl+V`) and click **Add calendar**. (Manual path: *Other calendars* → **+** → **From URL**.)
-   * **Apple / iOS**: *File → New Calendar Subscription* (Mac), or open the URL on iOS.
-   * **Outlook**: *Add calendar → Subscribe from web*.
+3. Subscribe from your calendar app using that URL. In **⚙ Ajustes** paste it into the **🌐 Suscribirse en tu calendario** box, then use the button for your provider (it saves the URL, copies it, and opens the right page). Detailed steps per provider:
+
+   **🟦 Google Calendar** (must be done on a computer — the mobile app can't add by URL):
+   1. Click **Google** in Ekin (or go to Google Calendar on the web).
+   2. Left sidebar → **Other calendars** → **+** → **From URL**.
+   3. Paste the URL (`Ctrl+V`) → **Add calendar**.
+   4. Google re-fetches external URLs **slowly (every several hours, up to ~24 h)** — this can't be forced.
+
+   **🟧 Outlook**:
+   * **Outlook.com / Microsoft 365 (web)** — click **Outlook** in Ekin (opens *Add calendar*), then **Subscribe from web** → paste the URL → give it a name/color → **Import/Subscribe**. (Work/365 accounts: same option at *outlook.office.com*.)
+   * **Outlook desktop (classic)** — **Home** → **Open Calendar** → **From Internet…** → paste the URL → **OK**.
+
+   **🍎 Apple / iCloud** (uses a `webcal://` link — click **Apple / iCloud** in Ekin to copy it in that form):
+   * **iPhone / iPad** — **Settings → Calendar → Accounts → Add Account → Other → Add Subscribed Calendar** → paste the link → **Next**.
+   * **Mac (Calendar app)** — **File → New Calendar Subscription…** → paste the link → **Subscribe**; here you can set the **refresh frequency** (as often as every few minutes). The subscription lives in iCloud and appears on all your Apple devices.
 
 ### What to expect
 * The calendar **appears within a minute or two** if the URL is valid. If it shows up empty or errors out, it's the URL/permissions — **not** a matter of waiting.
