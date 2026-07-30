@@ -10,9 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [0.5.1] - 2026-07-30
 
 ### Added
-- **Collapsible board columns.** A **◀** button collapses a column to a narrow strip (expand **▶**,
+- **Collapsible board columns.** A **◀️** button collapses a column to a narrow strip (expand **▶️**,
   task count, vertical name) to save horizontal space; the collapsed state is saved per column
-  (`columns.collapsed`).
+  (`columns.collapsed`). **Dragging a card onto a collapsed column expands it** and drops the card in.
 - **Rich-text editor upgrades** (task description + diary): **Tab** nests a bullet into a sub‑bullet
   (**Shift+Tab** un‑nests; glyph varies by depth ● ○ ▪); external text now **pastes as plain text**
   (no foreign fonts/colors); and you can **paste images** directly (embedded inline in the note).
@@ -24,8 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Formatting shortcuts now accept both conventions: **bold = Ctrl+B or Ctrl+N**, **italic = Ctrl+K or
   Ctrl+I** (Spanish MS Word uses N/K). The italic toolbar button now shows **K** (an italic "I" reads
   like a "/").
-- Clearer **column header icons** (**◀** collapse, **✎** edit/options) and a roomier, growable diary
-  input box (there was never a character limit on notes/descriptions — content is stored in full).
+- **Column header icons now use emoji** (**◀️** collapse, **✏️** edit/options) so they always render
+  (the previous text glyphs were blank in some fonts).
+- **Bigger task-detail window** (more room for the description and diary), a roomier growable diary
+  box (there was never a character limit — content is stored in full), and pasted **images now scale
+  to the text box width**.
 
 ### Removed
 - **Subtasks / checklists** (introduced in 0.5.0). The whole feature was removed — the in‑card

@@ -416,6 +416,7 @@ class ColumnWidget(QFrame):
     delete_column_requested = Signal(int) # column_id
     copy_column_requested = Signal(int)  # column_id
     collapse_toggle_requested = Signal(int)  # column_id (plegar/desplegar)
+    collapsed_card_drop = Signal(int, int)   # task_id, column_id (soltar tarjeta en columna plegada)
 
     COLLAPSED_WIDTH = 46
     EXPANDED_WIDTH = 280
@@ -467,13 +468,15 @@ class ColumnWidget(QFrame):
             self._init_expanded_ui()
 
     def _init_collapsed_ui(self):
-        """Columna plegada: tira estrecha con botón de desplegar, contador y nombre vertical."""
+        """Columna plegada: tira estrecha con botón de desplegar, contador y nombre vertical.
+        Acepta soltar una tarjeta encima: se despliega y recibe la tarjeta."""
+        self.setAcceptDrops(True)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 8, 4, 8)
         layout.setSpacing(8)
         layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
 
-        expand_btn = self._column_icon_button("▶", "Desplegar columna")
+        expand_btn = self._column_icon_button("▶️", "Desplegar columna")
         expand_btn.clicked.connect(lambda: self.collapse_toggle_requested.emit(self.column_id))
         layout.addWidget(expand_btn, 0, Qt.AlignHCenter)
 
@@ -519,13 +522,13 @@ class ColumnWidget(QFrame):
         header_layout.addWidget(self.title_label)
         header_layout.addStretch()
 
-        # Botón para plegar la columna (◀ = plegar hacia la izquierda)
-        collapse_btn = self._column_icon_button("◀", "Plegar columna")
+        # Botón para plegar la columna (◀️ = plegar hacia la izquierda)
+        collapse_btn = self._column_icon_button("◀️", "Plegar columna")
         collapse_btn.clicked.connect(lambda: self.collapse_toggle_requested.emit(self.column_id))
         header_layout.addWidget(collapse_btn)
 
-        # Botón de edición/opciones de la columna (✎ = editar / opciones)
-        self.menu_btn = self._column_icon_button("✎", "Editar columna (opciones: editar, copiar, eliminar)")
+        # Botón de edición/opciones de la columna (✏️ = editar / opciones)
+        self.menu_btn = self._column_icon_button("✏️", "Editar columna (opciones: editar, copiar, eliminar)")
         self.menu_btn.clicked.connect(self.show_column_menu)
         header_layout.addWidget(self.menu_btn)
 
@@ -557,6 +560,35 @@ class ColumnWidget(QFrame):
         self.add_task_btn.setCursor(Qt.PointingHandCursor)
         self.add_task_btn.clicked.connect(lambda: self.add_task_requested.emit(self.column_id))
         main_layout.addWidget(self.add_task_btn)
+
+    # --- Soltar una tarjeta sobre una columna PLEGADA (solo activo si collapsed) ---
+    def dragEnterEvent(self, event):
+        if self.collapsed and event.mimeData().hasFormat("application/x-ekin-task-id"):
+            event.acceptProposedAction()
+            self.set_column_style(dragging=True)
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if self.collapsed and event.mimeData().hasFormat("application/x-ekin-task-id"):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragLeaveEvent(self, event):
+        if self.collapsed:
+            self.set_column_style(dragging=False)
+        super().dragLeaveEvent(event)
+
+    def dropEvent(self, event):
+        mime = event.mimeData()
+        if self.collapsed and mime.hasFormat("application/x-ekin-task-id"):
+            task_id = int(mime.data("application/x-ekin-task-id").data().decode("utf-8"))
+            event.acceptProposedAction()
+            self.set_column_style(dragging=False)
+            self.collapsed_card_drop.emit(task_id, self.column_id)
+        else:
+            event.ignore()
 
     def set_column_style(self, dragging=False):
         """Establece el diseño de la columna (borde y fondo) basado en su color."""

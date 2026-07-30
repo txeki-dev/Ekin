@@ -358,6 +358,7 @@ class BoardViewWidget(QFrame):
             col_widget.delete_column_requested.connect(self.delete_column)
             col_widget.copy_column_requested.connect(self.copy_column)
             col_widget.collapse_toggle_requested.connect(self.handle_column_collapse)
+            col_widget.collapsed_card_drop.connect(self.handle_collapsed_card_drop)
 
             # Solo montamos las tarjetas si la columna está desplegada
             if not col_data.get("collapsed"):
@@ -461,6 +462,12 @@ class BoardViewWidget(QFrame):
         new_state = not (col_widget.collapsed if col_widget else False)
         database.set_column_collapsed(column_id, new_state, self.db_path)
         self.load_board(self.board_id)
+
+    def handle_collapsed_card_drop(self, task_id, column_id):
+        """Soltar una tarjeta sobre una columna plegada: la despliega y coloca la tarjeta al final."""
+        database.set_column_collapsed(column_id, False, self.db_path)
+        # Posición muy alta -> handle_task_drop la recorta al final de la columna destino
+        self.handle_task_drop(task_id, column_id, 10 ** 9)
 
     def handle_column_drop(self, column_id, target_position):
         """Reordena las columnas del tablero actual tras arrastrar una por su título."""

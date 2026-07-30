@@ -100,10 +100,11 @@ class MarkdownTextEdit(QTextEdit):
         super().insertFromMimeData(source)
 
     def _insert_image(self, image):
-        """Embebe un QImage como data URI base64 (queda guardado dentro del HTML)."""
-        max_w = 700  # escalar imágenes muy grandes para no inflar la base de datos
-        if image.width() > max_w:
-            image = image.scaledToWidth(max_w, Qt.SmoothTransformation)
+        """Embebe un QImage como data URI base64 (queda guardado dentro del HTML).
+        Ajusta la imagen al ancho del cuadro de texto (menos los márgenes)."""
+        avail = max(120, self.viewport().width() - 24)  # ancho útil del cuadro
+        if image.width() > avail:
+            image = image.scaledToWidth(avail, Qt.SmoothTransformation)
         buffer = QBuffer()
         buffer.open(QIODevice.WriteOnly)
         image.save(buffer, "PNG")
@@ -754,8 +755,8 @@ class TaskDetailDialog(QDialog):
         self.task_deleted = False  # Indica si se borró la tarea desde este diálogo
         
         self.setWindowTitle("Detalles de la Tarea")
-        self.resize(800, 550)
-        self.setMinimumSize(700, 450)
+        self.resize(1120, 720)
+        self.setMinimumSize(940, 580)
         
         self.init_ui()
         self.load_task_data()
