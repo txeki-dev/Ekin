@@ -21,8 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   README sync section documents all three in full.
 
 ### Changed
-- Formatting shortcuts match Spanish MS Word: **bold = Ctrl+B**, **italic = Ctrl+K** (the built‑in
-  Ctrl+I no longer toggles italic).
+- Formatting shortcuts now accept both conventions: **bold = Ctrl+B or Ctrl+N**, **italic = Ctrl+K or
+  Ctrl+I** (Spanish MS Word uses N/K). The italic toolbar button now shows **K** (an italic "I" reads
+  like a "/").
 - Clearer **column header icons** (**◀** collapse, **✎** edit/options) and a roomier, growable diary
   input box (there was never a character limit on notes/descriptions — content is stored in full).
 

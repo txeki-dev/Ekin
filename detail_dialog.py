@@ -31,22 +31,18 @@ class MarkdownTextEdit(QTextEdit):
         cursor = self.textCursor()
         ctrl = bool(event.modifiers() & Qt.ControlModifier)
 
-        # --- Negrita con Ctrl+B (explícito, para que siempre funcione) ---
-        if ctrl and event.key() == Qt.Key_B:
+        # --- Negrita: Ctrl+B o Ctrl+N (Negrita en Word en español) ---
+        if ctrl and event.key() in (Qt.Key_B, Qt.Key_N):
             fmt = QTextCharFormat()
             fmt.setFontWeight(QFont.Normal if self.fontWeight() > QFont.Normal else QFont.Bold)
             self.mergeCurrentCharFormat(fmt)
             event.accept()
             return
-        # --- Cursiva con Ctrl+K (como «Cursiva» en Word en español) ---
-        if ctrl and event.key() == Qt.Key_K:
+        # --- Cursiva: Ctrl+K (Cursiva en Word) o Ctrl+I ---
+        if ctrl and event.key() in (Qt.Key_K, Qt.Key_I):
             fmt = QTextCharFormat()
             fmt.setFontItalic(not self.fontItalic())
             self.mergeCurrentCharFormat(fmt)
-            event.accept()
-            return
-        # Neutralizar el Ctrl+I nativo: la cursiva ahora es Ctrl+K
-        if ctrl and event.key() == Qt.Key_I:
             event.accept()
             return
 
@@ -186,7 +182,7 @@ class RichTextToolbar(QWidget):
 
         self.bold_btn = QPushButton("B")
         self.bold_btn.setObjectName("FormatButton")
-        self.bold_btn.setToolTip("Negrita (Ctrl+B)")
+        self.bold_btn.setToolTip("Negrita (Ctrl+B o Ctrl+N)")
         self.bold_btn.setCheckable(True)
         self.bold_btn.setCursor(Qt.PointingHandCursor)
         self.bold_btn.setFixedSize(28, 26)
@@ -196,9 +192,10 @@ class RichTextToolbar(QWidget):
         self.bold_btn.clicked.connect(self.toggle_bold)
         layout.addWidget(self.bold_btn)
 
-        self.italic_btn = QPushButton("I")
+        # Etiqueta "K" (Cursiva): una "I" en cursiva se ve como "/", que confunde.
+        self.italic_btn = QPushButton("K")
         self.italic_btn.setObjectName("FormatButton")
-        self.italic_btn.setToolTip("Cursiva (Ctrl+K)")
+        self.italic_btn.setToolTip("Cursiva (Ctrl+K o Ctrl+I)")
         self.italic_btn.setCheckable(True)
         self.italic_btn.setCursor(Qt.PointingHandCursor)
         self.italic_btn.setFixedSize(28, 26)
