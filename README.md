@@ -14,7 +14,8 @@ Ekin Kanban is a sleek, resource-friendly, and offline-first personal Kanban boa
 - **Ultra-lightweight**: Operates with a minimal memory footprint (< 60MB RAM idle) compared to heavy Electron-based alternatives.
 - **Fluid Drag & Drop**: Native, smooth mouse controls to drag tasks across columns or reorder them.
 - **Task Journaling (Diario)**: A vertical, scrollable, timestamped diary inside each task card, perfect for keeping track of developer progress logs.
-- **Subtasks / Checklists**: Break a task into a checklist — add, tick, rename and delete items; the card shows a **`☑ done/total`** progress badge (green when complete).
+- **Rich Notes**: The description and diary support **bold** (Ctrl+B), *italic* (Ctrl+K) and nested bullet lists (Tab to indent). External text pastes as **plain text**, and you can **paste images** straight in.
+- **Collapsible Columns**: Fold a column you're not working on down to a slim strip (just its name and task count) with the **◀** button to save horizontal space.
 - **Global Search & Filter**: A 🔍 button (or **Ctrl+F**) searches every board by title/description and filters by board, tag, or due date; click a result to jump straight to its card.
 - **Due Dates & Multiple Tags**: Assign due dates using an interactive calendar popup and add multiple custom-colored tag pills to each task.
 - **Calendar View & Reminders**: A monthly calendar of your due dates (**drag a task chip to another day to reschedule it**), a deadline **bell** that groups **overdue**, today's, and tomorrow's tasks across all boards, and native **Windows notifications** for what's due today.
@@ -129,18 +130,18 @@ The database (`ekin_board.db`) is automatically initialized on the first run, an
 ### 2. Organizing Columns & Tasks
 * Inside a board, click **➕ Nueva Columna** to create stage headers (e.g., "To-Do", "In Progress", "Done").
 * **Reorder or move columns**: click and drag a column by its **title** to reorder it within the board, or drop it onto another board's button in the sidebar to move it there.
-* **Column Actions**: Click the three dots (**⋮**) in a column header to edit its name/color, delete it, or **copy** (clone) it and its tasks to another board.
+* **Column Actions**: Click the **✎** button in a column header to edit its name/color, delete it, or **copy** (clone) it and its tasks to another board.
+* **Collapse a column**: Click **◀** in the header to fold a column into a slim strip (name + task count); click **▶** on the strip to expand it again. The state is remembered per column.
 * Click **➕ Añadir Tarea** at the bottom of any column to quickly add a card.
 * **Drag & Drop**: Click and hold a task card to drag it to another column or change its vertical position.
 
 ### 3. Detail View, Structured Tags & Due Dates
 * Click on a task card to open the **Detail View**.
 * On the **left panel**:
-  - Change the task title and description, using the small toolbar for **bold**, *italic*, and bullet-list formatting.
+  - Change the task title and description. The toolbar (and shortcuts) give **bold** (Ctrl+B), *italic* (Ctrl+K) and bullet lists — press **Tab** on a bullet to nest it. Text pasted from elsewhere comes in as **plain text**, and you can **paste images** directly into the notes.
   - Set a **due date** using the calendar popup widget.
   - Click **➕ Asignar Etiqueta** to add a tag as a **Category: Value** pair (e.g. "Prioridad: Alta"), with its own color. Reusing an existing value keeps its color consistent everywhere it's used; typing a new one creates it on the fly.
-  - Use the **☑️ Subtareas** checklist to break the task into steps: type in the box and press Enter (or **➕ Añadir**), tick items as you finish them, click a title to rename it, or **×** to remove it. Changes save instantly, and the card shows a **`☑ done/total`** progress badge.
-* On the **right panel (Diario)**, type notes or updates about what you did (with the same bold/italic/bullet formatting toolbar), and press `Ctrl + Enter` (or click **✍️ Añadir al Diario**) to post it. Each note is saved with an automatic date and time stamp.
+* On the **right panel (Diario)**, type notes or updates about what you did (same formatting, plain-text paste and image paste), and press `Ctrl + Enter` (or click **✍️ Añadir al Diario**) to post it. Each note is saved with an automatic date and time stamp.
 * Click the red cross (**×**) on any note if you need to remove it.
 * Click **💾 Guardar Cambios** to apply your updates, or click **🗑️ Eliminar** to delete the entire task.
 * Collapse the sidebar using the **☰** button in the top left header bar to maximize workspace size.

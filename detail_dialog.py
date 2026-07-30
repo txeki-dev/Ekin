@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt, QDate, Signal
+from PySide6.QtCore import Qt, QDate, Signal, QBuffer, QIODevice
 from PySide6.QtWidgets import (
     QDialog, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QTextEdit, QPushButton, QScrollArea, QWidget,
@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import (
     QKeySequence, QColor, QShortcut, QFont, QTextCharFormat, QTextListFormat,
-    QTextCursor, QPixmap, QIcon
+    QTextCursor, QPixmap, QIcon, QImage
 )
 from datetime import datetime
 import re
@@ -31,6 +31,13 @@ class MarkdownTextEdit(QTextEdit):
         cursor = self.textCursor()
         ctrl = bool(event.modifiers() & Qt.ControlModifier)
 
+        # --- Negrita con Ctrl+B (explícito, para que siempre funcione) ---
+        if ctrl and event.key() == Qt.Key_B:
+            fmt = QTextCharFormat()
+            fmt.setFontWeight(QFont.Normal if self.fontWeight() > QFont.Normal else QFont.Bold)
+            self.mergeCurrentCharFormat(fmt)
+            event.accept()
+            return
         # --- Cursiva con Ctrl+K (como «Cursiva» en Word en español) ---
         if ctrl and event.key() == Qt.Key_K:
             fmt = QTextCharFormat()
@@ -80,6 +87,33 @@ class MarkdownTextEdit(QTextEdit):
                 return
 
         super().keyPressEvent(event)
+
+    def insertFromMimeData(self, source):
+        """Al pegar: las imágenes se insertan como imagen; el texto, SIEMPRE sin formato.
+
+        Así el contenido copiado de webs/Word se pega como texto plano (sin fuentes ni
+        colores ajenos), pero se pueden pegar capturas/imágenes del portapapeles."""
+        if source.hasImage():
+            image = source.imageData()
+            if isinstance(image, QImage) and not image.isNull():
+                self._insert_image(image)
+                return
+        if source.hasText():
+            self.insertPlainText(source.text())
+            return
+        super().insertFromMimeData(source)
+
+    def _insert_image(self, image):
+        """Embebe un QImage como data URI base64 (queda guardado dentro del HTML)."""
+        max_w = 700  # escalar imágenes muy grandes para no inflar la base de datos
+        if image.width() > max_w:
+            image = image.scaledToWidth(max_w, Qt.SmoothTransformation)
+        buffer = QBuffer()
+        buffer.open(QIODevice.WriteOnly)
+        image.save(buffer, "PNG")
+        b64 = bytes(buffer.data().toBase64()).decode("ascii")
+        buffer.close()
+        self.textCursor().insertHtml(f'<img src="data:image/png;base64,{b64}" />')
 
     def _convert_line_to_list(self, style):
         """Elimina el marcador escrito y convierte la línea actual en una lista."""
@@ -721,7 +755,6 @@ class TaskDetailDialog(QDialog):
         self.db_path = db_path
         self.current_tags = []      # Lista de diccionarios {'text': '...', 'color': '...'}
         self.task_deleted = False  # Indica si se borró la tarea desde este diálogo
-        self._collapsed = {}       # {subtask_id: bool} estado de plegado de cada subtarea
         
         self.setWindowTitle("Detalles de la Tarea")
         self.resize(800, 550)
@@ -811,51 +844,6 @@ class TaskDetailDialog(QDialog):
         tags_layout.addLayout(tag_btns_row)
         
         left_layout.addWidget(tags_section)
-
-        # 5. Subtareas / Checklist
-        subtasks_section = QWidget()
-        subtasks_outer = QVBoxLayout(subtasks_section)
-        subtasks_outer.setContentsMargins(0, 0, 0, 0)
-        subtasks_outer.setSpacing(4)
-
-        subtasks_header = QHBoxLayout()
-        subtasks_header.setSpacing(6)
-        subtasks_header.addWidget(QLabel("☑️ <b>Subtareas</b>"))
-        subtasks_header.addStretch()
-        self.subtasks_progress_label = QLabel("")
-        self.subtasks_progress_label.setStyleSheet(
-            f"color: {styles.COLORS['text_muted']}; font-size: 11px;"
-        )
-        subtasks_header.addWidget(self.subtasks_progress_label)
-        subtasks_outer.addLayout(subtasks_header)
-
-        subtasks_scroll = QScrollArea()
-        subtasks_scroll.setWidgetResizable(True)
-        subtasks_scroll.setFrameShape(QFrame.NoFrame)
-        subtasks_scroll.setStyleSheet("background: transparent; border: none;")
-        subtasks_scroll.setMaximumHeight(130)
-        self.subtasks_container = QWidget()
-        self.subtasks_container.setStyleSheet("background: transparent;")
-        self.subtasks_layout = QVBoxLayout(self.subtasks_container)
-        self.subtasks_layout.setContentsMargins(0, 0, 0, 0)
-        self.subtasks_layout.setSpacing(2)
-        self.subtasks_layout.setAlignment(Qt.AlignTop)
-        subtasks_scroll.setWidget(self.subtasks_container)
-        subtasks_outer.addWidget(subtasks_scroll)
-
-        add_sub_row = QHBoxLayout()
-        add_sub_row.setSpacing(6)
-        self.new_subtask_input = QLineEdit()
-        self.new_subtask_input.setPlaceholderText("Nueva subtarea…")
-        self.new_subtask_input.returnPressed.connect(self.add_subtask)
-        add_sub_row.addWidget(self.new_subtask_input)
-        self.add_subtask_btn = QPushButton("➕ Añadir")
-        self.add_subtask_btn.setCursor(Qt.PointingHandCursor)
-        self.add_subtask_btn.clicked.connect(self.add_subtask)
-        add_sub_row.addWidget(self.add_subtask_btn)
-        subtasks_outer.addLayout(add_sub_row)
-
-        left_layout.addWidget(subtasks_section)
         left_layout.addStretch()
 
         # Botones de Acción de la Tarea (Guardar, Eliminar, Cerrar)
@@ -912,7 +900,7 @@ class TaskDetailDialog(QDialog):
         self.logs_layout.setAlignment(Qt.AlignTop)
         
         self.scroll_area.setWidget(self.logs_container)
-        right_layout.addWidget(self.scroll_area)
+        right_layout.addWidget(self.scroll_area, 1)  # el historial domina el alto
 
         # Caja de entrada para nuevos logs
         input_container = QWidget()
@@ -922,7 +910,9 @@ class TaskDetailDialog(QDialog):
 
         self.log_input = MarkdownTextEdit()
         self.log_input.setPlaceholderText("Escribe una nota o actualización en el diario... (Ctrl+Enter para guardar)")
-        self.log_input.setFixedHeight(90)
+        # Caja cómoda que crece con el texto (sin límite de caracteres; solo tope visual)
+        self.log_input.setMinimumHeight(110)
+        self.log_input.setMaximumHeight(260)
         input_layout.addWidget(RichTextToolbar(self.log_input))
         input_layout.addWidget(self.log_input)
 
@@ -972,9 +962,6 @@ class TaskDetailDialog(QDialog):
         # Cargar etiquetas
         self.current_tags = task.get("tags", [])
         self.render_tags()
-
-        # Cargar subtareas (checklist)
-        self.reload_subtasks()
 
         # Cargar los logs
         self.reload_logs()
@@ -1156,162 +1143,6 @@ class TaskDetailDialog(QDialog):
             database.delete_task(self.task_id, self.db_path)
             self.task_deleted = True
             self.accept()
-
-    # --- Subtareas / checklist (se persisten al instante, como los logs) ---
-
-    def reload_subtasks(self):
-        """Repinta el checklist como árbol de dos niveles (subtareas -> subsubtareas),
-        respetando el estado de plegado de cada subtarea."""
-        while self.subtasks_layout.count():
-            item = self.subtasks_layout.takeAt(0)
-            w = item.widget()
-            if w:
-                w.deleteLater()
-
-        subtasks = database.get_subtasks(self.task_id, self.db_path)
-        top = [s for s in subtasks if s["parent_id"] is None]
-        children = {}
-        for s in subtasks:
-            if s["parent_id"] is not None:
-                children.setdefault(s["parent_id"], []).append(s)
-
-        if not subtasks:
-            hint = QLabel("Sin subtareas todavía.")
-            hint.setStyleSheet(
-                f"color: {styles.COLORS['text_muted']}; font-size: 11px; font-style: italic;"
-            )
-            self.subtasks_layout.addWidget(hint)
-        else:
-            for parent in top:
-                kids = children.get(parent["id"], [])
-                self.subtasks_layout.addWidget(self._build_top_row(parent, kids))
-                if kids and not self._collapsed.get(parent["id"], False):
-                    for kid in kids:
-                        self.subtasks_layout.addWidget(self._build_child_row(kid))
-        self._update_subtask_progress(subtasks)
-
-    def _subtask_checkbox(self, sub):
-        chk = QCheckBox()
-        chk.setChecked(bool(sub["done"]))
-        chk.setCursor(Qt.PointingHandCursor)
-        # `clicked` (no `toggled`) para que el setChecked programático del reload no reentre.
-        chk.clicked.connect(lambda checked, sid=sub["id"]: self.toggle_subtask(sid, checked))
-        return chk
-
-    def _subtask_title_edit(self, sub):
-        le = QLineEdit(sub["title"])
-        le.setFrame(False)
-        if sub["done"]:
-            le.setStyleSheet("background: transparent; border: none; color: #64748b;")
-            font = le.font()
-            font.setStrikeOut(True)   # tachado claro cuando está hecha
-            le.setFont(font)
-        else:
-            le.setStyleSheet("background: transparent; border: none;")
-        le.editingFinished.connect(
-            lambda sid=sub["id"], w=le: self.rename_subtask(sid, w.text())
-        )
-        return le
-
-    def _subtask_delete_btn(self, sub):
-        b = QPushButton("×")
-        b.setFixedSize(18, 18)
-        b.setCursor(Qt.PointingHandCursor)
-        b.setToolTip("Eliminar")
-        b.clicked.connect(lambda _=False, sid=sub["id"]: self.remove_subtask(sid))
-        return b
-
-    def _build_top_row(self, sub, kids):
-        row = QWidget()
-        row.setStyleSheet("background: transparent;")
-        h = QHBoxLayout(row)
-        h.setContentsMargins(0, 0, 0, 0)
-        h.setSpacing(4)
-
-        toggle = QPushButton()
-        toggle.setFixedSize(18, 18)
-        toggle.setStyleSheet("QPushButton { background: transparent; border: none; color: #94a3b8; }")
-        if kids:
-            collapsed = self._collapsed.get(sub["id"], False)
-            toggle.setText("▸" if collapsed else "▾")
-            toggle.setCursor(Qt.PointingHandCursor)
-            toggle.setToolTip("Plegar/desplegar subsubtareas")
-            toggle.clicked.connect(lambda _=False, sid=sub["id"]: self.toggle_collapse(sid))
-        else:
-            toggle.setEnabled(False)     # sin hijos: sin flecha
-        h.addWidget(toggle)
-
-        h.addWidget(self._subtask_checkbox(sub))
-        h.addWidget(self._subtask_title_edit(sub), 1)
-
-        add_child = QPushButton("＋")
-        add_child.setFixedSize(18, 18)
-        add_child.setCursor(Qt.PointingHandCursor)
-        add_child.setToolTip("Añadir subsubtarea")
-        add_child.clicked.connect(lambda _=False, sid=sub["id"]: self.add_sub_subtask(sid))
-        h.addWidget(add_child)
-
-        h.addWidget(self._subtask_delete_btn(sub))
-        return row
-
-    def _build_child_row(self, sub):
-        row = QWidget()
-        row.setStyleSheet("background: transparent;")
-        h = QHBoxLayout(row)
-        h.setContentsMargins(24, 0, 0, 0)   # sangría bajo el padre
-        h.setSpacing(4)
-        bullet = QLabel("•")
-        bullet.setStyleSheet("color: #64748b; background: transparent;")
-        h.addWidget(bullet)
-        h.addWidget(self._subtask_checkbox(sub))
-        h.addWidget(self._subtask_title_edit(sub), 1)
-        h.addWidget(self._subtask_delete_btn(sub))
-        return row
-
-    def toggle_collapse(self, subtask_id):
-        self._collapsed[subtask_id] = not self._collapsed.get(subtask_id, False)
-        self.reload_subtasks()
-
-    def add_subtask(self):
-        text = self.new_subtask_input.text().strip()
-        if not text:
-            return
-        database.create_subtask(self.task_id, text, db_path=self.db_path)
-        self.new_subtask_input.clear()
-        self.reload_subtasks()
-
-    def add_sub_subtask(self, parent_id):
-        text, ok = QInputDialog.getText(self, "Nueva subsubtarea", "Título de la subsubtarea:")
-        if ok and text.strip():
-            database.create_subtask(self.task_id, text.strip(), parent_id=parent_id, db_path=self.db_path)
-            self._collapsed[parent_id] = False   # asegurar que se vea recién creada
-            self.reload_subtasks()
-
-    def toggle_subtask(self, subtask_id, checked):
-        database.set_subtask_done(subtask_id, checked, self.db_path)
-        self.reload_subtasks()  # refresca tachado + progreso
-
-    def rename_subtask(self, subtask_id, text):
-        text = text.strip()
-        if not text:
-            self.reload_subtasks()  # título vacío: restaura el anterior
-            return
-        database.update_subtask_title(subtask_id, text, self.db_path)
-
-    def remove_subtask(self, subtask_id):
-        database.delete_subtask(subtask_id, self.db_path)
-        self.reload_subtasks()
-
-    def _update_subtask_progress(self, subtasks=None):
-        if subtasks is None:
-            subtasks = database.get_subtasks(self.task_id, self.db_path)
-        total = len(subtasks)
-        done = sum(1 for s in subtasks if s["done"])
-        if total == 0:
-            self.subtasks_progress_label.setText("")
-        else:
-            pct = int(done / total * 100)
-            self.subtasks_progress_label.setText(f"{done}/{total} · {pct}%")
 
     def reload_logs(self):
         """Limpia y vuelve a cargar todos los logs/entradas del diario."""
