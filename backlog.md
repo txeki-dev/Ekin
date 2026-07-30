@@ -71,14 +71,14 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 - [ ] **Per-board `.ics` feeds** so each board can be a separate subscribable calendar.
 
 ### Task power features
-- [x] **Global search & filter** (by title, tag, due, board) *(implemented — branch
-  `feat/0.5.0-subtasks`; 🔍 sidebar button + Ctrl+F; ships with 0.5.0)*.
-- [x] **Subtasks / checklists** inside a card *(implemented — branch `feat/0.5.0-subtasks`, PR pending
-  review/merge; ships with 0.5.0)*.
+- [x] **Global search & filter** (by title, tag, due, board) *(Done in v0.5.0 — 🔍 sidebar button + Ctrl+F)*.
+- [~] **Subtasks / checklists** inside a card — shipped in **v0.5.0** but **removed in v0.5.1** (product
+  decision; the nested-checklist approach wasn't a fit). Could be revisited later with a different UX.
 - [ ] **Recurring tasks** (daily/weekly/monthly).
-- [ ] **Attachments / links** on cards.
+- [ ] **Attachments / links** on cards.  *(pasting images inline already works, v0.5.1)*
 - [ ] **Undo/redo** for destructive actions (delete task/column/board).
-- [ ] **Keyboard shortcuts** — `Esc` to close dialogs, `Ctrl+N` new task, `Ctrl+F` search, arrow nav.
+- [ ] **Keyboard shortcuts** — `Esc` to close dialogs, `Ctrl+N` new task, ~~`Ctrl+F` search~~ (done),
+  arrow nav.
 
 ### Data & safety
 - [x] **Automatic DB backups** *(Done in v0.4.0)* — `backups.py` writes a consistent SQLite snapshot
@@ -100,9 +100,24 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 ---
 
 ## 🗺️ Suggested next steps
-1. ~~**0.3.2 (patch)** — ship the forensic fixes above.~~ ✅ Released.
-2. ~~**0.4.0** — reminders polish: overdue-in-bell + calendar drag-to-reschedule + "Subscribe in
-   Google" helper; plus automatic DB backups; plus the P1 `db_path` normalization.~~ ✅ Released 2026-07-22.
-3. **0.5.0 (next)** — global search + subtasks/checklists.
-4. **Ongoing tech debt** — CI `pytest`/lint workflow; connection-closing context manager;
-   `data_changed` only on real mutations; centralize duplicated stylesheets.
+1. ~~**0.3.2 (patch)** — ship the forensic fixes.~~ ✅ Released.
+2. ~~**0.4.0** — reminders polish + automatic DB backups + P1 `db_path` normalization.~~ ✅ 2026-07-22.
+3. ~~**0.5.0** — global search + subtasks/checklists.~~ ✅ 2026-07-29 *(subtasks later removed in 0.5.1)*.
+4. ~~**0.5.1** — UX refinements: collapsible columns (+ drop-to-expand), plain/image paste, comment
+   edit/delete, painted icons, Ctrl+B/N & Ctrl+K/I formatting, Outlook/iCloud sync docs, taskbar icon.~~
+   ✅ 2026-07-30.
+
+### 🎯 v0.6.0 — candidate themes (pick one or mix)
+Nothing here is pre-built; these are the prepared, prioritized options for the next wave:
+- **A · Calendar depth** — time-of-day due + `VALARM` alarms; **week/day view**; **filter by board** +
+  color legend; per-board `.ics` feeds.
+- **B · Power features** — **recurring tasks** (daily/weekly/monthly); **keyboard shortcuts**
+  (`Esc` close, `Ctrl+N` new task, arrow nav); **undo/redo** for destructive actions; attachments/links.
+- **C · Polish & platform** — **light theme** + toggle; a **Settings screen** (persist window
+  size/theme/notification prefs); **export/report** (JSON/CSV/Markdown); **board archiving**.
+- **D · Distribution** — **PyInstaller** standalone build + **update-from-Releases** (reach
+  non-developers; replaces the `git pull` auto-updater).
+
+### 🔧 Ongoing tech debt (fold into any wave)
+Connection-closing context manager; `data_changed` only on real mutations; centralize duplicated
+inline stylesheets; headless Qt smoke tests.
