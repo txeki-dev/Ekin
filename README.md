@@ -130,8 +130,8 @@ The database (`ekin_board.db`) is automatically initialized on the first run, an
 ### 2. Organizing Columns & Tasks
 * Inside a board, click **➕ Nueva Columna** to create stage headers (e.g., "To-Do", "In Progress", "Done").
 * **Reorder or move columns**: click and drag a column by its **title** to reorder it within the board, or drop it onto another board's button in the sidebar to move it there.
-* **Column Actions**: Click the **✎** button in a column header to edit its name/color, delete it, or **copy** (clone) it and its tasks to another board.
-* **Collapse a column**: Click **◀** in the header to fold a column into a slim strip (name + task count); click **▶** on the strip to expand it again. The state is remembered per column.
+* **Column Actions**: Click the **pencil (✎)** button in a column header to edit its name/color, delete it, or **copy** (clone) it and its tasks to another board.
+* **Collapse a column**: Click **◀** in the header to fold a column into a slim strip (name + task count); click **▶** on the strip to expand it again. The state is remembered per column, and **dropping a card onto a collapsed column expands it** and drops the card in.
 * Click **➕ Añadir Tarea** at the bottom of any column to quickly add a card.
 * **Drag & Drop**: Click and hold a task card to drag it to another column or change its vertical position.
 
@@ -142,9 +142,9 @@ The database (`ekin_board.db`) is automatically initialized on the first run, an
   - Set a **due date** using the calendar popup widget.
   - Click **➕ Asignar Etiqueta** to add a tag as a **Category: Value** pair (e.g. "Prioridad: Alta"), with its own color. Reusing an existing value keeps its color consistent everywhere it's used; typing a new one creates it on the fly.
 * On the **right panel (Diario)**, type notes or updates about what you did (same formatting, plain-text paste and image paste), and press `Ctrl + Enter` (or click **✍️ Añadir al Diario**) to post it. Each note is saved with an automatic date and time stamp.
-* Click the red cross (**×**) on any note if you need to remove it.
+* Each note has an **edit (✎)** and a **delete (×)** button — editing opens an inline editor (save or cancel); deleting removes the note.
 * Click **💾 Guardar Cambios** to apply your updates, or click **🗑️ Eliminar** to delete the entire task.
-* Collapse the sidebar using the **☰** button in the top left header bar to maximize workspace size.
+* Collapse the sidebar with the **◀ / ▶** button in the top-left header bar to maximize workspace size.
 
 ### 4. Calendar, Reminders & Notifications
 At the top of the sidebar there is a small utility bar:
