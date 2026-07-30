@@ -270,6 +270,17 @@ def test_delete_log(db_path):
     assert database.get_logs(task_id, db_path) == []
 
 
+def test_update_log_edits_content(db_path):
+    board_id = database.create_board("Board", db_path=db_path)
+    col_id = database.create_column(board_id, "Col", db_path=db_path)
+    task_id = database.create_task(col_id, "Tarea", db_path=db_path)
+    log_id = database.create_log(task_id, "original", db_path=db_path)
+
+    database.update_log(log_id, "editado", db_path=db_path)
+
+    assert database.get_logs(task_id, db_path)[0]["content"] == "editado"
+
+
 # --- Mover / copiar columnas entre tableros ---
 
 def test_move_column_to_board(db_path):
@@ -429,141 +440,6 @@ def test_db_name_is_resolved_at_call_time(tmp_path, monkeypatch):
 
     assert [b["id"] for b in boards] == [board_id]
     assert os.path.exists(target)          # el archivo se creó en la ruta reasignada
-
-
-# --- Subtareas / checklist ---
-
-def _task(db_path):
-    board_id = database.create_board("B", db_path=db_path)
-    col_id = database.create_column(board_id, "C", db_path=db_path)
-    return database.create_task(col_id, "T", db_path=db_path)
-
-
-def test_create_and_get_subtasks_ordered(db_path):
-    task_id = _task(db_path)
-    s1 = database.create_subtask(task_id, "Uno", db_path=db_path)
-    s2 = database.create_subtask(task_id, "Dos", db_path=db_path)
-    subs = database.get_subtasks(task_id, db_path=db_path)
-    assert [s["id"] for s in subs] == [s1, s2]
-    assert [s["position"] for s in subs] == [0, 1]
-    assert all(s["done"] == 0 for s in subs)
-
-
-def test_set_subtask_done_toggles(db_path):
-    task_id = _task(db_path)
-    s1 = database.create_subtask(task_id, "Uno", db_path=db_path)
-    database.set_subtask_done(s1, True, db_path=db_path)
-    assert database.get_subtasks(task_id, db_path=db_path)[0]["done"] == 1
-    database.set_subtask_done(s1, False, db_path=db_path)
-    assert database.get_subtasks(task_id, db_path=db_path)[0]["done"] == 0
-
-
-def test_update_subtask_title_and_delete(db_path):
-    task_id = _task(db_path)
-    s1 = database.create_subtask(task_id, "Original", db_path=db_path)
-    database.update_subtask_title(s1, "Renombrada", db_path=db_path)
-    assert database.get_subtasks(task_id, db_path=db_path)[0]["title"] == "Renombrada"
-    database.delete_subtask(s1, db_path=db_path)
-    assert database.get_subtasks(task_id, db_path=db_path) == []
-
-
-def test_delete_task_cascades_subtasks(db_path):
-    task_id = _task(db_path)
-    database.create_subtask(task_id, "Uno", db_path=db_path)
-    database.delete_task(task_id, db_path=db_path)
-    assert database.get_subtasks(task_id, db_path=db_path) == []
-
-
-def test_get_subtasks_progress_bulk(db_path):
-    t1 = _task(db_path)
-    board_id = database.create_board("B2", db_path=db_path)
-    col2 = database.create_column(board_id, "C2", db_path=db_path)
-    t2 = database.create_task(col2, "T2", db_path=db_path)
-    t3 = database.create_task(col2, "T3", db_path=db_path)  # sin subtareas
-
-    a = database.create_subtask(t1, "a", db_path=db_path)
-    database.create_subtask(t1, "b", db_path=db_path)
-    database.set_subtask_done(a, True, db_path=db_path)
-    database.create_subtask(t2, "c", db_path=db_path)
-
-    progress = database.get_subtasks_progress_bulk([t1, t2, t3], db_path=db_path)
-    assert progress[t1] == (1, 2)
-    assert progress[t2] == (0, 1)
-    assert t3 not in progress                       # sin subtareas -> ausente
-    assert database.get_subtasks_progress_bulk([], db_path=db_path) == {}
-
-
-def test_get_tasks_exposes_subtask_progress(db_path):
-    board_id = database.create_board("B", db_path=db_path)
-    col_id = database.create_column(board_id, "C", db_path=db_path)
-    t_with = database.create_task(col_id, "con", db_path=db_path)
-    t_without = database.create_task(col_id, "sin", db_path=db_path)
-    d = database.create_subtask(t_with, "x", db_path=db_path)
-    database.create_subtask(t_with, "y", db_path=db_path)
-    database.set_subtask_done(d, True, db_path=db_path)
-
-    by_id = {t["id"]: t for t in database.get_tasks(col_id, db_path=db_path)}
-    assert (by_id[t_with]["subtasks_done"], by_id[t_with]["subtasks_total"]) == (1, 2)
-    assert (by_id[t_without]["subtasks_done"], by_id[t_without]["subtasks_total"]) == (0, 0)
-
-
-def test_copy_board_duplicates_subtasks(db_path):
-    board_id = database.create_board("Orig", db_path=db_path)
-    col_id = database.create_column(board_id, "C", db_path=db_path)
-    task_id = database.create_task(col_id, "T", db_path=db_path)
-    done = database.create_subtask(task_id, "hecha", db_path=db_path)
-    database.create_subtask(task_id, "pendiente", db_path=db_path)
-    database.set_subtask_done(done, True, db_path=db_path)
-
-    new_board_id = database.copy_board(board_id, "Copia", "#654321", db_path=db_path)
-    new_col = database.get_columns(new_board_id, db_path=db_path)[0]
-    new_task = database.get_tasks(new_col["id"], db_path=db_path)[0]
-
-    copied = database.get_subtasks(new_task["id"], db_path=db_path)
-    assert [(s["title"], s["done"]) for s in copied] == [("hecha", 1), ("pendiente", 0)]
-
-
-def test_nested_subtasks_positions_progress_and_cascade(db_path):
-    t = _task(db_path)
-    parent = database.create_subtask(t, "Padre", db_path=db_path)
-    child1 = database.create_subtask(t, "Hijo 1", parent_id=parent, db_path=db_path)
-    child2 = database.create_subtask(t, "Hijo 2", parent_id=parent, db_path=db_path)
-    top2 = database.create_subtask(t, "Otro padre", db_path=db_path)
-
-    by_id = {s["id"]: s for s in database.get_subtasks(t, db_path=db_path)}
-    assert by_id[parent]["parent_id"] is None and by_id[top2]["parent_id"] is None
-    assert by_id[child1]["parent_id"] == parent and by_id[child2]["parent_id"] == parent
-    # posición relativa a las hermanas del mismo padre
-    assert (by_id[parent]["position"], by_id[top2]["position"]) == (0, 1)
-    assert (by_id[child1]["position"], by_id[child2]["position"]) == (0, 1)
-
-    # el progreso cuenta ambos niveles (4 en total)
-    database.set_subtask_done(child1, True, db_path=db_path)
-    assert database.get_subtasks_progress_bulk([t], db_path=db_path)[t] == (1, 4)
-
-    # borrar el padre elimina sus hijos, no al otro padre de primer nivel
-    database.delete_subtask(parent, db_path=db_path)
-    assert {s["id"] for s in database.get_subtasks(t, db_path=db_path)} == {top2}
-
-
-def test_copy_board_preserves_subtask_nesting(db_path):
-    b = database.create_board("B", db_path=db_path)
-    c = database.create_column(b, "C", db_path=db_path)
-    t = database.create_task(c, "T", db_path=db_path)
-    parent = database.create_subtask(t, "Padre", db_path=db_path)
-    database.create_subtask(t, "Hijo", parent_id=parent, db_path=db_path)
-
-    nb = database.copy_board(b, "Copia", "#123456", db_path=db_path)
-    ncol = database.get_columns(nb, db_path=db_path)[0]
-    ntask = database.get_tasks(ncol["id"], db_path=db_path)[0]
-    subs = database.get_subtasks(ntask["id"], db_path=db_path)
-
-    assert len(subs) == 2
-    new_parent = next(s for s in subs if s["parent_id"] is None)
-    new_child = next(s for s in subs if s["parent_id"] is not None)
-    assert (new_parent["title"], new_child["title"]) == ("Padre", "Hijo")
-    # el hijo copiado apunta al padre COPIADO, no al original
-    assert new_child["parent_id"] == new_parent["id"] and new_parent["id"] != parent
 
 
 # --- Búsqueda global (search_tasks) ---

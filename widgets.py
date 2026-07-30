@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QWidget, QMenu, QApplication, QLayout
 )
-from PySide6.QtGui import QDrag, QPixmap, QCursor, QPainter, QColor
+from PySide6.QtGui import QDrag, QPixmap, QCursor, QPainter, QColor, QIcon, QPolygon, QPen
 from datetime import datetime
 import styles
 from styles import hex_to_rgb
@@ -86,6 +86,52 @@ class FlowLayout(QLayout):
             lineHeight = max(lineHeight, item.sizeHint().height())
 
         return y + lineHeight - rect.y() + bottom
+
+
+def make_glyph_icon(kind, color, size=16):
+    """Dibuja un icono (triángulo o lápiz) como QPixmap, sin depender de fuentes.
+
+    Los glifos Unicode de flechas/lápiz no se renderizan de forma fiable en todas las
+    fuentes/instalaciones de Windows, así que los pintamos a mano (siempre visibles)."""
+    pix = QPixmap(size, size)
+    pix.fill(Qt.transparent)
+    p = QPainter(pix)
+    p.setRenderHint(QPainter.Antialiasing)
+    c = QColor(color)
+    s = float(size)
+    if kind in ("left", "right"):
+        p.setPen(Qt.NoPen)
+        p.setBrush(c)
+        if kind == "left":   # ◀
+            pts = [QPoint(int(s * 0.62), int(s * 0.20)),
+                   QPoint(int(s * 0.62), int(s * 0.80)),
+                   QPoint(int(s * 0.33), int(s * 0.50))]
+        else:                # ▶
+            pts = [QPoint(int(s * 0.38), int(s * 0.20)),
+                   QPoint(int(s * 0.38), int(s * 0.80)),
+                   QPoint(int(s * 0.67), int(s * 0.50))]
+        p.drawPolygon(QPolygon(pts))
+    elif kind == "pencil":   # lápiz (editar)
+        pen = QPen(c, max(2, int(s * 0.16)))
+        pen.setCapStyle(Qt.FlatCap)
+        p.setPen(pen)
+        p.drawLine(int(s * 0.28), int(s * 0.72), int(s * 0.60), int(s * 0.40))  # cuerpo
+        p.setPen(Qt.NoPen)
+        p.setBrush(c)
+        p.drawPolygon(QPolygon([          # punta (triángulo)
+            QPoint(int(s * 0.58), int(s * 0.38)),
+            QPoint(int(s * 0.82), int(s * 0.18)),
+            QPoint(int(s * 0.68), int(s * 0.48)),
+        ]))
+    elif kind == "cross":    # ✕ (borrar)
+        pen = QPen(c, max(2, int(s * 0.16)))
+        pen.setCapStyle(Qt.RoundCap)
+        p.setPen(pen)
+        m = s * 0.28
+        p.drawLine(int(m), int(m), int(s - m), int(s - m))
+        p.drawLine(int(s - m), int(m), int(m), int(s - m))
+    p.end()
+    return QIcon(pix)
 
 
 def compute_drop_index(cards_geom, drop_y, dragged_id):
@@ -180,10 +226,7 @@ class TaskCard(QFrame):
         # objectName: no existe regla QSS para #TaskCardDueDate.
         self.due_label = QLabel()
         self.due_layout.addWidget(self.due_label)
-        # Badge de progreso del checklist (☑ hechas/total)
-        self.subtasks_label = QLabel()
-        self.due_layout.addWidget(self.subtasks_label)
-        self.due_layout.addStretch()  # Empuja los badges a la izquierda
+        self.due_layout.addStretch()  # Empuja la fecha a la izquierda
         self.meta_layout.addWidget(self.due_container)
 
         layout.addLayout(self.meta_layout)
@@ -229,27 +272,6 @@ class TaskCard(QFrame):
             except Exception:
                 self.due_label.setText(f"📅 {due_date}")
                 self.due_label.setStyleSheet("color: #94a3b8; font-size: 10px;")
-            self.due_label.show()
-        else:
-            self.due_label.hide()
-
-        # Badge de progreso del checklist (☑ hechas/total); verde cuando está completo
-        done = self.task_data.get("subtasks_done", 0)
-        total = self.task_data.get("subtasks_total", 0)
-        if total > 0:
-            complete = done >= total
-            color = "#22c55e" if complete else "#94a3b8"
-            bg = "rgba(34, 197, 94, 0.15)" if complete else "rgba(148, 163, 184, 0.15)"
-            self.subtasks_label.setText(f"☑ {done}/{total}")
-            self.subtasks_label.setStyleSheet(
-                f"color: {color}; font-size: 10px; background-color: {bg}; border-radius: 4px; padding: 2px 4px;"
-            )
-            self.subtasks_label.show()
-        else:
-            self.subtasks_label.hide()
-
-        # El contenedor de metadatos se muestra si hay fecha o subtareas
-        if due_date or total > 0:
             self.due_container.show()
         else:
             self.due_container.hide()
@@ -440,6 +462,7 @@ class ColumnWidget(QFrame):
     delete_column_requested = Signal(int) # column_id
     copy_column_requested = Signal(int)  # column_id
     collapse_toggle_requested = Signal(int)  # column_id (plegar/desplegar)
+    collapsed_card_drop = Signal(int, int)   # task_id, column_id (soltar tarjeta en columna plegada)
 
     COLLAPSED_WIDTH = 46
     EXPANDED_WIDTH = 280
@@ -455,9 +478,10 @@ class ColumnWidget(QFrame):
         self.setFixedWidth(self.COLLAPSED_WIDTH if self.collapsed else self.EXPANDED_WIDTH)
         self.init_ui()
 
-    def _column_icon_button(self, text, tooltip):
-        """Pequeño botón cuadrado de icono a juego con el color de la columna."""
-        btn = QPushButton(text)
+    def _column_icon_button(self, kind, tooltip):
+        """Pequeño botón cuadrado con un icono PINTADO (left/right/pencil) a juego con
+        el color de la columna. Se pinta a mano para no depender de glifos de fuente."""
+        btn = QPushButton()
         btn.setFixedSize(24, 24)
         btn.setCursor(Qt.PointingHandCursor)
         btn.setToolTip(tooltip)
@@ -466,6 +490,8 @@ class ColumnWidget(QFrame):
         except Exception:
             r, g, b = 59, 130, 246
         color = self.column_data["color"]
+        btn.setIcon(make_glyph_icon(kind, color, 16))
+        btn.setIconSize(QSize(16, 16))
         btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: rgba({r}, {g}, {b}, 0.1);
@@ -491,13 +517,15 @@ class ColumnWidget(QFrame):
             self._init_expanded_ui()
 
     def _init_collapsed_ui(self):
-        """Columna plegada: tira estrecha con botón de desplegar, contador y nombre vertical."""
+        """Columna plegada: tira estrecha con botón de desplegar, contador y nombre vertical.
+        Acepta soltar una tarjeta encima: se despliega y recibe la tarjeta."""
+        self.setAcceptDrops(True)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 8, 4, 8)
         layout.setSpacing(8)
         layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
 
-        expand_btn = self._column_icon_button("»", "Desplegar columna")
+        expand_btn = self._column_icon_button("right", "Desplegar columna")
         expand_btn.clicked.connect(lambda: self.collapse_toggle_requested.emit(self.column_id))
         layout.addWidget(expand_btn, 0, Qt.AlignHCenter)
 
@@ -543,13 +571,13 @@ class ColumnWidget(QFrame):
         header_layout.addWidget(self.title_label)
         header_layout.addStretch()
 
-        # Botón para plegar la columna
-        collapse_btn = self._column_icon_button("«", "Plegar columna")
+        # Botón para plegar la columna (triángulo hacia la izquierda, pintado)
+        collapse_btn = self._column_icon_button("left", "Plegar columna")
         collapse_btn.clicked.connect(lambda: self.collapse_toggle_requested.emit(self.column_id))
         header_layout.addWidget(collapse_btn)
 
-        # Botón de menú para editar/borrar la columna
-        self.menu_btn = self._column_icon_button("⋮", "Opciones de columna")
+        # Botón de edición/opciones de la columna (lápiz pintado)
+        self.menu_btn = self._column_icon_button("pencil", "Editar columna (opciones: editar, copiar, eliminar)")
         self.menu_btn.clicked.connect(self.show_column_menu)
         header_layout.addWidget(self.menu_btn)
 
@@ -581,6 +609,35 @@ class ColumnWidget(QFrame):
         self.add_task_btn.setCursor(Qt.PointingHandCursor)
         self.add_task_btn.clicked.connect(lambda: self.add_task_requested.emit(self.column_id))
         main_layout.addWidget(self.add_task_btn)
+
+    # --- Soltar una tarjeta sobre una columna PLEGADA (solo activo si collapsed) ---
+    def dragEnterEvent(self, event):
+        if self.collapsed and event.mimeData().hasFormat("application/x-ekin-task-id"):
+            event.acceptProposedAction()
+            self.set_column_style(dragging=True)
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if self.collapsed and event.mimeData().hasFormat("application/x-ekin-task-id"):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragLeaveEvent(self, event):
+        if self.collapsed:
+            self.set_column_style(dragging=False)
+        super().dragLeaveEvent(event)
+
+    def dropEvent(self, event):
+        mime = event.mimeData()
+        if self.collapsed and mime.hasFormat("application/x-ekin-task-id"):
+            task_id = int(mime.data("application/x-ekin-task-id").data().decode("utf-8"))
+            event.acceptProposedAction()
+            self.set_column_style(dragging=False)
+            self.collapsed_card_drop.emit(task_id, self.column_id)
+        else:
+            event.ignore()
 
     def set_column_style(self, dragging=False):
         """Establece el diseño de la columna (borde y fondo) basado en su color."""

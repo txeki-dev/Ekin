@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt, QDate, Signal
+from PySide6.QtCore import Qt, QDate, Signal, QBuffer, QIODevice, QSize
 from PySide6.QtWidgets import (
     QDialog, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QTextEdit, QPushButton, QScrollArea, QWidget,
@@ -7,12 +7,13 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import (
     QKeySequence, QColor, QShortcut, QFont, QTextCharFormat, QTextListFormat,
-    QTextCursor, QPixmap, QIcon
+    QTextCursor, QPixmap, QIcon, QImage
 )
 from datetime import datetime
 import re
 import database
 import styles
+from widgets import make_glyph_icon
 
 
 class MarkdownTextEdit(QTextEdit):
@@ -27,19 +28,28 @@ class MarkdownTextEdit(QTextEdit):
     _BULLET_MARKERS = ("*", "-", "+")
     _ORDERED_RE = re.compile(r"\d+[.)]")
 
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # Si se define, devuelve el ancho máximo (px) para imágenes pegadas. Sirve para
+        # que las imágenes del chat quepan en el histórico (más estrecho que el editor).
+        self.image_width_provider = None
+
     def keyPressEvent(self, event):
         cursor = self.textCursor()
         ctrl = bool(event.modifiers() & Qt.ControlModifier)
 
-        # --- Cursiva con Ctrl+K (como «Cursiva» en Word en español) ---
-        if ctrl and event.key() == Qt.Key_K:
+        # --- Negrita: Ctrl+B o Ctrl+N (Negrita en Word en español) ---
+        if ctrl and event.key() in (Qt.Key_B, Qt.Key_N):
             fmt = QTextCharFormat()
-            fmt.setFontItalic(not self.fontItalic())
+            fmt.setFontWeight(QFont.Normal if self.fontWeight() > QFont.Normal else QFont.Bold)
             self.mergeCurrentCharFormat(fmt)
             event.accept()
             return
-        # Neutralizar el Ctrl+I nativo: la cursiva ahora es Ctrl+K
-        if ctrl and event.key() == Qt.Key_I:
+        # --- Cursiva: Ctrl+K (Cursiva en Word) o Ctrl+I ---
+        if ctrl and event.key() in (Qt.Key_K, Qt.Key_I):
+            fmt = QTextCharFormat()
+            fmt.setFontItalic(not self.fontItalic())
+            self.mergeCurrentCharFormat(fmt)
             event.accept()
             return
 
@@ -80,6 +90,38 @@ class MarkdownTextEdit(QTextEdit):
                 return
 
         super().keyPressEvent(event)
+
+    def insertFromMimeData(self, source):
+        """Al pegar: las imágenes se insertan como imagen; el texto, SIEMPRE sin formato.
+
+        Así el contenido copiado de webs/Word se pega como texto plano (sin fuentes ni
+        colores ajenos), pero se pueden pegar capturas/imágenes del portapapeles."""
+        if source.hasImage():
+            image = source.imageData()
+            if isinstance(image, QImage) and not image.isNull():
+                self._insert_image(image)
+                return
+        if source.hasText():
+            self.insertPlainText(source.text())
+            return
+        super().insertFromMimeData(source)
+
+    def _insert_image(self, image):
+        """Embebe un QImage como data URI base64 (queda guardado dentro del HTML).
+        Ajusta la imagen al ancho útil (el del histórico del chat si se ha configurado
+        un `image_width_provider`, que es más estrecho que el editor)."""
+        if self.image_width_provider:
+            avail = max(120, self.image_width_provider())
+        else:
+            avail = max(120, self.viewport().width() - 24)
+        if image.width() > avail:
+            image = image.scaledToWidth(avail, Qt.SmoothTransformation)
+        buffer = QBuffer()
+        buffer.open(QIODevice.WriteOnly)
+        image.save(buffer, "PNG")
+        b64 = bytes(buffer.data().toBase64()).decode("ascii")
+        buffer.close()
+        self.textCursor().insertHtml(f'<img src="data:image/png;base64,{b64}" />')
 
     def _convert_line_to_list(self, style):
         """Elimina el marcador escrito y convierte la línea actual en una lista."""
@@ -152,7 +194,7 @@ class RichTextToolbar(QWidget):
 
         self.bold_btn = QPushButton("B")
         self.bold_btn.setObjectName("FormatButton")
-        self.bold_btn.setToolTip("Negrita (Ctrl+B)")
+        self.bold_btn.setToolTip("Negrita (Ctrl+B o Ctrl+N)")
         self.bold_btn.setCheckable(True)
         self.bold_btn.setCursor(Qt.PointingHandCursor)
         self.bold_btn.setFixedSize(28, 26)
@@ -162,9 +204,10 @@ class RichTextToolbar(QWidget):
         self.bold_btn.clicked.connect(self.toggle_bold)
         layout.addWidget(self.bold_btn)
 
-        self.italic_btn = QPushButton("I")
+        # Etiqueta "K" (Cursiva): una "I" en cursiva se ve como "/", que confunde.
+        self.italic_btn = QPushButton("K")
         self.italic_btn.setObjectName("FormatButton")
-        self.italic_btn.setToolTip("Cursiva (Ctrl+K)")
+        self.italic_btn.setToolTip("Cursiva (Ctrl+K o Ctrl+I)")
         self.italic_btn.setCheckable(True)
         self.italic_btn.setCursor(Qt.PointingHandCursor)
         self.italic_btn.setFixedSize(28, 26)
@@ -215,67 +258,99 @@ class RichTextToolbar(QWidget):
 
 
 class LogEntryWidget(QFrame):
-    """Representa una única entrada en el diario/chat de la tarea."""
-    def __init__(self, log_data, delete_callback, parent=None):
+    """Una entrada del diario/chat, con botones (pintados) de editar y eliminar y
+    edición en línea del contenido."""
+    def __init__(self, log_data, delete_callback, save_edit_callback, parent=None):
         super().__init__(parent)
+        self.log_data = log_data
         self.log_id = log_data["id"]
         self.delete_callback = delete_callback
-        
+        self.save_edit_callback = save_edit_callback
+        self._editing = False
+
         self.setObjectName("LogEntryWidget")
         self.init_ui(log_data)
 
-    def init_ui(self, log_data):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(4)
+    def _icon_button(self, kind, color, tooltip, hover_rgba):
+        btn = QPushButton()
+        btn.setFixedSize(20, 20)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setToolTip(tooltip)
+        btn.setIcon(make_glyph_icon(kind, color, 13))
+        btn.setIconSize(QSize(13, 13))
+        btn.setStyleSheet(
+            "QPushButton { background: transparent; border: none; }"
+            f"QPushButton:hover {{ background-color: {hover_rgba}; border-radius: 3px; }}"
+        )
+        return btn
 
-        # Fila superior: Fecha/Hora y botón de eliminar
+    def init_ui(self, log_data):
+        self._layout = QVBoxLayout(self)
+        self._layout.setContentsMargins(8, 8, 8, 8)
+        self._layout.setSpacing(4)
+
+        # Fila superior: Fecha/Hora + botones de editar y eliminar
         top_layout = QHBoxLayout()
-        
-        # Formatear la fecha
+
         raw_date = log_data["created_at"]
         try:
-            # SQLite por defecto guarda en UTC o local text. Formateamos para mejor lectura
-            # Ejemplo: '2026-07-09 19:30:00' -> '09/07/2026 19:30'
+            # Ej: '2026-07-09 19:30:00' -> '09/07/2026 19:30'
             dt = datetime.strptime(raw_date, "%Y-%m-%d %H:%M:%S")
             formatted_date = dt.strftime("%d/%m/%Y %H:%M")
         except Exception:
-            formatted_date = raw_date  # Fallback
-            
+            formatted_date = raw_date
+
         timestamp_label = QLabel(formatted_date)
         timestamp_label.setObjectName("LogTimestamp")
         top_layout.addWidget(timestamp_label)
         top_layout.addStretch()
 
-        # Botón sutil para borrar la entrada del diario
-        delete_btn = QPushButton("×")
-        delete_btn.setFixedSize(16, 16)
-        delete_btn.setCursor(Qt.PointingHandCursor)
-        delete_btn.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                border: none;
-                color: #ef4444;
-                font-weight: bold;
-                font-size: 11px;
-            }
-            QPushButton:hover {
-                color: #dc2626;
-                background-color: rgba(239, 68, 68, 0.1);
-                border-radius: 2px;
-            }
-        """)
-        delete_btn.clicked.connect(lambda: self.delete_callback(self.log_id, self))
-        top_layout.addWidget(delete_btn)
-        
-        layout.addLayout(top_layout)
+        self.edit_btn = self._icon_button(
+            "pencil", "#94a3b8", "Editar comentario", "rgba(148, 163, 184, 0.20)")
+        self.edit_btn.clicked.connect(self._enter_edit_mode)
+        top_layout.addWidget(self.edit_btn)
+
+        self.delete_btn = self._icon_button(
+            "cross", "#ef4444", "Eliminar comentario", "rgba(239, 68, 68, 0.15)")
+        self.delete_btn.clicked.connect(lambda: self.delete_callback(self.log_id, self))
+        top_layout.addWidget(self.delete_btn)
+
+        self._layout.addLayout(top_layout)
 
         # Contenido de la entrada
-        content_label = QLabel(log_data["content"])
-        content_label.setObjectName("LogContent")
-        content_label.setWordWrap(True)
-        content_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        layout.addWidget(content_label)
+        self.content_label = QLabel(log_data["content"])
+        self.content_label.setObjectName("LogContent")
+        self.content_label.setWordWrap(True)
+        self.content_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._layout.addWidget(self.content_label)
+
+    def _enter_edit_mode(self):
+        """Sustituye el contenido por un editor en línea con Guardar/Cancelar."""
+        if self._editing:
+            return
+        self._editing = True
+        self.content_label.hide()
+        self.edit_btn.setEnabled(False)
+
+        self._editor = MarkdownTextEdit()
+        self._editor.setHtml(self.log_data["content"])
+        self._editor.setMinimumHeight(90)
+        self._layout.addWidget(RichTextToolbar(self._editor))
+        self._layout.addWidget(self._editor)
+
+        btns = QHBoxLayout()
+        btns.addStretch()
+        save_btn = QPushButton("Guardar")
+        save_btn.setObjectName("PrimaryButton")
+        save_btn.setCursor(Qt.PointingHandCursor)
+        save_btn.clicked.connect(lambda: self.save_edit_callback(self.log_id, self._editor.toHtml()))
+        btns.addWidget(save_btn)
+        cancel_btn = QPushButton("Cancelar")
+        cancel_btn.setCursor(Qt.PointingHandCursor)
+        cancel_btn.clicked.connect(lambda: self.save_edit_callback(self.log_id, None))
+        btns.addWidget(cancel_btn)
+        self._layout.addLayout(btns)
+        self._editor.setFocus()
 
 
 def color_icon(color, size=13):
@@ -721,11 +796,10 @@ class TaskDetailDialog(QDialog):
         self.db_path = db_path
         self.current_tags = []      # Lista de diccionarios {'text': '...', 'color': '...'}
         self.task_deleted = False  # Indica si se borró la tarea desde este diálogo
-        self._collapsed = {}       # {subtask_id: bool} estado de plegado de cada subtarea
         
         self.setWindowTitle("Detalles de la Tarea")
-        self.resize(800, 550)
-        self.setMinimumSize(700, 450)
+        self.resize(1120, 720)
+        self.setMinimumSize(940, 580)
         
         self.init_ui()
         self.load_task_data()
@@ -811,51 +885,6 @@ class TaskDetailDialog(QDialog):
         tags_layout.addLayout(tag_btns_row)
         
         left_layout.addWidget(tags_section)
-
-        # 5. Subtareas / Checklist
-        subtasks_section = QWidget()
-        subtasks_outer = QVBoxLayout(subtasks_section)
-        subtasks_outer.setContentsMargins(0, 0, 0, 0)
-        subtasks_outer.setSpacing(4)
-
-        subtasks_header = QHBoxLayout()
-        subtasks_header.setSpacing(6)
-        subtasks_header.addWidget(QLabel("☑️ <b>Subtareas</b>"))
-        subtasks_header.addStretch()
-        self.subtasks_progress_label = QLabel("")
-        self.subtasks_progress_label.setStyleSheet(
-            f"color: {styles.COLORS['text_muted']}; font-size: 11px;"
-        )
-        subtasks_header.addWidget(self.subtasks_progress_label)
-        subtasks_outer.addLayout(subtasks_header)
-
-        subtasks_scroll = QScrollArea()
-        subtasks_scroll.setWidgetResizable(True)
-        subtasks_scroll.setFrameShape(QFrame.NoFrame)
-        subtasks_scroll.setStyleSheet("background: transparent; border: none;")
-        subtasks_scroll.setMaximumHeight(130)
-        self.subtasks_container = QWidget()
-        self.subtasks_container.setStyleSheet("background: transparent;")
-        self.subtasks_layout = QVBoxLayout(self.subtasks_container)
-        self.subtasks_layout.setContentsMargins(0, 0, 0, 0)
-        self.subtasks_layout.setSpacing(2)
-        self.subtasks_layout.setAlignment(Qt.AlignTop)
-        subtasks_scroll.setWidget(self.subtasks_container)
-        subtasks_outer.addWidget(subtasks_scroll)
-
-        add_sub_row = QHBoxLayout()
-        add_sub_row.setSpacing(6)
-        self.new_subtask_input = QLineEdit()
-        self.new_subtask_input.setPlaceholderText("Nueva subtarea…")
-        self.new_subtask_input.returnPressed.connect(self.add_subtask)
-        add_sub_row.addWidget(self.new_subtask_input)
-        self.add_subtask_btn = QPushButton("➕ Añadir")
-        self.add_subtask_btn.setCursor(Qt.PointingHandCursor)
-        self.add_subtask_btn.clicked.connect(self.add_subtask)
-        add_sub_row.addWidget(self.add_subtask_btn)
-        subtasks_outer.addLayout(add_sub_row)
-
-        left_layout.addWidget(subtasks_section)
         left_layout.addStretch()
 
         # Botones de Acción de la Tarea (Guardar, Eliminar, Cerrar)
@@ -912,7 +941,7 @@ class TaskDetailDialog(QDialog):
         self.logs_layout.setAlignment(Qt.AlignTop)
         
         self.scroll_area.setWidget(self.logs_container)
-        right_layout.addWidget(self.scroll_area)
+        right_layout.addWidget(self.scroll_area, 1)  # el historial domina el alto
 
         # Caja de entrada para nuevos logs
         input_container = QWidget()
@@ -922,7 +951,11 @@ class TaskDetailDialog(QDialog):
 
         self.log_input = MarkdownTextEdit()
         self.log_input.setPlaceholderText("Escribe una nota o actualización en el diario... (Ctrl+Enter para guardar)")
-        self.log_input.setFixedHeight(90)
+        # Caja cómoda que crece con el texto (sin límite de caracteres; solo tope visual)
+        self.log_input.setMinimumHeight(110)
+        self.log_input.setMaximumHeight(260)
+        # Las imágenes pegadas en el chat se ajustan al ancho del histórico (más estrecho)
+        self.log_input.image_width_provider = self._chat_image_width
         input_layout.addWidget(RichTextToolbar(self.log_input))
         input_layout.addWidget(self.log_input)
 
@@ -972,9 +1005,6 @@ class TaskDetailDialog(QDialog):
         # Cargar etiquetas
         self.current_tags = task.get("tags", [])
         self.render_tags()
-
-        # Cargar subtareas (checklist)
-        self.reload_subtasks()
 
         # Cargar los logs
         self.reload_logs()
@@ -1157,162 +1187,6 @@ class TaskDetailDialog(QDialog):
             self.task_deleted = True
             self.accept()
 
-    # --- Subtareas / checklist (se persisten al instante, como los logs) ---
-
-    def reload_subtasks(self):
-        """Repinta el checklist como árbol de dos niveles (subtareas -> subsubtareas),
-        respetando el estado de plegado de cada subtarea."""
-        while self.subtasks_layout.count():
-            item = self.subtasks_layout.takeAt(0)
-            w = item.widget()
-            if w:
-                w.deleteLater()
-
-        subtasks = database.get_subtasks(self.task_id, self.db_path)
-        top = [s for s in subtasks if s["parent_id"] is None]
-        children = {}
-        for s in subtasks:
-            if s["parent_id"] is not None:
-                children.setdefault(s["parent_id"], []).append(s)
-
-        if not subtasks:
-            hint = QLabel("Sin subtareas todavía.")
-            hint.setStyleSheet(
-                f"color: {styles.COLORS['text_muted']}; font-size: 11px; font-style: italic;"
-            )
-            self.subtasks_layout.addWidget(hint)
-        else:
-            for parent in top:
-                kids = children.get(parent["id"], [])
-                self.subtasks_layout.addWidget(self._build_top_row(parent, kids))
-                if kids and not self._collapsed.get(parent["id"], False):
-                    for kid in kids:
-                        self.subtasks_layout.addWidget(self._build_child_row(kid))
-        self._update_subtask_progress(subtasks)
-
-    def _subtask_checkbox(self, sub):
-        chk = QCheckBox()
-        chk.setChecked(bool(sub["done"]))
-        chk.setCursor(Qt.PointingHandCursor)
-        # `clicked` (no `toggled`) para que el setChecked programático del reload no reentre.
-        chk.clicked.connect(lambda checked, sid=sub["id"]: self.toggle_subtask(sid, checked))
-        return chk
-
-    def _subtask_title_edit(self, sub):
-        le = QLineEdit(sub["title"])
-        le.setFrame(False)
-        if sub["done"]:
-            le.setStyleSheet("background: transparent; border: none; color: #64748b;")
-            font = le.font()
-            font.setStrikeOut(True)   # tachado claro cuando está hecha
-            le.setFont(font)
-        else:
-            le.setStyleSheet("background: transparent; border: none;")
-        le.editingFinished.connect(
-            lambda sid=sub["id"], w=le: self.rename_subtask(sid, w.text())
-        )
-        return le
-
-    def _subtask_delete_btn(self, sub):
-        b = QPushButton("×")
-        b.setFixedSize(18, 18)
-        b.setCursor(Qt.PointingHandCursor)
-        b.setToolTip("Eliminar")
-        b.clicked.connect(lambda _=False, sid=sub["id"]: self.remove_subtask(sid))
-        return b
-
-    def _build_top_row(self, sub, kids):
-        row = QWidget()
-        row.setStyleSheet("background: transparent;")
-        h = QHBoxLayout(row)
-        h.setContentsMargins(0, 0, 0, 0)
-        h.setSpacing(4)
-
-        toggle = QPushButton()
-        toggle.setFixedSize(18, 18)
-        toggle.setStyleSheet("QPushButton { background: transparent; border: none; color: #94a3b8; }")
-        if kids:
-            collapsed = self._collapsed.get(sub["id"], False)
-            toggle.setText("▸" if collapsed else "▾")
-            toggle.setCursor(Qt.PointingHandCursor)
-            toggle.setToolTip("Plegar/desplegar subsubtareas")
-            toggle.clicked.connect(lambda _=False, sid=sub["id"]: self.toggle_collapse(sid))
-        else:
-            toggle.setEnabled(False)     # sin hijos: sin flecha
-        h.addWidget(toggle)
-
-        h.addWidget(self._subtask_checkbox(sub))
-        h.addWidget(self._subtask_title_edit(sub), 1)
-
-        add_child = QPushButton("＋")
-        add_child.setFixedSize(18, 18)
-        add_child.setCursor(Qt.PointingHandCursor)
-        add_child.setToolTip("Añadir subsubtarea")
-        add_child.clicked.connect(lambda _=False, sid=sub["id"]: self.add_sub_subtask(sid))
-        h.addWidget(add_child)
-
-        h.addWidget(self._subtask_delete_btn(sub))
-        return row
-
-    def _build_child_row(self, sub):
-        row = QWidget()
-        row.setStyleSheet("background: transparent;")
-        h = QHBoxLayout(row)
-        h.setContentsMargins(24, 0, 0, 0)   # sangría bajo el padre
-        h.setSpacing(4)
-        bullet = QLabel("•")
-        bullet.setStyleSheet("color: #64748b; background: transparent;")
-        h.addWidget(bullet)
-        h.addWidget(self._subtask_checkbox(sub))
-        h.addWidget(self._subtask_title_edit(sub), 1)
-        h.addWidget(self._subtask_delete_btn(sub))
-        return row
-
-    def toggle_collapse(self, subtask_id):
-        self._collapsed[subtask_id] = not self._collapsed.get(subtask_id, False)
-        self.reload_subtasks()
-
-    def add_subtask(self):
-        text = self.new_subtask_input.text().strip()
-        if not text:
-            return
-        database.create_subtask(self.task_id, text, db_path=self.db_path)
-        self.new_subtask_input.clear()
-        self.reload_subtasks()
-
-    def add_sub_subtask(self, parent_id):
-        text, ok = QInputDialog.getText(self, "Nueva subsubtarea", "Título de la subsubtarea:")
-        if ok and text.strip():
-            database.create_subtask(self.task_id, text.strip(), parent_id=parent_id, db_path=self.db_path)
-            self._collapsed[parent_id] = False   # asegurar que se vea recién creada
-            self.reload_subtasks()
-
-    def toggle_subtask(self, subtask_id, checked):
-        database.set_subtask_done(subtask_id, checked, self.db_path)
-        self.reload_subtasks()  # refresca tachado + progreso
-
-    def rename_subtask(self, subtask_id, text):
-        text = text.strip()
-        if not text:
-            self.reload_subtasks()  # título vacío: restaura el anterior
-            return
-        database.update_subtask_title(subtask_id, text, self.db_path)
-
-    def remove_subtask(self, subtask_id):
-        database.delete_subtask(subtask_id, self.db_path)
-        self.reload_subtasks()
-
-    def _update_subtask_progress(self, subtasks=None):
-        if subtasks is None:
-            subtasks = database.get_subtasks(self.task_id, self.db_path)
-        total = len(subtasks)
-        done = sum(1 for s in subtasks if s["done"])
-        if total == 0:
-            self.subtasks_progress_label.setText("")
-        else:
-            pct = int(done / total * 100)
-            self.subtasks_progress_label.setText(f"{done}/{total} · {pct}%")
-
     def reload_logs(self):
         """Limpia y vuelve a cargar todos los logs/entradas del diario."""
         # Limpiar contenedor de logs
@@ -1325,11 +1199,24 @@ class TaskDetailDialog(QDialog):
         # Consultar y agregar los logs
         logs = database.get_logs(self.task_id, self.db_path)
         for log in logs:
-            log_widget = LogEntryWidget(log, self.delete_log_entry, self)
+            log_widget = LogEntryWidget(log, self.delete_log_entry, self.edit_log_entry, self)
             self.logs_layout.addWidget(log_widget)
-        
+
         # Pequeño retardo para dar tiempo a Qt a renderizar antes de bajar el scroll
         self.scroll_to_bottom()
+
+    def edit_log_entry(self, log_id, new_html):
+        """Guarda la edición de un comentario (o cancela si new_html es None) y recarga."""
+        if new_html is not None:
+            database.update_log(log_id, new_html, self.db_path)
+        self.reload_logs()
+
+    def _chat_image_width(self):
+        """Ancho máximo (px) para imágenes pegadas en el chat: el del histórico (más
+        estrecho que el editor), reservando márgenes y la barra de scroll para que no
+        aparezca scroll horizontal ni tape los botones de la entrada."""
+        w = self.scroll_area.viewport().width()
+        return max(120, w - 44)
 
     def add_log_entry(self):
         """Crea una nueva entrada de diario con el texto del input."""
