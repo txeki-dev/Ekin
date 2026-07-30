@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt, QDate, Signal, QBuffer, QIODevice
+from PySide6.QtCore import Qt, QDate, Signal, QBuffer, QIODevice, QSize
 from PySide6.QtWidgets import (
     QDialog, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QTextEdit, QPushButton, QScrollArea, QWidget,
@@ -13,6 +13,7 @@ from datetime import datetime
 import re
 import database
 import styles
+from widgets import make_glyph_icon
 
 
 class MarkdownTextEdit(QTextEdit):
@@ -26,6 +27,12 @@ class MarkdownTextEdit(QTextEdit):
     # Marcadores que disparan cada tipo de lista al pulsar espacio
     _BULLET_MARKERS = ("*", "-", "+")
     _ORDERED_RE = re.compile(r"\d+[.)]")
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # Si se define, devuelve el ancho máximo (px) para imágenes pegadas. Sirve para
+        # que las imágenes del chat quepan en el histórico (más estrecho que el editor).
+        self.image_width_provider = None
 
     def keyPressEvent(self, event):
         cursor = self.textCursor()
@@ -101,8 +108,12 @@ class MarkdownTextEdit(QTextEdit):
 
     def _insert_image(self, image):
         """Embebe un QImage como data URI base64 (queda guardado dentro del HTML).
-        Ajusta la imagen al ancho del cuadro de texto (menos los márgenes)."""
-        avail = max(120, self.viewport().width() - 24)  # ancho útil del cuadro
+        Ajusta la imagen al ancho útil (el del histórico del chat si se ha configurado
+        un `image_width_provider`, que es más estrecho que el editor)."""
+        if self.image_width_provider:
+            avail = max(120, self.image_width_provider())
+        else:
+            avail = max(120, self.viewport().width() - 24)
         if image.width() > avail:
             image = image.scaledToWidth(avail, Qt.SmoothTransformation)
         buffer = QBuffer()
@@ -247,67 +258,99 @@ class RichTextToolbar(QWidget):
 
 
 class LogEntryWidget(QFrame):
-    """Representa una única entrada en el diario/chat de la tarea."""
-    def __init__(self, log_data, delete_callback, parent=None):
+    """Una entrada del diario/chat, con botones (pintados) de editar y eliminar y
+    edición en línea del contenido."""
+    def __init__(self, log_data, delete_callback, save_edit_callback, parent=None):
         super().__init__(parent)
+        self.log_data = log_data
         self.log_id = log_data["id"]
         self.delete_callback = delete_callback
-        
+        self.save_edit_callback = save_edit_callback
+        self._editing = False
+
         self.setObjectName("LogEntryWidget")
         self.init_ui(log_data)
 
-    def init_ui(self, log_data):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(4)
+    def _icon_button(self, kind, color, tooltip, hover_rgba):
+        btn = QPushButton()
+        btn.setFixedSize(20, 20)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setToolTip(tooltip)
+        btn.setIcon(make_glyph_icon(kind, color, 13))
+        btn.setIconSize(QSize(13, 13))
+        btn.setStyleSheet(
+            "QPushButton { background: transparent; border: none; }"
+            f"QPushButton:hover {{ background-color: {hover_rgba}; border-radius: 3px; }}"
+        )
+        return btn
 
-        # Fila superior: Fecha/Hora y botón de eliminar
+    def init_ui(self, log_data):
+        self._layout = QVBoxLayout(self)
+        self._layout.setContentsMargins(8, 8, 8, 8)
+        self._layout.setSpacing(4)
+
+        # Fila superior: Fecha/Hora + botones de editar y eliminar
         top_layout = QHBoxLayout()
-        
-        # Formatear la fecha
+
         raw_date = log_data["created_at"]
         try:
-            # SQLite por defecto guarda en UTC o local text. Formateamos para mejor lectura
-            # Ejemplo: '2026-07-09 19:30:00' -> '09/07/2026 19:30'
+            # Ej: '2026-07-09 19:30:00' -> '09/07/2026 19:30'
             dt = datetime.strptime(raw_date, "%Y-%m-%d %H:%M:%S")
             formatted_date = dt.strftime("%d/%m/%Y %H:%M")
         except Exception:
-            formatted_date = raw_date  # Fallback
-            
+            formatted_date = raw_date
+
         timestamp_label = QLabel(formatted_date)
         timestamp_label.setObjectName("LogTimestamp")
         top_layout.addWidget(timestamp_label)
         top_layout.addStretch()
 
-        # Botón sutil para borrar la entrada del diario
-        delete_btn = QPushButton("×")
-        delete_btn.setFixedSize(16, 16)
-        delete_btn.setCursor(Qt.PointingHandCursor)
-        delete_btn.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                border: none;
-                color: #ef4444;
-                font-weight: bold;
-                font-size: 11px;
-            }
-            QPushButton:hover {
-                color: #dc2626;
-                background-color: rgba(239, 68, 68, 0.1);
-                border-radius: 2px;
-            }
-        """)
-        delete_btn.clicked.connect(lambda: self.delete_callback(self.log_id, self))
-        top_layout.addWidget(delete_btn)
-        
-        layout.addLayout(top_layout)
+        self.edit_btn = self._icon_button(
+            "pencil", "#94a3b8", "Editar comentario", "rgba(148, 163, 184, 0.20)")
+        self.edit_btn.clicked.connect(self._enter_edit_mode)
+        top_layout.addWidget(self.edit_btn)
+
+        self.delete_btn = self._icon_button(
+            "cross", "#ef4444", "Eliminar comentario", "rgba(239, 68, 68, 0.15)")
+        self.delete_btn.clicked.connect(lambda: self.delete_callback(self.log_id, self))
+        top_layout.addWidget(self.delete_btn)
+
+        self._layout.addLayout(top_layout)
 
         # Contenido de la entrada
-        content_label = QLabel(log_data["content"])
-        content_label.setObjectName("LogContent")
-        content_label.setWordWrap(True)
-        content_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        layout.addWidget(content_label)
+        self.content_label = QLabel(log_data["content"])
+        self.content_label.setObjectName("LogContent")
+        self.content_label.setWordWrap(True)
+        self.content_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._layout.addWidget(self.content_label)
+
+    def _enter_edit_mode(self):
+        """Sustituye el contenido por un editor en línea con Guardar/Cancelar."""
+        if self._editing:
+            return
+        self._editing = True
+        self.content_label.hide()
+        self.edit_btn.setEnabled(False)
+
+        self._editor = MarkdownTextEdit()
+        self._editor.setHtml(self.log_data["content"])
+        self._editor.setMinimumHeight(90)
+        self._layout.addWidget(RichTextToolbar(self._editor))
+        self._layout.addWidget(self._editor)
+
+        btns = QHBoxLayout()
+        btns.addStretch()
+        save_btn = QPushButton("Guardar")
+        save_btn.setObjectName("PrimaryButton")
+        save_btn.setCursor(Qt.PointingHandCursor)
+        save_btn.clicked.connect(lambda: self.save_edit_callback(self.log_id, self._editor.toHtml()))
+        btns.addWidget(save_btn)
+        cancel_btn = QPushButton("Cancelar")
+        cancel_btn.setCursor(Qt.PointingHandCursor)
+        cancel_btn.clicked.connect(lambda: self.save_edit_callback(self.log_id, None))
+        btns.addWidget(cancel_btn)
+        self._layout.addLayout(btns)
+        self._editor.setFocus()
 
 
 def color_icon(color, size=13):
@@ -911,6 +954,8 @@ class TaskDetailDialog(QDialog):
         # Caja cómoda que crece con el texto (sin límite de caracteres; solo tope visual)
         self.log_input.setMinimumHeight(110)
         self.log_input.setMaximumHeight(260)
+        # Las imágenes pegadas en el chat se ajustan al ancho del histórico (más estrecho)
+        self.log_input.image_width_provider = self._chat_image_width
         input_layout.addWidget(RichTextToolbar(self.log_input))
         input_layout.addWidget(self.log_input)
 
@@ -1154,11 +1199,24 @@ class TaskDetailDialog(QDialog):
         # Consultar y agregar los logs
         logs = database.get_logs(self.task_id, self.db_path)
         for log in logs:
-            log_widget = LogEntryWidget(log, self.delete_log_entry, self)
+            log_widget = LogEntryWidget(log, self.delete_log_entry, self.edit_log_entry, self)
             self.logs_layout.addWidget(log_widget)
-        
+
         # Pequeño retardo para dar tiempo a Qt a renderizar antes de bajar el scroll
         self.scroll_to_bottom()
+
+    def edit_log_entry(self, log_id, new_html):
+        """Guarda la edición de un comentario (o cancela si new_html es None) y recarga."""
+        if new_html is not None:
+            database.update_log(log_id, new_html, self.db_path)
+        self.reload_logs()
+
+    def _chat_image_width(self):
+        """Ancho máximo (px) para imágenes pegadas en el chat: el del histórico (más
+        estrecho que el editor), reservando márgenes y la barra de scroll para que no
+        aparezca scroll horizontal ni tape los botones de la entrada."""
+        w = self.scroll_area.viewport().width()
+        return max(120, w - 44)
 
     def add_log_entry(self):
         """Crea una nueva entrada de diario con el texto del input."""

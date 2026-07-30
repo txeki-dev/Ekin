@@ -270,6 +270,17 @@ def test_delete_log(db_path):
     assert database.get_logs(task_id, db_path) == []
 
 
+def test_update_log_edits_content(db_path):
+    board_id = database.create_board("Board", db_path=db_path)
+    col_id = database.create_column(board_id, "Col", db_path=db_path)
+    task_id = database.create_task(col_id, "Tarea", db_path=db_path)
+    log_id = database.create_log(task_id, "original", db_path=db_path)
+
+    database.update_log(log_id, "editado", db_path=db_path)
+
+    assert database.get_logs(task_id, db_path)[0]["content"] == "editado"
+
+
 # --- Mover / copiar columnas entre tableros ---
 
 def test_move_column_to_board(db_path):

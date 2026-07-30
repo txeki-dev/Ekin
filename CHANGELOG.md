@@ -10,9 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [0.5.1] - 2026-07-30
 
 ### Added
-- **Collapsible board columns.** A **◀️** button collapses a column to a narrow strip (expand **▶️**,
+- **Collapsible board columns.** A collapse button folds a column to a narrow strip (expand button,
   task count, vertical name) to save horizontal space; the collapsed state is saved per column
   (`columns.collapsed`). **Dragging a card onto a collapsed column expands it** and drops the card in.
+- **Edit a diary/chat comment.** Each comment now has clear **edit** and **delete** icon buttons;
+  editing opens an inline editor (new `database.update_log`).
 - **Rich-text editor upgrades** (task description + diary): **Tab** nests a bullet into a sub‑bullet
   (**Shift+Tab** un‑nests; glyph varies by depth ● ○ ▪); external text now **pastes as plain text**
   (no foreign fonts/colors); and you can **paste images** directly (embedded inline in the note).
@@ -24,11 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Formatting shortcuts now accept both conventions: **bold = Ctrl+B or Ctrl+N**, **italic = Ctrl+K or
   Ctrl+I** (Spanish MS Word uses N/K). The italic toolbar button now shows **K** (an italic "I" reads
   like a "/").
-- **Column header icons now use emoji** (**◀️** collapse, **✏️** edit/options) so they always render
-  (the previous text glyphs were blank in some fonts).
+- **Column, sidebar-toggle and comment icons are now painted** (pixmaps drawn at runtime) instead of
+  Unicode/emoji glyphs, so they always render regardless of font. Collapse/expand shows ◀/▶ arrows and
+  edit shows a pencil; the sidebar toggle now uses ◀/▶ too.
 - **Bigger task-detail window** (more room for the description and diary), a roomier growable diary
-  box (there was never a character limit — content is stored in full), and pasted **images now scale
-  to the text box width**.
+  box (there was never a character limit — content is stored in full), and pasted **images scale to
+  the text box width** — chat images use the (narrower) history width so there's no horizontal scroll
+  and the entry's edit/delete buttons stay visible.
 
 ### Removed
 - **Subtasks / checklists** (introduced in 0.5.0). The whole feature was removed — the in‑card

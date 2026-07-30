@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QWidget, QMenu, QApplication, QLayout
 )
-from PySide6.QtGui import QDrag, QPixmap, QCursor, QPainter, QColor
+from PySide6.QtGui import QDrag, QPixmap, QCursor, QPainter, QColor, QIcon, QPolygon, QPen
 from datetime import datetime
 import styles
 from styles import hex_to_rgb
@@ -86,6 +86,52 @@ class FlowLayout(QLayout):
             lineHeight = max(lineHeight, item.sizeHint().height())
 
         return y + lineHeight - rect.y() + bottom
+
+
+def make_glyph_icon(kind, color, size=16):
+    """Dibuja un icono (triángulo o lápiz) como QPixmap, sin depender de fuentes.
+
+    Los glifos Unicode de flechas/lápiz no se renderizan de forma fiable en todas las
+    fuentes/instalaciones de Windows, así que los pintamos a mano (siempre visibles)."""
+    pix = QPixmap(size, size)
+    pix.fill(Qt.transparent)
+    p = QPainter(pix)
+    p.setRenderHint(QPainter.Antialiasing)
+    c = QColor(color)
+    s = float(size)
+    if kind in ("left", "right"):
+        p.setPen(Qt.NoPen)
+        p.setBrush(c)
+        if kind == "left":   # ◀
+            pts = [QPoint(int(s * 0.62), int(s * 0.20)),
+                   QPoint(int(s * 0.62), int(s * 0.80)),
+                   QPoint(int(s * 0.33), int(s * 0.50))]
+        else:                # ▶
+            pts = [QPoint(int(s * 0.38), int(s * 0.20)),
+                   QPoint(int(s * 0.38), int(s * 0.80)),
+                   QPoint(int(s * 0.67), int(s * 0.50))]
+        p.drawPolygon(QPolygon(pts))
+    elif kind == "pencil":   # lápiz (editar)
+        pen = QPen(c, max(2, int(s * 0.16)))
+        pen.setCapStyle(Qt.FlatCap)
+        p.setPen(pen)
+        p.drawLine(int(s * 0.28), int(s * 0.72), int(s * 0.60), int(s * 0.40))  # cuerpo
+        p.setPen(Qt.NoPen)
+        p.setBrush(c)
+        p.drawPolygon(QPolygon([          # punta (triángulo)
+            QPoint(int(s * 0.58), int(s * 0.38)),
+            QPoint(int(s * 0.82), int(s * 0.18)),
+            QPoint(int(s * 0.68), int(s * 0.48)),
+        ]))
+    elif kind == "cross":    # ✕ (borrar)
+        pen = QPen(c, max(2, int(s * 0.16)))
+        pen.setCapStyle(Qt.RoundCap)
+        p.setPen(pen)
+        m = s * 0.28
+        p.drawLine(int(m), int(m), int(s - m), int(s - m))
+        p.drawLine(int(s - m), int(m), int(m), int(s - m))
+    p.end()
+    return QIcon(pix)
 
 
 def compute_drop_index(cards_geom, drop_y, dragged_id):
@@ -432,9 +478,10 @@ class ColumnWidget(QFrame):
         self.setFixedWidth(self.COLLAPSED_WIDTH if self.collapsed else self.EXPANDED_WIDTH)
         self.init_ui()
 
-    def _column_icon_button(self, text, tooltip):
-        """Pequeño botón cuadrado de icono a juego con el color de la columna."""
-        btn = QPushButton(text)
+    def _column_icon_button(self, kind, tooltip):
+        """Pequeño botón cuadrado con un icono PINTADO (left/right/pencil) a juego con
+        el color de la columna. Se pinta a mano para no depender de glifos de fuente."""
+        btn = QPushButton()
         btn.setFixedSize(24, 24)
         btn.setCursor(Qt.PointingHandCursor)
         btn.setToolTip(tooltip)
@@ -443,6 +490,8 @@ class ColumnWidget(QFrame):
         except Exception:
             r, g, b = 59, 130, 246
         color = self.column_data["color"]
+        btn.setIcon(make_glyph_icon(kind, color, 16))
+        btn.setIconSize(QSize(16, 16))
         btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: rgba({r}, {g}, {b}, 0.1);
@@ -476,7 +525,7 @@ class ColumnWidget(QFrame):
         layout.setSpacing(8)
         layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
 
-        expand_btn = self._column_icon_button("▶️", "Desplegar columna")
+        expand_btn = self._column_icon_button("right", "Desplegar columna")
         expand_btn.clicked.connect(lambda: self.collapse_toggle_requested.emit(self.column_id))
         layout.addWidget(expand_btn, 0, Qt.AlignHCenter)
 
@@ -522,13 +571,13 @@ class ColumnWidget(QFrame):
         header_layout.addWidget(self.title_label)
         header_layout.addStretch()
 
-        # Botón para plegar la columna (◀️ = plegar hacia la izquierda)
-        collapse_btn = self._column_icon_button("◀️", "Plegar columna")
+        # Botón para plegar la columna (triángulo hacia la izquierda, pintado)
+        collapse_btn = self._column_icon_button("left", "Plegar columna")
         collapse_btn.clicked.connect(lambda: self.collapse_toggle_requested.emit(self.column_id))
         header_layout.addWidget(collapse_btn)
 
-        # Botón de edición/opciones de la columna (✏️ = editar / opciones)
-        self.menu_btn = self._column_icon_button("✏️", "Editar columna (opciones: editar, copiar, eliminar)")
+        # Botón de edición/opciones de la columna (lápiz pintado)
+        self.menu_btn = self._column_icon_button("pencil", "Editar columna (opciones: editar, copiar, eliminar)")
         self.menu_btn.clicked.connect(self.show_column_menu)
         header_layout.addWidget(self.menu_btn)
 

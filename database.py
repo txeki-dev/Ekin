@@ -726,6 +726,18 @@ def get_logs(task_id, db_path=None):
         )
         return [dict(row) for row in cursor.fetchall()]
 
+def update_log(log_id, content, db_path=None):
+    """Edita el contenido (HTML) de una entrada del diario y refresca el updated_at de la tarea."""
+    db_path = db_path or DB_NAME
+    with get_connection(db_path) as conn:
+        conn.execute("UPDATE task_logs SET content = ? WHERE id = ?", (content, log_id))
+        conn.execute(
+            "UPDATE tasks SET updated_at = CURRENT_TIMESTAMP "
+            "WHERE id = (SELECT task_id FROM task_logs WHERE id = ?)",
+            (log_id,)
+        )
+        conn.commit()
+
 def delete_log(log_id, db_path=None):
     db_path = db_path or DB_NAME
     with get_connection(db_path) as conn:

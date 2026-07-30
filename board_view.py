@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtWidgets import (
     QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QInputDialog, QMessageBox, QDialog, QLineEdit, QColorDialog,
@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
 import database
 import styles
 from styles import hex_to_rgb
-from widgets import ColumnWidget, TaskCard
+from widgets import ColumnWidget, TaskCard, make_glyph_icon
 from detail_dialog import TaskDetailDialog
 
 
@@ -226,25 +226,26 @@ class BoardViewWidget(QFrame):
         header_layout.setContentsMargins(15, 0, 15, 0)
         header_layout.setSpacing(10)
 
-        # Botón para colapsar/desplegar la barra lateral
-        self.toggle_sidebar_btn = QPushButton("☰")
+        # Botón para colapsar/desplegar la barra lateral (◀ plegar / ▶ desplegar, pintado)
+        self._sidebar_visible = True
+        self.toggle_sidebar_btn = QPushButton()
         self.toggle_sidebar_btn.setFixedSize(32, 32)
         self.toggle_sidebar_btn.setCursor(Qt.PointingHandCursor)
         self.toggle_sidebar_btn.setToolTip("Mostrar/Ocultar barra lateral")
+        self.toggle_sidebar_btn.setIcon(make_glyph_icon("left", "#f8fafc", 16))
+        self.toggle_sidebar_btn.setIconSize(QSize(16, 16))
         self.toggle_sidebar_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: transparent;
                 border: 1px solid {styles.COLORS['border']};
                 border-radius: 6px;
-                font-size: 15px;
-                color: #f8fafc;
             }}
             QPushButton:hover {{
                 background-color: {styles.COLORS['bg_card']};
                 border-color: {styles.COLORS['accent_blue']};
             }}
         """)
-        self.toggle_sidebar_btn.clicked.connect(self.toggle_sidebar_requested.emit)
+        self.toggle_sidebar_btn.clicked.connect(self._on_toggle_sidebar)
         header_layout.addWidget(self.toggle_sidebar_btn)
 
         # Título del Tablero
@@ -455,6 +456,13 @@ class BoardViewWidget(QFrame):
         if confirm == QMessageBox.Yes:
             database.delete_column(column_id, self.db_path)
             self.load_board(self.board_id)
+
+    def _on_toggle_sidebar(self):
+        """Alterna la barra lateral y actualiza el icono: ◀ (plegar) / ▶ (desplegar)."""
+        self._sidebar_visible = not self._sidebar_visible
+        kind = "left" if self._sidebar_visible else "right"
+        self.toggle_sidebar_btn.setIcon(make_glyph_icon(kind, "#f8fafc", 16))
+        self.toggle_sidebar_requested.emit()
 
     def handle_column_collapse(self, column_id):
         """Pliega o despliega una columna (persiste el estado) y recarga el tablero."""
