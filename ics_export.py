@@ -77,11 +77,19 @@ def _fold_line(line):
     return "\r\n ".join(p.decode("utf-8") for p in pieces)
 
 
-def build_ics(db_path=None):
-    """Construye el contenido .ics (texto) con todas las tareas que tienen due_date."""
+def build_ics(db_path=None, board_id=None):
+    """Construye el contenido .ics (texto) con las tareas que tienen due_date.
+
+    Con `board_id` genera el feed de un solo tablero (calendarios por tablero). Si una
+    tarea tiene hora (`due_time`), emite un evento con hora + un aviso `VALARM`; si no,
+    un evento de día completo."""
     db_path = db_path or database.DB_NAME
-    tasks = database.get_scheduled_tasks(db_path=db_path)
+    tasks = database.get_scheduled_tasks(board_id=board_id, db_path=db_path)
     now_utc = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+    cal_name = "Ekin Kanban"
+    if board_id is not None and tasks:
+        cal_name = f"Ekin — {tasks[0]['board_name']}"
 
     lines = [
         "BEGIN:VCALENDAR",
@@ -89,7 +97,7 @@ def build_ics(db_path=None):
         "PRODID:-//Ekin Kanban//Ekin//ES",
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
-        "X-WR-CALNAME:Ekin Kanban",
+        f"X-WR-CALNAME:{_escape(cal_name)}",
     ]
 
     for t in tasks:
@@ -97,7 +105,25 @@ def build_ics(db_path=None):
             start = datetime.strptime(t["due_date"], "%Y-%m-%d").date()
         except (ValueError, TypeError):
             continue
-        end = start + timedelta(days=1)  # DTEND es exclusivo en eventos de día completo
+
+        # ¿Tiene hora? -> evento con hora + VALARM; si no, evento de día completo.
+        due_time = (t.get("due_time") or "").strip()
+        start_dt = None
+        if due_time:
+            try:
+                hh, mm = due_time.split(":")
+                start_dt = datetime(start.year, start.month, start.day, int(hh), int(mm))
+            except (ValueError, TypeError):
+                start_dt = None
+
+        if start_dt is not None:
+            end_dt = start_dt + timedelta(hours=1)
+            dtstart_line = f"DTSTART:{start_dt.strftime('%Y%m%dT%H%M%S')}"
+            dtend_line = f"DTEND:{end_dt.strftime('%Y%m%dT%H%M%S')}"
+        else:
+            end = start + timedelta(days=1)  # DTEND es exclusivo en eventos de día completo
+            dtstart_line = f"DTSTART;VALUE=DATE:{start.strftime('%Y%m%d')}"
+            dtend_line = f"DTEND;VALUE=DATE:{end.strftime('%Y%m%d')}"
 
         description_parts = [f"Tablero: {t['board_name']}"]
         if t.get("tags"):
@@ -119,8 +145,8 @@ def build_ics(db_path=None):
             f"UID:ekin-task-{t['id']}@ekin-kanban",
             f"DTSTAMP:{stamp}",
             f"SEQUENCE:{sequence}",
-            f"DTSTART;VALUE=DATE:{start.strftime('%Y%m%d')}",
-            f"DTEND;VALUE=DATE:{end.strftime('%Y%m%d')}",
+            dtstart_line,
+            dtend_line,
             f"SUMMARY:{_escape(t['title'] or '(sin título)')}",
             f"DESCRIPTION:{_escape(chr(10).join(description_parts))}",
             f"CATEGORIES:{_escape(t['board_name'])}",
@@ -128,6 +154,15 @@ def build_ics(db_path=None):
         ]
         if last_modified:
             event.append(f"LAST-MODIFIED:{last_modified}")
+        if start_dt is not None:
+            # Aviso 15 min antes para eventos con hora
+            event.extend([
+                "BEGIN:VALARM",
+                "ACTION:DISPLAY",
+                f"DESCRIPTION:{_escape(t['title'] or '(sin título)')}",
+                "TRIGGER:-PT15M",
+                "END:VALARM",
+            ])
         event.append("END:VEVENT")
         lines.extend(event)
 
@@ -135,10 +170,10 @@ def build_ics(db_path=None):
     return "\r\n".join(_fold_line(line) for line in lines) + "\r\n"
 
 
-def export_ics(path, db_path=None):
+def export_ics(path, db_path=None, board_id=None):
     """Escribe el archivo .ics en `path`. Devuelve el número de eventos exportados."""
     db_path = db_path or database.DB_NAME
-    content = build_ics(db_path=db_path)
+    content = build_ics(db_path=db_path, board_id=board_id)
     with open(path, "w", encoding="utf-8", newline="") as f:
         f.write(content)
     return content.count("BEGIN:VEVENT")

@@ -1,8 +1,8 @@
-from PySide6.QtCore import Qt, QDate, Signal, QBuffer, QIODevice, QSize
+from PySide6.QtCore import Qt, QDate, QTime, Signal, QBuffer, QIODevice, QSize
 from PySide6.QtWidgets import (
     QDialog, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QTextEdit, QPushButton, QScrollArea, QWidget,
-    QColorDialog, QMessageBox, QCheckBox, QDateEdit, QComboBox,
+    QColorDialog, QMessageBox, QCheckBox, QDateEdit, QTimeEdit, QComboBox,
     QListWidget, QListWidgetItem, QInputDialog
 )
 from PySide6.QtGui import (
@@ -841,15 +841,27 @@ class TaskDetailDialog(QDialog):
         
         self.due_enable_chk = QCheckBox("Habilitar")
         self.due_enable_chk.setCursor(Qt.PointingHandCursor)
-        self.due_enable_chk.stateChanged.connect(lambda state: self.due_date_edit.setEnabled(self.due_enable_chk.isChecked()))
+        self.due_enable_chk.stateChanged.connect(self._sync_due_enabled)
         due_layout.addWidget(self.due_enable_chk)
-        
+
         self.due_date_edit = QDateEdit()
         self.due_date_edit.setCalendarPopup(True)
         self.due_date_edit.setDate(QDate.currentDate())
         self.due_date_edit.setDisplayFormat("yyyy-MM-dd")
         self.due_date_edit.setEnabled(False)
         due_layout.addWidget(self.due_date_edit)
+
+        # Hora de vencimiento opcional (activa un aviso en el .ics)
+        self.due_time_chk = QCheckBox("Hora")
+        self.due_time_chk.setCursor(Qt.PointingHandCursor)
+        self.due_time_chk.setToolTip("Añadir hora al vencimiento (crea un aviso en el calendario)")
+        self.due_time_chk.stateChanged.connect(self._sync_due_enabled)
+        due_layout.addWidget(self.due_time_chk)
+        self.due_time_edit = QTimeEdit()
+        self.due_time_edit.setDisplayFormat("HH:mm")
+        self.due_time_edit.setTime(QTime(9, 0))
+        self.due_time_edit.setEnabled(False)
+        due_layout.addWidget(self.due_time_edit)
 
         # Recurrencia (repetir la tarea)
         due_layout.addWidget(QLabel("🔁"))
@@ -989,6 +1001,13 @@ class TaskDetailDialog(QDialog):
         shortcut_num = QShortcut(QKeySequence("Ctrl+Enter"), self)
         shortcut_num.activated.connect(self.add_log_entry)
 
+    def _sync_due_enabled(self):
+        """Habilita/inhabilita fecha y hora según los checks."""
+        due_on = self.due_enable_chk.isChecked()
+        self.due_date_edit.setEnabled(due_on)
+        self.due_time_chk.setEnabled(due_on)
+        self.due_time_edit.setEnabled(due_on and self.due_time_chk.isChecked())
+
     def load_task_data(self):
         """Carga los datos iniciales de la tarea y sus logs desde la base de datos."""
         task = database.get_task(self.task_id, self.db_path)
@@ -1010,6 +1029,15 @@ class TaskDetailDialog(QDialog):
             self.due_enable_chk.setChecked(False)
             self.due_date_edit.setEnabled(False)
             self.due_date_edit.setDate(QDate.currentDate())
+
+        # Cargar hora de vencimiento
+        due_time = task.get("due_time")
+        if due_date and due_time:
+            self.due_time_chk.setChecked(True)
+            self.due_time_edit.setTime(QTime.fromString(due_time, "HH:mm"))
+        else:
+            self.due_time_chk.setChecked(False)
+        self._sync_due_enabled()
 
         # Cargar recurrencia
         rec = task.get("recurrence", "none") or "none"
@@ -1173,14 +1201,18 @@ class TaskDetailDialog(QDialog):
 
         description = self.desc_input.toHtml()
 
-        # Obtener fecha de vencimiento
+        # Obtener fecha y hora de vencimiento
         due_date = None
+        due_time = None
         if self.due_enable_chk.isChecked():
             due_date = self.due_date_edit.date().toString("yyyy-MM-dd")
+            if self.due_time_chk.isChecked():
+                due_time = self.due_time_edit.time().toString("HH:mm")
 
         # Guardar tarea principal (las columnas tag_text/tag_color quedan sin uso: las etiquetas
         # estructuradas viven en task_tags/tag_values)
         database.update_task(self.task_id, title, description, "", "#6b7280", due_date, self.db_path)
+        database.set_task_due_time(self.task_id, due_time, self.db_path)
 
         # Guardar las etiquetas asignadas
         tag_value_ids = [tag["tag_value_id"] for tag in self.current_tags]

@@ -362,6 +362,13 @@ def update_task_due_date(task_id, due_date, db_path=None):
         )
         conn.commit()
 
+def set_task_due_time(task_id, due_time, db_path=None):
+    """Fija la hora de vencimiento ('HH:MM') de una tarea, o None para dejarla de día completo."""
+    db_path = db_path or DB_NAME
+    with get_connection(db_path) as conn:
+        conn.execute("UPDATE tasks SET due_time = ? WHERE id = ?", (due_time or None, task_id))
+        conn.commit()
+
 # --- RECURRENCIA DE TAREAS ---
 
 def next_occurrence(date_str, recurrence):

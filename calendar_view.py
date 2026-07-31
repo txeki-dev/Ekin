@@ -1,13 +1,13 @@
 """Vista de calendario mensual para Ekin: muestra las tareas por su fecha de vencimiento
 y permite exportar a iCalendar (.ics) desde su diálogo de Ajustes."""
 import calendar as _cal
-from datetime import date
+from datetime import date, timedelta
 
 from PySide6.QtCore import Qt, Signal, QMimeData, QPoint, QUrl
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
     QFrame, QDialog, QFileDialog, QMessageBox, QSizePolicy, QApplication, QLineEdit,
-    QScrollArea
+    QScrollArea, QComboBox
 )
 from PySide6.QtGui import QColor, QPixmap, QIcon, QDrag, QDesktopServices
 
@@ -88,7 +88,7 @@ class DayCell(QFrame):
         self._base_style = style
         self.setStyleSheet(style)
 
-    def set_day(self, day_number, tasks, is_today=False, cell_date=None):
+    def set_day(self, day_number, tasks, is_today=False, cell_date=None, max_show=3):
         # Vaciar los chips previos (se conserva la etiqueta del día en el índice 0)
         while self._layout.count() > 1:
             item = self._layout.takeAt(1)
@@ -119,7 +119,6 @@ class DayCell(QFrame):
                 f"#DayNumber {{ color: {styles.COLORS['text_muted']}; font-weight: bold; }}"
             )
 
-        max_show = 3
         for t in tasks[:max_show]:
             title = t["title"] or "(sin título)"
             label = title if len(title) <= 20 else title[:19] + "…"
@@ -174,8 +173,15 @@ class DayCell(QFrame):
             event.ignore()
 
 
+def _group_by_day(tasks):
+    by_day = {}
+    for t in tasks:
+        by_day.setdefault(t["due_date"], []).append(t)
+    return by_day
+
+
 class CalendarViewWidget(QWidget):
-    """Vista mensual completa. Sustituye a la vista de tablero cuando está activa."""
+    """Vista de calendario (mes / semana / día) con filtro por tablero y leyenda."""
     close_requested = Signal()
     task_activated = Signal(int, int)  # task_id, board_id
     data_changed = Signal()            # tras reprogramar una tarea (refresca campana/.ics)
@@ -184,18 +190,19 @@ class CalendarViewWidget(QWidget):
         super().__init__(parent)
         self.db_path = db_path
         self.setObjectName("CalendarView")
-        today = date.today()
-        self.year = today.year
-        self.month = today.month
+        self.view_mode = "month"   # month | week | day
+        self.anchor = date.today()
+        self.cells = []
+        self._modes = ["month", "week", "day"]
         self._build_ui()
+        self._rebuild_grid()
         self.refresh()
 
     def _build_ui(self):
-        root = QVBoxLayout(self)
-        root.setContentsMargins(16, 16, 16, 16)
-        root.setSpacing(12)
+        self._root = QVBoxLayout(self)
+        self._root.setContentsMargins(16, 16, 16, 16)
+        self._root.setSpacing(10)
 
-        # --- Cabecera: navegación + acciones ---
         header = QHBoxLayout()
         header.setSpacing(6)
 
@@ -203,16 +210,16 @@ class CalendarViewWidget(QWidget):
         prev_btn.setObjectName("CalNavButton")
         prev_btn.setFixedSize(30, 28)
         prev_btn.setCursor(Qt.PointingHandCursor)
-        prev_btn.clicked.connect(self.prev_month)
+        prev_btn.clicked.connect(self.go_prev)
 
         next_btn = QPushButton("›")
         next_btn.setObjectName("CalNavButton")
         next_btn.setFixedSize(30, 28)
         next_btn.setCursor(Qt.PointingHandCursor)
-        next_btn.clicked.connect(self.next_month)
+        next_btn.clicked.connect(self.go_next)
 
-        self.month_label = QLabel("")
-        self.month_label.setObjectName("CalendarMonthLabel")
+        self.period_label = QLabel("")
+        self.period_label.setObjectName("CalendarMonthLabel")
 
         today_btn = QPushButton("Hoy")
         today_btn.setCursor(Qt.PointingHandCursor)
@@ -221,8 +228,24 @@ class CalendarViewWidget(QWidget):
         header.addWidget(prev_btn)
         header.addWidget(next_btn)
         header.addSpacing(8)
-        header.addWidget(self.month_label)
+        header.addWidget(self.period_label)
         header.addStretch()
+
+        # Selector de vista (Mes/Semana/Día)
+        self.mode_combo = QComboBox()
+        for lbl in ("Mes", "Semana", "Día"):
+            self.mode_combo.addItem(lbl)
+        self.mode_combo.setToolTip("Vista del calendario")
+        self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
+        header.addWidget(self.mode_combo)
+
+        # Filtro por tablero
+        self.board_combo = QComboBox()
+        self.board_combo.setToolTip("Filtrar por tablero")
+        self.board_combo.currentIndexChanged.connect(lambda _=0: self.refresh())
+        header.addWidget(self.board_combo)
+
+        header.addWidget(today_btn)
 
         settings_btn = QPushButton("⚙  Ajustes")
         settings_btn.setCursor(Qt.PointingHandCursor)
@@ -235,62 +258,133 @@ class CalendarViewWidget(QWidget):
         close_btn.setToolTip("Volver a la vista de tablero")
         close_btn.clicked.connect(self.close_requested.emit)
 
-        header.addWidget(today_btn)
         header.addWidget(settings_btn)
         header.addWidget(close_btn)
-        root.addLayout(header)
+        self._root.addLayout(header)
 
-        # --- Rejilla: fila 0 = cabecera de días de la semana; filas 1-6 = semanas ---
-        grid = QGridLayout()
-        grid.setSpacing(6)
+        # Leyenda de tableros (color + nombre)
+        legend_host = QWidget()
+        self.legend = QHBoxLayout(legend_host)
+        self.legend.setContentsMargins(2, 0, 2, 0)
+        self.legend.setSpacing(12)
+        self._root.addWidget(legend_host)
+
+        # Rejilla (se reconstruye según el modo)
+        self.grid_host = QWidget()
+        self.grid = QGridLayout(self.grid_host)
+        self.grid.setSpacing(6)
+        self._root.addWidget(self.grid_host, 1)
+
+    def _make_cell(self):
+        cell = DayCell()
+        cell.task_clicked.connect(self.task_activated.emit)
+        cell.task_rescheduled.connect(self._on_task_rescheduled)
+        return cell
+
+    def _rebuild_grid(self):
+        """Reconstruye la rejilla de celdas según el modo de vista."""
+        while self.grid.count():
+            item = self.grid.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+        self.cells = []
+        for c in range(7):
+            self.grid.setColumnStretch(c, 0)
+        for r in range(7):
+            self.grid.setRowStretch(r, 0)
+
+        if self.view_mode == "day":
+            cell = self._make_cell()
+            self.grid.addWidget(cell, 0, 0)
+            self.cells.append(cell)
+            self.grid.setColumnStretch(0, 1)
+            self.grid.setRowStretch(0, 1)
+            return
+
         for col, name in enumerate(_WEEKDAYS):
             lbl = QLabel(name)
             lbl.setObjectName("WeekdayHeader")
             lbl.setAlignment(Qt.AlignCenter)
-            grid.addWidget(lbl, 0, col)
+            self.grid.addWidget(lbl, 0, col)
+            self.grid.setColumnStretch(col, 1)
 
-        self.cells = []
-        for week in range(6):
+        rows = 6 if self.view_mode == "month" else 1
+        for r in range(rows):
             for dow in range(7):
-                cell = DayCell()
-                cell.task_clicked.connect(self.task_activated.emit)
-                cell.task_rescheduled.connect(self._on_task_rescheduled)
-                grid.addWidget(cell, week + 1, dow)
+                cell = self._make_cell()
+                self.grid.addWidget(cell, r + 1, dow)
                 self.cells.append(cell)
+            self.grid.setRowStretch(r + 1, 1)
 
-        for col in range(7):
-            grid.setColumnStretch(col, 1)
-        for row in range(1, 7):
-            grid.setRowStretch(row, 1)
+    def _reload_board_filter(self):
+        current = self.board_combo.currentData()
+        self.board_combo.blockSignals(True)
+        self.board_combo.clear()
+        self.board_combo.addItem("Todos los tableros", None)
+        for b in database.get_boards(self.db_path, include_archived=True):
+            self.board_combo.addItem(b["name"], b["id"])
+        idx = self.board_combo.findData(current)
+        self.board_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        self.board_combo.blockSignals(False)
 
-        root.addLayout(grid, 1)
+    def _reload_legend(self):
+        while self.legend.count():
+            item = self.legend.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+        for b in database.get_boards(self.db_path):
+            lab = QLabel(f"● {b['name']}")
+            lab.setStyleSheet(f"color: {b['color']}; font-size: 11px; font-weight: bold; background: transparent;")
+            self.legend.addWidget(lab)
+        self.legend.addStretch()
 
     def refresh(self):
-        """Vuelve a pintar el mes actual con sus tareas."""
-        self.month_label.setText(f"{_MONTHS[self.month - 1]} {self.year}")
-
-        first_weekday, num_days = _cal.monthrange(self.year, self.month)  # first_weekday: 0=lunes
-        start = date(self.year, self.month, 1)
-        end = date(self.year, self.month, num_days)
-        tasks = database.get_scheduled_tasks(start.isoformat(), end.isoformat(), db_path=self.db_path)
-
-        by_day = {}
-        for t in tasks:
-            by_day.setdefault(t["due_date"], []).append(t)
-
+        """Recarga filtro/leyenda y pinta el periodo actual según el modo."""
+        self._reload_board_filter()
+        self._reload_legend()
+        board_id = self.board_combo.currentData()
         today = date.today()
-        for idx, cell in enumerate(self.cells):
-            day_number = idx - first_weekday + 1
-            if 1 <= day_number <= num_days:
-                cell_date = date(self.year, self.month, day_number)
-                cell.set_day(
-                    day_number,
-                    by_day.get(cell_date.isoformat(), []),
-                    is_today=(cell_date == today),
-                    cell_date=cell_date,
-                )
-            else:
-                cell.set_day(None, [])
+
+        if self.view_mode == "month":
+            self.period_label.setText(f"{_MONTHS[self.anchor.month - 1]} {self.anchor.year}")
+            first_weekday, num_days = _cal.monthrange(self.anchor.year, self.anchor.month)
+            start = date(self.anchor.year, self.anchor.month, 1)
+            end = date(self.anchor.year, self.anchor.month, num_days)
+            by_day = _group_by_day(database.get_scheduled_tasks(
+                start.isoformat(), end.isoformat(), board_id=board_id, db_path=self.db_path))
+            for idx, cell in enumerate(self.cells):
+                day_number = idx - first_weekday + 1
+                if 1 <= day_number <= num_days:
+                    cd = date(self.anchor.year, self.anchor.month, day_number)
+                    cell.set_day(day_number, by_day.get(cd.isoformat(), []),
+                                 is_today=(cd == today), cell_date=cd)
+                else:
+                    cell.set_day(None, [])
+
+        elif self.view_mode == "week":
+            monday = self.anchor - timedelta(days=self.anchor.weekday())
+            sunday = monday + timedelta(days=6)
+            self.period_label.setText(f"Semana {monday.strftime('%d/%m')} – {sunday.strftime('%d/%m/%Y')}")
+            by_day = _group_by_day(database.get_scheduled_tasks(
+                monday.isoformat(), sunday.isoformat(), board_id=board_id, db_path=self.db_path))
+            for i, cell in enumerate(self.cells):
+                cd = monday + timedelta(days=i)
+                cell.set_day(cd.day, by_day.get(cd.isoformat(), []),
+                             is_today=(cd == today), cell_date=cd, max_show=8)
+
+        else:  # day
+            self.period_label.setText(f"{_WEEKDAYS[self.anchor.weekday()]} {self.anchor.strftime('%d/%m/%Y')}")
+            tasks = database.get_scheduled_tasks(
+                self.anchor.isoformat(), self.anchor.isoformat(), board_id=board_id, db_path=self.db_path)
+            self.cells[0].set_day(self.anchor.day, tasks, is_today=(self.anchor == today),
+                                  cell_date=self.anchor, max_show=50)
+
+    def _on_mode_changed(self, index):
+        self.view_mode = self._modes[index]
+        self._rebuild_grid()
+        self.refresh()
 
     def _on_task_rescheduled(self, task_id, iso_date):
         """Cambia la fecha de vencimiento de una tarea arrastrada a otro día."""
@@ -299,23 +393,27 @@ class CalendarViewWidget(QWidget):
         # Avisar a la app para refrescar la campana y reescribir el .ics sincronizado.
         self.data_changed.emit()
 
-    def prev_month(self):
-        self.month -= 1
-        if self.month < 1:
-            self.month = 12
-            self.year -= 1
+    def _shift(self, direction):
+        if self.view_mode == "month":
+            m = self.anchor.month - 1 + direction
+            year = self.anchor.year + (m // 12)
+            month = m % 12 + 1
+            last = _cal.monthrange(year, month)[1]
+            self.anchor = date(year, month, min(self.anchor.day, last))
+        elif self.view_mode == "week":
+            self.anchor = self.anchor + timedelta(days=7 * direction)
+        else:
+            self.anchor = self.anchor + timedelta(days=direction)
         self.refresh()
 
-    def next_month(self):
-        self.month += 1
-        if self.month > 12:
-            self.month = 1
-            self.year += 1
-        self.refresh()
+    def go_prev(self):
+        self._shift(-1)
+
+    def go_next(self):
+        self._shift(1)
 
     def go_today(self):
-        today = date.today()
-        self.year, self.month = today.year, today.month
+        self.anchor = date.today()
         self.refresh()
 
     def open_settings(self):
@@ -471,6 +569,13 @@ class CalendarSettingsDialog(QDialog):
         export_btn.setToolTip("Guardar una copia .ics puntual (snapshot) en otra ubicación")
         export_btn.clicked.connect(self.export_once)
         btns.addWidget(export_btn)
+        # Feed por tablero: exportar todos o solo un tablero
+        self.export_board_combo = QComboBox()
+        self.export_board_combo.setToolTip("Exportar el calendario de todos los tableros o de uno solo")
+        self.export_board_combo.addItem("Todos los tableros", None)
+        for b in database.get_boards(self.db_path, include_archived=True):
+            self.export_board_combo.addItem(b["name"], b["id"])
+        btns.addWidget(self.export_board_combo)
         btns.addStretch()
         close_btn = QPushButton("Cerrar")
         close_btn.setCursor(Qt.PointingHandCursor)
@@ -617,14 +722,16 @@ class CalendarSettingsDialog(QDialog):
         )
 
     def export_once(self):
-        default_name = f"ekin_calendario_{date.today().isoformat()}.ics"
+        board_id = self.export_board_combo.currentData()
+        board_txt = "" if board_id is None else f"_{self.export_board_combo.currentText()}"
+        default_name = f"ekin_calendario{board_txt}_{date.today().isoformat()}.ics"
         path, _ = QFileDialog.getSaveFileName(
             self, "Exportar copia del calendario", default_name, "iCalendar (*.ics)"
         )
         if not path:
             return
         try:
-            count = ics_export.export_ics(path, self.db_path)
+            count = ics_export.export_ics(path, self.db_path, board_id=board_id)
         except Exception as exc:
             QMessageBox.critical(self, "Error", f"No se pudo exportar el calendario:\n{exc}")
             return

@@ -95,3 +95,39 @@ def test_build_ics_skips_tasks_without_due_date(db_path):
     database.create_task(cid, "Sin fecha", db_path=db_path)
     content = ics_export.build_ics(db_path)
     assert content.count("BEGIN:VEVENT") == 0
+
+
+# --- Hora de vencimiento + VALARM + feed por tablero (v0.6.0) ---
+
+def test_build_ics_timed_event_with_valarm(db_path):
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    t = database.create_task(c, "Reunión", due_date="2026-08-01", db_path=db_path)
+    database.set_task_due_time(t, "09:30", db_path=db_path)
+
+    content = ics_export.build_ics(db_path)
+    assert "DTSTART:20260801T093000" in content        # evento con hora (no VALUE=DATE)
+    assert "DTEND:20260801T103000" in content          # +1 h
+    assert "BEGIN:VALARM" in content and "TRIGGER:-PT15M" in content
+
+
+def test_build_ics_all_day_when_no_time(db_path):
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    database.create_task(c, "Todo el día", due_date="2026-08-02", db_path=db_path)
+    content = ics_export.build_ics(db_path)
+    assert "DTSTART;VALUE=DATE:20260802" in content
+    assert "BEGIN:VALARM" not in content
+
+
+def test_build_ics_per_board_filter(db_path):
+    b1 = database.create_board("B1", db_path=db_path)
+    c1 = database.create_column(b1, "C", db_path=db_path)
+    b2 = database.create_board("B2", db_path=db_path)
+    c2 = database.create_column(b2, "C", db_path=db_path)
+    database.create_task(c1, "Tarea B1", due_date="2026-08-01", db_path=db_path)
+    database.create_task(c2, "Tarea B2", due_date="2026-08-01", db_path=db_path)
+
+    only_b1 = ics_export.build_ics(db_path, board_id=b1)
+    assert "Tarea B1" in only_b1 and "Tarea B2" not in only_b1
+    assert only_b1.count("BEGIN:VEVENT") == 1

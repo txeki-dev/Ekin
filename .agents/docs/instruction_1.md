@@ -59,11 +59,11 @@ construction. Full suite green + ruff clean at each commit. `version.py` → 0.6
 - [x] C2 export/report module (`exporter.py`) + sidebar "⬇ Exportar" menu (JSON/CSV/MD)
 - [x] B1 recurring tasks (schema + `next_occurrence`/`advance*`; detail-dialog combo; 🔁 card badge;
   startup `advance_overdue_recurring`)
-### Sub-wave 2
-- [ ] A1 time-of-day + VALARM
-- [ ] A2 calendar board filter + legend
-- [ ] A3 week/day view
-- [ ] A4 per-board feeds
+### Sub-wave 2 — DONE
+- [x] A1 time-of-day (`due_time`) + `VALARM` in ics; detail-dialog time field; card shows time
+- [x] A2 calendar board filter + colored legend
+- [x] A3 month/week/day view modes
+- [x] A4 per-board `.ics` (`build_ics(board_id=…)`) + per-board export picker in settings
 ### Sub-wave 3
 - [ ] B2 shortcuts · [ ] B3 undo/redo · [ ] B4 attachments/links
 - [ ] C3 light theme · [ ] C4 settings screen
