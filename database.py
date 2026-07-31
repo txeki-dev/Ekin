@@ -1,4 +1,6 @@
 import sqlite3
+import calendar as _cal
+from datetime import datetime, date, timedelta
 
 DB_NAME = "ekin_board.db"
 
@@ -22,15 +24,18 @@ def init_db(db_path=None):
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 color TEXT NOT NULL DEFAULT '#3b82f6',
+                archived INTEGER NOT NULL DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
-        # Migración: Verificar si la columna 'color' existe en 'boards'
+
+        # Migración: columnas 'color' y 'archived' en 'boards'
         cursor.execute("PRAGMA table_info(boards)")
         columns_info = [row[1] for row in cursor.fetchall()]
         if "color" not in columns_info:
             cursor.execute("ALTER TABLE boards ADD COLUMN color TEXT NOT NULL DEFAULT '#3b82f6'")
+        if "archived" not in columns_info:
+            cursor.execute("ALTER TABLE boards ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
         
         # Tabla de columnas (columns)
         cursor.execute("""
@@ -67,11 +72,15 @@ def init_db(db_path=None):
             )
         """)
         
-        # Migración: Verificar si la columna 'due_date' existe en 'tasks'
+        # Migración: columnas 'due_date', 'due_time' y 'recurrence' en 'tasks'
         cursor.execute("PRAGMA table_info(tasks)")
         tasks_columns = [row[1] for row in cursor.fetchall()]
         if "due_date" not in tasks_columns:
             cursor.execute("ALTER TABLE tasks ADD COLUMN due_date TEXT")
+        if "due_time" not in tasks_columns:
+            cursor.execute("ALTER TABLE tasks ADD COLUMN due_time TEXT")
+        if "recurrence" not in tasks_columns:
+            cursor.execute("ALTER TABLE tasks ADD COLUMN recurrence TEXT NOT NULL DEFAULT 'none'")
         
         # Tabla de logs/diario (task_logs)
         cursor.execute("""
@@ -181,20 +190,32 @@ def create_board(name, color='#3b82f6', db_path=None):
         conn.commit()
         return cursor.lastrowid
 
-def get_boards(db_path=None):
+def get_boards(db_path=None, include_archived=False):
+    """Devuelve los tableros. Por defecto excluye los archivados."""
     db_path = db_path or DB_NAME
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name, color, created_at FROM boards ORDER BY id ASC")
+        query = "SELECT id, name, color, archived, created_at FROM boards"
+        if not include_archived:
+            query += " WHERE archived = 0"
+        query += " ORDER BY id ASC"
+        cursor.execute(query)
         return [dict(row) for row in cursor.fetchall()]
 
 def get_board(board_id, db_path=None):
     db_path = db_path or DB_NAME
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name, color, created_at FROM boards WHERE id = ?", (board_id,))
+        cursor.execute("SELECT id, name, color, archived, created_at FROM boards WHERE id = ?", (board_id,))
         row = cursor.fetchone()
         return dict(row) if row else None
+
+def set_board_archived(board_id, archived, db_path=None):
+    """Archiva (1) o desarchiva (0) un tablero. Los archivados se ocultan de la barra lateral."""
+    db_path = db_path or DB_NAME
+    with get_connection(db_path) as conn:
+        conn.execute("UPDATE boards SET archived = ? WHERE id = ?", (1 if archived else 0, board_id))
+        conn.commit()
 
 def update_board(board_id, name, color, db_path=None):
     db_path = db_path or DB_NAME
@@ -293,7 +314,7 @@ def get_tasks(column_id, db_path=None):
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute(
-            """SELECT id, column_id, title, description, tag_text, tag_color, position, created_at, updated_at, due_date
+            """SELECT id, column_id, title, description, tag_text, tag_color, position, created_at, updated_at, due_date, due_time, recurrence
                FROM tasks WHERE column_id = ? ORDER BY position ASC""",
             (column_id,)
         )
@@ -308,7 +329,7 @@ def get_task(task_id, db_path=None):
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute(
-            """SELECT id, column_id, title, description, tag_text, tag_color, position, created_at, updated_at, due_date
+            """SELECT id, column_id, title, description, tag_text, tag_color, position, created_at, updated_at, due_date, due_time, recurrence
                FROM tasks WHERE id = ?""",
             (task_id,)
         )
@@ -340,6 +361,84 @@ def update_task_due_date(task_id, due_date, db_path=None):
             (due_date, task_id)
         )
         conn.commit()
+
+# --- RECURRENCIA DE TAREAS ---
+
+def next_occurrence(date_str, recurrence):
+    """Siguiente fecha ('YYYY-MM-DD') según la recurrencia (daily/weekly/monthly),
+    o None si no aplica. Función pura (fácil de testear)."""
+    if not date_str or recurrence in (None, "", "none"):
+        return None
+    try:
+        d = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return None
+    if recurrence == "daily":
+        d = d + timedelta(days=1)
+    elif recurrence == "weekly":
+        d = d + timedelta(days=7)
+    elif recurrence == "monthly":
+        month = d.month + 1
+        year = d.year + (1 if month > 12 else 0)
+        month = month - 12 if month > 12 else month
+        last_day = _cal.monthrange(year, month)[1]
+        d = date(year, month, min(d.day, last_day))  # recorta si el mes es más corto
+    else:
+        return None
+    return d.isoformat()
+
+def set_task_recurrence(task_id, recurrence, db_path=None):
+    """Fija la recurrencia de una tarea ('none'/'daily'/'weekly'/'monthly')."""
+    db_path = db_path or DB_NAME
+    with get_connection(db_path) as conn:
+        conn.execute("UPDATE tasks SET recurrence = ? WHERE id = ?", (recurrence or "none", task_id))
+        conn.commit()
+
+def advance_recurrence(task_id, db_path=None):
+    """Avanza la fecha de vencimiento de una tarea recurrente a su siguiente ocurrencia.
+    Devuelve la nueva fecha, o None si no es recurrente o no tiene fecha."""
+    db_path = db_path or DB_NAME
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT due_date, recurrence FROM tasks WHERE id = ?", (task_id,))
+        row = cursor.fetchone()
+        if not row:
+            return None
+        nxt = next_occurrence(row["due_date"], row["recurrence"])
+        if nxt is None:
+            return None
+        conn.execute(
+            "UPDATE tasks SET due_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (nxt, task_id)
+        )
+        conn.commit()
+        return nxt
+
+def advance_overdue_recurring(today_iso, db_path=None):
+    """Adelanta las tareas recurrentes vencidas a su próxima ocurrencia >= hoy.
+    Pensado para ejecutarse al arrancar. Devuelve cuántas tareas se adelantaron."""
+    db_path = db_path or DB_NAME
+    advanced = 0
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, due_date, recurrence FROM tasks "
+            "WHERE recurrence IS NOT NULL AND recurrence != 'none' "
+            "AND due_date IS NOT NULL AND due_date != '' AND due_date < ?",
+            (today_iso,)
+        )
+        rows = cursor.fetchall()
+        for row in rows:
+            nxt = row["due_date"]
+            guard = 0
+            while nxt is not None and nxt < today_iso and guard < 3000:
+                nxt = next_occurrence(nxt, row["recurrence"])
+                guard += 1
+            if nxt is not None and nxt != row["due_date"]:
+                conn.execute("UPDATE tasks SET due_date = ? WHERE id = ?", (nxt, row["id"]))
+                advanced += 1
+        conn.commit()
+    return advanced
 
 def get_task_tags(task_id, db_path=None):
     db_path = db_path or DB_NAME
@@ -557,7 +656,7 @@ def get_scheduled_tasks(start_date=None, end_date=None, board_id=None, db_path=N
     """
     db_path = db_path or DB_NAME
     query = [
-        "SELECT t.id, t.title, t.description, t.due_date, t.column_id, t.updated_at,",
+        "SELECT t.id, t.title, t.description, t.due_date, t.due_time, t.recurrence, t.column_id, t.updated_at,",
         "       c.board_id AS board_id, b.name AS board_name, b.color AS board_color",
         "FROM tasks t",
         "JOIN columns c ON t.column_id = c.id",

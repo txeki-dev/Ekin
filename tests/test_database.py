@@ -483,3 +483,59 @@ def test_search_filter_by_tag_and_only_due(db_path):
 
     only_due = {t["id"] for t in database.search_tasks(only_due=True, db_path=db_path)}
     assert only_due == {tagged}
+
+
+# --- Archivar tableros (v0.6.0) ---
+
+def test_board_archiving(db_path):
+    b1 = database.create_board("Activo", db_path=db_path)
+    b2 = database.create_board("A archivar", db_path=db_path)
+
+    assert {b["id"] for b in database.get_boards(db_path)} == {b1, b2}
+    database.set_board_archived(b2, True, db_path=db_path)
+    assert [b["id"] for b in database.get_boards(db_path)] == [b1]                       # oculto por defecto
+    assert {b["id"] for b in database.get_boards(db_path, include_archived=True)} == {b1, b2}
+    assert database.get_board(b2, db_path)["archived"] == 1
+    database.set_board_archived(b2, False, db_path=db_path)
+    assert {b["id"] for b in database.get_boards(db_path)} == {b1, b2}
+
+
+# --- Recurrencia (v0.6.0) ---
+
+def test_next_occurrence_units_and_month_clamp():
+    assert database.next_occurrence("2026-01-10", "daily") == "2026-01-11"
+    assert database.next_occurrence("2026-01-10", "weekly") == "2026-01-17"
+    assert database.next_occurrence("2026-01-15", "monthly") == "2026-02-15"
+    # 31 ene -> 28 feb (2026 no es bisiesto): recorta al último día del mes
+    assert database.next_occurrence("2026-01-31", "monthly") == "2026-02-28"
+    # dic -> ene del año siguiente
+    assert database.next_occurrence("2026-12-20", "monthly") == "2027-01-20"
+    assert database.next_occurrence("2026-01-10", "none") is None
+    assert database.next_occurrence("", "daily") is None
+    assert database.next_occurrence("no-fecha", "daily") is None
+
+
+def test_advance_recurrence(db_path):
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    t = database.create_task(c, "T", due_date="2026-01-10", db_path=db_path)
+    database.set_task_recurrence(t, "weekly", db_path=db_path)
+
+    assert database.advance_recurrence(t, db_path=db_path) == "2026-01-17"
+    assert database.get_task(t, db_path)["due_date"] == "2026-01-17"
+    # no recurrente -> None
+    t2 = database.create_task(c, "T2", due_date="2026-01-10", db_path=db_path)
+    assert database.advance_recurrence(t2, db_path=db_path) is None
+
+
+def test_advance_overdue_recurring(db_path):
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    rec = database.create_task(c, "Recurrente", due_date="2026-01-01", db_path=db_path)
+    database.set_task_recurrence(rec, "daily", db_path=db_path)
+    plain = database.create_task(c, "Sin recurrencia", due_date="2026-01-01", db_path=db_path)
+
+    n = database.advance_overdue_recurring("2026-01-05", db_path=db_path)
+    assert n == 1
+    assert database.get_task(rec, db_path)["due_date"] == "2026-01-05"     # adelantada a hoy
+    assert database.get_task(plain, db_path)["due_date"] == "2026-01-01"   # intacta
