@@ -51,6 +51,11 @@ class MainWindow(QMainWindow):
 
         # Inicializar base de datos
         database.init_db()
+        # Adelantar tareas recurrentes vencidas a su próxima ocurrencia
+        try:
+            database.advance_overdue_recurring(date.today().isoformat())
+        except Exception as exc:
+            print(f"No se pudieron adelantar tareas recurrentes: {exc}")
         self.check_onboarding()
 
         # Contenido del último .ics sincronizado (para no reescribir si no cambió nada)

@@ -850,8 +850,17 @@ class TaskDetailDialog(QDialog):
         self.due_date_edit.setDisplayFormat("yyyy-MM-dd")
         self.due_date_edit.setEnabled(False)
         due_layout.addWidget(self.due_date_edit)
+
+        # Recurrencia (repetir la tarea)
+        due_layout.addWidget(QLabel("🔁"))
+        self._recurrence_values = ["none", "daily", "weekly", "monthly"]
+        self.recurrence_combo = QComboBox()
+        for label in ("Sin repetir", "Diaria", "Semanal", "Mensual"):
+            self.recurrence_combo.addItem(label)
+        self.recurrence_combo.setToolTip("Repetir la tarea: al pasar la fecha, se adelanta sola")
+        due_layout.addWidget(self.recurrence_combo)
         due_layout.addStretch()
-        
+
         left_layout.addWidget(due_section)
 
         # 4. Sección de Etiquetas Múltiples
@@ -1001,6 +1010,12 @@ class TaskDetailDialog(QDialog):
             self.due_enable_chk.setChecked(False)
             self.due_date_edit.setEnabled(False)
             self.due_date_edit.setDate(QDate.currentDate())
+
+        # Cargar recurrencia
+        rec = task.get("recurrence", "none") or "none"
+        self.recurrence_combo.setCurrentIndex(
+            self._recurrence_values.index(rec) if rec in self._recurrence_values else 0
+        )
 
         # Cargar etiquetas
         self.current_tags = task.get("tags", [])
@@ -1170,6 +1185,11 @@ class TaskDetailDialog(QDialog):
         # Guardar las etiquetas asignadas
         tag_value_ids = [tag["tag_value_id"] for tag in self.current_tags]
         database.set_task_tags(self.task_id, tag_value_ids, self.db_path)
+
+        # Guardar la recurrencia
+        database.set_task_recurrence(
+            self.task_id, self._recurrence_values[self.recurrence_combo.currentIndex()], self.db_path
+        )
 
         self.accept()
 

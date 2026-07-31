@@ -1,12 +1,14 @@
 from PySide6.QtCore import Qt, Signal, QTimer, QPoint
 from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QWidget, QMessageBox, QDialog, QLineEdit, QColorDialog
+    QScrollArea, QWidget, QMessageBox, QDialog, QLineEdit, QColorDialog,
+    QMenu, QFileDialog
 )
 from PySide6.QtGui import QColor, QPixmap, QIcon
 from datetime import date, datetime, timedelta
 import database
 import styles
+import exporter
 from styles import hex_to_rgb
 
 # Nombres cortos en español para el reloj (evita depender de la locale del sistema)
@@ -101,13 +103,15 @@ class BoardButton(QFrame):
     """Widget personalizado para representar un botón de tablero en la barra lateral."""
     clicked = Signal(int)  # Emite el board_id cuando se pulsa
     column_dropped = Signal(int, int)  # column_id, target_board_id (al soltar una columna arrastrada)
+    archive_toggle_requested = Signal(int, bool)  # board_id, nuevo estado archivado
 
-    def __init__(self, board_id, name, color, active=False, parent=None):
+    def __init__(self, board_id, name, color, active=False, archived=False, parent=None):
         super().__init__(parent)
         self.board_id = board_id
         self.name = name
         self.color = color
         self.active = active
+        self.archived = archived
 
         self.setCursor(Qt.PointingHandCursor)
         self.setFixedHeight(40)
@@ -119,14 +123,28 @@ class BoardButton(QFrame):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(12, 6, 12, 6)
         layout.setSpacing(6)
-        
-        self.label = QLabel(self.name)
+
+        self.label = QLabel(("🗄 " + self.name) if self.archived else self.name)
         self.label.setStyleSheet("font-weight: bold; background: transparent; border: none; color: inherit;")
         self.label.setWordWrap(False)
+        if self.archived:
+            self.setToolTip("Tablero archivado — clic derecho para desarchivar")
         layout.addWidget(self.label)
         layout.addStretch()
-        
+
         self.update_style()
+
+    def contextMenuEvent(self, event):
+        menu = QMenu(self)
+        menu.setStyleSheet(f"""
+            QMenu {{ background-color: {styles.COLORS['bg_sidebar']};
+                     border: 1px solid {styles.COLORS['border']}; border-radius: 4px; }}
+            QMenu::item {{ padding: 6px 20px; color: {styles.COLORS['text_main']}; }}
+            QMenu::item:selected {{ background-color: {styles.COLORS['accent_blue']}; }}
+        """)
+        action = menu.addAction("📤 Desarchivar tablero" if self.archived else "🗄 Archivar tablero")
+        if menu.exec(event.globalPos()) == action:
+            self.archive_toggle_requested.emit(self.board_id, not self.archived)
 
     def update_style(self):
         try:
@@ -283,6 +301,7 @@ class SidebarWidget(QFrame):
         self.db_path = db_path
         self.active_board_id = None
         self.board_buttons = {}  # Guarda referencia a {board_id: BoardButton}
+        self.show_archived = False  # si se muestran los tableros archivados en la lista
 
         self.setObjectName("SidebarFrame")
         self.init_ui()
@@ -375,6 +394,24 @@ class SidebarWidget(QFrame):
         action_layout.addWidget(self.delete_btn)
 
         btn_layout.addLayout(action_layout)
+
+        # Fila secundaria: ver archivados + exportar
+        extra_layout = QHBoxLayout()
+        extra_layout.setSpacing(6)
+        self.archived_btn = QPushButton("🗄 Archivados")
+        self.archived_btn.setCheckable(True)
+        self.archived_btn.setCursor(Qt.PointingHandCursor)
+        self.archived_btn.setToolTip("Mostrar/ocultar los tableros archivados (clic derecho en un tablero para archivar)")
+        self.archived_btn.toggled.connect(self.toggle_show_archived)
+        extra_layout.addWidget(self.archived_btn)
+
+        self.export_btn = QPushButton("⬇ Exportar")
+        self.export_btn.setCursor(Qt.PointingHandCursor)
+        self.export_btn.setToolTip("Exportar todos los tableros a JSON / CSV / informe Markdown")
+        self.export_btn.clicked.connect(self.show_export_menu)
+        extra_layout.addWidget(self.export_btn)
+
+        btn_layout.addLayout(extra_layout)
         layout.addLayout(btn_layout)
 
     def _build_utility_bar(self):
@@ -471,8 +508,8 @@ class SidebarWidget(QFrame):
             if widget:
                 widget.deleteLater()
         
-        boards = database.get_boards(self.db_path)
-        
+        boards = database.get_boards(self.db_path, include_archived=self.show_archived)
+
         if not boards:
             self.active_board_id = None
             self.board_selected.emit(-1)
@@ -494,15 +531,62 @@ class SidebarWidget(QFrame):
             board_id = board["id"]
             is_active = (board_id == self.active_board_id)
             
-            btn = BoardButton(board_id, board["name"], board["color"], active=is_active, parent=self)
+            btn = BoardButton(board_id, board["name"], board["color"], active=is_active,
+                              archived=bool(board.get("archived", 0)), parent=self)
             btn.clicked.connect(self.select_board)
             btn.column_dropped.connect(self.handle_column_dropped)
+            btn.archive_toggle_requested.connect(self.handle_archive_toggle)
             self.boards_layout.addWidget(btn)
             self.board_buttons[board_id] = btn
 
         # Emitir la selección del tablero activo para que la vista del tablero se cargue
         self.board_selected.emit(self.active_board_id)
         self.refresh_notifications()
+
+    def toggle_show_archived(self, checked):
+        self.show_archived = checked
+        self.reload_boards()
+
+    def handle_archive_toggle(self, board_id, new_archived):
+        """Archiva/desarchiva un tablero y recarga la lista."""
+        database.set_board_archived(board_id, new_archived, self.db_path)
+        # Si archivamos el activo y no se muestran archivados, la selección caerá al primero
+        if new_archived and board_id == self.active_board_id and not self.show_archived:
+            self.active_board_id = None
+        self.reload_boards()
+        self.board_changed.emit()
+
+    def show_export_menu(self):
+        """Menú para exportar todos los tableros a JSON / CSV / informe Markdown."""
+        menu = QMenu(self)
+        menu.setStyleSheet(f"""
+            QMenu {{ background-color: {styles.COLORS['bg_sidebar']};
+                     border: 1px solid {styles.COLORS['border']}; border-radius: 4px; }}
+            QMenu::item {{ padding: 6px 20px; color: {styles.COLORS['text_main']}; }}
+            QMenu::item:selected {{ background-color: {styles.COLORS['accent_blue']}; }}
+        """)
+        act_json = menu.addAction("JSON (.json)")
+        act_csv = menu.addAction("CSV de tareas (.csv)")
+        act_md = menu.addAction("Informe Markdown (.md)")
+        chosen = menu.exec(self.export_btn.mapToGlobal(QPoint(0, self.export_btn.height())))
+        if chosen == act_json:
+            self._export_to_file("JSON", "ekin_export.json", "JSON (*.json)", exporter.boards_to_json)
+        elif chosen == act_csv:
+            self._export_to_file("CSV", "ekin_tareas.csv", "CSV (*.csv)", exporter.tasks_to_csv)
+        elif chosen == act_md:
+            self._export_to_file("Markdown", "ekin_informe.md", "Markdown (*.md)", exporter.report_markdown)
+
+    def _export_to_file(self, label, default_name, file_filter, build_fn):
+        path, _ = QFileDialog.getSaveFileName(self, f"Exportar {label}", default_name, file_filter)
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8", newline="") as f:
+                f.write(build_fn(self.db_path))
+        except Exception as exc:
+            QMessageBox.critical(self, "Error al exportar", f"No se pudo exportar:\n{exc}")
+            return
+        QMessageBox.information(self, "Exportado", f"Exportación {label} guardada en:\n{path}")
 
     def handle_column_dropped(self, column_id, target_board_id):
         """Mueve una columna arrastrada desde el tablero activo hasta el botón de otro tablero."""

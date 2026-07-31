@@ -54,10 +54,11 @@ construction. Full suite green + ruff clean at each commit. `version.py` → 0.6
 `[0.6.0]` grouped by theme; README + context + diary updated.
 
 ## Task checklist
-### Sub-wave 1
-- [ ] C1 board archiving (db + sidebar)
-- [ ] C2 export/report module + entry point
-- [ ] B1 recurring tasks (schema + advance logic + UI field)
+### Sub-wave 1 — DONE
+- [x] C1 board archiving (db + sidebar: right-click archive, "🗄 Archivados" toggle)
+- [x] C2 export/report module (`exporter.py`) + sidebar "⬇ Exportar" menu (JSON/CSV/MD)
+- [x] B1 recurring tasks (schema + `next_occurrence`/`advance*`; detail-dialog combo; 🔁 card badge;
+  startup `advance_overdue_recurring`)
 ### Sub-wave 2
 - [ ] A1 time-of-day + VALARM
 - [ ] A2 calendar board filter + legend
