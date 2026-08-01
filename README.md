@@ -17,9 +17,13 @@ Ekin Kanban is a sleek, resource-friendly, and offline-first personal Kanban boa
 - **Rich Notes**: The description and diary support **bold** (Ctrl+B), *italic* (Ctrl+K) and nested bullet lists (Tab to indent). External text pastes as **plain text**, and you can **paste images** straight in.
 - **Collapsible Columns**: Fold a column you're not working on down to a slim strip (just its name and task count) with the **◀** button to save horizontal space.
 - **Global Search & Filter**: A 🔍 button (or **Ctrl+F**) searches every board by title/description and filters by board, tag, or due date; click a result to jump straight to its card.
-- **Due Dates & Multiple Tags**: Assign due dates using an interactive calendar popup and add multiple custom-colored tag pills to each task.
-- **Calendar View & Reminders**: A monthly calendar of your due dates (**drag a task chip to another day to reschedule it**), a deadline **bell** that groups **overdue**, today's, and tomorrow's tasks across all boards, and native **Windows notifications** for what's due today.
-- **Calendar Sync (iCalendar)**: Keep an always-updated `.ics` feed that you can **subscribe** to from Google Calendar, Apple Calendar, or Outlook — additions, edits, and deletions all propagate. A **"Subscribe in Google"** helper copies your feed URL and opens Google's add-by-URL page for you.
+- **Due Dates, Times & Recurring Tasks**: Assign a due date (and optional **time**), plus a **recurrence** (daily/weekly/monthly) — overdue recurring tasks roll forward automatically. Cards show **🔁** for recurring and multiple custom-colored tag pills.
+- **Calendar View & Reminders**: **Month / Week / Day** views with a **board filter** and color legend; **drag a chip to reschedule**; a deadline **bell** that groups **overdue**, today's and tomorrow's tasks; and native **Windows notifications**.
+- **Calendar Sync (iCalendar)**: An always-updated `.ics` feed (with **timed events + `VALARM` reminders** and **per-board feeds**) you can **subscribe** to from Google/Apple/Outlook. A **"Subscribe"** helper copies the URL and opens the provider page.
+- **Attachments / Links**: Attach URLs or file paths to a card (**🔗**), open or remove them from the task detail.
+- **Undo / Redo**: **Ctrl+Z / Ctrl+Y** restores a deleted task, column or board — with all its tags, diary and links.
+- **Board Archiving & Export**: Archive boards to declutter the sidebar; export everything to **JSON / CSV / Markdown**.
+- **Themes & Settings**: A ⚙ settings screen with a **dark/light theme** toggle, notification prefs, and a remembered window size.
 - **Automatic Backups**: On every startup Ekin snapshots your database into a `backups/` folder (keeping the most recent few) before applying any changes — a cheap safety net against accidents.
 - **Collapsible Sidebar**: Hide or reveal the sidebar using the toggle (`☰`) button in the board header to maximize work space.
 - **Column & Board Copying/Moving**: Easily move or copy columns to other boards, or copy complete boards with all sub-tasks, tags, and diaries.

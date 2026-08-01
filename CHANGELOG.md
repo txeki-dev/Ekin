@@ -7,7 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.5.1] - 2026-07-30
+## [0.6.0] - 2026-08-01
+
+### Added — Calendar depth (A)
+- **Time-of-day due + reminders.** A task can have an optional **time** (`due_time`); such tasks
+  export as timed events with a **`VALARM`** (15-minute reminder) instead of all-day.
+- **Week / Day views.** The calendar now toggles between **Mes / Semana / Día**.
+- **Filter by board + legend.** A board filter and a colored board legend on the calendar.
+- **Per-board `.ics` feeds.** `build_ics(board_id=…)` and a per-board picker in the export dialog.
+
+### Added — Power features (B)
+- **Recurring tasks** (daily / weekly / monthly): set in the task dialog; a **🔁** badge on the card;
+  overdue recurring tasks **advance to the next occurrence on startup**.
+- **Undo / redo** for destructive deletes (task, column, board) via **Ctrl+Z / Ctrl+Y** — restores
+  the whole deleted subtree (tags, diary, links) from a snapshot.
+- **Attachments / links** on a card: add URLs/paths (open, delete); **🔗** count on the card.
+- **Keyboard shortcuts:** **Ctrl+N** new task, **Ctrl+F** search, **Esc** closes dialogs.
+
+### Added — Polish & platform (C)
+- **Board archiving:** right-click a board to archive/unarchive; a **🗄 Archivados** toggle hides them.
+- **Export / report:** a sidebar **⬇ Exportar** menu → **JSON**, **CSV** (tasks) or a **Markdown**
+  project report (`exporter.py`).
+- **Settings screen** (⚙ in the sidebar): **theme** (dark / **light**, experimental), Windows
+  **notifications** toggle, and the window **size/position is remembered**.
+
+### Changed
+- `database` gains `boards.archived`, `tasks.due_time`/`recurrence`, and a `task_links` table (all via
+  additive migrations); `styles` is now `build_qss(palette)` + `set_theme()` with dark/light palettes.
 
 ### Added
 - **Collapsible board columns.** A collapse button folds a column to a narrow strip (expand button,

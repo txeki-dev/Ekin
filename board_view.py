@@ -9,6 +9,7 @@ import styles
 from styles import hex_to_rgb
 from widgets import ColumnWidget, TaskCard, make_glyph_icon
 from detail_dialog import TaskDetailDialog
+from undo import UndoAction
 
 
 class BoardColumnsArea(QWidget):
@@ -203,9 +204,31 @@ class BoardViewWidget(QFrame):
         self.db_path = db_path
         self.board_id = None
         self.column_widgets = {}  # Guarda referencia a {column_id: ColumnWidget}
+        self.undo_manager = None  # lo inyecta MainWindow
         self.setObjectName("BoardViewWidget")
-        
+
         self.init_ui()
+
+    def _refresh_current(self):
+        if self.board_id and self.board_id != -1:
+            self.load_board(self.board_id)
+
+    def _push_delete_undo(self, label, snap, restore_fn, delete_fn):
+        """Registra una acción deshacer/rehacer para un borrado (restaurar desde snapshot)."""
+        if self.undo_manager is None or snap is None:
+            return
+        holder = {}
+
+        def do_undo():
+            holder["id"] = restore_fn(snap)
+            self._refresh_current()
+
+        def do_redo():
+            if holder.get("id") is not None:
+                delete_fn(holder["id"], self.db_path)
+                self._refresh_current()
+
+        self.undo_manager.push(UndoAction(label, do_undo, do_redo))
 
     def init_ui(self):
         self.main_layout = QVBoxLayout(self)
@@ -454,8 +477,15 @@ class BoardViewWidget(QFrame):
             QMessageBox.No
         )
         if confirm == QMessageBox.Yes:
+            board_id = self.board_id
+            snap = database.snapshot_column(column_id, self.db_path)
             database.delete_column(column_id, self.db_path)
             self.load_board(self.board_id)
+            self._push_delete_undo(
+                "Eliminar columna", snap,
+                lambda s: database.restore_column(s, board_id=board_id, db_path=self.db_path),
+                database.delete_column,
+            )
 
     def _on_toggle_sidebar(self):
         """Alterna la barra lateral y actualiza el icono: ◀ (plegar) / ▶ (desplegar)."""
@@ -530,6 +560,14 @@ class BoardViewWidget(QFrame):
 
     # --- ACCIONES DE TAREAS ---
 
+    def quick_add_task(self):
+        """Atajo Ctrl+N: añade una tarea a la primera columna del tablero activo."""
+        if not self.board_id or self.board_id == -1:
+            return
+        columns = database.get_columns(self.board_id, self.db_path)
+        if columns:
+            self.add_task(columns[0]["id"])
+
     def add_task(self, column_id):
         """Crea una tarea solicitando el título rápidamente."""
         title, ok = QInputDialog.getText(
@@ -544,7 +582,15 @@ class BoardViewWidget(QFrame):
         """Abre el diálogo de detalle/chat de una tarea."""
         dialog = TaskDetailDialog(task_id, self.db_path, self)
         dialog.exec()
-        
+
+        # Si se eliminó la tarea desde el diálogo, registrar el deshacer con su snapshot.
+        if getattr(dialog, "task_deleted", False) and getattr(dialog, "deleted_snapshot", None):
+            self._push_delete_undo(
+                "Eliminar tarea", dialog.deleted_snapshot,
+                lambda s: database.restore_task(s, db_path=self.db_path),
+                database.delete_task,
+            )
+
         # Al cerrarse el diálogo, refrescamos el tablero completo por si hubo
         # cambios en el título, descripción, etiquetas o si se eliminó la tarea.
         self.load_board(self.board_id)

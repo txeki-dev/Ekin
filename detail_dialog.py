@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt, QDate, QTime, Signal, QBuffer, QIODevice, QSize
+from PySide6.QtCore import Qt, QDate, QTime, QUrl, Signal, QBuffer, QIODevice, QSize
 from PySide6.QtWidgets import (
     QDialog, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QTextEdit, QPushButton, QScrollArea, QWidget,
@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import (
     QKeySequence, QColor, QShortcut, QFont, QTextCharFormat, QTextListFormat,
-    QTextCursor, QPixmap, QIcon, QImage
+    QTextCursor, QPixmap, QIcon, QImage, QDesktopServices
 )
 from datetime import datetime
 import re
@@ -906,6 +906,38 @@ class TaskDetailDialog(QDialog):
         tags_layout.addLayout(tag_btns_row)
         
         left_layout.addWidget(tags_section)
+
+        # 5. Enlaces / adjuntos
+        links_section = QWidget()
+        links_outer = QVBoxLayout(links_section)
+        links_outer.setContentsMargins(0, 0, 0, 0)
+        links_outer.setSpacing(4)
+        links_outer.addWidget(QLabel("🔗 <b>Enlaces / adjuntos:</b>"))
+
+        self.links_container = QWidget()
+        self.links_layout = QVBoxLayout(self.links_container)
+        self.links_layout.setContentsMargins(0, 0, 0, 0)
+        self.links_layout.setSpacing(2)
+        links_outer.addWidget(self.links_container)
+
+        add_link_row = QHBoxLayout()
+        add_link_row.setSpacing(6)
+        self.link_url_input = QLineEdit()
+        self.link_url_input.setPlaceholderText("URL o ruta…")
+        self.link_url_input.returnPressed.connect(self.add_link)
+        add_link_row.addWidget(self.link_url_input, 2)
+        self.link_label_input = QLineEdit()
+        self.link_label_input.setPlaceholderText("Nombre (opcional)")
+        add_link_row.addWidget(self.link_label_input, 1)
+        add_link_btn = QPushButton("➕")
+        add_link_btn.setFixedWidth(30)
+        add_link_btn.setCursor(Qt.PointingHandCursor)
+        add_link_btn.setToolTip("Añadir enlace")
+        add_link_btn.clicked.connect(self.add_link)
+        add_link_row.addWidget(add_link_btn)
+        links_outer.addLayout(add_link_row)
+
+        left_layout.addWidget(links_section)
         left_layout.addStretch()
 
         # Botones de Acción de la Tarea (Guardar, Eliminar, Cerrar)
@@ -1049,7 +1081,8 @@ class TaskDetailDialog(QDialog):
         self.current_tags = task.get("tags", [])
         self.render_tags()
 
-        # Cargar los logs
+        # Cargar enlaces y logs
+        self.reload_links()
         self.reload_logs()
 
     def render_tags(self):
@@ -1235,9 +1268,68 @@ class TaskDetailDialog(QDialog):
             QMessageBox.No
         )
         if confirm == QMessageBox.Yes:
+            # Snapshot antes de borrar, para poder deshacer (Ctrl+Z)
+            self.deleted_snapshot = database.snapshot_task(self.task_id, self.db_path)
             database.delete_task(self.task_id, self.db_path)
             self.task_deleted = True
             self.accept()
+
+    # --- Enlaces / adjuntos (persistidos al instante) ---
+
+    def reload_links(self):
+        while self.links_layout.count():
+            item = self.links_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+        links = database.get_task_links(self.task_id, self.db_path)
+        if not links:
+            hint = QLabel("Sin enlaces.")
+            hint.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 11px; font-style: italic;")
+            self.links_layout.addWidget(hint)
+            return
+        for link in links:
+            self.links_layout.addWidget(self._build_link_row(link))
+
+    def _build_link_row(self, link):
+        row = QWidget()
+        row.setStyleSheet("background: transparent;")
+        h = QHBoxLayout(row)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(6)
+        open_btn = QPushButton("🔗 " + (link["label"] or link["url"]))
+        open_btn.setCursor(Qt.PointingHandCursor)
+        open_btn.setToolTip(link["url"])
+        open_btn.setStyleSheet(
+            "QPushButton { background: transparent; border: none; color: #60a5fa; text-align: left; }"
+            "QPushButton:hover { text-decoration: underline; }"
+        )
+        open_btn.clicked.connect(lambda _=False, url=link["url"]: QDesktopServices.openUrl(QUrl(url)))
+        h.addWidget(open_btn, 1)
+        del_btn = QPushButton()
+        del_btn.setFixedSize(18, 18)
+        del_btn.setCursor(Qt.PointingHandCursor)
+        del_btn.setToolTip("Eliminar enlace")
+        del_btn.setIcon(make_glyph_icon("cross", "#ef4444", 12))
+        del_btn.setIconSize(QSize(12, 12))
+        del_btn.setStyleSheet("QPushButton { background: transparent; border: none; }")
+        del_btn.clicked.connect(lambda _=False, lid=link["id"]: self.remove_link(lid))
+        h.addWidget(del_btn)
+        return row
+
+    def add_link(self):
+        url = self.link_url_input.text().strip()
+        if not url:
+            return
+        label = self.link_label_input.text().strip() or None
+        database.add_task_link(self.task_id, url, label, self.db_path)
+        self.link_url_input.clear()
+        self.link_label_input.clear()
+        self.reload_links()
+
+    def remove_link(self, link_id):
+        database.delete_task_link(link_id, self.db_path)
+        self.reload_links()
 
     def reload_logs(self):
         """Limpia y vuelve a cargar todos los logs/entradas del diario."""

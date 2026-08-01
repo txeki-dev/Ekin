@@ -141,6 +141,18 @@ def init_db(db_path=None):
             )
         """)
 
+        # Enlaces / adjuntos de una tarea (URL o ruta de archivo, con etiqueta opcional)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS task_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id INTEGER NOT NULL,
+                url TEXT NOT NULL,
+                label TEXT,
+                position INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+            )
+        """)
+
         # Migración: enlazar task_tags con tag_values en vez de usar texto/color libres
         cursor.execute("PRAGMA table_info(task_tags)")
         task_tags_columns = [row[1] for row in cursor.fetchall()]
@@ -319,9 +331,12 @@ def get_tasks(column_id, db_path=None):
             (column_id,)
         )
         tasks = [dict(row) for row in cursor.fetchall()]
-    tags_by_task = get_task_tags_bulk([t["id"] for t in tasks], db_path)
+    ids = [t["id"] for t in tasks]
+    tags_by_task = get_task_tags_bulk(ids, db_path)
+    links_by_task = get_task_links_bulk(ids, db_path)
     for t in tasks:
         t["tags"] = tags_by_task.get(t["id"], [])
+        t["links"] = links_by_task.get(t["id"], [])
     return tasks
 
 def get_task(task_id, db_path=None):
@@ -832,6 +847,57 @@ def get_logs(task_id, db_path=None):
         )
         return [dict(row) for row in cursor.fetchall()]
 
+# --- ENLACES / ADJUNTOS DE TAREAS ---
+
+def add_task_link(task_id, url, label=None, db_path=None):
+    """Añade un enlace/adjunto (URL o ruta) a una tarea. Devuelve su id."""
+    db_path = db_path or DB_NAME
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COALESCE(MAX(position), -1) FROM task_links WHERE task_id = ?", (task_id,))
+        pos = cursor.fetchone()[0] + 1
+        cursor.execute(
+            "INSERT INTO task_links (task_id, url, label, position) VALUES (?, ?, ?, ?)",
+            (task_id, url, label or None, pos)
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+def get_task_links(task_id, db_path=None):
+    db_path = db_path or DB_NAME
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, task_id, url, label, position FROM task_links WHERE task_id = ? ORDER BY position ASC",
+            (task_id,)
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+def delete_task_link(link_id, db_path=None):
+    db_path = db_path or DB_NAME
+    with get_connection(db_path) as conn:
+        conn.execute("DELETE FROM task_links WHERE id = ?", (link_id,))
+        conn.commit()
+
+def get_task_links_bulk(task_ids, db_path=None):
+    """{task_id: [enlaces]} para varias tareas en una consulta (evita N+1 al pintar el tablero)."""
+    db_path = db_path or DB_NAME
+    result = {tid: [] for tid in task_ids}
+    if not task_ids:
+        return result
+    placeholders = ",".join("?" * len(task_ids))
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"SELECT id, task_id, url, label, position FROM task_links "
+            f"WHERE task_id IN ({placeholders}) ORDER BY task_id ASC, position ASC",
+            list(task_ids)
+        )
+        for row in cursor.fetchall():
+            d = dict(row)
+            result.setdefault(d["task_id"], []).append(d)
+    return result
+
 def update_log(log_id, content, db_path=None):
     """Edita el contenido (HTML) de una entrada del diario y refresca el updated_at de la tarea."""
     db_path = db_path or DB_NAME
@@ -1024,3 +1090,101 @@ def copy_board(board_id, new_name, new_color, db_path=None):
 
         conn.commit()
         return new_board_id
+
+
+# --- SNAPSHOT / RESTORE (para deshacer borrados) ---
+
+def snapshot_task(task_id, db_path=None):
+    """Captura todo el contenido de una tarea para poder recrearla (deshacer)."""
+    db_path = db_path or DB_NAME
+    task = get_task(task_id, db_path)
+    if not task:
+        return None
+    return {
+        "column_id": task["column_id"], "title": task["title"],
+        "description": task["description"], "position": task["position"],
+        "due_date": task.get("due_date"), "due_time": task.get("due_time"),
+        "recurrence": task.get("recurrence", "none"),
+        "tag_value_ids": [t["tag_value_id"] for t in task.get("tags", [])],
+        "logs": [{"content": lg["content"], "created_at": lg["created_at"]}
+                 for lg in get_logs(task_id, db_path)],
+        "links": [{"url": lk["url"], "label": lk["label"]}
+                  for lk in get_task_links(task_id, db_path)],
+    }
+
+def restore_task(snap, column_id=None, db_path=None):
+    """Recrea una tarea a partir de un snapshot. Devuelve el nuevo id."""
+    db_path = db_path or DB_NAME
+    column_id = column_id if column_id is not None else snap["column_id"]
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COALESCE(MAX(position), -1) FROM tasks WHERE column_id = ?", (column_id,))
+        pos = cursor.fetchone()[0] + 1
+        cursor.execute(
+            "INSERT INTO tasks (column_id, title, description, position, due_date, due_time, recurrence) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (column_id, snap["title"], snap["description"], pos, snap.get("due_date"),
+             snap.get("due_time"), snap.get("recurrence", "none"))
+        )
+        new_id = cursor.lastrowid
+        for tvid in snap.get("tag_value_ids", []):
+            cursor.execute(
+                "INSERT INTO task_tags (task_id, tag_value_id, text, color) VALUES (?, ?, '', '#6b7280')",
+                (new_id, tvid))
+        for lg in snap.get("logs", []):
+            cursor.execute("INSERT INTO task_logs (task_id, content, created_at) VALUES (?, ?, ?)",
+                           (new_id, lg["content"], lg["created_at"]))
+        for lk in snap.get("links", []):
+            cursor.execute("INSERT INTO task_links (task_id, url, label, position) VALUES (?, ?, ?, 0)",
+                           (new_id, lk["url"], lk["label"]))
+        conn.commit()
+        return new_id
+
+def snapshot_column(column_id, db_path=None):
+    db_path = db_path or DB_NAME
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT board_id, name, color, position, collapsed FROM columns WHERE id = ?", (column_id,))
+        row = cursor.fetchone()
+    if not row:
+        return None
+    snap = dict(row)
+    snap["tasks"] = [snapshot_task(t["id"], db_path) for t in get_tasks(column_id, db_path)]
+    return snap
+
+def restore_column(snap, board_id=None, db_path=None):
+    db_path = db_path or DB_NAME
+    board_id = board_id if board_id is not None else snap["board_id"]
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COALESCE(MAX(position), -1) FROM columns WHERE board_id = ?", (board_id,))
+        pos = cursor.fetchone()[0] + 1
+        cursor.execute(
+            "INSERT INTO columns (board_id, name, color, position, collapsed) VALUES (?, ?, ?, ?, ?)",
+            (board_id, snap["name"], snap["color"], pos, snap.get("collapsed", 0)))
+        new_col = cursor.lastrowid
+        conn.commit()
+    for task_snap in snap.get("tasks", []):
+        if task_snap:
+            restore_task(task_snap, column_id=new_col, db_path=db_path)
+    return new_col
+
+def snapshot_board(board_id, db_path=None):
+    db_path = db_path or DB_NAME
+    board = get_board(board_id, db_path)
+    if not board:
+        return None
+    return {
+        "name": board["name"], "color": board["color"], "archived": board.get("archived", 0),
+        "columns": [snapshot_column(c["id"], db_path) for c in get_columns(board_id, db_path)],
+    }
+
+def restore_board(snap, db_path=None):
+    db_path = db_path or DB_NAME
+    new_board = create_board(snap["name"], snap["color"], db_path)
+    if snap.get("archived"):
+        set_board_archived(new_board, True, db_path)
+    for col_snap in snap.get("columns", []):
+        if col_snap:
+            restore_column(col_snap, board_id=new_board, db_path=db_path)
+    return new_board

@@ -539,3 +539,74 @@ def test_advance_overdue_recurring(db_path):
     assert n == 1
     assert database.get_task(rec, db_path)["due_date"] == "2026-01-05"     # adelantada a hoy
     assert database.get_task(plain, db_path)["due_date"] == "2026-01-01"   # intacta
+
+
+# --- Enlaces / adjuntos (v0.6.0) ---
+
+def test_task_links_crud_and_bulk(db_path):
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    t1 = database.create_task(c, "T1", db_path=db_path)
+    t2 = database.create_task(c, "T2", db_path=db_path)
+
+    l1 = database.add_task_link(t1, "https://ejemplo.com", "Docs", db_path=db_path)
+    database.add_task_link(t1, "https://otro.com", db_path=db_path)
+    links = database.get_task_links(t1, db_path=db_path)
+    assert [x["url"] for x in links] == ["https://ejemplo.com", "https://otro.com"]
+    assert links[0]["label"] == "Docs" and links[0]["position"] == 0
+
+    bulk = database.get_task_links_bulk([t1, t2], db_path=db_path)
+    assert len(bulk[t1]) == 2 and bulk[t2] == []
+    # get_tasks expone los enlaces
+    by_id = {t["id"]: t for t in database.get_tasks(c, db_path=db_path)}
+    assert len(by_id[t1]["links"]) == 2 and by_id[t2]["links"] == []
+
+    database.delete_task_link(l1, db_path=db_path)
+    assert [x["url"] for x in database.get_task_links(t1, db_path=db_path)] == ["https://otro.com"]
+
+    # borrar la tarea elimina sus enlaces (cascade)
+    database.delete_task(t1, db_path=db_path)
+    assert database.get_task_links(t1, db_path=db_path) == []
+
+
+# --- Snapshot / restore (deshacer borrados, v0.6.0) ---
+
+def test_snapshot_and_restore_task(db_path):
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    t = database.create_task(c, "Tarea", description="desc", due_date="2026-09-01", db_path=db_path)
+    database.set_task_due_time(t, "08:15", db_path=db_path)
+    database.set_task_recurrence(t, "weekly", db_path=db_path)
+    tv = database.get_or_create_tag_value("Prioridad", "Alta", "#ef4444", db_path=db_path)
+    database.set_task_tags(t, [tv], db_path=db_path)
+    database.create_log(t, "una nota", db_path=db_path)
+    database.add_task_link(t, "https://x.com", "X", db_path=db_path)
+
+    snap = database.snapshot_task(t, db_path=db_path)
+    database.delete_task(t, db_path=db_path)
+    assert database.get_task(t, db_path) is None
+
+    new_id = database.restore_task(snap, db_path=db_path)
+    r = database.get_task(new_id, db_path)
+    assert r["title"] == "Tarea" and r["due_date"] == "2026-09-01"
+    assert r["due_time"] == "08:15" and r["recurrence"] == "weekly"
+    assert r["tags"][0]["value"] == "Alta"
+    assert [lg["content"] for lg in database.get_logs(new_id, db_path)] == ["una nota"]
+    assert [lk["url"] for lk in database.get_task_links(new_id, db_path)] == ["https://x.com"]
+
+
+def test_snapshot_and_restore_board_hierarchy(db_path):
+    b = database.create_board("Original", "#123456", db_path=db_path)
+    c = database.create_column(b, "Col", db_path=db_path)
+    database.create_task(c, "T1", due_date="2026-01-01", db_path=db_path)
+    database.create_task(c, "T2", db_path=db_path)
+
+    snap = database.snapshot_board(b, db_path=db_path)
+    database.delete_board(b, db_path=db_path)
+    assert database.get_board(b, db_path) is None
+
+    nb = database.restore_board(snap, db_path=db_path)
+    cols = database.get_columns(nb, db_path=db_path)
+    assert len(cols) == 1 and cols[0]["name"] == "Col"
+    titles = [t["title"] for t in database.get_tasks(cols[0]["id"], db_path=db_path)]
+    assert titles == ["T1", "T2"]

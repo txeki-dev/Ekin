@@ -266,7 +266,9 @@ class TaskCard(QFrame):
 
                 recurring = self.task_data.get("recurrence", "none") not in (None, "", "none")
                 time_txt = f" {self.task_data['due_time']}" if self.task_data.get("due_time") else ""
-                self.due_label.setText(f"📅 {formatted}{time_txt}" + ("  🔁" if recurring else ""))
+                n_links = len(self.task_data.get("links", []))
+                extra = ("  🔁" if recurring else "") + (f"  🔗{n_links}" if n_links else "")
+                self.due_label.setText(f"📅 {formatted}{time_txt}{extra}")
                 if is_overdue:
                     self.due_label.setStyleSheet("color: #ef4444; font-weight: bold; font-size: 10px; background-color: rgba(239, 68, 68, 0.15); border-radius: 4px; padding: 2px 4px;")
                 else:

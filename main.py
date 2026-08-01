@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QSplitter, QWidget, QHBoxLayout, QMessageBox,
     QStackedWidget, QSystemTrayIcon, QMenu
 )
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QByteArray
 from PySide6.QtGui import QIcon, QShortcut, QKeySequence
 import database
 import backups
@@ -16,6 +16,8 @@ from board_view import BoardViewWidget
 from calendar_view import CalendarViewWidget
 from detail_dialog import TaskDetailDialog
 from search_dialog import SearchDialog
+from settings_dialog import SettingsDialog
+from undo import UndoManager
 import ics_export
 from version import __version__
 
@@ -61,7 +63,16 @@ class MainWindow(QMainWindow):
         # Contenido del último .ics sincronizado (para no reescribir si no cambió nada)
         self._last_synced_ics = None
 
+        # Gestor de deshacer/rehacer (borrados)
+        self.undo_manager = UndoManager()
+
         self.init_ui()
+        self.board_view.undo_manager = self.undo_manager
+        self.sidebar.undo_manager = self.undo_manager
+
+        # Tema guardado + geometría de ventana recordada
+        self.apply_theme(database.get_setting("theme", "dark"), reload=False)
+        self._restore_geometry()
 
         # Bandeja del sistema + notificaciones nativas de Windows
         self._last_notified = None
@@ -81,6 +92,15 @@ class MainWindow(QMainWindow):
         # Atajo global de búsqueda (Ctrl+F)
         self._search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
         self._search_shortcut.activated.connect(self.show_search)
+
+        # Ctrl+N: nueva tarea en la primera columna del tablero activo
+        self._new_task_shortcut = QShortcut(QKeySequence("Ctrl+N"), self)
+        self._new_task_shortcut.activated.connect(self.board_view.quick_add_task)
+
+        # Deshacer / rehacer borrados (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z)
+        QShortcut(QKeySequence("Ctrl+Z"), self).activated.connect(self._do_undo)
+        QShortcut(QKeySequence("Ctrl+Y"), self).activated.connect(self._do_redo)
+        QShortcut(QKeySequence("Ctrl+Shift+Z"), self).activated.connect(self._do_redo)
 
         # Comprobar actualizaciones tras 1 segundo
         QTimer.singleShot(1000, self.check_for_updates)
@@ -136,6 +156,7 @@ class MainWindow(QMainWindow):
         # Campana de vencimientos y vista de calendario
         self.sidebar.open_calendar_requested.connect(self.show_calendar_view)
         self.sidebar.open_search_requested.connect(self.show_search)
+        self.sidebar.open_settings_requested.connect(self.show_settings)
         self.sidebar.open_task_requested.connect(self.on_notification_task)
         self.calendar_view.close_requested.connect(self.show_board_view)
         self.calendar_view.task_activated.connect(self.on_calendar_task)
@@ -172,6 +193,46 @@ class MainWindow(QMainWindow):
         dialog = SearchDialog(database.DB_NAME, self)
         dialog.task_activated.connect(self.on_notification_task)
         dialog.exec()
+
+    def apply_theme(self, theme, reload=True):
+        """Aplica el tema (oscuro/claro) al vuelo. `reload` recarga el tablero para que
+        las tarjetas/columnas se reconstruyan con la nueva paleta."""
+        QApplication.instance().setStyleSheet(styles.set_theme(theme))
+        if reload and self.sidebar.active_board_id:
+            self.board_view.load_board(self.sidebar.active_board_id)
+
+    def show_settings(self):
+        """Abre la pantalla de Ajustes (tema, notificaciones)."""
+        dlg = SettingsDialog(database.DB_NAME, self)
+        dlg.theme_changed.connect(lambda t: self.apply_theme(t, reload=True))
+        dlg.exec()
+
+    def _do_undo(self):
+        if self.undo_manager.undo():
+            self.sidebar.refresh_notifications()
+            self.sync_ics()
+
+    def _do_redo(self):
+        if self.undo_manager.redo():
+            self.sidebar.refresh_notifications()
+            self.sync_ics()
+
+    def _restore_geometry(self):
+        geo = database.get_setting("window_geometry", "")
+        if geo:
+            try:
+                self.restoreGeometry(QByteArray.fromBase64(geo.encode("ascii")))
+            except Exception:
+                pass
+
+    def closeEvent(self, event):
+        try:
+            database.set_setting(
+                "window_geometry", bytes(self.saveGeometry().toBase64()).decode("ascii")
+            )
+        except Exception:
+            pass
+        super().closeEvent(event)
 
     def _open_task_detail(self, task_id):
         """Abre el diálogo de detalle de una tarea."""
@@ -249,6 +310,8 @@ class MainWindow(QMainWindow):
     def notify_due_today(self):
         """Muestra un toast de Windows con las tareas que vencen hoy (si las hay)."""
         if not QSystemTrayIcon.isSystemTrayAvailable():
+            return
+        if database.get_setting("notifications_enabled", "1") == "0":
             return
         today = date.today().isoformat()
         tasks = database.get_scheduled_tasks(today, today)

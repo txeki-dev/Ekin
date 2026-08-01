@@ -64,9 +64,12 @@ construction. Full suite green + ruff clean at each commit. `version.py` → 0.6
 - [x] A2 calendar board filter + colored legend
 - [x] A3 month/week/day view modes
 - [x] A4 per-board `.ics` (`build_ics(board_id=…)`) + per-board export picker in settings
-### Sub-wave 3
-- [ ] B2 shortcuts · [ ] B3 undo/redo · [ ] B4 attachments/links
-- [ ] C3 light theme · [ ] C4 settings screen
+### Sub-wave 3 — DONE
+- [x] B2 shortcuts (Ctrl+N new task; Ctrl+Z/Ctrl+Y undo/redo; Esc closes dialogs by default)
+- [x] B3 undo/redo (snapshot/restore task·column·board; `undo.py` UndoManager; wired into deletes)
+- [x] B4 attachments/links (`task_links` + helpers; detail-dialog section; 🔗 card badge)
+- [x] C3 light theme (`styles.build_qss`/`set_theme` + LIGHT palette; live apply + persist)
+- [x] C4 settings screen (`settings_dialog.py`: theme, notifications; window geometry persisted)
 ### Close-out
-- [ ] version 0.6.0, CHANGELOG/README/context/diary, full validation, PR
+- [x] version 0.6.0, CHANGELOG/README/context/diary, full validation (64 tests, ruff clean), PR
 </content>

@@ -10,6 +10,7 @@ import database
 import styles
 import exporter
 from styles import hex_to_rgb
+from undo import UndoAction
 
 # Nombres cortos en español para el reloj (evita depender de la locale del sistema)
 _DIAS = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
@@ -294,6 +295,7 @@ class SidebarWidget(QFrame):
     board_changed = Signal()              # Emite cuando se añade/edita/borra un tablero
     open_calendar_requested = Signal()    # Emite al pulsar el botón de calendario
     open_search_requested = Signal()      # Emite al pulsar el botón de búsqueda
+    open_settings_requested = Signal()    # Emite al pulsar el botón de ajustes
     open_task_requested = Signal(int, int)  # (task_id, board_id) desde la campana o la búsqueda
 
     def __init__(self, db_path=database.DB_NAME, parent=None):
@@ -302,6 +304,7 @@ class SidebarWidget(QFrame):
         self.active_board_id = None
         self.board_buttons = {}  # Guarda referencia a {board_id: BoardButton}
         self.show_archived = False  # si se muestran los tableros archivados en la lista
+        self.undo_manager = None  # lo inyecta MainWindow
 
         self.setObjectName("SidebarFrame")
         self.init_ui()
@@ -460,6 +463,14 @@ class SidebarWidget(QFrame):
         self.calendar_btn.setToolTip("Abrir vista de calendario")
         self.calendar_btn.clicked.connect(self.open_calendar_requested.emit)
         bar_layout.addWidget(self.calendar_btn)
+
+        self.settings_btn = QPushButton("⚙")
+        self.settings_btn.setObjectName("UtilityIconButton")
+        self.settings_btn.setFixedSize(34, 28)
+        self.settings_btn.setCursor(Qt.PointingHandCursor)
+        self.settings_btn.setToolTip("Ajustes (tema, notificaciones)")
+        self.settings_btn.clicked.connect(self.open_settings_requested.emit)
+        bar_layout.addWidget(self.settings_btn)
 
         return bar
 
@@ -675,7 +686,31 @@ class SidebarWidget(QFrame):
             QMessageBox.No
         )
         if confirm == QMessageBox.Yes:
-            database.delete_board(self.active_board_id, self.db_path)
+            board_id = self.active_board_id
+            snap = database.snapshot_board(board_id, self.db_path)
+            database.delete_board(board_id, self.db_path)
             self.active_board_id = None
             self.reload_boards()
             self.board_changed.emit()
+            self._push_board_undo(snap)
+
+    def _push_board_undo(self, snap):
+        """Registra deshacer/rehacer del borrado de un tablero (restaurar desde snapshot)."""
+        if self.undo_manager is None or snap is None:
+            return
+        holder = {}
+
+        def do_undo():
+            holder["id"] = database.restore_board(snap, self.db_path)
+            self.reload_boards(select_board_id=holder["id"])
+            self.board_changed.emit()
+
+        def do_redo():
+            if holder.get("id") is not None:
+                database.delete_board(holder["id"], self.db_path)
+                if self.active_board_id == holder["id"]:
+                    self.active_board_id = None
+                self.reload_boards()
+                self.board_changed.emit()
+
+        self.undo_manager.push(UndoAction("Eliminar tablero", do_undo, do_redo))

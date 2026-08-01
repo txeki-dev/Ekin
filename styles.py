@@ -24,34 +24,35 @@ COLORS = {
     "success": "#10b981",       # Emerald 500
 }
 
-QSS = f"""
+def build_qss(c):
+    return f"""
 /* --- Estilos Generales --- */
 QWidget {{
     font-family: 'Segoe UI', 'Inter', 'Helvetica Neue', Arial, sans-serif;
     font-size: 13px;
-    color: {COLORS["text_main"]};
+    color: {c["text_main"]};
 }}
 
 QMainWindow {{
-    background-color: {COLORS["bg_main"]};
+    background-color: {c["bg_main"]};
 }}
 
 QDialog {{
-    background-color: {COLORS["bg_sidebar"]};
-    border: 1px solid {COLORS["border"]};
+    background-color: {c["bg_sidebar"]};
+    border: 1px solid {c["border"]};
     border-radius: 8px;
 }}
 
 /* --- Barra Lateral (Sidebar) --- */
 #SidebarFrame {{
-    background-color: {COLORS["bg_sidebar"]};
-    border-right: 1px solid {COLORS["border"]};
+    background-color: {c["bg_sidebar"]};
+    border-right: 1px solid {c["border"]};
 }}
 
 #SidebarTitle {{
     font-size: 18px;
     font-weight: bold;
-    color: {COLORS["text_main"]};
+    color: {c["text_main"]};
     margin-bottom: 10px;
 }}
 
@@ -66,18 +67,18 @@ QListWidget::item {{
     padding: 10px 15px;
     margin: 4px 8px;
     border-radius: 6px;
-    color: {COLORS["text_muted"]};
+    color: {c["text_muted"]};
     font-weight: 500;
 }}
 
 QListWidget::item:hover {{
-    background-color: {COLORS["bg_card"]};
-    color: {COLORS["text_main"]};
+    background-color: {c["bg_card"]};
+    color: {c["text_main"]};
 }}
 
 QListWidget::item:selected {{
-    background-color: {COLORS["accent_blue"]};
-    color: {COLORS["text_main"]};
+    background-color: {c["accent_blue"]};
+    color: {c["text_main"]};
     font-weight: bold;
 }}
 
@@ -89,11 +90,11 @@ QListWidget::item:selected {{
 #ColumnTitle {{
     font-size: 14px;
     font-weight: bold;
-    color: {COLORS["text_main"]};
+    color: {c["text_main"]};
 }}
 
 #ColumnHeaderBar {{
-    border-bottom: 2px solid {COLORS["accent_blue"]};
+    border-bottom: 2px solid {c["accent_blue"]};
     border-top-left-radius: 8px;
     border-top-right-radius: 8px;
 }}
@@ -105,21 +106,21 @@ QListWidget::item:selected {{
 
 /* --- Tarjeta de Tarea (TaskCard) --- */
 #TaskCardFrame {{
-    background-color: {COLORS["bg_sidebar"]};
-    border: 1.5px solid {COLORS["border"]};
+    background-color: {c["bg_sidebar"]};
+    border: 1.5px solid {c["border"]};
     border-radius: 8px;
     padding: 10px;
 }}
 
 #TaskCardFrame:hover {{
-    border: 1.5px solid {COLORS["accent_blue"]};
-    background-color: {COLORS["bg_card"]};
+    border: 1.5px solid {c["accent_blue"]};
+    background-color: {c["bg_card"]};
 }}
 
 #TaskCardTitle {{
     font-size: 13px;
     font-weight: 600;
-    color: {COLORS["text_main"]};
+    color: {c["text_main"]};
 }}
 
 #TaskCardTag {{
@@ -132,8 +133,8 @@ QListWidget::item:selected {{
 
 /* --- Botones --- */
 QPushButton {{
-    background-color: {COLORS["bg_card"]};
-    border: 1px solid {COLORS["border"]};
+    background-color: {c["bg_card"]};
+    border: 1px solid {c["border"]};
     border-radius: 6px;
     padding: 6px 12px;
     font-weight: 500;
@@ -141,22 +142,22 @@ QPushButton {{
 
 QPushButton:hover {{
     background-color: #475569;
-    border-color: {COLORS["text_muted"]};
+    border-color: {c["text_muted"]};
 }}
 
 QPushButton:pressed {{
-    background-color: {COLORS["bg_sidebar"]};
+    background-color: {c["bg_sidebar"]};
 }}
 
 #PrimaryButton {{
-    background-color: {COLORS["accent_blue"]};
+    background-color: {c["accent_blue"]};
     border: none;
     color: #ffffff;
     font-weight: bold;
 }}
 
 #PrimaryButton:hover {{
-    background-color: {COLORS["accent_hover"]};
+    background-color: {c["accent_hover"]};
 }}
 
 #PrimaryButton:pressed {{
@@ -164,13 +165,13 @@ QPushButton:pressed {{
 }}
 
 #DangerButton {{
-    background-color: {COLORS["danger"]};
+    background-color: {c["danger"]};
     border: none;
     color: #ffffff;
 }}
 
 #DangerButton:hover {{
-    background-color: {COLORS["danger_hover"]};
+    background-color: {c["danger_hover"]};
 }}
 
 #DangerButton:pressed {{
@@ -179,17 +180,17 @@ QPushButton:pressed {{
 
 #AddTaskButton {{
     background-color: transparent;
-    border: 1px dashed {COLORS["border"]};
-    color: {COLORS["text_muted"]};
+    border: 1px dashed {c["border"]};
+    color: {c["text_muted"]};
     border-radius: 6px;
     padding: 8px;
     font-weight: bold;
 }}
 
 #AddTaskButton:hover {{
-    background-color: {COLORS["bg_card"]};
-    border-color: {COLORS["accent_blue"]};
-    color: {COLORS["text_main"]};
+    background-color: {c["bg_card"]};
+    border-color: {c["accent_blue"]};
+    color: {c["text_main"]};
 }}
 
 /* --- Botones de la Barra de Formato de Texto (Negrita, Cursiva, Viñetas) --- */
@@ -198,39 +199,39 @@ QPushButton:pressed {{
     border: 1px solid transparent;
     border-radius: 4px;
     padding: 0px;
-    color: {COLORS["text_muted"]};
+    color: {c["text_muted"]};
     font-size: 15px;
 }}
 
 #FormatButton:hover {{
-    background-color: {COLORS["bg_card"]};
-    border-color: {COLORS["border"]};
-    color: {COLORS["text_main"]};
+    background-color: {c["bg_card"]};
+    border-color: {c["border"]};
+    color: {c["text_main"]};
 }}
 
 #FormatButton:checked {{
-    background-color: {COLORS["accent_blue"]};
-    border-color: {COLORS["accent_blue"]};
+    background-color: {c["accent_blue"]};
+    border-color: {c["accent_blue"]};
     color: #ffffff;
 }}
 
 #FormatButton:pressed {{
-    background-color: {COLORS["accent_hover"]};
+    background-color: {c["accent_hover"]};
     color: #ffffff;
 }}
 
 /* --- Inputs (QLineEdit, QTextEdit) --- */
 QLineEdit, QTextEdit, QPlainTextEdit {{
-    background-color: {COLORS["bg_main"]};
-    border: 1px solid {COLORS["border"]};
+    background-color: {c["bg_main"]};
+    border: 1px solid {c["border"]};
     border-radius: 6px;
     padding: 6px;
-    color: {COLORS["text_main"]};
-    selection-background-color: {COLORS["accent_blue"]};
+    color: {c["text_main"]};
+    selection-background-color: {c["accent_blue"]};
 }}
 
 QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {{
-    border: 1px solid {COLORS["accent_blue"]};
+    border: 1px solid {c["accent_blue"]};
 }}
 
 /* --- Scrollbars Personalizadas (Sleek Scrollbar) --- */
@@ -241,13 +242,13 @@ QScrollBar:vertical {{
 }}
 
 QScrollBar::handle:vertical {{
-    background-color: {COLORS["border"]};
+    background-color: {c["border"]};
     min-height: 20px;
     border-radius: 4px;
 }}
 
 QScrollBar::handle:vertical:hover {{
-    background-color: {COLORS["text_muted"]};
+    background-color: {c["text_muted"]};
 }}
 
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
@@ -261,13 +262,13 @@ QScrollBar:horizontal {{
 }}
 
 QScrollBar::handle:horizontal {{
-    background-color: {COLORS["border"]};
+    background-color: {c["border"]};
     min-width: 20px;
     border-radius: 4px;
 }}
 
 QScrollBar::handle:horizontal:hover {{
-    background-color: {COLORS["text_muted"]};
+    background-color: {c["text_muted"]};
 }}
 
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
@@ -276,13 +277,13 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
 
 /* --- Elementos de Chat/Diario --- */
 #ChatScrollArea {{
-    background-color: {COLORS["bg_main"]};
-    border: 1px solid {COLORS["border"]};
+    background-color: {c["bg_main"]};
+    border: 1px solid {c["border"]};
     border-radius: 8px;
 }}
 
 #LogEntryWidget {{
-    background-color: {COLORS["bg_card"]};
+    background-color: {c["bg_card"]};
     border-radius: 8px;
     margin: 4px;
     padding: 8px;
@@ -290,31 +291,31 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
 
 #LogTimestamp {{
     font-size: 10px;
-    color: {COLORS["text_muted"]};
+    color: {c["text_muted"]};
     font-weight: bold;
 }}
 
 #LogContent {{
     font-size: 12.5px;
-    color: {COLORS["text_main"]};
+    color: {c["text_main"]};
 }}
 
 /* --- Filas de valores en el Gestor de Etiquetas --- */
 #TagValueRow {{
-    background-color: {COLORS["bg_card"]};
-    border: 1px solid {COLORS["border"]};
+    background-color: {c["bg_card"]};
+    border: 1px solid {c["border"]};
     border-radius: 6px;
 }}
 
 /* --- Barra de utilidades de la Sidebar (reloj + campana + calendario) --- */
 #UtilityBar {{
-    background-color: {COLORS["bg_main"]};
-    border: 1px solid {COLORS["border"]};
+    background-color: {c["bg_main"]};
+    border: 1px solid {c["border"]};
     border-radius: 8px;
 }}
 
 #ClockLabel {{
-    color: {COLORS["text_muted"]};
+    color: {c["text_muted"]};
     font-size: 12px;
     font-weight: bold;
     background: transparent;
@@ -330,27 +331,27 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
 }}
 
 #UtilityIconButton:hover {{
-    background-color: {COLORS["bg_card"]};
-    border-color: {COLORS["border"]};
+    background-color: {c["bg_card"]};
+    border-color: {c["border"]};
 }}
 
 #UtilityIconButton:pressed {{
-    background-color: {COLORS["bg_sidebar"]};
+    background-color: {c["bg_sidebar"]};
 }}
 
 #BellBadge {{
-    background-color: {COLORS["danger"]};
+    background-color: {c["danger"]};
     color: #ffffff;
     font-size: 9px;
     font-weight: bold;
     border-radius: 7px;
-    border: 1px solid {COLORS["bg_main"]};
+    border: 1px solid {c["bg_main"]};
 }}
 
 /* --- Popup de vencimientos --- */
 #NotificationsPopup {{
-    background-color: {COLORS["bg_sidebar"]};
-    border: 1px solid {COLORS["border"]};
+    background-color: {c["bg_sidebar"]};
+    border: 1px solid {c["border"]};
     border-radius: 8px;
 }}
 
@@ -364,31 +365,31 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
 }}
 
 #NotificationItem:hover {{
-    background-color: {COLORS["bg_card"]};
-    border-color: {COLORS["accent_blue"]};
+    background-color: {c["bg_card"]};
+    border-color: {c["accent_blue"]};
 }}
 
 /* --- Vista de Calendario --- */
 #CalendarView {{
-    background-color: {COLORS["bg_main"]};
+    background-color: {c["bg_main"]};
 }}
 
 #CalendarMonthLabel {{
     font-size: 18px;
     font-weight: bold;
-    color: {COLORS["text_main"]};
+    color: {c["text_main"]};
 }}
 
 #WeekdayHeader {{
-    color: {COLORS["text_muted"]};
+    color: {c["text_muted"]};
     font-size: 11px;
     font-weight: bold;
     padding-bottom: 2px;
 }}
 
 #CalNavButton {{
-    background-color: {COLORS["bg_card"]};
-    border: 1px solid {COLORS["border"]};
+    background-color: {c["bg_card"]};
+    border: 1px solid {c["border"]};
     border-radius: 6px;
     font-size: 16px;
     font-weight: bold;
@@ -396,19 +397,19 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
 }}
 
 #CalNavButton:hover {{
-    background-color: {COLORS["accent_blue"]};
-    border-color: {COLORS["accent_blue"]};
+    background-color: {c["accent_blue"]};
+    border-color: {c["accent_blue"]};
     color: #ffffff;
 }}
 
 #DayCell {{
-    background-color: {COLORS["bg_column"]};
-    border: 1px solid {COLORS["border"]};
+    background-color: {c["bg_column"]};
+    border: 1px solid {c["border"]};
     border-radius: 8px;
 }}
 
 #DayNumber {{
-    color: {COLORS["text_muted"]};
+    color: {c["text_muted"]};
     font-size: 11px;
     font-weight: bold;
     background: transparent;
@@ -416,18 +417,45 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
 }}
 
 #CalendarChip {{
-    background-color: {COLORS["bg_card"]};
+    background-color: {c["bg_card"]};
     border: none;
     border-radius: 4px;
     padding: 2px 4px;
     font-size: 10px;
     font-weight: 500;
     text-align: left;
-    color: {COLORS["text_main"]};
+    color: {c["text_main"]};
 }}
 
 #CalendarChip:hover {{
-    background-color: {COLORS["accent_blue"]};
+    background-color: {c["accent_blue"]};
     color: #ffffff;
 }}
 """
+
+
+DARK = dict(COLORS)
+LIGHT = {
+    "bg_main": "#f1f5f9",       # Slate 100
+    "bg_sidebar": "#e2e8f0",    # Slate 200
+    "bg_card": "#ffffff",       # White
+    "bg_column": "#e2e8f0",     # Slate 200
+    "border": "#cbd5e1",        # Slate 300
+    "text_main": "#0f172a",     # Slate 900
+    "text_muted": "#64748b",    # Slate 500
+    "accent_blue": "#3b82f6",
+    "accent_hover": "#2563eb",
+    "danger": "#ef4444",
+    "danger_hover": "#dc2626",
+    "success": "#10b981",
+}
+
+
+def set_theme(name):
+    """Cambia la paleta activa (COLORS) in-place y devuelve el QSS correspondiente."""
+    COLORS.clear()
+    COLORS.update(LIGHT if name == "light" else DARK)
+    return build_qss(COLORS)
+
+
+QSS = build_qss(COLORS)
