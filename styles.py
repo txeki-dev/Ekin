@@ -61,6 +61,12 @@ def color_swatch_css(color, hover=False):
     return css
 
 
+def tag_pill_css(color):
+    """CSS base para una pastilla de etiqueta coloreada (fondo + esquinas redondeadas).
+    Cada sitio de uso añade encima sus propias reglas de fuente/relleno/marco."""
+    return f"background-color: {color}; border-radius: 4px;"
+
+
 def build_qss(c):
     return f"""
 /* --- Estilos Generales --- */

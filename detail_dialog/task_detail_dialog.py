@@ -333,12 +333,7 @@ class TaskDetailDialog(QDialog):
             pill.setObjectName("TagPillFrame")
             pill.setCursor(Qt.PointingHandCursor)
             pill.setToolTip("Clic para cambiar el valor")
-            pill.setStyleSheet(f"""
-                #TagPillFrame {{
-                    background-color: {tag['color']};
-                    border-radius: 4px;
-                }}
-            """)
+            pill.setStyleSheet(f"#TagPillFrame {{ {styles.tag_pill_css(tag['color'])} }}")
             pill.clicked.connect(lambda idx=index: self.edit_tag_at(idx))
             pill_layout = QHBoxLayout(pill)
             pill_layout.setContentsMargins(6, 2, 6, 2)

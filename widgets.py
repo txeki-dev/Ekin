@@ -248,7 +248,7 @@ class TaskCard(QFrame):
             for tag in tags:
                 lbl = QLabel(f"{tag['category']}: {tag['value']}".upper())
                 lbl.setStyleSheet(
-                    f"background-color: {tag['color']}; color: #ffffff; font-size: 9px; font-weight: bold; border-radius: 4px; padding: 2px 5px;"
+                    f"{styles.tag_pill_css(tag['color'])} color: #ffffff; font-size: 9px; font-weight: bold; padding: 2px 5px;"
                 )
                 self.tags_layout.addWidget(lbl)
             self.tags_container.show()
