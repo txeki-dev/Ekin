@@ -1,5 +1,14 @@
 import pytest
+from PySide6.QtWidgets import QApplication
 import database
+
+
+@pytest.fixture(scope="session")
+def qapp():
+    """QApplication compartida para toda la sesión de tests: cualquier test que
+    construya un widget de Qt (QDialog, QWidget, ...) debe pedir este fixture."""
+    app = QApplication.instance() or QApplication([])
+    yield app
 
 
 @pytest.fixture
