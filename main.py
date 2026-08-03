@@ -145,7 +145,10 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(splitter)
 
         # Conectar señales entre sidebar y board_view
-        self.sidebar.board_selected.connect(self.board_view.load_board)
+        # notify=False: cambiar de tablero es navegación, no una mutación de datos.
+        self.sidebar.board_selected.connect(
+            lambda board_id: self.board_view.load_board(board_id, notify=False)
+        )
 
         # Si cambia algo en los tableros, recargamos el estado
         self.sidebar.board_changed.connect(self.on_board_changed)
@@ -171,7 +174,7 @@ class MainWindow(QMainWindow):
 
         # Cargar tablero seleccionado inicial (se maneja automáticamente por reload_boards() en la sidebar)
         if self.sidebar.active_board_id:
-            self.board_view.load_board(self.sidebar.active_board_id)
+            self.board_view.load_board(self.sidebar.active_board_id, notify=False)
 
     def on_board_changed(self):
         """Manejador si el tablero actual cambió en el sidebar."""
@@ -199,7 +202,7 @@ class MainWindow(QMainWindow):
         las tarjetas/columnas se reconstruyan con la nueva paleta."""
         QApplication.instance().setStyleSheet(styles.set_theme(theme))
         if reload and self.sidebar.active_board_id:
-            self.board_view.load_board(self.sidebar.active_board_id)
+            self.board_view.load_board(self.sidebar.active_board_id, notify=False)
 
     def show_settings(self):
         """Abre la pantalla de Ajustes (tema, notificaciones)."""
@@ -235,27 +238,31 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
 
     def _open_task_detail(self, task_id):
-        """Abre el diálogo de detalle de una tarea."""
+        """Abre el diálogo de detalle de una tarea. Devuelve True si el diálogo
+        modificó o borró la tarea (para que el llamante decida si refrescar)."""
         dialog = TaskDetailDialog(task_id, database.DB_NAME, self)
         dialog.exec()
+        return getattr(dialog, "modified", False) or getattr(dialog, "task_deleted", False)
 
     def on_notification_task(self, task_id, board_id):
         """Desde la campana: ir al tablero de la tarea, mostrarlo y abrir su detalle."""
         self.show_board_view()
         if board_id and self.sidebar.active_board_id != board_id:
             self.sidebar.select_board(board_id)
-        self._open_task_detail(task_id)
-        # Refrescar la vista actual y los indicadores tras posibles cambios
-        if self.sidebar.active_board_id:
-            self.board_view.load_board(self.sidebar.active_board_id)
-        self.sidebar.refresh_notifications()
+        changed = self._open_task_detail(task_id)
+        # Refrescar la vista actual y los indicadores solo si hubo cambios reales
+        if changed:
+            if self.sidebar.active_board_id:
+                self.board_view.load_board(self.sidebar.active_board_id)
+            self.sidebar.refresh_notifications()
 
     def on_calendar_task(self, task_id, board_id):
         """Desde el calendario: abrir el detalle y quedarnos en el calendario."""
-        self._open_task_detail(task_id)
-        self.calendar_view.refresh()
-        self.sidebar.refresh_notifications()
-        self.sync_ics()
+        changed = self._open_task_detail(task_id)
+        if changed:
+            self.calendar_view.refresh()
+            self.sidebar.refresh_notifications()
+            self.sync_ics()
 
     def sync_ics(self):
         """Si hay una ruta de sincronización configurada, reescribe el .ics (feed suscribible).

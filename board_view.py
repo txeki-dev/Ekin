@@ -325,10 +325,12 @@ class BoardViewWidget(QFrame):
         # Por defecto ocultamos la zona del tablero hasta cargar uno
         self.board_scroll_area.hide()
 
-    def load_board(self, board_id):
-        """Carga las columnas y tareas de un tablero específico."""
+    def load_board(self, board_id, notify=True):
+        """Carga las columnas y tareas de un tablero específico. `notify=False` evita
+        emitir data_changed cuando la carga es solo navegación (cambio de tablero,
+        recarga de tema, arranque) y no refleja una mutación real de datos."""
         self.board_id = board_id
-        
+
         if board_id == -1:
             # Mostrar pantalla de bienvenida
             self.board_scroll_area.hide()
@@ -336,7 +338,8 @@ class BoardViewWidget(QFrame):
             self.welcome_widget.show()
             self.clear_columns_layout()
             self.setStyleSheet("")
-            self.data_changed.emit()
+            if notify:
+                self.data_changed.emit()
             return
 
         # Ocultar bienvenida y mostrar scroll area y cabecera
@@ -422,7 +425,8 @@ class BoardViewWidget(QFrame):
 
         self.columns_layout.addWidget(self.add_column_card)
 
-        self.data_changed.emit()
+        if notify:
+            self.data_changed.emit()
 
     def clear_columns_layout(self):
         """Limpia todos los widgets del layout de columnas."""
@@ -591,9 +595,12 @@ class BoardViewWidget(QFrame):
                 database.delete_task,
             )
 
-        # Al cerrarse el diálogo, refrescamos el tablero completo por si hubo
-        # cambios en el título, descripción, etiquetas o si se eliminó la tarea.
-        self.load_board(self.board_id)
+        # Solo refrescamos el tablero (y notificamos campana/calendario) si el
+        # diálogo realmente cambió algo: título, descripción, etiquetas, diario,
+        # enlaces o si se eliminó la tarea. Si solo se abrió para consultar, no
+        # hace falta recargar nada.
+        if getattr(dialog, "modified", False) or getattr(dialog, "task_deleted", False):
+            self.load_board(self.board_id)
 
     # --- DRAG & DROP DE TAREAS ---
 

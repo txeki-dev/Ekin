@@ -796,6 +796,7 @@ class TaskDetailDialog(QDialog):
         self.db_path = db_path
         self.current_tags = []      # Lista de diccionarios {'text': '...', 'color': '...'}
         self.task_deleted = False  # Indica si se borró la tarea desde este diálogo
+        self.modified = False      # Indica si hubo algún cambio real (título, tags, diario, enlaces...)
         
         self.setWindowTitle("Detalles de la Tarea")
         self.resize(1120, 720)
@@ -1256,6 +1257,7 @@ class TaskDetailDialog(QDialog):
             self.task_id, self._recurrence_values[self.recurrence_combo.currentIndex()], self.db_path
         )
 
+        self.modified = True
         self.accept()
 
     def delete_task(self):
@@ -1325,10 +1327,12 @@ class TaskDetailDialog(QDialog):
         database.add_task_link(self.task_id, url, label, self.db_path)
         self.link_url_input.clear()
         self.link_label_input.clear()
+        self.modified = True
         self.reload_links()
 
     def remove_link(self, link_id):
         database.delete_task_link(link_id, self.db_path)
+        self.modified = True
         self.reload_links()
 
     def reload_logs(self):
@@ -1353,6 +1357,7 @@ class TaskDetailDialog(QDialog):
         """Guarda la edición de un comentario (o cancela si new_html es None) y recarga."""
         if new_html is not None:
             database.update_log(log_id, new_html, self.db_path)
+            self.modified = True
         self.reload_logs()
 
     def _chat_image_width(self):
@@ -1369,7 +1374,8 @@ class TaskDetailDialog(QDialog):
 
         database.create_log(self.task_id, self.log_input.toHtml(), self.db_path)
         self.log_input.clear()
-        
+        self.modified = True
+
         # En vez de recargar todo, recargamos para asegurar sincronización limpia
         self.reload_logs()
 
@@ -1384,6 +1390,7 @@ class TaskDetailDialog(QDialog):
         )
         if confirm == QMessageBox.Yes:
             database.delete_log(log_id, self.db_path)
+            self.modified = True
             widget.deleteLater()
 
     def scroll_to_bottom(self):
