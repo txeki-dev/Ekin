@@ -25,15 +25,19 @@ Ordered roughly by value/effort. Checkboxes track what's done.
   **(P1 — consistency)**
 - [x] **`TaskListArea.layout` shadows `QWidget.layout()`** (`widgets.py`). *(Done in v0.4.0.)* Renamed
   to `list_layout`. **(P2)**
-- [ ] **Connections are never explicitly closed.** `with get_connection() as conn:` only manages the
-  transaction, not closing; CPython refcounting closes them promptly so it's not a real leak, but a
-  closing context manager (or a shared connection) would be more robust and faster. **(P2 — perf)**
-- [ ] **`data_changed` fires on plain navigation, not just mutations.** Switching boards re-runs the
-  calendar refresh, the bell query and (if configured) the full `.ics` build. Introduce a dedicated
-  "data mutated" signal, or only refresh the calendar when it becomes visible. **(P2 — perf)**
-- [ ] **Duplicated inline stylesheets.** The dark `QMenu` theme, colored swatch buttons and several
-  ad-hoc styles are repeated across `widgets.py`/`board_view.py`/`detail_dialog.py`. Centralize in
-  `styles.py` via object names. **(P3)**
+- [x] **Connections are never explicitly closed.** *(Done in the post-0.6.0 readability pass.)*
+  `get_connection` is now a real `contextlib.contextmanager` that closes in a `finally` block
+  (commit on success, rollback on exception); all 58 call sites unchanged. **(P2 — perf)**
+- [x] **`data_changed` fires on plain navigation, not just mutations.** *(Done in the post-0.6.0
+  readability pass.)* `board_view.load_board(board_id, notify=True)` now skips the emit for
+  pure-navigation callers (board switch, startup, theme reload); `TaskDetailDialog` tracks
+  `self.modified` so opening a task to just look no longer triggers a bell/calendar/`.ics`
+  refresh. **(P2 — perf)**
+- [x] **Duplicated inline stylesheets.** *(Done in the post-0.6.0 readability pass — QMenu/swatch
+  only.)* Added `styles.style_menu()` / `styles.color_swatch_css()`; replaced all QMenu and
+  color-swatch duplicates (`widgets.py`, `sidebar.py`, `board_view.py`, `detail_dialog.py`) plus
+  styled the previously-bare tray menu. Other ad-hoc inline styles (tag pills, buttons) not
+  touched — still a candidate for a future pass. **(P3)**
 - [x] **Dead `#TaskCardDueDate` object name** *(Done in v0.4.0.)* — dropped the unused name (label is
   styled inline). **(P3)**
 - [x] **iCalendar line folding** *(Done in v0.4.0.)* — continuations now cap at 74 content octets so
@@ -106,18 +110,21 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 4. ~~**0.5.1** — UX refinements: collapsible columns (+ drop-to-expand), plain/image paste, comment
    edit/delete, painted icons, Ctrl+B/N & Ctrl+K/I formatting, Outlook/iCloud sync docs, taskbar icon.~~
    ✅ 2026-07-30.
+5. ~~**0.6.0** — calendar depth (Mes/Semana/Día + filter + VALARM + per-board feeds); recurring
+   tasks; undo/redo; attachments/links; board archiving; export (JSON/CSV/MD); dark/light theme +
+   Settings screen.~~ ✅ 2026-08-03.
+6. ~~**Post-0.6.0 readability pass** — connection leak fix; `data_changed` over-firing fix;
+   centralize QMenu/swatch QSS; split `detail_dialog.py` → `detail_dialog/` package (7 classes,
+   one per file); split `database.py` → `database/` package (~60 functions across 11 domain
+   modules, `DB_NAME`/`get_connection` kept together in `__init__.py` to preserve call-time
+   resolution).~~ ✅ 2026-08-03.
 
-### 🎯 v0.6.0 — candidate themes (pick one or mix)
-Nothing here is pre-built; these are the prepared, prioritized options for the next wave:
-- **A · Calendar depth** — time-of-day due + `VALARM` alarms; **week/day view**; **filter by board** +
-  color legend; per-board `.ics` feeds.
-- **B · Power features** — **recurring tasks** (daily/weekly/monthly); **keyboard shortcuts**
-  (`Esc` close, `Ctrl+N` new task, arrow nav); **undo/redo** for destructive actions; attachments/links.
-- **C · Polish & platform** — **light theme** + toggle; a **Settings screen** (persist window
-  size/theme/notification prefs); **export/report** (JSON/CSV/Markdown); **board archiving**.
-- **D · Distribution** — **PyInstaller** standalone build + **update-from-Releases** (reach
-  non-developers; replaces the `git pull` auto-updater).
+### 🎯 Theme D — Distribution (parked)
+**PyInstaller** standalone build + **update-from-Releases** (replaces the `git pull` auto-updater).
+Parked per the user's direction: the project stays dev-mode (run from source) until there's a
+reason to distribute it to non-developers.
 
 ### 🔧 Ongoing tech debt (fold into any wave)
-Connection-closing context manager; `data_changed` only on real mutations; centralize duplicated
-inline stylesheets; headless Qt smoke tests.
+Headless Qt smoke tests (calendar grid, bell popup, settings dialog); i18n (hardcoded Spanish
+strings); remaining inline QSS beyond QMenu/swatch (tag pills, misc buttons); per-board *auto-sync*
+feeds; light-theme polish (some inline colors still assume dark).
