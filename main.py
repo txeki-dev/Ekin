@@ -66,12 +66,15 @@ class MainWindow(QMainWindow):
         # Gestor de deshacer/rehacer (borrados)
         self.undo_manager = UndoManager()
 
+        # Tema guardado: se aplica ANTES de construir la UI, para que los widgets que
+        # fijan su estilo una sola vez en construcción (p. ej. el título del tablero)
+        # nazcan ya con la paleta correcta en vez de con el valor por defecto (oscuro).
+        self.apply_theme(database.get_setting("theme", "dark"), reload=False)
+
         self.init_ui()
         self.board_view.undo_manager = self.undo_manager
         self.sidebar.undo_manager = self.undo_manager
 
-        # Tema guardado + geometría de ventana recordada
-        self.apply_theme(database.get_setting("theme", "dark"), reload=False)
         self._restore_geometry()
 
         # Bandeja del sistema + notificaciones nativas de Windows

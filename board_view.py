@@ -246,7 +246,7 @@ class BoardViewWidget(QFrame):
         self.toggle_sidebar_btn.setFixedSize(32, 32)
         self.toggle_sidebar_btn.setCursor(Qt.PointingHandCursor)
         self.toggle_sidebar_btn.setToolTip("Mostrar/Ocultar barra lateral")
-        self.toggle_sidebar_btn.setIcon(make_glyph_icon("left", "#f8fafc", 16))
+        self.toggle_sidebar_btn.setIcon(make_glyph_icon("left", styles.COLORS['text_main'], 16))
         self.toggle_sidebar_btn.setIconSize(QSize(16, 16))
         self.toggle_sidebar_btn.setStyleSheet(f"""
             QPushButton {{
@@ -264,7 +264,7 @@ class BoardViewWidget(QFrame):
 
         # Título del Tablero
         self.board_title_label = QLabel("Mi Tablero")
-        self.board_title_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #f8fafc;")
+        self.board_title_label.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {styles.COLORS['text_main']};")
         header_layout.addWidget(self.board_title_label)
         header_layout.addStretch()
 

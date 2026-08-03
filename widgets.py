@@ -167,28 +167,28 @@ class TaskCard(QFrame):
     def set_card_style(self, board_color_hex):
         """Aplica dinámicamente el estilo a la tarjeta basándose en el color de fondo del tablero."""
         self.board_color_hex = board_color_hex
-        
-        # Color base Slate 900 de la ventana (#0f172a)
-        base_r, base_g, base_b = 15, 23, 42
+
+        # Color base de la ventana, según el tema activo (oscuro o claro)
+        base_r, base_g, base_b = hex_to_rgb(styles.COLORS['bg_main'])
         try:
             r, g, b = hex_to_rgb(board_color_hex)
         except Exception:
             r, g, b = 59, 130, 246
-            
+
         alpha = 0.06
         blend_r = int(base_r * (1 - alpha) + r * alpha)
         blend_g = int(base_g * (1 - alpha) + g * alpha)
         blend_b = int(base_b * (1 - alpha) + b * alpha)
-        
-        # Marco sólido Slate 600 y fondo idéntico al fondo del tablero
+
+        # Marco sólido y fondo idéntico al fondo del tablero
         self.setStyleSheet(f"""
             #TaskCardFrame {{
                 background-color: rgb({blend_r}, {blend_g}, {blend_b});
-                border: 1.5px solid #475569;
+                border: 1.5px solid {styles.COLORS['border']};
                 border-radius: 8px;
             }}
             #TaskCardFrame:hover {{
-                border: 1.5px solid #3b82f6;
+                border: 1.5px solid {styles.COLORS['accent_blue']};
                 background-color: rgb({min(255, blend_r + 12)}, {min(255, blend_g + 12)}, {min(255, blend_b + 16)});
             }}
         """)
@@ -270,12 +270,20 @@ class TaskCard(QFrame):
                 extra = ("  🔁" if recurring else "") + (f"  🔗{n_links}" if n_links else "")
                 self.due_label.setText(f"📅 {formatted}{time_txt}{extra}")
                 if is_overdue:
-                    self.due_label.setStyleSheet("color: #ef4444; font-weight: bold; font-size: 10px; background-color: rgba(239, 68, 68, 0.15); border-radius: 4px; padding: 2px 4px;")
+                    dr, dg, db = hex_to_rgb(styles.COLORS['danger'])
+                    self.due_label.setStyleSheet(
+                        f"color: {styles.COLORS['danger']}; font-weight: bold; font-size: 10px; "
+                        f"background-color: rgba({dr}, {dg}, {db}, 0.15); border-radius: 4px; padding: 2px 4px;"
+                    )
                 else:
-                    self.due_label.setStyleSheet("color: #94a3b8; font-size: 10px; background-color: rgba(148, 163, 184, 0.15); border-radius: 4px; padding: 2px 4px;")
+                    mr, mg, mb = hex_to_rgb(styles.COLORS['text_muted'])
+                    self.due_label.setStyleSheet(
+                        f"color: {styles.COLORS['text_muted']}; font-size: 10px; "
+                        f"background-color: rgba({mr}, {mg}, {mb}, 0.15); border-radius: 4px; padding: 2px 4px;"
+                    )
             except Exception:
                 self.due_label.setText(f"📅 {due_date}")
-                self.due_label.setStyleSheet("color: #94a3b8; font-size: 10px;")
+                self.due_label.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 10px;")
             self.due_container.show()
         else:
             self.due_container.hide()
