@@ -16,7 +16,8 @@ dev = [
 ]
 
 [tool.setuptools]
-py-modules = ["main", "database", "board_view", "detail_dialog", "sidebar", "styles", "widgets", "version", "calendar_view", "ics_export", "backups", "search_dialog"]
+py-modules = ["main", "board_view", "sidebar", "styles", "widgets", "version", "calendar_view", "ics_export", "backups", "search_dialog", "exporter", "settings_dialog", "undo"]
+packages = ["database", "detail_dialog"]
 
 [tool.setuptools.dynamic]
 version = { attr = "version.__version__" }
