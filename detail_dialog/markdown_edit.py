@@ -1,9 +1,11 @@
 from PySide6.QtCore import Qt, QBuffer, QIODevice
-from PySide6.QtWidgets import QTextEdit, QPushButton, QWidget, QHBoxLayout
+from PySide6.QtWidgets import QTextEdit, QPushButton, QWidget, QHBoxLayout, QInputDialog
 from PySide6.QtGui import (
-    QFont, QTextCharFormat, QTextListFormat, QTextCursor, QImage
+    QFont, QTextCharFormat, QTextListFormat, QTextCursor, QImage,
+    QTextTableFormat, QTextFrameFormat, QColor
 )
 import re
+import styles
 
 
 class MarkdownTextEdit(QTextEdit):
@@ -39,6 +41,13 @@ class MarkdownTextEdit(QTextEdit):
         if ctrl and event.key() in (Qt.Key_K, Qt.Key_I):
             fmt = QTextCharFormat()
             fmt.setFontItalic(not self.fontItalic())
+            self.mergeCurrentCharFormat(fmt)
+            event.accept()
+            return
+        # --- Tachado: Ctrl+Shift+X ---
+        if ctrl and bool(event.modifiers() & Qt.ShiftModifier) and event.key() == Qt.Key_X:
+            fmt = QTextCharFormat()
+            fmt.setFontStrikeOut(not self.currentCharFormat().fontStrikeOut())
             self.mergeCurrentCharFormat(fmt)
             event.accept()
             return
@@ -82,19 +91,59 @@ class MarkdownTextEdit(QTextEdit):
         super().keyPressEvent(event)
 
     def insertFromMimeData(self, source):
-        """Al pegar: las imágenes se insertan como imagen; el texto, SIEMPRE sin formato.
+        """Al pegar: las imágenes se insertan como imagen; una tabla (de Excel/Sheets/Word o
+        un origen HTML con `<table>`) se inserta como tabla real; el resto del texto,
+        SIEMPRE sin formato.
 
         Así el contenido copiado de webs/Word se pega como texto plano (sin fuentes ni
-        colores ajenos), pero se pueden pegar capturas/imágenes del portapapeles."""
+        colores ajenos), pero se pueden pegar capturas/imágenes y tablas del portapapeles."""
         if source.hasImage():
             image = source.imageData()
             if isinstance(image, QImage) and not image.isNull():
                 self._insert_image(image)
                 return
+        if source.hasHtml() and "<table" in source.html().lower():
+            # Se conserva el HTML de la tabla tal cual: Qt reconstruye una QTextTable real
+            # (con celdas combinadas, etc.) y así se preserva su aspecto de origen.
+            self.textCursor().insertHtml(source.html())
+            return
         if source.hasText():
+            grid = self._grid_from_plain_text(source.text())
+            if grid is not None:
+                self.insert_table(len(grid), max(len(row) for row in grid), cell_texts=grid)
+                return
             self.insertPlainText(source.text())
             return
         super().insertFromMimeData(source)
+
+    @staticmethod
+    def _grid_from_plain_text(text):
+        """Si el texto plano pegado tiene pinta de tabla (varias líneas con tabuladores,
+        p. ej. copiado de una hoja de cálculo sin HTML en el portapapeles), lo devuelve
+        como una cuadrícula de filas de texto. Si no, devuelve None."""
+        lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        while lines and lines[-1] == "":
+            lines.pop()
+        if len(lines) < 2 or not any("\t" in ln for ln in lines):
+            return None
+        return [ln.split("\t") for ln in lines]
+
+    def insert_table(self, rows, cols, cell_texts=None):
+        """Inserta una tabla `rows`x`cols` en la posición del cursor, con el estilo del
+        tema activo. Si se pasa `cell_texts` (lista de filas de texto), rellena cada
+        celda con su contenido; si no, la deja vacía (usado por el botón «Insertar tabla»)."""
+        fmt = QTextTableFormat()
+        fmt.setCellPadding(4)
+        fmt.setCellSpacing(0)
+        fmt.setBorder(1)
+        fmt.setBorderStyle(QTextFrameFormat.BorderStyle_Solid)
+        fmt.setBorderBrush(QColor(styles.COLORS["border"]))
+        table = self.textCursor().insertTable(rows, cols, fmt)
+        if cell_texts:
+            for r, row in enumerate(cell_texts):
+                for c, text in enumerate(row):
+                    if r < rows and c < cols:
+                        table.cellAt(r, c).firstCursorPosition().insertText(text)
 
     def _insert_image(self, image):
         """Embebe un QImage como data URI base64 (queda guardado dentro del HTML).
@@ -173,7 +222,7 @@ class MarkdownTextEdit(QTextEdit):
 
 
 class RichTextToolbar(QWidget):
-    """Barra de formato básica (negrita, cursiva, viñetas) para un QTextEdit."""
+    """Barra de formato básica (negrita, cursiva, tachado, viñetas, tablas) para un QTextEdit."""
     def __init__(self, text_edit, parent=None):
         super().__init__(parent)
         self.text_edit = text_edit
@@ -207,6 +256,18 @@ class RichTextToolbar(QWidget):
         self.italic_btn.clicked.connect(self.toggle_italic)
         layout.addWidget(self.italic_btn)
 
+        self.strike_btn = QPushButton("S")
+        self.strike_btn.setObjectName("FormatButton")
+        self.strike_btn.setToolTip("Tachado (Ctrl+Shift+X)")
+        self.strike_btn.setCheckable(True)
+        self.strike_btn.setCursor(Qt.PointingHandCursor)
+        self.strike_btn.setFixedSize(28, 26)
+        strike_font = QFont()
+        strike_font.setStrikeOut(True)
+        self.strike_btn.setFont(strike_font)
+        self.strike_btn.clicked.connect(self.toggle_strikethrough)
+        layout.addWidget(self.strike_btn)
+
         self.bullet_btn = QPushButton("•")
         self.bullet_btn.setObjectName("FormatButton")
         self.bullet_btn.setToolTip("Lista con viñetas  ·  también con «* », «- » o «+ »")
@@ -214,6 +275,14 @@ class RichTextToolbar(QWidget):
         self.bullet_btn.setFixedSize(28, 26)
         self.bullet_btn.clicked.connect(self.toggle_bullets)
         layout.addWidget(self.bullet_btn)
+
+        self.table_btn = QPushButton("▦")
+        self.table_btn.setObjectName("FormatButton")
+        self.table_btn.setToolTip("Insertar tabla")
+        self.table_btn.setCursor(Qt.PointingHandCursor)
+        self.table_btn.setFixedSize(28, 26)
+        self.table_btn.clicked.connect(self.insert_table_dialog)
+        layout.addWidget(self.table_btn)
 
         layout.addStretch()
 
@@ -234,6 +303,12 @@ class RichTextToolbar(QWidget):
         self.text_edit.mergeCurrentCharFormat(fmt)
         self.text_edit.setFocus()
 
+    def toggle_strikethrough(self):
+        fmt = QTextCharFormat()
+        fmt.setFontStrikeOut(self.strike_btn.isChecked())
+        self.text_edit.mergeCurrentCharFormat(fmt)
+        self.text_edit.setFocus()
+
     def toggle_bullets(self):
         cursor = self.text_edit.textCursor()
         list_format = QTextListFormat()
@@ -241,7 +316,19 @@ class RichTextToolbar(QWidget):
         cursor.createList(list_format)
         self.text_edit.setFocus()
 
+    def insert_table_dialog(self):
+        """Pide filas y columnas y crea una tabla vacía en la posición del cursor."""
+        rows, ok = QInputDialog.getInt(self, "Insertar tabla", "Filas:", 3, 1, 20)
+        if not ok:
+            return
+        cols, ok = QInputDialog.getInt(self, "Insertar tabla", "Columnas:", 3, 1, 20)
+        if not ok:
+            return
+        self.text_edit.insert_table(rows, cols)
+        self.text_edit.setFocus()
+
     def sync_buttons(self, *args):
         fmt = self.text_edit.currentCharFormat()
         self.bold_btn.setChecked(fmt.fontWeight() == QFont.Bold)
         self.italic_btn.setChecked(fmt.fontItalic())
+        self.strike_btn.setChecked(fmt.fontStrikeOut())

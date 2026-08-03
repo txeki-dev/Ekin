@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Tables in the description and diary.** Paste a table (from Excel/Sheets/Word, or plain
+  tab-separated text) and it becomes a real table instead of jumbled text; the new **▦** toolbar
+  button inserts an empty table (prompts for rows/columns).
+- **Strikethrough** formatting (Ctrl+Shift+X, plus a toolbar button) in the description and diary.
+
 ## [0.6.0] - 2026-08-01
 
 ### Added — Calendar depth (A)
