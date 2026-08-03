@@ -10,6 +10,7 @@ import database
 import styles
 import exporter
 from styles import hex_to_rgb
+from strings import t
 from undo import UndoAction
 
 # Nombres cortos en español para el reloj (evita depender de la locale del sistema)
@@ -39,12 +40,12 @@ class NotificationsPopup(QDialog):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(6)
 
-        header = QLabel("🔔  Vencimientos")
+        header = QLabel(t("sidebar.notifications.header"))
         header.setStyleSheet("font-weight: bold; font-size: 13px; background: transparent;")
         layout.addWidget(header)
 
         if not tasks:
-            empty = QLabel("No hay tareas atrasadas ni próximas. ✅")
+            empty = QLabel(t("sidebar.notifications.empty"))
             empty.setWordWrap(True)
             empty.setStyleSheet(f"color: {styles.COLORS['text_muted']}; padding: 8px 2px; background: transparent;")
             layout.addWidget(empty)
@@ -66,10 +67,12 @@ class NotificationsPopup(QDialog):
         vbox.setAlignment(Qt.AlignTop)
 
         # Atrasadas = con fecha anterior a hoy. Se muestran arriba y en tono de alerta.
-        self._add_group(vbox, "ATRASADAS", [t for t in tasks if t["due_date"] < today],
-                        color=styles.COLORS["danger"])
-        self._add_group(vbox, "HOY", [t for t in tasks if t["due_date"] == today])
-        self._add_group(vbox, "MAÑANA", [t for t in tasks if t["due_date"] == tomorrow])
+        self._add_group(vbox, t("sidebar.notifications.group_overdue"),
+                        [x for x in tasks if x["due_date"] < today], color=styles.COLORS["danger"])
+        self._add_group(vbox, t("sidebar.notifications.group_today"),
+                        [x for x in tasks if x["due_date"] == today])
+        self._add_group(vbox, t("sidebar.notifications.group_tomorrow"),
+                        [x for x in tasks if x["due_date"] == tomorrow])
 
         scroll.setWidget(content)
         layout.addWidget(scroll)
@@ -84,14 +87,14 @@ class NotificationsPopup(QDialog):
             " margin-top: 4px; background: transparent;"
         )
         vbox.addWidget(group_label)
-        for t in tasks:
-            btn = QPushButton(t["title"] or "(sin título)")
+        for task in tasks:
+            btn = QPushButton(task["title"] or t("sidebar.notifications.item_no_title"))
             btn.setObjectName("NotificationItem")
-            btn.setIcon(_swatch_icon(t["board_color"]))
+            btn.setIcon(_swatch_icon(task["board_color"]))
             btn.setCursor(Qt.PointingHandCursor)
-            btn.setToolTip(f"{t['board_name']} · vence {t['due_date']}")
+            btn.setToolTip(t("sidebar.notifications.item_tooltip", board=task['board_name'], due_date=task['due_date']))
             btn.clicked.connect(
-                lambda _=False, tid=t["id"], bid=t["board_id"]: self._activate(tid, bid)
+                lambda _=False, tid=task["id"], bid=task["board_id"]: self._activate(tid, bid)
             )
             vbox.addWidget(btn)
 
@@ -129,7 +132,7 @@ class BoardButton(QFrame):
         self.label.setStyleSheet("font-weight: bold; background: transparent; border: none; color: inherit;")
         self.label.setWordWrap(False)
         if self.archived:
-            self.setToolTip("Tablero archivado — clic derecho para desarchivar")
+            self.setToolTip(t("sidebar.board_button.archived_tooltip"))
         layout.addWidget(self.label)
         layout.addStretch()
 
@@ -138,7 +141,9 @@ class BoardButton(QFrame):
     def contextMenuEvent(self, event):
         menu = QMenu(self)
         styles.style_menu(menu)
-        action = menu.addAction("📤 Desarchivar tablero" if self.archived else "🗄 Archivar tablero")
+        action = menu.addAction(
+            t("sidebar.board_button.menu_unarchive") if self.archived else t("sidebar.board_button.menu_archive")
+        )
         if menu.exec(event.globalPos()) == action:
             self.archive_toggle_requested.emit(self.board_id, not self.archived)
 
@@ -222,14 +227,14 @@ class BoardEditDialog(QDialog):
         layout.setContentsMargins(15, 15, 15, 15)
 
         # Nombre del Tablero
-        layout.addWidget(QLabel("<b>Nombre del Tablero:</b>"))
+        layout.addWidget(QLabel(t("sidebar.board_edit.name_label")))
         self.name_input = QLineEdit(name)
-        self.name_input.setPlaceholderText("Ej. Trabajo, Personal, Viaje...")
+        self.name_input.setPlaceholderText(t("sidebar.board_edit.name_placeholder"))
         layout.addWidget(self.name_input)
 
         # Color del Tablero
         color_layout = QHBoxLayout()
-        color_layout.addWidget(QLabel("<b>Color de Fondo:</b>"))
+        color_layout.addWidget(QLabel(t("sidebar.board_edit.color_label")))
         
         self.color_btn = QPushButton()
         self.color_btn.setFixedSize(40, 24)
@@ -246,19 +251,19 @@ class BoardEditDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
         
-        self.ok_btn = QPushButton("Guardar")
+        self.ok_btn = QPushButton(t("sidebar.board_edit.save"))
         self.ok_btn.setObjectName("PrimaryButton")
         self.ok_btn.clicked.connect(self.validate_and_accept)
         btn_layout.addWidget(self.ok_btn)
 
-        self.cancel_btn = QPushButton("Cancelar")
+        self.cancel_btn = QPushButton(t("sidebar.board_edit.cancel"))
         self.cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(self.cancel_btn)
 
         layout.addLayout(btn_layout)
 
     def choose_color(self):
-        color = QColorDialog.getColor(QColor(self.color), self, "Seleccionar Color del Tablero")
+        color = QColorDialog.getColor(QColor(self.color), self, t("sidebar.board_edit.color_dialog_title"))
         if color.isValid():
             self.color = color.name()
             self.update_color_btn_style()
@@ -268,7 +273,7 @@ class BoardEditDialog(QDialog):
 
     def validate_and_accept(self):
         if not self.name_input.text().strip():
-            QMessageBox.warning(self, "Atención", "El nombre del tablero no puede estar vacío.")
+            QMessageBox.warning(self, t("sidebar.board_edit.warn_title"), t("sidebar.board_edit.warn_empty_name"))
             return
         self.accept()
 
@@ -322,7 +327,7 @@ class SidebarWidget(QFrame):
             )
         title_layout.addWidget(logo_label)
 
-        title_label = QLabel("EKIN")
+        title_label = QLabel(t("sidebar.title"))
         title_label.setObjectName("SidebarTitle")
         title_layout.addWidget(title_label)
 
@@ -332,7 +337,7 @@ class SidebarWidget(QFrame):
         # --- Barra de utilidades: reloj + campana de vencimientos + calendario ---
         layout.addWidget(self._build_utility_bar())
 
-        subtitle_label = QLabel("Mis Tableros")
+        subtitle_label = QLabel(t("sidebar.boards_subtitle"))
         subtitle_label.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-weight: bold; margin-left: 8px;")
         layout.addWidget(subtitle_label)
 
@@ -356,7 +361,7 @@ class SidebarWidget(QFrame):
         btn_layout.setSpacing(8)
 
         # Botón para añadir tablero
-        self.add_btn = QPushButton("➕ Nuevo Tablero")
+        self.add_btn = QPushButton(t("sidebar.add_board_btn"))
         self.add_btn.setObjectName("PrimaryButton")
         self.add_btn.setCursor(Qt.PointingHandCursor)
         self.add_btn.clicked.connect(self.add_board)
@@ -366,17 +371,17 @@ class SidebarWidget(QFrame):
         action_layout = QHBoxLayout()
         action_layout.setSpacing(6)
 
-        self.edit_btn = QPushButton("✏️ Editar")
+        self.edit_btn = QPushButton(t("sidebar.edit_board_btn"))
         self.edit_btn.setCursor(Qt.PointingHandCursor)
         self.edit_btn.clicked.connect(self.edit_board)
         action_layout.addWidget(self.edit_btn)
 
-        self.copy_btn = QPushButton("📋 Copiar")
+        self.copy_btn = QPushButton(t("sidebar.copy_board_btn"))
         self.copy_btn.setCursor(Qt.PointingHandCursor)
         self.copy_btn.clicked.connect(self.copy_board)
         action_layout.addWidget(self.copy_btn)
 
-        self.delete_btn = QPushButton("🗑️ Borrar")
+        self.delete_btn = QPushButton(t("sidebar.delete_board_btn"))
         self.delete_btn.setObjectName("DangerButton")
         self.delete_btn.setCursor(Qt.PointingHandCursor)
         self.delete_btn.clicked.connect(self.delete_board)
@@ -387,16 +392,16 @@ class SidebarWidget(QFrame):
         # Fila secundaria: ver archivados + exportar
         extra_layout = QHBoxLayout()
         extra_layout.setSpacing(6)
-        self.archived_btn = QPushButton("🗄 Archivados")
+        self.archived_btn = QPushButton(t("sidebar.archived_btn"))
         self.archived_btn.setCheckable(True)
         self.archived_btn.setCursor(Qt.PointingHandCursor)
-        self.archived_btn.setToolTip("Mostrar/ocultar los tableros archivados (clic derecho en un tablero para archivar)")
+        self.archived_btn.setToolTip(t("sidebar.archived_tooltip"))
         self.archived_btn.toggled.connect(self.toggle_show_archived)
         extra_layout.addWidget(self.archived_btn)
 
-        self.export_btn = QPushButton("⬇ Exportar")
+        self.export_btn = QPushButton(t("sidebar.export_btn"))
         self.export_btn.setCursor(Qt.PointingHandCursor)
-        self.export_btn.setToolTip("Exportar todos los tableros a JSON / CSV / informe Markdown")
+        self.export_btn.setToolTip(t("sidebar.export_tooltip"))
         self.export_btn.clicked.connect(self.show_export_menu)
         extra_layout.addWidget(self.export_btn)
 
@@ -423,7 +428,7 @@ class SidebarWidget(QFrame):
         self.bell_btn.setObjectName("UtilityIconButton")
         self.bell_btn.setGeometry(0, 0, 34, 28)
         self.bell_btn.setCursor(Qt.PointingHandCursor)
-        self.bell_btn.setToolTip("Tareas atrasadas o que vencen hoy o mañana")
+        self.bell_btn.setToolTip(t("sidebar.bell_tooltip"))
         self.bell_btn.clicked.connect(self.show_notifications)
 
         self.bell_badge = QLabel("0", bell_container)
@@ -438,7 +443,7 @@ class SidebarWidget(QFrame):
         self.search_btn.setObjectName("UtilityIconButton")
         self.search_btn.setFixedSize(34, 28)
         self.search_btn.setCursor(Qt.PointingHandCursor)
-        self.search_btn.setToolTip("Buscar tareas (Ctrl+F)")
+        self.search_btn.setToolTip(t("sidebar.search_tooltip"))
         self.search_btn.clicked.connect(self.open_search_requested.emit)
         bar_layout.addWidget(self.search_btn)
 
@@ -446,7 +451,7 @@ class SidebarWidget(QFrame):
         self.calendar_btn.setObjectName("UtilityIconButton")
         self.calendar_btn.setFixedSize(34, 28)
         self.calendar_btn.setCursor(Qt.PointingHandCursor)
-        self.calendar_btn.setToolTip("Abrir vista de calendario")
+        self.calendar_btn.setToolTip(t("sidebar.calendar_tooltip"))
         self.calendar_btn.clicked.connect(self.open_calendar_requested.emit)
         bar_layout.addWidget(self.calendar_btn)
 
@@ -454,7 +459,7 @@ class SidebarWidget(QFrame):
         self.settings_btn.setObjectName("UtilityIconButton")
         self.settings_btn.setFixedSize(34, 28)
         self.settings_btn.setCursor(Qt.PointingHandCursor)
-        self.settings_btn.setToolTip("Ajustes (tema, notificaciones)")
+        self.settings_btn.setToolTip(t("sidebar.settings_tooltip"))
         self.settings_btn.clicked.connect(self.open_settings_requested.emit)
         bar_layout.addWidget(self.settings_btn)
 
@@ -557,9 +562,9 @@ class SidebarWidget(QFrame):
         """Menú para exportar todos los tableros a JSON / CSV / informe Markdown."""
         menu = QMenu(self)
         styles.style_menu(menu)
-        act_json = menu.addAction("JSON (.json)")
-        act_csv = menu.addAction("CSV de tareas (.csv)")
-        act_md = menu.addAction("Informe Markdown (.md)")
+        act_json = menu.addAction(t("sidebar.export_menu.json"))
+        act_csv = menu.addAction(t("sidebar.export_menu.csv"))
+        act_md = menu.addAction(t("sidebar.export_menu.markdown"))
         chosen = menu.exec(self.export_btn.mapToGlobal(QPoint(0, self.export_btn.height())))
         if chosen == act_json:
             self._export_to_file("JSON", "ekin_export.json", "JSON (*.json)", exporter.boards_to_json)
@@ -569,16 +574,16 @@ class SidebarWidget(QFrame):
             self._export_to_file("Markdown", "ekin_informe.md", "Markdown (*.md)", exporter.report_markdown)
 
     def _export_to_file(self, label, default_name, file_filter, build_fn):
-        path, _ = QFileDialog.getSaveFileName(self, f"Exportar {label}", default_name, file_filter)
+        path, _ = QFileDialog.getSaveFileName(self, t("sidebar.export.dialog_title", label=label), default_name, file_filter)
         if not path:
             return
         try:
             with open(path, "w", encoding="utf-8", newline="") as f:
                 f.write(build_fn(self.db_path))
         except Exception as exc:
-            QMessageBox.critical(self, "Error al exportar", f"No se pudo exportar:\n{exc}")
+            QMessageBox.critical(self, t("sidebar.export.error_title"), t("sidebar.export.error_body", error=exc))
             return
-        QMessageBox.information(self, "Exportado", f"Exportación {label} guardada en:\n{path}")
+        QMessageBox.information(self, t("sidebar.export.done_title"), t("sidebar.export.done_body", label=label, path=path))
 
     def handle_column_dropped(self, column_id, target_board_id):
         """Mueve una columna arrastrada desde el tablero activo hasta el botón de otro tablero."""
@@ -619,7 +624,7 @@ class SidebarWidget(QFrame):
 
     def add_board(self):
         """Abre el diálogo para crear un nuevo tablero con nombre y color."""
-        dialog = BoardEditDialog("Nuevo Tablero", name="", color="#3b82f6", parent=self)
+        dialog = BoardEditDialog(t("sidebar.board_edit.new_title"), name="", color="#3b82f6", parent=self)
         if dialog.exec() == QDialog.Accepted:
             name, color = dialog.get_data()
             board_id = database.create_board(name, color, self.db_path)
@@ -634,7 +639,7 @@ class SidebarWidget(QFrame):
         active_btn = self.board_buttons[self.active_board_id]
         
         dialog = BoardEditDialog(
-            "Editar Tablero",
+            t("sidebar.board_edit.edit_title"),
             name=active_btn.name,
             color=active_btn.color,
             parent=self
@@ -653,8 +658,8 @@ class SidebarWidget(QFrame):
         active_btn = self.board_buttons[self.active_board_id]
         
         dialog = BoardEditDialog(
-            "Copiar Tablero",
-            name=f"{active_btn.name} - Copia",
+            t("sidebar.board_edit.copy_title"),
+            name=t("sidebar.board_edit.copy_default_name", name=active_btn.name),
             color=active_btn.color,
             parent=self
         )
@@ -673,8 +678,8 @@ class SidebarWidget(QFrame):
 
         confirm = QMessageBox.question(
             self,
-            "Eliminar Tablero",
-            f"¿Estás seguro de eliminar el tablero '{board_name}'?\nEsto borrará todas sus columnas, tareas y diarios asociados de forma permanente.",
+            t("sidebar.delete_board.title"),
+            t("sidebar.delete_board.body", name=board_name),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
@@ -706,4 +711,4 @@ class SidebarWidget(QFrame):
                 self.reload_boards()
                 self.board_changed.emit()
 
-        self.undo_manager.push(UndoAction("Eliminar tablero", do_undo, do_redo))
+        self.undo_manager.push(UndoAction(t("sidebar.delete_board.undo_label"), do_undo, do_redo))

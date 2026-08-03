@@ -11,6 +11,7 @@ from PySide6.QtGui import QIcon, QShortcut, QKeySequence
 import database
 import backups
 import styles
+from strings import t
 from sidebar import SidebarWidget
 from board_view import BoardViewWidget
 from calendar_view import CalendarViewWidget
@@ -38,7 +39,7 @@ def app_icon():
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f"Ekin Kanban - Trello Lite v{__version__}")
+        self.setWindowTitle(t("main.window_title", version=__version__))
         self.setWindowIcon(app_icon())
         self.resize(1100, 700)
         self.setMinimumSize(850, 500)
@@ -220,7 +221,7 @@ class MainWindow(QMainWindow):
     def show_settings(self):
         """Abre la pantalla de Ajustes (tema, notificaciones)."""
         dlg = SettingsDialog(database.DB_NAME, self)
-        dlg.theme_changed.connect(lambda t: self.apply_theme(t, reload=True))
+        dlg.theme_changed.connect(lambda theme: self.apply_theme(theme, reload=True))
         dlg.exec()
 
     def _do_undo(self):
@@ -304,14 +305,14 @@ class MainWindow(QMainWindow):
     def setup_tray(self):
         """Crea el icono de bandeja (habilita toasts nativos de Windows)."""
         self.tray = QSystemTrayIcon(app_icon(), self)
-        self.tray.setToolTip("Ekin Kanban")
+        self.tray.setToolTip(t("main.tray.tooltip"))
 
         menu = QMenu()
         styles.style_menu(menu)
-        open_action = menu.addAction("Abrir Ekin")
+        open_action = menu.addAction(t("main.tray.open"))
         open_action.triggered.connect(self.show_and_raise)
         menu.addSeparator()
-        quit_action = menu.addAction("Salir")
+        quit_action = menu.addAction(t("main.tray.quit"))
         quit_action.triggered.connect(QApplication.quit)
         self.tray.setContextMenu(menu)
 
@@ -344,11 +345,11 @@ class MainWindow(QMainWindow):
         self._last_notified = date.today()
         if not tasks:
             return
-        titles = ", ".join(t["title"] for t in tasks[:5])
+        titles = ", ".join(task["title"] for task in tasks[:5])
         if len(tasks) > 5:
             titles += "…"
         self.tray.showMessage(
-            f"Ekin — {len(tasks)} tarea(s) vencen hoy",
+            t("main.tray.due_today_title", count=len(tasks)),
             titles,
             QSystemTrayIcon.MessageIcon.Information,
             8000
@@ -394,8 +395,8 @@ class MainWindow(QMainWindow):
             if "behind" in result.stdout:
                 confirm = QMessageBox.question(
                     self,
-                    "Actualización Disponible",
-                    "Hay una nueva versión de Ekin Kanban en GitHub.\n¿Deseas descargarla y reiniciar la aplicación ahora?",
+                    t("main.update.available_title"),
+                    t("main.update.available_body"),
                     QMessageBox.Yes | QMessageBox.No,
                     QMessageBox.Yes
                 )
@@ -412,8 +413,8 @@ class MainWindow(QMainWindow):
                     
                     QMessageBox.information(
                         self,
-                        "Actualizado",
-                        "La aplicación se ha actualizado con éxito. Se reiniciará ahora."
+                        t("main.update.done_title"),
+                        t("main.update.done_body")
                     )
                     
                     # Reiniciar el script actual de python
@@ -428,33 +429,28 @@ class MainWindow(QMainWindow):
         boards = database.get_boards()
         if not boards:
             # Crear tablero inicial de ejemplo
-            board_id = database.create_board("Mi Primer Tablero")
-            
+            board_id = database.create_board(t("main.onboarding.board_name"))
+
             # Crear columnas de ejemplo
-            todo_id = database.create_column(board_id, "Pendientes", "#60a5fa")  # Azul claro
-            database.create_column(board_id, "En Progreso", "#fbbf24")  # Amarillo/Ambar
-            database.create_column(board_id, "Completado", "#34d399")   # Verde esmeralda
-            
+            todo_id = database.create_column(board_id, t("main.onboarding.col_todo"), "#60a5fa")  # Azul claro
+            database.create_column(board_id, t("main.onboarding.col_doing"), "#fbbf24")  # Amarillo/Ambar
+            database.create_column(board_id, t("main.onboarding.col_done"), "#34d399")   # Verde esmeralda
+
             # Crear una tarea de ejemplo
             task_id = database.create_task(
                 todo_id,
-                "Explorar Ekin Kanban",
-                "¡Bienvenido!\n\nEsta es una tarjeta de tarea. Haz click sobre ella para:\n"
-                "- Cambiar el título\n"
-                "- Añadir una descripción\n"
-                "- Configurar etiquetas personalizadas\n"
-                "- Registrar tus avances en el Diario personal (a la derecha)"
+                t("main.onboarding.task_title"),
+                t("main.onboarding.task_description")
             )
 
             # Asignar una etiqueta de ejemplo (Categoría: Valor)
-            priority_tag_id = database.get_or_create_tag_value("Prioridad", "Alta", "#ef4444")
+            priority_tag_id = database.get_or_create_tag_value(
+                t("main.onboarding.tag_category"), t("main.onboarding.tag_value"), "#ef4444"
+            )
             database.set_task_tags(task_id, [priority_tag_id])
 
             # Añadir una nota de diario inicial a la tarea
-            database.create_log(
-                task_id,
-                "He inicializado la aplicación por primera vez. ¡Todo listo para empezar a trabajar!"
-            )
+            database.create_log(task_id, t("main.onboarding.log_entry"))
 
 
 def main():

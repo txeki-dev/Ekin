@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 import database
 import styles
 from styles import hex_to_rgb
+from strings import t
 from widgets import ColumnWidget, TaskCard, make_glyph_icon
 from detail_dialog import TaskDetailDialog
 from undo import UndoAction
@@ -70,14 +71,14 @@ class ColumnEditDialog(QDialog):
         layout.setContentsMargins(15, 15, 15, 15)
 
         # Nombre de la columna
-        layout.addWidget(QLabel("<b>Nombre de la Columna:</b>"))
+        layout.addWidget(QLabel(t("board_view.column_edit.name_label")))
         self.name_input = QLineEdit(name)
-        self.name_input.setPlaceholderText("Ej. Pendientes, En Proceso...")
+        self.name_input.setPlaceholderText(t("board_view.column_edit.name_placeholder"))
         layout.addWidget(self.name_input)
 
         # Color de la columna
         color_layout = QHBoxLayout()
-        color_layout.addWidget(QLabel("<b>Color de Acento:</b>"))
+        color_layout.addWidget(QLabel(t("board_view.column_edit.color_label")))
         
         self.color_btn = QPushButton()
         self.color_btn.setFixedSize(40, 24)
@@ -94,19 +95,19 @@ class ColumnEditDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
         
-        self.ok_btn = QPushButton("Guardar")
+        self.ok_btn = QPushButton(t("board_view.column_edit.save"))
         self.ok_btn.setObjectName("PrimaryButton")
         self.ok_btn.clicked.connect(self.validate_and_accept)
         btn_layout.addWidget(self.ok_btn)
 
-        self.cancel_btn = QPushButton("Cancelar")
+        self.cancel_btn = QPushButton(t("board_view.column_edit.cancel"))
         self.cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(self.cancel_btn)
 
         layout.addLayout(btn_layout)
 
     def choose_color(self):
-        color = QColorDialog.getColor(self.color, self, "Seleccionar Color de Columna")
+        color = QColorDialog.getColor(self.color, self, t("board_view.column_edit.color_dialog_title"))
         if color.isValid():
             self.color = color.name()
             self.update_color_btn_style()
@@ -116,7 +117,9 @@ class ColumnEditDialog(QDialog):
 
     def validate_and_accept(self):
         if not self.name_input.text().strip():
-            QMessageBox.warning(self, "Atención", "El nombre de la columna no puede estar vacío.")
+            QMessageBox.warning(
+                self, t("board_view.column_edit.warn_title"), t("board_view.column_edit.warn_empty_name")
+            )
             return
         self.accept()
 
@@ -142,7 +145,7 @@ class BoardSelectionDialog(QDialog):
         layout.setSpacing(12)
         layout.setContentsMargins(15, 15, 15, 15)
         
-        layout.addWidget(QLabel("<b>Selecciona el tablero de destino:</b>"))
+        layout.addWidget(QLabel(t("board_view.board_selection.target_label")))
         
         self.board_combo = QComboBox()
         # Consultar tableros
@@ -166,16 +169,16 @@ class BoardSelectionDialog(QDialog):
         self.ok_btn.clicked.connect(self.accept_selection)
         btn_layout.addWidget(self.ok_btn)
         
-        self.cancel_btn = QPushButton("Cancelar")
+        self.cancel_btn = QPushButton(t("board_view.board_selection.cancel"))
         self.cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(self.cancel_btn)
-        
+
         layout.addLayout(btn_layout)
-        
+
         if not self.available_boards:
             self.ok_btn.setEnabled(False)
             self.board_combo.setEnabled(False)
-            self.board_combo.addItem("No hay otros tableros")
+            self.board_combo.addItem(t("board_view.board_selection.no_other_boards"))
             
     def accept_selection(self):
         index = self.board_combo.currentIndex()
@@ -245,7 +248,7 @@ class BoardViewWidget(QFrame):
         self.toggle_sidebar_btn = QPushButton()
         self.toggle_sidebar_btn.setFixedSize(32, 32)
         self.toggle_sidebar_btn.setCursor(Qt.PointingHandCursor)
-        self.toggle_sidebar_btn.setToolTip("Mostrar/Ocultar barra lateral")
+        self.toggle_sidebar_btn.setToolTip(t("board_view.header.toggle_sidebar_tooltip"))
         self.toggle_sidebar_btn.setIcon(make_glyph_icon("left", styles.COLORS['text_main'], 16))
         self.toggle_sidebar_btn.setIconSize(QSize(16, 16))
         self.toggle_sidebar_btn.setStyleSheet(f"""
@@ -263,7 +266,7 @@ class BoardViewWidget(QFrame):
         header_layout.addWidget(self.toggle_sidebar_btn)
 
         # Título del Tablero
-        self.board_title_label = QLabel("Mi Tablero")
+        self.board_title_label = QLabel(t("board_view.header.default_title"))
         self.board_title_label.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {styles.COLORS['text_main']};")
         header_layout.addWidget(self.board_title_label)
         header_layout.addStretch()
@@ -276,11 +279,7 @@ class BoardViewWidget(QFrame):
         welcome_layout = QVBoxLayout(self.welcome_widget)
         welcome_layout.setAlignment(Qt.AlignCenter)
         
-        welcome_label = QLabel(
-            "💻 ¡Bienvenido a Ekin Kanban!\n\n"
-            "Crea tu primer tablero en el panel lateral\n"
-            "para empezar a organizar tus tareas y diarios."
-        )
+        welcome_label = QLabel(t("board_view.welcome"))
         welcome_label.setStyleSheet(f"""
             QLabel {{
                 font-size: 16px;
@@ -408,7 +407,7 @@ class BoardViewWidget(QFrame):
         add_col_layout = QVBoxLayout(self.add_column_card)
         add_col_layout.setAlignment(Qt.AlignCenter)
         
-        add_col_btn = QPushButton("➕ Nueva Columna")
+        add_col_btn = QPushButton(t("board_view.add_column_btn"))
         add_col_btn.setObjectName("PrimaryButton")
         add_col_btn.setCursor(Qt.PointingHandCursor)
         add_col_btn.clicked.connect(self.add_column)
@@ -435,7 +434,7 @@ class BoardViewWidget(QFrame):
         if not self.board_id:
             return
         
-        dialog = ColumnEditDialog("Nueva Columna", name="", color="#3b82f6", parent=self)
+        dialog = ColumnEditDialog(t("board_view.column_edit.new_title"), name="", color="#3b82f6", parent=self)
         if dialog.exec() == QDialog.Accepted:
             name, color = dialog.get_data()
             database.create_column(self.board_id, name, color, self.db_path)
@@ -448,7 +447,7 @@ class BoardViewWidget(QFrame):
             return
 
         dialog = ColumnEditDialog(
-            "Editar Columna",
+            t("board_view.column_edit.edit_title"),
             name=col_widget.column_data["name"],
             color=col_widget.column_data["color"],
             parent=self
@@ -466,8 +465,8 @@ class BoardViewWidget(QFrame):
 
         confirm = QMessageBox.question(
             self,
-            "Eliminar Columna",
-            f"¿Estás seguro de eliminar la columna '{col_widget.column_data['name']}'?\nEsto borrará todas sus tareas de forma permanente.",
+            t("board_view.delete_column.title"),
+            t("board_view.delete_column.body", name=col_widget.column_data['name']),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
@@ -477,7 +476,7 @@ class BoardViewWidget(QFrame):
             database.delete_column(column_id, self.db_path)
             self.load_board(self.board_id)
             self._push_delete_undo(
-                "Eliminar columna", snap,
+                t("board_view.delete_column.undo_label"), snap,
                 lambda s: database.restore_column(s, board_id=board_id, db_path=self.db_path),
                 database.delete_column,
             )
@@ -486,7 +485,7 @@ class BoardViewWidget(QFrame):
         """Alterna la barra lateral y actualiza el icono: ◀ (plegar) / ▶ (desplegar)."""
         self._sidebar_visible = not self._sidebar_visible
         kind = "left" if self._sidebar_visible else "right"
-        self.toggle_sidebar_btn.setIcon(make_glyph_icon(kind, "#f8fafc", 16))
+        self.toggle_sidebar_btn.setIcon(make_glyph_icon(kind, styles.COLORS['text_main'], 16))
         self.toggle_sidebar_requested.emit()
 
     def handle_column_collapse(self, column_id):
@@ -531,24 +530,24 @@ class BoardViewWidget(QFrame):
             return
             
         dialog = BoardSelectionDialog(
-            "Copiar Columna",
-            "Copiar",
+            t("board_view.copy_column.title"),
+            t("board_view.copy_column.action"),
             exclude_board_id=self.board_id,
             db_path=self.db_path,
             parent=self
         )
-        
+
         if dialog.exec() == QDialog.Accepted and dialog.selected_board_id is not None:
             target_board_id = dialog.selected_board_id
             target_board = database.get_board(target_board_id, self.db_path)
-            board_name = target_board["name"] if target_board else "el tablero seleccionado"
-            
+            board_name = target_board["name"] if target_board else t("board_view.copy_column.fallback_board_name")
+
             database.copy_column_to_board(column_id, target_board_id, self.db_path)
-            
+
             QMessageBox.information(
                 self,
-                "Columna Copiada",
-                f"La columna '{col_widget.column_data['name']}' y todas sus tareas/logs han sido copiadas con éxito a '{board_name}'."
+                t("board_view.copy_column.done_title"),
+                t("board_view.copy_column.done_body", column=col_widget.column_data['name'], board=board_name)
             )
             
             self.load_board(self.board_id)
@@ -566,7 +565,7 @@ class BoardViewWidget(QFrame):
     def add_task(self, column_id):
         """Crea una tarea solicitando el título rápidamente."""
         title, ok = QInputDialog.getText(
-            self, "Nueva Tarea", "Introduce el título de la tarea:",
+            self, t("board_view.add_task.title"), t("board_view.add_task.prompt"),
             text=""
         )
         if ok and title.strip():
@@ -581,7 +580,7 @@ class BoardViewWidget(QFrame):
         # Si se eliminó la tarea desde el diálogo, registrar el deshacer con su snapshot.
         if getattr(dialog, "task_deleted", False) and getattr(dialog, "deleted_snapshot", None):
             self._push_delete_undo(
-                "Eliminar tarea", dialog.deleted_snapshot,
+                t("board_view.delete_task.undo_label"), dialog.deleted_snapshot,
                 lambda s: database.restore_task(s, db_path=self.db_path),
                 database.delete_task,
             )
@@ -614,10 +613,10 @@ class BoardViewWidget(QFrame):
 
         # Remover la tarea que se está moviendo de la lista de origen
         moved_task = None
-        for t in source_tasks:
-            if t["id"] == task_id:
-                moved_task = t
-                source_tasks.remove(t)
+        for task in source_tasks:
+            if task["id"] == task_id:
+                moved_task = task
+                source_tasks.remove(task)
                 break
         
         if not moved_task:

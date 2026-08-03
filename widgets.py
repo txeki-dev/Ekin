@@ -7,6 +7,7 @@ from PySide6.QtGui import QDrag, QPixmap, QCursor, QPainter, QColor, QIcon, QPol
 from datetime import datetime
 import styles
 from styles import hex_to_rgb
+from strings import t
 
 
 class FlowLayout(QLayout):
@@ -537,14 +538,14 @@ class ColumnWidget(QFrame):
         layout.setSpacing(8)
         layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
 
-        expand_btn = self._column_icon_button("right", "Desplegar columna")
+        expand_btn = self._column_icon_button("right", t("widgets.column.expand_tooltip"))
         expand_btn.clicked.connect(lambda: self.collapse_toggle_requested.emit(self.column_id))
         layout.addWidget(expand_btn, 0, Qt.AlignHCenter)
 
         count = self.column_data.get("task_count", 0)
         count_label = QLabel(str(count))
         count_label.setAlignment(Qt.AlignHCenter)
-        count_label.setToolTip(f"{count} tarea(s)")
+        count_label.setToolTip(t("widgets.column.task_count_tooltip", count=count))
         count_label.setStyleSheet(
             f"color: {styles.COLORS['text_muted']}; font-size: 12px; font-weight: bold; background: transparent;"
         )
@@ -579,17 +580,17 @@ class ColumnWidget(QFrame):
         # Nombre de la columna (arrastrable para reordenar o mover a otro tablero)
         self.title_label = DraggableColumnTitle(self.column_data["name"], self)
         self.title_label.setObjectName("ColumnTitle")
-        self.title_label.setToolTip("Arrastra para reordenar o mover esta columna a otro tablero")
+        self.title_label.setToolTip(t("widgets.column.title_drag_tooltip"))
         header_layout.addWidget(self.title_label)
         header_layout.addStretch()
 
         # Botón para plegar la columna (triángulo hacia la izquierda, pintado)
-        collapse_btn = self._column_icon_button("left", "Plegar columna")
+        collapse_btn = self._column_icon_button("left", t("widgets.column.collapse_tooltip"))
         collapse_btn.clicked.connect(lambda: self.collapse_toggle_requested.emit(self.column_id))
         header_layout.addWidget(collapse_btn)
 
         # Botón de edición/opciones de la columna (lápiz pintado)
-        self.menu_btn = self._column_icon_button("pencil", "Editar columna (opciones: editar, copiar, eliminar)")
+        self.menu_btn = self._column_icon_button("pencil", t("widgets.column.edit_tooltip"))
         self.menu_btn.clicked.connect(self.show_column_menu)
         header_layout.addWidget(self.menu_btn)
 
@@ -616,7 +617,7 @@ class ColumnWidget(QFrame):
         main_layout.addWidget(scroll_area)
 
         # 3. Botón para añadir una nueva tarea
-        self.add_task_btn = QPushButton("➕ Añadir Tarea")
+        self.add_task_btn = QPushButton(t("widgets.column.add_task_btn"))
         self.add_task_btn.setObjectName("AddTaskButton")
         self.add_task_btn.setCursor(Qt.PointingHandCursor)
         self.add_task_btn.clicked.connect(lambda: self.add_task_requested.emit(self.column_id))
@@ -680,10 +681,10 @@ class ColumnWidget(QFrame):
         menu = QMenu(self)
         styles.style_menu(menu)
 
-        edit_action = menu.addAction("✏️ Editar Columna")
-        copy_action = menu.addAction("📋 Copiar a otro tablero...")
+        edit_action = menu.addAction(t("widgets.column.menu_edit"))
+        copy_action = menu.addAction(t("widgets.column.menu_copy"))
         menu.addSeparator()
-        delete_action = menu.addAction("🗑️ Eliminar Columna")
+        delete_action = menu.addAction(t("widgets.column.menu_delete"))
 
         action = menu.exec(QCursor.pos())
         if action == edit_action:
