@@ -335,7 +335,13 @@ class MainWindow(QMainWindow):
         self.activateWindow()
 
     def notify_due_today(self):
-        """Muestra un toast de Windows con las tareas que vencen hoy (si las hay)."""
+        """Muestra un toast con las tareas que vencen hoy (si las hay).
+
+        Portabilidad: QSystemTrayIcon es multiplataforma (con isSystemTrayAvailable()
+        ya cubriendo Linux/entornos sin bandeja), pero showMessage() tiene integración
+        históricamente floja con el Centro de Notificaciones en macOS -- limitación de
+        Qt, no arreglable sin un puente nativo (p. ej. PyObjC) fuera del alcance actual.
+        """
         if not QSystemTrayIcon.isSystemTrayAvailable():
             return
         if database.get_setting("notifications_enabled", "1") == "0":
