@@ -16,7 +16,7 @@ dev = [
 ]
 
 [tool.setuptools]
-py-modules = ["main", "board_view", "sidebar", "styles", "widgets", "version", "calendar_view", "ics_export", "backups", "search_dialog", "exporter", "settings_dialog", "undo"]
+py-modules = ["main", "board_view", "sidebar", "styles", "widgets", "version", "calendar_view", "ics_export", "backups", "search_dialog", "exporter", "settings_dialog", "undo", "strings"]
 packages = ["database", "detail_dialog"]
 
 [tool.setuptools.dynamic]
