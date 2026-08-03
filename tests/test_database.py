@@ -610,3 +610,46 @@ def test_snapshot_and_restore_board_hierarchy(db_path):
     assert len(cols) == 1 and cols[0]["name"] == "Col"
     titles = [t["title"] for t in database.get_tasks(cols[0]["id"], db_path=db_path)]
     assert titles == ["T1", "T2"]
+
+
+# --- Rutas de sincronización .ics por tablero (database.ics_sync) ---
+
+def test_board_ics_sync_path_default_is_none(db_path):
+    b = database.create_board("B", db_path=db_path)
+    assert database.get_board_ics_sync_path(b, db_path=db_path) is None
+    assert database.get_all_board_ics_sync_paths(db_path=db_path) == {}
+
+
+def test_set_and_get_board_ics_sync_path(db_path):
+    b = database.create_board("B", db_path=db_path)
+    database.set_board_ics_sync_path(b, "/a/b.ics", db_path=db_path)
+    assert database.get_board_ics_sync_path(b, db_path=db_path) == "/a/b.ics"
+    # upsert: reasignar no crea una segunda fila
+    database.set_board_ics_sync_path(b, "/c/d.ics", db_path=db_path)
+    assert database.get_board_ics_sync_path(b, db_path=db_path) == "/c/d.ics"
+    assert database.get_all_board_ics_sync_paths(db_path=db_path) == {b: "/c/d.ics"}
+
+
+def test_delete_board_ics_sync_path(db_path):
+    b = database.create_board("B", db_path=db_path)
+    database.set_board_ics_sync_path(b, "/a/b.ics", db_path=db_path)
+    database.delete_board_ics_sync_path(b, db_path=db_path)
+    assert database.get_board_ics_sync_path(b, db_path=db_path) is None
+
+
+def test_get_all_board_ics_sync_paths_multiple_boards(db_path):
+    b1 = database.create_board("B1", db_path=db_path)
+    database.create_board("B2", db_path=db_path)  # sin sync path: no debe aparecer
+    b3 = database.create_board("B3", db_path=db_path)
+    database.set_board_ics_sync_path(b1, "/one.ics", db_path=db_path)
+    database.set_board_ics_sync_path(b3, "/three.ics", db_path=db_path)
+    assert database.get_all_board_ics_sync_paths(db_path=db_path) == {
+        b1: "/one.ics", b3: "/three.ics"
+    }
+
+
+def test_board_ics_sync_path_cascades_on_board_delete(db_path):
+    b = database.create_board("B", db_path=db_path)
+    database.set_board_ics_sync_path(b, "/a/b.ics", db_path=db_path)
+    database.delete_board(b, db_path=db_path)
+    assert database.get_all_board_ics_sync_paths(db_path=db_path) == {}

@@ -470,6 +470,16 @@ class CalendarSettingsDialog(QDialog):
         sync_desc.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 12px;")
         sync_layout.addWidget(sync_desc)
 
+        # Feed por tablero: la sincronización automática puede ser global (un único
+        # archivo con todos los tableros) o una por tablero (varios feeds independientes).
+        self.sync_board_combo = QComboBox()
+        self.sync_board_combo.setToolTip("Sincronizar automáticamente todos los tableros o solo uno")
+        self.sync_board_combo.addItem("Todos los tableros", None)
+        for b in database.get_boards(self.db_path, include_archived=True):
+            self.sync_board_combo.addItem(b["name"], b["id"])
+        self.sync_board_combo.currentIndexChanged.connect(lambda *_: self._refresh_sync_label())
+        sync_layout.addWidget(self.sync_board_combo)
+
         self.sync_path_label = QLabel("")
         self.sync_path_label.setWordWrap(True)
         self.sync_path_label.setStyleSheet("font-size: 11px;")
@@ -585,8 +595,18 @@ class CalendarSettingsDialog(QDialog):
 
         self._refresh_sync_label()
 
+    def _current_sync_board_id(self):
+        """None = feed global (todos los tableros); si no, el id del tablero elegido."""
+        return self.sync_board_combo.currentData()
+
+    def _get_current_sync_path(self):
+        board_id = self._current_sync_board_id()
+        if board_id is None:
+            return database.get_setting("ics_sync_path", "", self.db_path)
+        return database.get_board_ics_sync_path(board_id, self.db_path) or ""
+
     def _refresh_sync_label(self):
-        path = database.get_setting("ics_sync_path", "", self.db_path)
+        path = self._get_current_sync_path()
         if path:
             self.sync_path_label.setText(f"✅ Sincronizando en:<br><code>{path}</code>")
             self.sync_path_label.setStyleSheet(f"font-size: 11px; color: {styles.COLORS['success']};")
@@ -599,7 +619,8 @@ class CalendarSettingsDialog(QDialog):
             self.configure_btn.setText("📂  Elegir archivo…")
 
     def configure_sync(self):
-        current = database.get_setting("ics_sync_path", "", self.db_path)
+        board_id = self._current_sync_board_id()
+        current = self._get_current_sync_path()
         default = current or "ekin_calendario.ics"
         path, _ = QFileDialog.getSaveFileName(
             self, "Archivo de sincronización", default, "iCalendar (*.ics)"
@@ -607,11 +628,14 @@ class CalendarSettingsDialog(QDialog):
         if not path:
             return
         try:
-            count = ics_export.export_ics(path, self.db_path)
+            count = ics_export.export_ics(path, self.db_path, board_id=board_id)
         except Exception as exc:
             QMessageBox.critical(self, "Error", f"No se pudo crear el archivo:\n{exc}")
             return
-        database.set_setting("ics_sync_path", path, self.db_path)
+        if board_id is None:
+            database.set_setting("ics_sync_path", path, self.db_path)
+        else:
+            database.set_board_ics_sync_path(board_id, path, self.db_path)
         self._refresh_sync_label()
         QMessageBox.information(
             self, "Sincronización activada",
@@ -620,7 +644,11 @@ class CalendarSettingsDialog(QDialog):
         )
 
     def disable_sync(self):
-        database.set_setting("ics_sync_path", "", self.db_path)
+        board_id = self._current_sync_board_id()
+        if board_id is None:
+            database.set_setting("ics_sync_path", "", self.db_path)
+        else:
+            database.delete_board_ics_sync_path(board_id, self.db_path)
         self._refresh_sync_label()
 
     def _subscribe_url(self):

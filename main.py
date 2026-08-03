@@ -60,8 +60,9 @@ class MainWindow(QMainWindow):
             print(f"No se pudieron adelantar tareas recurrentes: {exc}")
         self.check_onboarding()
 
-        # Contenido del último .ics sincronizado (para no reescribir si no cambió nada)
-        self._last_synced_ics = None
+        # Contenido del último .ics sincronizado por feed (para no reescribir si no
+        # cambió nada); clave = "__global__" o un board_id.
+        self._last_synced_ics = {}
 
         # Gestor de deshacer/rehacer (borrados)
         self.undo_manager = UndoManager()
@@ -277,21 +278,26 @@ class MainWindow(QMainWindow):
             self.sync_ics()
 
     def sync_ics(self):
-        """Si hay una ruta de sincronización configurada, reescribe el .ics (feed suscribible).
-        Solo escribe cuando el contenido ha cambiado, para no generar subidas redundantes
-        en carpetas de Dropbox/OneDrive/Drive."""
-        path = database.get_setting("ics_sync_path", "")
+        """Reescribe cada feed .ics con auto-sync configurado (el global de todos los
+        tableros, más uno por cada tablero con su propia ruta). Cada feed solo se
+        reescribe si su contenido cambió, para no generar subidas redundantes en
+        carpetas de Dropbox/OneDrive/Drive."""
+        self._sync_one_ics("__global__", database.get_setting("ics_sync_path", ""), board_id=None)
+        for board_id, path in database.get_all_board_ics_sync_paths().items():
+            self._sync_one_ics(board_id, path, board_id=board_id)
+
+    def _sync_one_ics(self, cache_key, path, board_id):
         if not path:
             return
         try:
-            content = ics_export.build_ics(database.DB_NAME)
-            if content == self._last_synced_ics:
+            content = ics_export.build_ics(database.DB_NAME, board_id=board_id)
+            if content == self._last_synced_ics.get(cache_key):
                 return
             with open(path, "w", encoding="utf-8", newline="") as f:
                 f.write(content)
-            self._last_synced_ics = content
+            self._last_synced_ics[cache_key] = content
         except Exception as exc:
-            print(f"Error al sincronizar el .ics: {exc}")
+            print(f"Error al sincronizar el .ics ({cache_key}): {exc}")
 
     # --- Bandeja del sistema y notificaciones ---
 

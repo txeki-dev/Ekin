@@ -198,6 +198,15 @@ def init_db(db_path=None):
                         "UPDATE task_tags SET tag_value_id = ? WHERE id = ?",
                         (value_cache[cache_key], row["id"])
                     )
+
+        # Rutas de sincronización .ics por tablero (feed auto-sync además del global)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS board_ics_sync (
+                board_id INTEGER PRIMARY KEY,
+                path TEXT NOT NULL,
+                FOREIGN KEY(board_id) REFERENCES boards(id) ON DELETE CASCADE
+            )
+        """)
         conn.commit()
 
 
@@ -212,5 +221,6 @@ from .settings import *  # noqa: E402,F401,F403
 from .tasks import *  # noqa: E402,F401,F403
 from .scheduling import *  # noqa: E402,F401,F403
 from .search import *  # noqa: E402,F401,F403
+from .ics_sync import *  # noqa: E402,F401,F403
 from .board_ops import *  # noqa: E402,F401,F403
 from .snapshots import *  # noqa: E402,F401,F403
