@@ -1,16 +1,26 @@
 import sqlite3
 import calendar as _cal
+import contextlib
 from datetime import datetime, date, timedelta
 
 DB_NAME = "ekin_board.db"
 
+@contextlib.contextmanager
 def get_connection(db_path=None):
-    """Establece una conexión a la base de datos y habilita las claves foráneas."""
+    """Establece una conexión a la base de datos, habilita las claves foráneas y la
+    cierra siempre al salir (commit en éxito, rollback si hay excepción)."""
     db_path = db_path or DB_NAME
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA foreign_keys = ON;")
     conn.row_factory = sqlite3.Row  # Permite acceder a las columnas por nombre
-    return conn
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 def init_db(db_path=None):
     """Crea las tablas necesarias si no existen."""
