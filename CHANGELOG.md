@@ -7,11 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-03
+
 ### Added
 - **Tables in the description and diary.** Paste a table (from Excel/Sheets/Word, or plain
   tab-separated text) and it becomes a real table instead of jumbled text; the new **▦** toolbar
   button inserts an empty table (prompts for rows/columns).
 - **Strikethrough** formatting (Ctrl+Shift+X, plus a toolbar button) in the description and diary.
+
+### Fixed
+- Database connections are now closed after every use (previously left open until garbage-collected).
+- The bell, calendar and `.ics` feed no longer refresh on plain navigation (switching boards,
+  changing the theme) — only when a task, column or board actually changes.
 
 ## [0.6.0] - 2026-08-01
 
