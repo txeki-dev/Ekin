@@ -112,16 +112,7 @@ class ColumnEditDialog(QDialog):
             self.update_color_btn_style()
 
     def update_color_btn_style(self):
-        self.color_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {self.color};
-                border: 1px solid {styles.COLORS['border']};
-                border-radius: 4px;
-            }}
-            QPushButton:hover {{
-                border-color: #ffffff;
-            }}
-        """)
+        self.color_btn.setStyleSheet(styles.color_swatch_css(self.color, hover=True))
 
     def validate_and_accept(self):
         if not self.name_input.text().strip():

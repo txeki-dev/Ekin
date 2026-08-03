@@ -289,6 +289,7 @@ class MainWindow(QMainWindow):
         self.tray.setToolTip("Ekin Kanban")
 
         menu = QMenu()
+        styles.style_menu(menu)
         open_action = menu.addAction("Abrir Ekin")
         open_action.triggered.connect(self.show_and_raise)
         menu.addSeparator()

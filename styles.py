@@ -24,6 +24,43 @@ COLORS = {
     "success": "#10b981",       # Emerald 500
 }
 
+def style_menu(menu):
+    """Aplica el tema oscuro estándar (fondo/borde/item/selección) a un QMenu."""
+    menu.setStyleSheet(f"""
+        QMenu {{
+            background-color: {COLORS['bg_sidebar']};
+            border: 1px solid {COLORS['border']};
+            border-radius: 4px;
+        }}
+        QMenu::item {{
+            padding: 6px 20px;
+            color: {COLORS['text_main']};
+        }}
+        QMenu::item:selected {{
+            background-color: {COLORS['accent_blue']};
+        }}
+    """)
+
+
+def color_swatch_css(color, hover=False):
+    """CSS para un botón de muestra de color (color + borde + esquinas redondeadas).
+    `hover=True` añade un borde blanco al pasar el ratón."""
+    css = f"""
+        QPushButton {{
+            background-color: {color};
+            border: 1px solid {COLORS['border']};
+            border-radius: 4px;
+        }}
+    """
+    if hover:
+        css += """
+        QPushButton:hover {
+            border-color: #ffffff;
+        }
+        """
+    return css
+
+
 def build_qss(c):
     return f"""
 /* --- Estilos Generales --- */

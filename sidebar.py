@@ -137,12 +137,7 @@ class BoardButton(QFrame):
 
     def contextMenuEvent(self, event):
         menu = QMenu(self)
-        menu.setStyleSheet(f"""
-            QMenu {{ background-color: {styles.COLORS['bg_sidebar']};
-                     border: 1px solid {styles.COLORS['border']}; border-radius: 4px; }}
-            QMenu::item {{ padding: 6px 20px; color: {styles.COLORS['text_main']}; }}
-            QMenu::item:selected {{ background-color: {styles.COLORS['accent_blue']}; }}
-        """)
+        styles.style_menu(menu)
         action = menu.addAction("📤 Desarchivar tablero" if self.archived else "🗄 Archivar tablero")
         if menu.exec(event.globalPos()) == action:
             self.archive_toggle_requested.emit(self.board_id, not self.archived)
@@ -269,16 +264,7 @@ class BoardEditDialog(QDialog):
             self.update_color_btn_style()
 
     def update_color_btn_style(self):
-        self.color_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {self.color};
-                border: 1px solid {styles.COLORS['border']};
-                border-radius: 4px;
-            }}
-            QPushButton:hover {{
-                border-color: #ffffff;
-            }}
-        """)
+        self.color_btn.setStyleSheet(styles.color_swatch_css(self.color, hover=True))
 
     def validate_and_accept(self):
         if not self.name_input.text().strip():
@@ -570,12 +556,7 @@ class SidebarWidget(QFrame):
     def show_export_menu(self):
         """Menú para exportar todos los tableros a JSON / CSV / informe Markdown."""
         menu = QMenu(self)
-        menu.setStyleSheet(f"""
-            QMenu {{ background-color: {styles.COLORS['bg_sidebar']};
-                     border: 1px solid {styles.COLORS['border']}; border-radius: 4px; }}
-            QMenu::item {{ padding: 6px 20px; color: {styles.COLORS['text_main']}; }}
-            QMenu::item:selected {{ background-color: {styles.COLORS['accent_blue']}; }}
-        """)
+        styles.style_menu(menu)
         act_json = menu.addAction("JSON (.json)")
         act_csv = menu.addAction("CSV de tareas (.csv)")
         act_md = menu.addAction("Informe Markdown (.md)")

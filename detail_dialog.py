@@ -580,9 +580,7 @@ class TagManagerDialog(QDialog):
         swatch.setFixedSize(20, 20)
         swatch.setCursor(Qt.PointingHandCursor)
         swatch.setToolTip("Cambiar color")
-        swatch.setStyleSheet(
-            f"background-color: {value['color']}; border: 1px solid {styles.COLORS['border']}; border-radius: 4px;"
-        )
+        swatch.setStyleSheet(styles.color_swatch_css(value['color']))
         swatch.clicked.connect(lambda _=False, v=dict(value): self.change_value_color(v))
         h.addWidget(swatch)
 
@@ -615,9 +613,7 @@ class TagManagerDialog(QDialog):
             self._refresh_new_color_btn()
 
     def _refresh_new_color_btn(self):
-        self.new_color_btn.setStyleSheet(
-            f"background-color: {self.new_value_color}; border: 1px solid {styles.COLORS['border']}; border-radius: 4px;"
-        )
+        self.new_color_btn.setStyleSheet(styles.color_swatch_css(self.new_value_color))
 
     def add_value(self):
         cat_id = self.current_category_id()

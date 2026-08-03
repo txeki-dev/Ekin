@@ -670,22 +670,8 @@ class ColumnWidget(QFrame):
     def show_column_menu(self):
         """Muestra el menú contextual de la columna para editarla, moverla, copiarla o borrarla."""
         menu = QMenu(self)
-        # Aplicar el tema oscuro al menú
-        menu.setStyleSheet(f"""
-            QMenu {{
-                background-color: {styles.COLORS['bg_sidebar']};
-                border: 1px solid {styles.COLORS['border']};
-                border-radius: 4px;
-            }}
-            QMenu::item {{
-                padding: 6px 20px;
-                color: {styles.COLORS['text_main']};
-            }}
-            QMenu::item:selected {{
-                background-color: {styles.COLORS['accent_blue']};
-            }}
-        """)
-        
+        styles.style_menu(menu)
+
         edit_action = menu.addAction("✏️ Editar Columna")
         copy_action = menu.addAction("📋 Copiar a otro tablero...")
         menu.addSeparator()
