@@ -33,11 +33,11 @@ Ordered roughly by value/effort. Checkboxes track what's done.
   pure-navigation callers (board switch, startup, theme reload); `TaskDetailDialog` tracks
   `self.modified` so opening a task to just look no longer triggers a bell/calendar/`.ics`
   refresh. **(P2 — perf)**
-- [x] **Duplicated inline stylesheets.** *(Done in the post-0.6.0 readability pass — QMenu/swatch
-  only.)* Added `styles.style_menu()` / `styles.color_swatch_css()`; replaced all QMenu and
-  color-swatch duplicates (`widgets.py`, `sidebar.py`, `board_view.py`, `detail_dialog.py`) plus
-  styled the previously-bare tray menu. Other ad-hoc inline styles (tag pills, buttons) not
-  touched — still a candidate for a future pass. **(P3)**
+- [x] **Duplicated inline stylesheets.** *(Done in the post-0.6.0 readability pass — QMenu/swatch;
+  extended 2026-08-03 with tag pills.)* `styles.style_menu()` / `styles.color_swatch_css()` /
+  `styles.tag_pill_css()` cover QMenu, color-swatch and tag-pill duplicates across
+  `widgets.py`/`sidebar.py`/`board_view.py`/`detail_dialog/*`, plus the tray menu. Other ad-hoc
+  one-off inline styles (not actually duplicated elsewhere) intentionally left alone. **(P3)**
 - [x] **Dead `#TaskCardDueDate` object name** *(Done in v0.4.0.)* — dropped the unused name (label is
   styled inline). **(P3)**
 - [x] **iCalendar line folding** *(Done in v0.4.0.)* — continuations now cap at 74 content octets so
@@ -53,7 +53,9 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 
 - [x] Tests for `ics_export` (escaping, folding, `SEQUENCE`/`LAST-MODIFIED`, all-day `DTSTART/DTEND`).
   *(Done in v0.4.0 — `tests/test_ics_export.py`.)*
-- [ ] Headless (offscreen) smoke tests for the Qt widgets (calendar grid, bell popup, settings dialog).
+- [x] Headless (offscreen) smoke tests for the Qt widgets (calendar grid, bell popup, settings dialog).
+  *(Done 2026-08-03 — `tests/test_widgets_headless.py` + a session-scoped `qapp` fixture in
+  `conftest.py`; passes with `QT_QPA_PLATFORM=offscreen`, matching CI.)*
 - [x] CI workflow running `pytest` on push/PR *(Done — `.github/workflows/ci.yml`, matrix py3.10–3.12
   with the Qt system libs; `test` job).*
 - [x] `ruff` lint check in CI *(Done — `lint` job; ruleset `E4/E7/E9/F` in `[tool.ruff.lint]`, baseline
@@ -73,7 +75,11 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 - [x] **Calendar: filter by board** + a board color legend *(Done in v0.6.0)*.
 - [x] **"Subscribe in Google" helper** in Ajustes *(Done in v0.4.0)* — stores the public feed URL
   (`ics_public_url`) and a button that copies it and opens Google's *add-by-URL* page.
-- [x] **Per-board `.ics` feeds** so each board can be a separate subscribable calendar *(Done in v0.6.0)*.
+- [x] **Per-board `.ics` feeds** so each board can be a separate subscribable calendar. One-off
+  **export** was per-board since v0.6.0; **auto-sync** (the always-up-to-date subscribable feed)
+  became per-board too on 2026-08-03 — `board_ics_sync` table + `database/ics_sync.py`, a board
+  picker in `CalendarSettingsDialog`'s auto-sync section (mirrors the export picker), and
+  `main.py`'s `sync_ics()` now rewrites the global feed plus every configured per-board feed.
 
 ### Task power features
 - [x] **Global search & filter** (by title, tag, due, board) *(Done in v0.5.0 — 🔍 sidebar button + Ctrl+F)*.
@@ -82,8 +88,12 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 - [x] **Recurring tasks** (daily/weekly/monthly) *(Done in v0.6.0)*.
 - [x] **Attachments / links** on cards *(Done in v0.6.0 — `task_links` table)*.
 - [x] **Undo/redo** for destructive actions (delete task/column/board) *(Done in v0.6.0 — snapshot/restore + `undo.py`)*.
-- [ ] **Keyboard shortcuts** — ~~`Ctrl+N` new task~~ (done), ~~`Ctrl+F` search~~ (done), ~~`Ctrl+Z`/`Ctrl+Y`
-  undo/redo~~ (done); still missing: `Esc` to close dialogs, arrow-key board navigation.
+- [x] **Keyboard shortcuts** — ~~`Ctrl+N` new task~~, ~~`Ctrl+F` search~~, ~~`Ctrl+Z`/`Ctrl+Y`
+  undo/redo~~ all done earlier. `Esc` to close dialogs was already free (Qt's default `QDialog`
+  behavior — verified empirically with a headless `QTest.keyClick` sweep across all 9 dialogs, no
+  code needed). Arrow-key board navigation added 2026-08-03: **Alt+Up/Alt+Down** cycle boards
+  (`SidebarWidget.select_adjacent_board`) — bare arrows were unavailable, already claimed by every
+  text field and list widget in the app.
 - [x] **Rich-text tables + strikethrough** in the description/diary editors *(Done post-0.6.0,
   2026-08-03)*. Pasting a table (Excel/Sheets/Word, or tab-separated text) inserts a real table
   instead of flattening it to text; the toolbar's **▦** button inserts an empty one. Strikethrough
@@ -100,8 +110,18 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 - [x] **Settings screen** — persist window size/position, theme, notification prefs, sync path *(Done
   in v0.6.0 — `settings_dialog.py`; sync path already lived in `app_settings` since 0.4.0)*.
 - [x] **Light theme** + theme toggle *(Done in v0.6.0 — QSS was already centralized)*.
-- [ ] **Internationalization (i18n)** — strings are hardcoded Spanish; extract to enable EN/others.
-- [ ] **Cross-platform notifications** verified on macOS/Linux (Qt tray already portable).
+- [x] **Internationalization (i18n)** — infrastructure done 2026-08-03: every user-facing string
+  (~280) moved into `strings.py` (a flat `STRINGS` dict + `t(key, **kwargs)`), covering the whole
+  app — `main.py`, `board_view.py`, `widgets.py`, `sidebar.py`, `calendar_view.py`,
+  `search_dialog.py`, `settings_dialog.py`, `detail_dialog/*`. Spanish is still the only *active*
+  language (no `.ts`/`.qm`/translator tooling, no language switcher yet — deliberately scoped to
+  extraction-only per the user's direction) but adding a second language now only touches `strings.py`.
+- [x] **Cross-platform notifications** — audited 2026-08-03 (code review, not live macOS/Linux
+  testing — no such machine available here). Already portable: the only two OS-specific call sites
+  (`subprocess.STARTUPINFO`, `ctypes.windll` AppUserModelID) are correctly guarded behind
+  `os.name == 'nt'`, and `QSystemTrayIcon` usage already checks `isSystemTrayAvailable()`. One
+  documented, unfixable-from-here limitation: `QSystemTrayIcon.showMessage()` has weak Notification
+  Center integration on macOS (a Qt/OS gap — would need a native bridge like PyObjC).
 
 ### Packaging & distribution
 - [ ] **Standalone executable** (PyInstaller) so non-developers don't need Python/git.
@@ -127,6 +147,12 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 7. ~~**0.7.0** — table paste/insert (Excel/Sheets/Word or tab-separated text; **▦** toolbar button
    for an empty table) + strikethrough (Ctrl+Shift+X) in the description/diary editors, released
    together with the readability-pass fixes above.~~ ✅ 2026-08-03.
+8. ~~**Small-wins + medium batch** — `Esc`-closes-dialogs (verified, already free) + Alt+Up/Down
+   board nav; tag-pill QSS centralization; light-theme hardcoded-color fixes (+ an `apply_theme`
+   ordering bug so the fix actually takes effect on startup); per-board auto-sync `.ics` feeds;
+   i18n string-extraction infrastructure (`strings.py`, ~280 strings); cross-platform notification
+   audit (already portable, one documented macOS limitation); headless Qt widget smoke tests.~~
+   ✅ 2026-08-03.
 
 ### 🎯 Theme D — Distribution (parked)
 **PyInstaller** standalone build + **update-from-Releases** (replaces the `git pull` auto-updater).
@@ -134,6 +160,7 @@ Parked per the user's direction: the project stays dev-mode (run from source) un
 reason to distribute it to non-developers.
 
 ### 🔧 Ongoing tech debt (fold into any wave)
-Headless Qt smoke tests (calendar grid, bell popup, settings dialog); i18n (hardcoded Spanish
-strings); remaining inline QSS beyond QMenu/swatch (tag pills, misc buttons); per-board *auto-sync*
-feeds; light-theme polish (some inline colors still assume dark).
+Full i18n (an actual English translation + a language switcher in Settings — today's pass was
+extraction-only, Spanish stays the only active language); remaining inline QSS beyond
+QMenu/swatch/tag-pill (misc one-off buttons, not actually duplicated so lower value); auto-updater
+still uses `git pull` (tied to Theme D).
