@@ -605,6 +605,18 @@ class SidebarWidget(QFrame):
 
         self.board_selected.emit(board_id)
 
+    def select_adjacent_board(self, direction):
+        """Selecciona el tablero anterior (-1) o siguiente (+1) al activo, en el orden en
+        que aparecen en la barra lateral. No hace nada con 0 o 1 tableros, y se detiene en
+        los extremos (no da la vuelta)."""
+        board_ids = list(self.board_buttons.keys())
+        if len(board_ids) < 2 or self.active_board_id not in board_ids:
+            return
+        idx = board_ids.index(self.active_board_id)
+        new_idx = max(0, min(len(board_ids) - 1, idx + direction))
+        if new_idx != idx:
+            self.select_board(board_ids[new_idx])
+
     def add_board(self):
         """Abre el diálogo para crear un nuevo tablero con nombre y color."""
         dialog = BoardEditDialog("Nuevo Tablero", name="", color="#3b82f6", parent=self)

@@ -102,6 +102,15 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+Y"), self).activated.connect(self._do_redo)
         QShortcut(QKeySequence("Ctrl+Shift+Z"), self).activated.connect(self._do_redo)
 
+        # Alt+Arriba/Abajo: navegar entre tableros (bare arrows están reservados para
+        # mover el cursor dentro de campos de texto y listas).
+        QShortcut(QKeySequence("Alt+Up"), self).activated.connect(
+            lambda: self.sidebar.select_adjacent_board(-1)
+        )
+        QShortcut(QKeySequence("Alt+Down"), self).activated.connect(
+            lambda: self.sidebar.select_adjacent_board(1)
+        )
+
         # Comprobar actualizaciones tras 1 segundo
         QTimer.singleShot(1000, self.check_for_updates)
 
