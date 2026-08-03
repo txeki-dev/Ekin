@@ -66,13 +66,14 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 ### Reminders & calendar (build on 0.3.x)
 - [x] **Overdue in the bell** *(Done in v0.4.0)* — past-due tasks now surface in their own "ATRASADAS"
   group above today/tomorrow, included in the badge count.
-- [ ] **Time-of-day due + `VALARM`** — optional time on due dates, and reminder alarms in the `.ics`.
-- [x] **Calendar: drag a task to change its due date** *(Done in v0.4.0)*. — a **week/day view** is
-  still pending.
-- [ ] **Calendar: filter by board** + a board color legend.
+- [x] **Time-of-day due + `VALARM`** *(Done in v0.6.0)* — optional time on due dates, and reminder
+  alarms in the `.ics`.
+- [x] **Calendar: drag a task to change its due date** *(Done in v0.4.0)*, plus **Month/Week/Day
+  views** *(Done in v0.6.0)*.
+- [x] **Calendar: filter by board** + a board color legend *(Done in v0.6.0)*.
 - [x] **"Subscribe in Google" helper** in Ajustes *(Done in v0.4.0)* — stores the public feed URL
   (`ics_public_url`) and a button that copies it and opens Google's *add-by-URL* page.
-- [ ] **Per-board `.ics` feeds** so each board can be a separate subscribable calendar.
+- [x] **Per-board `.ics` feeds** so each board can be a separate subscribable calendar *(Done in v0.6.0)*.
 
 ### Task power features
 - [x] **Global search & filter** (by title, tag, due, board) *(Done in v0.5.0 — 🔍 sidebar button + Ctrl+F)*.
@@ -91,13 +92,14 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 ### Data & safety
 - [x] **Automatic DB backups** *(Done in v0.4.0)* — `backups.py` writes a consistent SQLite snapshot
   to `backups/` on startup and keeps the 5 most recent.
-- [ ] **Export/report** — dump boards to JSON/CSV or a Markdown project report.
-- [ ] **Board archiving** (hide without deleting).
+- [x] **Export/report** — dump boards to JSON/CSV or a Markdown project report *(Done in v0.6.0 —
+  `exporter.py`)*.
+- [x] **Board archiving** (hide without deleting) *(Done in v0.6.0)*.
 
 ### UX & platform
-- [ ] **Settings screen** — persist window size/position, theme, notification prefs, sync path (some
-  of this already lives in `app_settings`).
-- [ ] **Light theme** + theme toggle (QSS is already centralized).
+- [x] **Settings screen** — persist window size/position, theme, notification prefs, sync path *(Done
+  in v0.6.0 — `settings_dialog.py`; sync path already lived in `app_settings` since 0.4.0)*.
+- [x] **Light theme** + theme toggle *(Done in v0.6.0 — QSS was already centralized)*.
 - [ ] **Internationalization (i18n)** — strings are hardcoded Spanish; extract to enable EN/others.
 - [ ] **Cross-platform notifications** verified on macOS/Linux (Qt tray already portable).
 
@@ -122,6 +124,9 @@ Ordered roughly by value/effort. Checkboxes track what's done.
    one per file); split `database.py` → `database/` package (~60 functions across 11 domain
    modules, `DB_NAME`/`get_connection` kept together in `__init__.py` to preserve call-time
    resolution).~~ ✅ 2026-08-03.
+7. ~~**0.7.0** — table paste/insert (Excel/Sheets/Word or tab-separated text; **▦** toolbar button
+   for an empty table) + strikethrough (Ctrl+Shift+X) in the description/diary editors, released
+   together with the readability-pass fixes above.~~ ✅ 2026-08-03.
 
 ### 🎯 Theme D — Distribution (parked)
 **PyInstaller** standalone build + **update-from-Releases** (replaces the `git pull` auto-updater).
