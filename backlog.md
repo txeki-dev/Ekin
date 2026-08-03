@@ -78,11 +78,15 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 - [x] **Global search & filter** (by title, tag, due, board) *(Done in v0.5.0 — 🔍 sidebar button + Ctrl+F)*.
 - [~] **Subtasks / checklists** inside a card — shipped in **v0.5.0** but **removed in v0.5.1** (product
   decision; the nested-checklist approach wasn't a fit). Could be revisited later with a different UX.
-- [ ] **Recurring tasks** (daily/weekly/monthly).
-- [ ] **Attachments / links** on cards.  *(pasting images inline already works, v0.5.1)*
-- [ ] **Undo/redo** for destructive actions (delete task/column/board).
-- [ ] **Keyboard shortcuts** — `Esc` to close dialogs, `Ctrl+N` new task, ~~`Ctrl+F` search~~ (done),
-  arrow nav.
+- [x] **Recurring tasks** (daily/weekly/monthly) *(Done in v0.6.0)*.
+- [x] **Attachments / links** on cards *(Done in v0.6.0 — `task_links` table)*.
+- [x] **Undo/redo** for destructive actions (delete task/column/board) *(Done in v0.6.0 — snapshot/restore + `undo.py`)*.
+- [ ] **Keyboard shortcuts** — ~~`Ctrl+N` new task~~ (done), ~~`Ctrl+F` search~~ (done), ~~`Ctrl+Z`/`Ctrl+Y`
+  undo/redo~~ (done); still missing: `Esc` to close dialogs, arrow-key board navigation.
+- [x] **Rich-text tables + strikethrough** in the description/diary editors *(Done post-0.6.0,
+  2026-08-03)*. Pasting a table (Excel/Sheets/Word, or tab-separated text) inserts a real table
+  instead of flattening it to text; the toolbar's **▦** button inserts an empty one. Strikethrough
+  via Ctrl+Shift+X or a toolbar button, alongside the existing bold/italic/bullets.
 
 ### Data & safety
 - [x] **Automatic DB backups** *(Done in v0.4.0)* — `backups.py` writes a consistent SQLite snapshot
