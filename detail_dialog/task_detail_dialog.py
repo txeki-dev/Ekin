@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QKeySequence, QShortcut, QDesktopServices
 import database
 import styles
+from strings import t
 from widgets import make_glyph_icon
 from .markdown_edit import MarkdownTextEdit, RichTextToolbar
 from .log_entry import LogEntryWidget
@@ -24,7 +25,7 @@ class TaskDetailDialog(QDialog):
         self.task_deleted = False  # Indica si se borró la tarea desde este diálogo
         self.modified = False      # Indica si hubo algún cambio real (título, tags, diario, enlaces...)
 
-        self.setWindowTitle("Detalles de la Tarea")
+        self.setWindowTitle(t("task_detail.window_title"))
         self.resize(1120, 720)
         self.setMinimumSize(940, 580)
 
@@ -46,15 +47,15 @@ class TaskDetailDialog(QDialog):
         left_layout.setSpacing(12)
 
         # 1. Título
-        left_layout.addWidget(QLabel("📝 <b>Título de la Tarea</b>"))
+        left_layout.addWidget(QLabel(t("task_detail.title_label")))
         self.title_input = QLineEdit()
-        self.title_input.setPlaceholderText("Ej. Escribir informe mensual...")
+        self.title_input.setPlaceholderText(t("task_detail.title_placeholder"))
         left_layout.addWidget(self.title_input)
 
         # 2. Descripción
-        left_layout.addWidget(QLabel("📄 <b>Descripción / Notas</b>"))
+        left_layout.addWidget(QLabel(t("task_detail.description_label")))
         self.desc_input = MarkdownTextEdit()
-        self.desc_input.setPlaceholderText("Añade detalles sobre esta tarea...")
+        self.desc_input.setPlaceholderText(t("task_detail.description_placeholder"))
         left_layout.addWidget(RichTextToolbar(self.desc_input))
         left_layout.addWidget(self.desc_input)
 
@@ -64,9 +65,9 @@ class TaskDetailDialog(QDialog):
         due_layout.setContentsMargins(0, 0, 0, 0)
         due_layout.setSpacing(10)
 
-        due_layout.addWidget(QLabel("📅 <b>Vencimiento:</b>"))
+        due_layout.addWidget(QLabel(t("task_detail.due_label")))
 
-        self.due_enable_chk = QCheckBox("Habilitar")
+        self.due_enable_chk = QCheckBox(t("task_detail.due_enable_checkbox"))
         self.due_enable_chk.setCursor(Qt.PointingHandCursor)
         self.due_enable_chk.stateChanged.connect(self._sync_due_enabled)
         due_layout.addWidget(self.due_enable_chk)
@@ -79,9 +80,9 @@ class TaskDetailDialog(QDialog):
         due_layout.addWidget(self.due_date_edit)
 
         # Hora de vencimiento opcional (activa un aviso en el .ics)
-        self.due_time_chk = QCheckBox("Hora")
+        self.due_time_chk = QCheckBox(t("task_detail.due_time_checkbox"))
         self.due_time_chk.setCursor(Qt.PointingHandCursor)
-        self.due_time_chk.setToolTip("Añadir hora al vencimiento (crea un aviso en el calendario)")
+        self.due_time_chk.setToolTip(t("task_detail.due_time_tooltip"))
         self.due_time_chk.stateChanged.connect(self._sync_due_enabled)
         due_layout.addWidget(self.due_time_chk)
         self.due_time_edit = QTimeEdit()
@@ -94,9 +95,12 @@ class TaskDetailDialog(QDialog):
         due_layout.addWidget(QLabel("🔁"))
         self._recurrence_values = ["none", "daily", "weekly", "monthly"]
         self.recurrence_combo = QComboBox()
-        for label in ("Sin repetir", "Diaria", "Semanal", "Mensual"):
+        for label in (
+            t("task_detail.recurrence_none"), t("task_detail.recurrence_daily"),
+            t("task_detail.recurrence_weekly"), t("task_detail.recurrence_monthly")
+        ):
             self.recurrence_combo.addItem(label)
-        self.recurrence_combo.setToolTip("Repetir la tarea: al pasar la fecha, se adelanta sola")
+        self.recurrence_combo.setToolTip(t("task_detail.recurrence_tooltip"))
         due_layout.addWidget(self.recurrence_combo)
         due_layout.addStretch()
 
@@ -108,7 +112,7 @@ class TaskDetailDialog(QDialog):
         tags_layout.setContentsMargins(0, 0, 0, 0)
         tags_layout.setSpacing(4)
 
-        tags_layout.addWidget(QLabel("🏷️ <b>Etiquetas:</b>"))
+        tags_layout.addWidget(QLabel(t("task_detail.tags_label")))
 
         self.tags_container_widget = QWidget()
         self.tags_container_layout = QHBoxLayout(self.tags_container_widget)
@@ -119,13 +123,13 @@ class TaskDetailDialog(QDialog):
 
         tag_btns_row = QHBoxLayout()
         tag_btns_row.setSpacing(6)
-        self.add_tag_btn = QPushButton("➕ Asignar Etiqueta")
+        self.add_tag_btn = QPushButton(t("task_detail.assign_tag_btn"))
         self.add_tag_btn.setCursor(Qt.PointingHandCursor)
         self.add_tag_btn.clicked.connect(self.assign_tag_dialog)
         tag_btns_row.addWidget(self.add_tag_btn)
 
-        self.manage_tags_btn = QPushButton("⚙ Gestionar")
-        self.manage_tags_btn.setToolTip("Definir etiquetas permanentes y sus valores")
+        self.manage_tags_btn = QPushButton(t("task_detail.manage_tags_btn"))
+        self.manage_tags_btn.setToolTip(t("task_detail.manage_tags_tooltip"))
         self.manage_tags_btn.setCursor(Qt.PointingHandCursor)
         self.manage_tags_btn.clicked.connect(self.open_tag_manager)
         tag_btns_row.addWidget(self.manage_tags_btn)
@@ -139,7 +143,7 @@ class TaskDetailDialog(QDialog):
         links_outer = QVBoxLayout(links_section)
         links_outer.setContentsMargins(0, 0, 0, 0)
         links_outer.setSpacing(4)
-        links_outer.addWidget(QLabel("🔗 <b>Enlaces / adjuntos:</b>"))
+        links_outer.addWidget(QLabel(t("task_detail.links_label")))
 
         self.links_container = QWidget()
         self.links_layout = QVBoxLayout(self.links_container)
@@ -150,16 +154,16 @@ class TaskDetailDialog(QDialog):
         add_link_row = QHBoxLayout()
         add_link_row.setSpacing(6)
         self.link_url_input = QLineEdit()
-        self.link_url_input.setPlaceholderText("URL o ruta…")
+        self.link_url_input.setPlaceholderText(t("task_detail.link_url_placeholder"))
         self.link_url_input.returnPressed.connect(self.add_link)
         add_link_row.addWidget(self.link_url_input, 2)
         self.link_label_input = QLineEdit()
-        self.link_label_input.setPlaceholderText("Nombre (opcional)")
+        self.link_label_input.setPlaceholderText(t("task_detail.link_label_placeholder"))
         add_link_row.addWidget(self.link_label_input, 1)
         add_link_btn = QPushButton("➕")
         add_link_btn.setFixedWidth(30)
         add_link_btn.setCursor(Qt.PointingHandCursor)
-        add_link_btn.setToolTip("Añadir enlace")
+        add_link_btn.setToolTip(t("task_detail.add_link_tooltip"))
         add_link_btn.clicked.connect(self.add_link)
         add_link_row.addWidget(add_link_btn)
         links_outer.addLayout(add_link_row)
@@ -170,7 +174,7 @@ class TaskDetailDialog(QDialog):
         # Botones de Acción de la Tarea (Guardar, Eliminar, Cerrar)
         action_layout = QHBoxLayout()
 
-        self.delete_task_btn = QPushButton("🗑️ Eliminar")
+        self.delete_task_btn = QPushButton(t("task_detail.delete_task_btn"))
         self.delete_task_btn.setObjectName("DangerButton")
         self.delete_task_btn.setCursor(Qt.PointingHandCursor)
         self.delete_task_btn.clicked.connect(self.delete_task)
@@ -178,13 +182,13 @@ class TaskDetailDialog(QDialog):
 
         action_layout.addStretch()
 
-        self.save_btn = QPushButton("💾 Guardar Cambios")
+        self.save_btn = QPushButton(t("task_detail.save_btn"))
         self.save_btn.setObjectName("PrimaryButton")
         self.save_btn.setCursor(Qt.PointingHandCursor)
         self.save_btn.clicked.connect(self.save_changes)
         action_layout.addWidget(self.save_btn)
 
-        self.close_btn = QPushButton("❌ Cerrar")
+        self.close_btn = QPushButton(t("task_detail.close_btn"))
         self.close_btn.setCursor(Qt.PointingHandCursor)
         self.close_btn.clicked.connect(self.reject)
         action_layout.addWidget(self.close_btn)
@@ -207,7 +211,7 @@ class TaskDetailDialog(QDialog):
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(10)
 
-        right_layout.addWidget(QLabel("📖 <b>Log / Diario Personal de la Tarea</b>"))
+        right_layout.addWidget(QLabel(t("task_detail.log_header")))
 
         # Área de Scroll para ver el historial
         self.scroll_area = QScrollArea()
@@ -230,7 +234,7 @@ class TaskDetailDialog(QDialog):
         input_layout.setSpacing(6)
 
         self.log_input = MarkdownTextEdit()
-        self.log_input.setPlaceholderText("Escribe una nota o actualización en el diario... (Ctrl+Enter para guardar)")
+        self.log_input.setPlaceholderText(t("task_detail.log_input_placeholder"))
         # Caja cómoda que crece con el texto (sin límite de caracteres; solo tope visual)
         self.log_input.setMinimumHeight(110)
         self.log_input.setMaximumHeight(260)
@@ -241,7 +245,7 @@ class TaskDetailDialog(QDialog):
 
         log_btn_layout = QHBoxLayout()
         log_btn_layout.addStretch()
-        self.add_log_btn = QPushButton("✍️ Añadir al Diario")
+        self.add_log_btn = QPushButton(t("task_detail.add_log_btn"))
         self.add_log_btn.setObjectName("PrimaryButton")
         self.add_log_btn.setCursor(Qt.PointingHandCursor)
         self.add_log_btn.clicked.connect(self.add_log_entry)
@@ -271,7 +275,7 @@ class TaskDetailDialog(QDialog):
         """Carga los datos iniciales de la tarea y sus logs desde la base de datos."""
         task = database.get_task(self.task_id, self.db_path)
         if not task:
-            QMessageBox.critical(self, "Error", "No se pudo cargar la tarea.")
+            QMessageBox.critical(self, t("task_detail.load_error_title"), t("task_detail.load_error_body"))
             self.reject()
             return
 
@@ -323,7 +327,7 @@ class TaskDetailDialog(QDialog):
                 widget.deleteLater()
 
         if not self.current_tags:
-            hint = QLabel("Sin etiquetas. Pulsa «Asignar Etiqueta».")
+            hint = QLabel(t("task_detail.no_tags_hint"))
             hint.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 11px; font-style: italic;")
             self.tags_container_layout.addWidget(hint)
             return
@@ -332,7 +336,7 @@ class TaskDetailDialog(QDialog):
             pill = ClickableTagPill()
             pill.setObjectName("TagPillFrame")
             pill.setCursor(Qt.PointingHandCursor)
-            pill.setToolTip("Clic para cambiar el valor")
+            pill.setToolTip(t("task_detail.tag_pill_tooltip"))
             pill.setStyleSheet(f"#TagPillFrame {{ {styles.tag_pill_css(tag['color'])} }}")
             pill.clicked.connect(lambda idx=index: self.edit_tag_at(idx))
             pill_layout = QHBoxLayout(pill)
@@ -346,7 +350,7 @@ class TaskDetailDialog(QDialog):
             del_btn = QPushButton("×")
             del_btn.setFixedSize(14, 14)
             del_btn.setCursor(Qt.PointingHandCursor)
-            del_btn.setToolTip("Quitar de la tarea")
+            del_btn.setToolTip(t("task_detail.tag_pill_remove_tooltip"))
             del_btn.setStyleSheet("""
                 QPushButton {
                     background: transparent;
@@ -371,8 +375,8 @@ class TaskDetailDialog(QDialog):
         """Asigna (o reemplaza) el valor de una etiqueta permanente, garantizando un
         único valor por etiqueta en la tarea y conservando la posición existente."""
         idx = next(
-            (i for i, t in enumerate(self.current_tags)
-             if t["category"].lower() == tag["category"].lower()),
+            (i for i, tg in enumerate(self.current_tags)
+             if tg["category"].lower() == tag["category"].lower()),
             None
         )
         if idx is None:
@@ -381,8 +385,8 @@ class TaskDetailDialog(QDialog):
             self.current_tags[idx] = tag
             # Eliminar cualquier duplicado posterior de la misma etiqueta
             self.current_tags = [
-                t for i, t in enumerate(self.current_tags)
-                if i == idx or t["category"].lower() != tag["category"].lower()
+                tg for i, tg in enumerate(self.current_tags)
+                if i == idx or tg["category"].lower() != tag["category"].lower()
             ]
         self.render_tags()
 
@@ -451,7 +455,7 @@ class TaskDetailDialog(QDialog):
         """Guarda el título, descripción, etiquetas y fecha de vencimiento."""
         title = self.title_input.text().strip()
         if not title:
-            QMessageBox.warning(self, "Atención", "El título de la tarea no puede estar vacío.")
+            QMessageBox.warning(self, t("task_detail.warn_title"), t("task_detail.warn_empty_title"))
             return
 
         description = self.desc_input.toHtml()
@@ -485,8 +489,8 @@ class TaskDetailDialog(QDialog):
         """Borra definitivamente la tarea actual de la base de datos."""
         confirm = QMessageBox.question(
             self,
-            "Confirmar Eliminación",
-            "¿Estás seguro de que deseas eliminar esta tarea de forma permanente? No se podrá recuperar.",
+            t("task_detail.delete_task_title"),
+            t("task_detail.delete_task_body"),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
@@ -507,7 +511,7 @@ class TaskDetailDialog(QDialog):
                 w.deleteLater()
         links = database.get_task_links(self.task_id, self.db_path)
         if not links:
-            hint = QLabel("Sin enlaces.")
+            hint = QLabel(t("task_detail.no_links_hint"))
             hint.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 11px; font-style: italic;")
             self.links_layout.addWidget(hint)
             return
@@ -532,7 +536,7 @@ class TaskDetailDialog(QDialog):
         del_btn = QPushButton()
         del_btn.setFixedSize(18, 18)
         del_btn.setCursor(Qt.PointingHandCursor)
-        del_btn.setToolTip("Eliminar enlace")
+        del_btn.setToolTip(t("task_detail.delete_link_tooltip"))
         del_btn.setIcon(make_glyph_icon("cross", "#ef4444", 12))
         del_btn.setIconSize(QSize(12, 12))
         del_btn.setStyleSheet("QPushButton { background: transparent; border: none; }")
@@ -604,8 +608,8 @@ class TaskDetailDialog(QDialog):
         """Elimina una entrada de diario tras confirmación."""
         confirm = QMessageBox.question(
             self,
-            "Eliminar Entrada",
-            "¿Estás seguro de que deseas borrar esta entrada del diario?",
+            t("task_detail.delete_log_title"),
+            t("task_detail.delete_log_body"),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )

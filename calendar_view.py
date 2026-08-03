@@ -14,6 +14,7 @@ from PySide6.QtGui import QColor, QPixmap, QIcon, QDrag, QDesktopServices
 import database
 import styles
 import ics_export
+from strings import t
 
 _WEEKDAYS = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"]
 _MONTHS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -119,23 +120,23 @@ class DayCell(QFrame):
                 f"#DayNumber {{ color: {styles.COLORS['text_muted']}; font-weight: bold; }}"
             )
 
-        for t in tasks[:max_show]:
-            title = t["title"] or "(sin título)"
+        for task in tasks[:max_show]:
+            title = task["title"] or t("calendar.chip_no_title")
             label = title if len(title) <= 20 else title[:19] + "…"
-            chip = CalendarChip(t["id"], label)
+            chip = CalendarChip(task["id"], label)
             chip.setObjectName("CalendarChip")
-            chip.setIcon(_swatch_icon(t["board_color"]))
+            chip.setIcon(_swatch_icon(task["board_color"]))
             chip.setCursor(Qt.PointingHandCursor)
-            chip.setToolTip(f"{t['board_name']} · {title}\nArrastra a otro día para reprogramar")
+            chip.setToolTip(t("calendar.chip_tooltip", board=task['board_name'], title=title))
             # Evita que un título largo ensanche la columna
             chip.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
             chip.clicked.connect(
-                lambda _=False, tid=t["id"], bid=t["board_id"]: self.task_clicked.emit(tid, bid)
+                lambda _=False, tid=task["id"], bid=task["board_id"]: self.task_clicked.emit(tid, bid)
             )
             self._layout.addWidget(chip)
 
         if len(tasks) > max_show:
-            more = QLabel(f"+{len(tasks) - max_show} más")
+            more = QLabel(t("calendar.more_tasks", count=len(tasks) - max_show))
             more.setStyleSheet(
                 f"color: {styles.COLORS['text_muted']}; font-size: 9px; background: transparent; padding-left: 2px;"
             )
@@ -175,8 +176,8 @@ class DayCell(QFrame):
 
 def _group_by_day(tasks):
     by_day = {}
-    for t in tasks:
-        by_day.setdefault(t["due_date"], []).append(t)
+    for task in tasks:
+        by_day.setdefault(task["due_date"], []).append(task)
     return by_day
 
 
@@ -221,7 +222,7 @@ class CalendarViewWidget(QWidget):
         self.period_label = QLabel("")
         self.period_label.setObjectName("CalendarMonthLabel")
 
-        today_btn = QPushButton("Hoy")
+        today_btn = QPushButton(t("calendar.today_btn"))
         today_btn.setCursor(Qt.PointingHandCursor)
         today_btn.clicked.connect(self.go_today)
 
@@ -233,29 +234,29 @@ class CalendarViewWidget(QWidget):
 
         # Selector de vista (Mes/Semana/Día)
         self.mode_combo = QComboBox()
-        for lbl in ("Mes", "Semana", "Día"):
+        for lbl in (t("calendar.mode_month"), t("calendar.mode_week"), t("calendar.mode_day")):
             self.mode_combo.addItem(lbl)
-        self.mode_combo.setToolTip("Vista del calendario")
+        self.mode_combo.setToolTip(t("calendar.mode_tooltip"))
         self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
         header.addWidget(self.mode_combo)
 
         # Filtro por tablero
         self.board_combo = QComboBox()
-        self.board_combo.setToolTip("Filtrar por tablero")
+        self.board_combo.setToolTip(t("calendar.board_filter_tooltip"))
         self.board_combo.currentIndexChanged.connect(lambda _=0: self.refresh())
         header.addWidget(self.board_combo)
 
         header.addWidget(today_btn)
 
-        settings_btn = QPushButton("⚙  Ajustes")
+        settings_btn = QPushButton(t("calendar.settings_btn"))
         settings_btn.setCursor(Qt.PointingHandCursor)
-        settings_btn.setToolTip("Sincronizar / exportar a Google, Apple u Outlook")
+        settings_btn.setToolTip(t("calendar.settings_tooltip"))
         settings_btn.clicked.connect(self.open_settings)
 
-        close_btn = QPushButton("✖  Cerrar")
+        close_btn = QPushButton(t("calendar.close_btn"))
         close_btn.setObjectName("PrimaryButton")
         close_btn.setCursor(Qt.PointingHandCursor)
-        close_btn.setToolTip("Volver a la vista de tablero")
+        close_btn.setToolTip(t("calendar.close_tooltip"))
         close_btn.clicked.connect(self.close_requested.emit)
 
         header.addWidget(settings_btn)
@@ -321,7 +322,7 @@ class CalendarViewWidget(QWidget):
         current = self.board_combo.currentData()
         self.board_combo.blockSignals(True)
         self.board_combo.clear()
-        self.board_combo.addItem("Todos los tableros", None)
+        self.board_combo.addItem(t("calendar.all_boards"), None)
         for b in database.get_boards(self.db_path, include_archived=True):
             self.board_combo.addItem(b["name"], b["id"])
         idx = self.board_combo.findData(current)
@@ -366,7 +367,9 @@ class CalendarViewWidget(QWidget):
         elif self.view_mode == "week":
             monday = self.anchor - timedelta(days=self.anchor.weekday())
             sunday = monday + timedelta(days=6)
-            self.period_label.setText(f"Semana {monday.strftime('%d/%m')} – {sunday.strftime('%d/%m/%Y')}")
+            self.period_label.setText(
+                t("calendar.week_period", start=monday.strftime('%d/%m'), end=sunday.strftime('%d/%m/%Y'))
+            )
             by_day = _group_by_day(database.get_scheduled_tasks(
                 monday.isoformat(), sunday.isoformat(), board_id=board_id, db_path=self.db_path))
             for i, cell in enumerate(self.cells):
@@ -430,19 +433,16 @@ class CalendarSettingsDialog(QDialog):
     def __init__(self, db_path, parent=None):
         super().__init__(parent)
         self.db_path = db_path
-        self.setWindowTitle("Ajustes de Calendario")
+        self.setWindowTitle(t("calendar.settings_dialog.title"))
         self.setMinimumWidth(520)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 18, 18, 18)
         layout.setSpacing(12)
 
-        layout.addWidget(QLabel("🔗 <b>Sincronización de calendario</b>"))
+        layout.addWidget(QLabel(t("calendar.settings_dialog.header")))
 
-        info = QLabel(
-            "Ekin exporta tus tareas con fecha de vencimiento a un archivo estándar "
-            "<b>iCalendar (.ics)</b>, compatible con Google Calendar, Apple Calendar y Outlook."
-        )
+        info = QLabel(t("calendar.settings_dialog.info"))
         info.setWordWrap(True)
         info.setStyleSheet(f"color: {styles.COLORS['text_muted']};")
         layout.addWidget(info)
@@ -458,14 +458,10 @@ class CalendarSettingsDialog(QDialog):
         sync_layout.setContentsMargins(12, 12, 12, 12)
         sync_layout.setSpacing(8)
 
-        sync_title = QLabel("🔄 <b>Sincronización automática</b> (recomendado)")
+        sync_title = QLabel(t("calendar.settings_dialog.sync_title"))
         sync_layout.addWidget(sync_title)
 
-        sync_desc = QLabel(
-            "Ekin mantiene un archivo .ics <b>siempre al día</b> (lo reescribe al cambiar "
-            "tareas). Guárdalo en una carpeta de Dropbox / OneDrive / Google Drive y "
-            "<b>suscríbete</b> a él una sola vez: a partir de ahí se actualiza solo."
-        )
+        sync_desc = QLabel(t("calendar.settings_dialog.sync_desc"))
         sync_desc.setWordWrap(True)
         sync_desc.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 12px;")
         sync_layout.addWidget(sync_desc)
@@ -473,8 +469,8 @@ class CalendarSettingsDialog(QDialog):
         # Feed por tablero: la sincronización automática puede ser global (un único
         # archivo con todos los tableros) o una por tablero (varios feeds independientes).
         self.sync_board_combo = QComboBox()
-        self.sync_board_combo.setToolTip("Sincronizar automáticamente todos los tableros o solo uno")
-        self.sync_board_combo.addItem("Todos los tableros", None)
+        self.sync_board_combo.setToolTip(t("calendar.settings_dialog.sync_board_tooltip"))
+        self.sync_board_combo.addItem(t("calendar.all_boards"), None)
         for b in database.get_boards(self.db_path, include_archived=True):
             self.sync_board_combo.addItem(b["name"], b["id"])
         self.sync_board_combo.currentIndexChanged.connect(lambda *_: self._refresh_sync_label())
@@ -486,12 +482,12 @@ class CalendarSettingsDialog(QDialog):
         sync_layout.addWidget(self.sync_path_label)
 
         sync_btns = QHBoxLayout()
-        self.configure_btn = QPushButton("📂  Elegir archivo…")
+        self.configure_btn = QPushButton(t("calendar.settings_dialog.configure_btn_initial"))
         self.configure_btn.setObjectName("PrimaryButton")
         self.configure_btn.setCursor(Qt.PointingHandCursor)
         self.configure_btn.clicked.connect(self.configure_sync)
         sync_btns.addWidget(self.configure_btn)
-        self.disable_btn = QPushButton("Desactivar")
+        self.disable_btn = QPushButton(t("calendar.settings_dialog.disable_btn"))
         self.disable_btn.setCursor(Qt.PointingHandCursor)
         self.disable_btn.clicked.connect(self.disable_sync)
         sync_btns.addWidget(self.disable_btn)
@@ -511,21 +507,16 @@ class CalendarSettingsDialog(QDialog):
         subscribe_layout.setContentsMargins(12, 12, 12, 12)
         subscribe_layout.setSpacing(8)
 
-        subscribe_title = QLabel("🌐 <b>Suscribirse en tu calendario</b>")
+        subscribe_title = QLabel(t("calendar.settings_dialog.subscribe_title"))
         subscribe_layout.addWidget(subscribe_title)
 
-        subscribe_desc = QLabel(
-            "Sube el archivo .ics a una carpeta pública (Google Drive / Dropbox / OneDrive) "
-            "y pega aquí su <b>URL pública</b>. Ekin la guarda y, según el botón, la copia al "
-            "portapapeles y abre la página del proveedor para <b>añadir un calendario por URL</b> "
-            "(el paso manual que suele fallar). Guía detallada abajo."
-        )
+        subscribe_desc = QLabel(t("calendar.settings_dialog.subscribe_desc"))
         subscribe_desc.setWordWrap(True)
         subscribe_desc.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 12px;")
         subscribe_layout.addWidget(subscribe_desc)
 
         self.public_url_input = QLineEdit(database.get_setting("ics_public_url", "", self.db_path))
-        self.public_url_input.setPlaceholderText("https://…/ekin_calendario.ics")
+        self.public_url_input.setPlaceholderText(t("calendar.settings_dialog.public_url_placeholder"))
         subscribe_layout.addWidget(self.public_url_input)
 
         provider_btns = QHBoxLayout()
@@ -533,19 +524,19 @@ class CalendarSettingsDialog(QDialog):
         self.subscribe_btn = QPushButton("Google")
         self.subscribe_btn.setObjectName("PrimaryButton")
         self.subscribe_btn.setCursor(Qt.PointingHandCursor)
-        self.subscribe_btn.setToolTip("Copiar la URL y abrir «Añadir por URL» de Google Calendar")
+        self.subscribe_btn.setToolTip(t("calendar.settings_dialog.google_btn_tooltip"))
         self.subscribe_btn.clicked.connect(self.subscribe_google)
         provider_btns.addWidget(self.subscribe_btn)
 
         self.subscribe_outlook_btn = QPushButton("Outlook")
         self.subscribe_outlook_btn.setCursor(Qt.PointingHandCursor)
-        self.subscribe_outlook_btn.setToolTip("Copiar la URL y abrir «Suscribirse desde la web» de Outlook")
+        self.subscribe_outlook_btn.setToolTip(t("calendar.settings_dialog.outlook_btn_tooltip"))
         self.subscribe_outlook_btn.clicked.connect(self.subscribe_outlook)
         provider_btns.addWidget(self.subscribe_outlook_btn)
 
         self.subscribe_apple_btn = QPushButton("Apple / iCloud")
         self.subscribe_apple_btn.setCursor(Qt.PointingHandCursor)
-        self.subscribe_apple_btn.setToolTip("Copiar la URL como enlace webcal:// para iPhone/Mac")
+        self.subscribe_apple_btn.setToolTip(t("calendar.settings_dialog.apple_btn_tooltip"))
         self.subscribe_apple_btn.clicked.connect(self.subscribe_apple)
         provider_btns.addWidget(self.subscribe_apple_btn)
         provider_btns.addStretch()
@@ -574,20 +565,20 @@ class CalendarSettingsDialog(QDialog):
         layout.addWidget(steps_scroll, 1)
 
         btns = QHBoxLayout()
-        export_btn = QPushButton("⬇  Exportar copia…")
+        export_btn = QPushButton(t("calendar.export_once_btn"))
         export_btn.setCursor(Qt.PointingHandCursor)
-        export_btn.setToolTip("Guardar una copia .ics puntual (snapshot) en otra ubicación")
+        export_btn.setToolTip(t("calendar.export_once_tooltip"))
         export_btn.clicked.connect(self.export_once)
         btns.addWidget(export_btn)
         # Feed por tablero: exportar todos o solo un tablero
         self.export_board_combo = QComboBox()
-        self.export_board_combo.setToolTip("Exportar el calendario de todos los tableros o de uno solo")
-        self.export_board_combo.addItem("Todos los tableros", None)
+        self.export_board_combo.setToolTip(t("calendar.export_board_tooltip"))
+        self.export_board_combo.addItem(t("calendar.all_boards"), None)
         for b in database.get_boards(self.db_path, include_archived=True):
             self.export_board_combo.addItem(b["name"], b["id"])
         btns.addWidget(self.export_board_combo)
         btns.addStretch()
-        close_btn = QPushButton("Cerrar")
+        close_btn = QPushButton(t("calendar.settings_dialog.close_btn"))
         close_btn.setCursor(Qt.PointingHandCursor)
         close_btn.clicked.connect(self.accept)
         btns.addWidget(close_btn)
@@ -608,29 +599,31 @@ class CalendarSettingsDialog(QDialog):
     def _refresh_sync_label(self):
         path = self._get_current_sync_path()
         if path:
-            self.sync_path_label.setText(f"✅ Sincronizando en:<br><code>{path}</code>")
+            self.sync_path_label.setText(t("calendar.settings_dialog.sync_active", path=path))
             self.sync_path_label.setStyleSheet(f"font-size: 11px; color: {styles.COLORS['success']};")
             self.disable_btn.setEnabled(True)
-            self.configure_btn.setText("📂  Cambiar archivo…")
+            self.configure_btn.setText(t("calendar.settings_dialog.configure_btn_change"))
         else:
-            self.sync_path_label.setText("⚪ Sincronización automática desactivada.")
+            self.sync_path_label.setText(t("calendar.settings_dialog.sync_inactive"))
             self.sync_path_label.setStyleSheet(f"font-size: 11px; color: {styles.COLORS['text_muted']};")
             self.disable_btn.setEnabled(False)
-            self.configure_btn.setText("📂  Elegir archivo…")
+            self.configure_btn.setText(t("calendar.settings_dialog.configure_btn_initial"))
 
     def configure_sync(self):
         board_id = self._current_sync_board_id()
         current = self._get_current_sync_path()
         default = current or "ekin_calendario.ics"
         path, _ = QFileDialog.getSaveFileName(
-            self, "Archivo de sincronización", default, "iCalendar (*.ics)"
+            self, t("calendar.settings_dialog.configure_file_dialog_title"), default, "iCalendar (*.ics)"
         )
         if not path:
             return
         try:
             count = ics_export.export_ics(path, self.db_path, board_id=board_id)
         except Exception as exc:
-            QMessageBox.critical(self, "Error", f"No se pudo crear el archivo:\n{exc}")
+            QMessageBox.critical(
+                self, t("calendar.error_title"), t("calendar.settings_dialog.configure_error_body", error=exc)
+            )
             return
         if board_id is None:
             database.set_setting("ics_sync_path", path, self.db_path)
@@ -638,9 +631,8 @@ class CalendarSettingsDialog(QDialog):
             database.set_board_ics_sync_path(board_id, path, self.db_path)
         self._refresh_sync_label()
         QMessageBox.information(
-            self, "Sincronización activada",
-            f"Ekin mantendrá {count} tarea(s) sincronizadas en:\n{path}\n\n"
-            "Suscríbete a este archivo una vez desde tu calendario y se actualizará solo."
+            self, t("calendar.settings_dialog.sync_activated_title"),
+            t("calendar.settings_dialog.sync_activated_body", count=count, path=path)
         )
 
     def disable_sync(self):
@@ -656,9 +648,8 @@ class CalendarSettingsDialog(QDialog):
         url = self.public_url_input.text().strip()
         if not url:
             QMessageBox.warning(
-                self, "URL vacía",
-                "Pega primero la URL pública de tu archivo .ics (el enlace compartido de la carpeta "
-                "en la nube donde lo sincronizas)."
+                self, t("calendar.settings_dialog.empty_url_title"),
+                t("calendar.settings_dialog.empty_url_body")
             )
             return None
         database.set_setting("ics_public_url", url, self.db_path)
@@ -674,13 +665,7 @@ class CalendarSettingsDialog(QDialog):
             QUrl("https://calendar.google.com/calendar/u/0/r/settings/addbyurl")
         )
         QMessageBox.information(
-            self, "Google Calendar",
-            "He copiado la URL al portapapeles y abierto Google Calendar (en el ordenador; "
-            "la app de móvil no permite añadir por URL).\n\n"
-            "1. Menú lateral izquierdo → «Otros calendarios» → «+» → «Desde una URL».\n"
-            "2. Pega la URL (Ctrl+V) y pulsa «Añadir calendario».\n\n"
-            "Nota: Google recarga los calendarios por URL de forma lenta (cada varias horas, "
-            "hasta ~24 h) y no se puede forzar."
+            self, t("calendar.settings_dialog.google_title"), t("calendar.settings_dialog.google_body")
         )
 
     def subscribe_outlook(self):
@@ -691,13 +676,7 @@ class CalendarSettingsDialog(QDialog):
         QApplication.clipboard().setText(url)
         QDesktopServices.openUrl(QUrl("https://outlook.live.com/calendar/0/addcalendar"))
         QMessageBox.information(
-            self, "Outlook Calendar",
-            "He copiado la URL al portapapeles y abierto Outlook en el navegador.\n\n"
-            "1. En Outlook.com: «Agregar calendario» → «Suscribirse desde la web».\n"
-            "   (En Outlook de trabajo/Microsoft 365 la ruta es outlook.office.com → misma opción.)\n"
-            "2. Pega la URL (Ctrl+V), ponle un nombre y color, y pulsa «Importar»/«Suscribirse».\n\n"
-            "El Outlook de escritorio (clásico) también admite: Inicio → «Abrir calendario» → "
-            "«De Internet…» y pegar la URL."
+            self, t("calendar.settings_dialog.outlook_title"), t("calendar.settings_dialog.outlook_body")
         )
 
     def subscribe_apple(self):
@@ -708,64 +687,28 @@ class CalendarSettingsDialog(QDialog):
         webcal = url.replace("https://", "webcal://").replace("http://", "webcal://")
         QApplication.clipboard().setText(webcal)
         QMessageBox.information(
-            self, "Apple / iCloud",
-            "He copiado la URL como enlace <b>webcal://</b> al portapapeles (así iOS/macOS la "
-            "reconocen como suscripción). Pégala aquí:\n\n"
-            "• iPhone/iPad: Ajustes → Calendario → Cuentas → Añadir cuenta → Otra → "
-            "«Añadir calendario suscrito» → pega el enlace → Siguiente.\n"
-            "• Mac (app Calendario): Archivo → «Nueva suscripción de calendario…» → pega el enlace → "
-            "Suscribirse; ahí puedes fijar la frecuencia de actualización (incluso cada pocos minutos).\n\n"
-            "La suscripción se guarda en iCloud y se ve en todos tus dispositivos Apple."
+            self, t("calendar.settings_dialog.apple_title"), t("calendar.settings_dialog.apple_body")
         )
 
     @staticmethod
     def _provider_guide_html():
         """Guía detallada de suscripción por proveedor (texto del diálogo de Ajustes)."""
-        return (
-            "<b>📋 Cómo suscribirte (se mantiene sincronizado, sin duplicados)</b>"
-            "<p><b>0) Consigue una URL pública y directa del .ics.</b> Guarda el archivo en una "
-            "carpeta de la nube y comparte el enlace <i>directo al archivo</i> (no a una página de "
-            "vista previa):"
-            "<ul>"
-            "<li><b>Google Drive</b>: compartir «Cualquiera con el enlace». El enlace normal apunta a "
-            "una vista HTML; usa la forma de descarga directa "
-            "<code>https://drive.google.com/uc?export=download&id=ID_DEL_ARCHIVO</code>.</li>"
-            "<li><b>Dropbox</b>: copia el enlace y cambia el final <code>?dl=0</code> por "
-            "<code>?dl=1</code>.</li>"
-            "<li><b>OneDrive</b>: «Compartir» → «Cualquier persona con el vínculo» → copia el enlace.</li>"
-            "</ul>"
-            "Ábrela en una ventana de incógnito: debes ver texto que empieza por "
-            "<code>BEGIN:VCALENDAR</code>. Si ves un login o una vista previa, el enlace no sirve.</p>"
-            "<p><b>🟦 Google Calendar</b> (solo en el ordenador): menú lateral → «Otros calendarios» → "
-            "«+» → «Desde una URL» → pega la URL → «Añadir calendario». Refresco lento (varias horas).</p>"
-            "<p><b>🟧 Outlook</b>: en <i>Outlook.com/365 (web)</i> → «Agregar calendario» → «Suscribirse "
-            "desde la web» → pega la URL → nombre/color → «Importar». En <i>Outlook de escritorio</i> → "
-            "Inicio → «Abrir calendario» → «De Internet…» → pega la URL.</p>"
-            "<p><b>🍎 Apple / iCloud</b> (usa un enlace <code>webcal://</code>): "
-            "<i>iPhone/iPad</i> → Ajustes → Calendario → Cuentas → Añadir cuenta → Otra → «Añadir "
-            "calendario suscrito» → pega el enlace. <i>Mac</i> → app Calendario → Archivo → «Nueva "
-            "suscripción de calendario…» → pega el enlace (puedes elegir cada cuánto se actualiza).</p>"
-            "<p><b>⚠️ Suscribir ≠ Importar.</b> «Importar» una copia es una foto fija: no refleja "
-            "cambios ni borrados y puede duplicar eventos. Suscríbete a la URL para que se actualice solo.</p>"
-        )
+        return t("calendar.settings_dialog.provider_guide")
 
     def export_once(self):
         board_id = self.export_board_combo.currentData()
         board_txt = "" if board_id is None else f"_{self.export_board_combo.currentText()}"
         default_name = f"ekin_calendario{board_txt}_{date.today().isoformat()}.ics"
         path, _ = QFileDialog.getSaveFileName(
-            self, "Exportar copia del calendario", default_name, "iCalendar (*.ics)"
+            self, t("calendar.export_dialog_title"), default_name, "iCalendar (*.ics)"
         )
         if not path:
             return
         try:
             count = ics_export.export_ics(path, self.db_path, board_id=board_id)
         except Exception as exc:
-            QMessageBox.critical(self, "Error", f"No se pudo exportar el calendario:\n{exc}")
+            QMessageBox.critical(self, t("calendar.error_title"), t("calendar.export_error_body", error=exc))
             return
         QMessageBox.information(
-            self, "Exportado",
-            f"Se exportaron {count} tarea(s) con fecha a:\n{path}\n\n"
-            "Recuerda: una copia importada es una foto fija; para que se mantenga al día, "
-            "usa la sincronización automática de arriba y suscríbete al archivo."
+            self, t("calendar.export_done_title"), t("calendar.export_done_body", count=count, path=path)
         )

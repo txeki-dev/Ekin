@@ -138,6 +138,267 @@ STRINGS = {
         "Esto borrará todas sus columnas, tareas y diarios asociados de forma permanente."
     ),
     "sidebar.delete_board.undo_label": "Eliminar tablero",
+
+    # --- calendar_view.py: vista de calendario + ajustes de sincronización .ics ---
+    "calendar.chip_no_title": "(sin título)",
+    "calendar.chip_tooltip": "{board} · {title}\nArrastra a otro día para reprogramar",
+    "calendar.more_tasks": "+{count} más",
+    "calendar.today_btn": "Hoy",
+    "calendar.mode_month": "Mes",
+    "calendar.mode_week": "Semana",
+    "calendar.mode_day": "Día",
+    "calendar.mode_tooltip": "Vista del calendario",
+    "calendar.board_filter_tooltip": "Filtrar por tablero",
+    "calendar.settings_btn": "⚙  Ajustes",
+    "calendar.settings_tooltip": "Sincronizar / exportar a Google, Apple u Outlook",
+    "calendar.close_btn": "✖  Cerrar",
+    "calendar.close_tooltip": "Volver a la vista de tablero",
+    "calendar.all_boards": "Todos los tableros",
+    "calendar.week_period": "Semana {start} – {end}",
+    "calendar.error_title": "Error",
+
+    "calendar.settings_dialog.title": "Ajustes de Calendario",
+    "calendar.settings_dialog.header": "🔗 <b>Sincronización de calendario</b>",
+    "calendar.settings_dialog.info": (
+        "Ekin exporta tus tareas con fecha de vencimiento a un archivo estándar "
+        "<b>iCalendar (.ics)</b>, compatible con Google Calendar, Apple Calendar y Outlook."
+    ),
+    "calendar.settings_dialog.sync_title": "🔄 <b>Sincronización automática</b> (recomendado)",
+    "calendar.settings_dialog.sync_desc": (
+        "Ekin mantiene un archivo .ics <b>siempre al día</b> (lo reescribe al cambiar "
+        "tareas). Guárdalo en una carpeta de Dropbox / OneDrive / Google Drive y "
+        "<b>suscríbete</b> a él una sola vez: a partir de ahí se actualiza solo."
+    ),
+    "calendar.settings_dialog.sync_board_tooltip": "Sincronizar automáticamente todos los tableros o solo uno",
+    "calendar.settings_dialog.configure_btn_initial": "📂  Elegir archivo…",
+    "calendar.settings_dialog.configure_btn_change": "📂  Cambiar archivo…",
+    "calendar.settings_dialog.disable_btn": "Desactivar",
+    "calendar.settings_dialog.subscribe_title": "🌐 <b>Suscribirse en tu calendario</b>",
+    "calendar.settings_dialog.subscribe_desc": (
+        "Sube el archivo .ics a una carpeta pública (Google Drive / Dropbox / OneDrive) "
+        "y pega aquí su <b>URL pública</b>. Ekin la guarda y, según el botón, la copia al "
+        "portapapeles y abre la página del proveedor para <b>añadir un calendario por URL</b> "
+        "(el paso manual que suele fallar). Guía detallada abajo."
+    ),
+    "calendar.settings_dialog.public_url_placeholder": "https://…/ekin_calendario.ics",
+    "calendar.settings_dialog.google_btn_tooltip": "Copiar la URL y abrir «Añadir por URL» de Google Calendar",
+    "calendar.settings_dialog.outlook_btn_tooltip": "Copiar la URL y abrir «Suscribirse desde la web» de Outlook",
+    "calendar.settings_dialog.apple_btn_tooltip": "Copiar la URL como enlace webcal:// para iPhone/Mac",
+    "calendar.export_once_btn": "⬇  Exportar copia…",
+    "calendar.export_once_tooltip": "Guardar una copia .ics puntual (snapshot) en otra ubicación",
+    "calendar.export_board_tooltip": "Exportar el calendario de todos los tableros o de uno solo",
+    "calendar.settings_dialog.close_btn": "Cerrar",
+    "calendar.settings_dialog.sync_active": "✅ Sincronizando en:<br><code>{path}</code>",
+    "calendar.settings_dialog.sync_inactive": "⚪ Sincronización automática desactivada.",
+    "calendar.settings_dialog.configure_file_dialog_title": "Archivo de sincronización",
+    "calendar.settings_dialog.configure_error_body": "No se pudo crear el archivo:\n{error}",
+    "calendar.settings_dialog.sync_activated_title": "Sincronización activada",
+    "calendar.settings_dialog.sync_activated_body": (
+        "Ekin mantendrá {count} tarea(s) sincronizadas en:\n{path}\n\n"
+        "Suscríbete a este archivo una vez desde tu calendario y se actualizará solo."
+    ),
+    "calendar.settings_dialog.empty_url_title": "URL vacía",
+    "calendar.settings_dialog.empty_url_body": (
+        "Pega primero la URL pública de tu archivo .ics (el enlace compartido de la carpeta "
+        "en la nube donde lo sincronizas)."
+    ),
+    "calendar.settings_dialog.google_title": "Google Calendar",
+    "calendar.settings_dialog.google_body": (
+        "He copiado la URL al portapapeles y abierto Google Calendar (en el ordenador; "
+        "la app de móvil no permite añadir por URL).\n\n"
+        "1. Menú lateral izquierdo → «Otros calendarios» → «+» → «Desde una URL».\n"
+        "2. Pega la URL (Ctrl+V) y pulsa «Añadir calendario».\n\n"
+        "Nota: Google recarga los calendarios por URL de forma lenta (cada varias horas, "
+        "hasta ~24 h) y no se puede forzar."
+    ),
+    "calendar.settings_dialog.outlook_title": "Outlook Calendar",
+    "calendar.settings_dialog.outlook_body": (
+        "He copiado la URL al portapapeles y abierto Outlook en el navegador.\n\n"
+        "1. En Outlook.com: «Agregar calendario» → «Suscribirse desde la web».\n"
+        "   (En Outlook de trabajo/Microsoft 365 la ruta es outlook.office.com → misma opción.)\n"
+        "2. Pega la URL (Ctrl+V), ponle un nombre y color, y pulsa «Importar»/«Suscribirse».\n\n"
+        "El Outlook de escritorio (clásico) también admite: Inicio → «Abrir calendario» → "
+        "«De Internet…» y pegar la URL."
+    ),
+    "calendar.settings_dialog.apple_title": "Apple / iCloud",
+    "calendar.settings_dialog.apple_body": (
+        "He copiado la URL como enlace <b>webcal://</b> al portapapeles (así iOS/macOS la "
+        "reconocen como suscripción). Pégala aquí:\n\n"
+        "• iPhone/iPad: Ajustes → Calendario → Cuentas → Añadir cuenta → Otra → "
+        "«Añadir calendario suscrito» → pega el enlace → Siguiente.\n"
+        "• Mac (app Calendario): Archivo → «Nueva suscripción de calendario…» → pega el enlace → "
+        "Suscribirse; ahí puedes fijar la frecuencia de actualización (incluso cada pocos minutos).\n\n"
+        "La suscripción se guarda en iCloud y se ve en todos tus dispositivos Apple."
+    ),
+    "calendar.settings_dialog.provider_guide": (
+        "<b>📋 Cómo suscribirte (se mantiene sincronizado, sin duplicados)</b>"
+        "<p><b>0) Consigue una URL pública y directa del .ics.</b> Guarda el archivo en una "
+        "carpeta de la nube y comparte el enlace <i>directo al archivo</i> (no a una página de "
+        "vista previa):"
+        "<ul>"
+        "<li><b>Google Drive</b>: compartir «Cualquiera con el enlace». El enlace normal apunta a "
+        "una vista HTML; usa la forma de descarga directa "
+        "<code>https://drive.google.com/uc?export=download&id=ID_DEL_ARCHIVO</code>.</li>"
+        "<li><b>Dropbox</b>: copia el enlace y cambia el final <code>?dl=0</code> por "
+        "<code>?dl=1</code>.</li>"
+        "<li><b>OneDrive</b>: «Compartir» → «Cualquier persona con el vínculo» → copia el enlace.</li>"
+        "</ul>"
+        "Ábrela en una ventana de incógnito: debes ver texto que empieza por "
+        "<code>BEGIN:VCALENDAR</code>. Si ves un login o una vista previa, el enlace no sirve.</p>"
+        "<p><b>🟦 Google Calendar</b> (solo en el ordenador): menú lateral → «Otros calendarios» → "
+        "«+» → «Desde una URL» → pega la URL → «Añadir calendario». Refresco lento (varias horas).</p>"
+        "<p><b>🟧 Outlook</b>: en <i>Outlook.com/365 (web)</i> → «Agregar calendario» → «Suscribirse "
+        "desde la web» → pega la URL → nombre/color → «Importar». En <i>Outlook de escritorio</i> → "
+        "Inicio → «Abrir calendario» → «De Internet…» → pega la URL.</p>"
+        "<p><b>🍎 Apple / iCloud</b> (usa un enlace <code>webcal://</code>): "
+        "<i>iPhone/iPad</i> → Ajustes → Calendario → Cuentas → Añadir cuenta → Otra → «Añadir "
+        "calendario suscrito» → pega el enlace. <i>Mac</i> → app Calendario → Archivo → «Nueva "
+        "suscripción de calendario…» → pega el enlace (puedes elegir cada cuánto se actualiza).</p>"
+        "<p><b>⚠️ Suscribir ≠ Importar.</b> «Importar» una copia es una foto fija: no refleja "
+        "cambios ni borrados y puede duplicar eventos. Suscríbete a la URL para que se actualice solo.</p>"
+    ),
+    "calendar.export_dialog_title": "Exportar copia del calendario",
+    "calendar.export_error_body": "No se pudo exportar el calendario:\n{error}",
+    "calendar.export_done_title": "Exportado",
+    "calendar.export_done_body": (
+        "Se exportaron {count} tarea(s) con fecha a:\n{path}\n\n"
+        "Recuerda: una copia importada es una foto fija; para que se mantenga al día, "
+        "usa la sincronización automática de arriba y suscríbete al archivo."
+    ),
+
+    # --- search_dialog.py: búsqueda global de tareas ---
+    "search.window_title": "Buscar tareas",
+    "search.header": "🔍 <b>Buscar tareas</b>",
+    "search.text_placeholder": "Título o descripción…",
+    "search.all_boards": "Todos los tableros",
+    "search.all_tags": "Todas las etiquetas",
+    "search.only_due_checkbox": "Solo con vencimiento",
+    "search.close_btn": "Cerrar",
+    "search.result_count": "{count} resultado(s)",
+    "search.no_results": "Sin resultados.",
+    "search.result_no_title": "(sin título)",
+    "search.result_tooltip": "{board} · {column}",
+
+    # --- settings_dialog.py: pantalla de Ajustes (tema, notificaciones) ---
+    "settings.window_title": "Ajustes",
+    "settings.header": "⚙ <b>Ajustes de Ekin</b>",
+    "settings.theme_label": "🎨 Tema:",
+    "settings.theme_dark": "Oscuro",
+    "settings.theme_light": "Claro",
+    "settings.theme_hint": (
+        "El tema claro es <i>experimental</i>: algunos colores de tarjetas/tableros están "
+        "afinados para el oscuro. Se aplica del todo al reiniciar la app."
+    ),
+    "settings.notifications_checkbox": "Mostrar avisos de Windows para tareas que vencen hoy",
+    "settings.geometry_hint": "El tamaño y la posición de la ventana se recuerdan automáticamente.",
+    "settings.close_btn": "Cerrar",
+
+    # --- detail_dialog/markdown_edit.py: editor de texto enriquecido (barra de formato) ---
+    "markdown_edit.bold_tooltip": "Negrita (Ctrl+B o Ctrl+N)",
+    "markdown_edit.italic_tooltip": "Cursiva (Ctrl+K o Ctrl+I)",
+    "markdown_edit.strike_tooltip": "Tachado (Ctrl+Shift+X)",
+    "markdown_edit.bullet_tooltip": "Lista con viñetas  ·  también con «* », «- » o «+ »",
+    "markdown_edit.table_tooltip": "Insertar tabla",
+    "markdown_edit.table_dialog_title": "Insertar tabla",
+    "markdown_edit.table_rows_label": "Filas:",
+    "markdown_edit.table_cols_label": "Columnas:",
+
+    # --- detail_dialog/log_entry.py: entrada del diario/chat ---
+    "log_entry.edit_tooltip": "Editar comentario",
+    "log_entry.delete_tooltip": "Eliminar comentario",
+    "log_entry.save_btn": "Guardar",
+    "log_entry.cancel_btn": "Cancelar",
+
+    # --- detail_dialog/tag_manager_dialog.py: gestor del catálogo de etiquetas ---
+    "tag_manager.window_title": "Gestionar Etiquetas",
+    "tag_manager.header": "🏷️ <b>Etiquetas</b>",
+    "tag_manager.add_category_btn": "＋ Nueva",
+    "tag_manager.category_action_label": "Renombrar etiqueta",  # tooltip + QInputDialog title (misma frase)
+    "tag_manager.delete_category_tooltip": "Eliminar etiqueta",  # tooltip + QMessageBox title (misma frase)
+    "tag_manager.values_title_default": "<b>Valores</b>",
+    "tag_manager.values_title_for_category": "<b>Valores de «{category}»</b>",
+    "tag_manager.new_value_placeholder": "Nuevo valor (ej. Alta)…",
+    "tag_manager.new_value_color_tooltip": "Color del nuevo valor",
+    "tag_manager.add_value_btn": "Añadir valor",
+    "tag_manager.close_btn": "Cerrar",
+    "tag_manager.add_category_dialog_title": "Nueva etiqueta",
+    "tag_manager.add_category_prompt": "Nombre de la etiqueta (ej. Prioridad):",
+    "tag_manager.new_name_prompt": "Nuevo nombre:",  # usado al renombrar etiqueta y al renombrar valor
+    "tag_manager.delete_category_body": (
+        "¿Eliminar la etiqueta «{category}» y todos sus valores?\n"
+        "Se quitará de todas las tareas que la usen."
+    ),
+    "tag_manager.no_category_hint": "Crea o selecciona una etiqueta a la izquierda para definir sus valores.",
+    "tag_manager.no_values_hint": "Aún no hay valores. Añade el primero abajo.",
+    "tag_manager.swatch_tooltip": "Cambiar color",
+    "tag_manager.rename_value_tooltip": "Renombrar valor",  # tooltip + QInputDialog title (misma frase)
+    "tag_manager.delete_value_tooltip": "Eliminar valor",  # tooltip + QMessageBox title (misma frase)
+    "tag_manager.color_dialog_title": "Color del valor",
+    "tag_manager.warn_title": "Atención",
+    "tag_manager.duplicate_value_body": "Ya existe un valor con ese nombre en esta etiqueta.",
+    "tag_manager.delete_value_body": (
+        "¿Eliminar el valor «{value}»?\nSe quitará de las tareas que lo tengan asignado."
+    ),
+
+    # --- detail_dialog/tag_picker_dialog.py: asignar/editar una etiqueta en una tarea ---
+    "tag_picker.title_edit": "Editar Etiqueta",
+    "tag_picker.title_assign": "Asignar Etiqueta",
+    "tag_picker.category_label": "🏷️ <b>Etiqueta</b>",
+    "tag_picker.value_label": "<b>Valor</b>",
+    "tag_picker.manage_btn": "⚙  Gestionar etiquetas…",
+    "tag_picker.accept_btn": "Aceptar",
+    "tag_picker.cancel_btn": "Cancelar",
+    "tag_picker.none_option": "— Ninguno (ocultar) —",
+    "tag_picker.no_categories_hint": "No hay etiquetas definidas. Usa «Gestionar etiquetas…» para crear una.",
+    "tag_picker.no_values_hint": "Esta etiqueta no tiene valores. Añádelos en «Gestionar etiquetas…».",
+    "tag_picker.warn_title": "Atención",
+    "tag_picker.warn_no_category": "Primero crea una etiqueta en «Gestionar etiquetas…».",
+    "tag_picker.warn_no_value": "Selecciona un valor (o créalo en «Gestionar etiquetas…»).",
+
+    # --- detail_dialog/task_detail_dialog.py: diálogo principal de detalle de tarea ---
+    "task_detail.window_title": "Detalles de la Tarea",
+    "task_detail.title_label": "📝 <b>Título de la Tarea</b>",
+    "task_detail.title_placeholder": "Ej. Escribir informe mensual...",
+    "task_detail.description_label": "📄 <b>Descripción / Notas</b>",
+    "task_detail.description_placeholder": "Añade detalles sobre esta tarea...",
+    "task_detail.due_label": "📅 <b>Vencimiento:</b>",
+    "task_detail.due_enable_checkbox": "Habilitar",
+    "task_detail.due_time_checkbox": "Hora",
+    "task_detail.due_time_tooltip": "Añadir hora al vencimiento (crea un aviso en el calendario)",
+    "task_detail.recurrence_none": "Sin repetir",
+    "task_detail.recurrence_daily": "Diaria",
+    "task_detail.recurrence_weekly": "Semanal",
+    "task_detail.recurrence_monthly": "Mensual",
+    "task_detail.recurrence_tooltip": "Repetir la tarea: al pasar la fecha, se adelanta sola",
+    "task_detail.tags_label": "🏷️ <b>Etiquetas:</b>",
+    "task_detail.assign_tag_btn": "➕ Asignar Etiqueta",
+    "task_detail.manage_tags_btn": "⚙ Gestionar",
+    "task_detail.manage_tags_tooltip": "Definir etiquetas permanentes y sus valores",
+    "task_detail.links_label": "🔗 <b>Enlaces / adjuntos:</b>",
+    "task_detail.link_url_placeholder": "URL o ruta…",
+    "task_detail.link_label_placeholder": "Nombre (opcional)",
+    "task_detail.add_link_tooltip": "Añadir enlace",
+    "task_detail.delete_task_btn": "🗑️ Eliminar",
+    "task_detail.save_btn": "💾 Guardar Cambios",
+    "task_detail.close_btn": "❌ Cerrar",
+    "task_detail.log_header": "📖 <b>Log / Diario Personal de la Tarea</b>",
+    "task_detail.log_input_placeholder": "Escribe una nota o actualización en el diario... (Ctrl+Enter para guardar)",
+    "task_detail.add_log_btn": "✍️ Añadir al Diario",
+    "task_detail.load_error_title": "Error",
+    "task_detail.load_error_body": "No se pudo cargar la tarea.",
+    "task_detail.no_tags_hint": "Sin etiquetas. Pulsa «Asignar Etiqueta».",
+    "task_detail.tag_pill_tooltip": "Clic para cambiar el valor",
+    "task_detail.tag_pill_remove_tooltip": "Quitar de la tarea",
+    "task_detail.warn_title": "Atención",
+    "task_detail.warn_empty_title": "El título de la tarea no puede estar vacío.",
+    "task_detail.delete_task_title": "Confirmar Eliminación",
+    "task_detail.delete_task_body": (
+        "¿Estás seguro de que deseas eliminar esta tarea de forma permanente? No se podrá recuperar."
+    ),
+    "task_detail.no_links_hint": "Sin enlaces.",
+    "task_detail.delete_link_tooltip": "Eliminar enlace",
+    "task_detail.delete_log_title": "Eliminar Entrada",
+    "task_detail.delete_log_body": "¿Estás seguro de que deseas borrar esta entrada del diario?",
 }
 
 

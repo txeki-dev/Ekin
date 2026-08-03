@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QColor
 import database
 import styles
+from strings import t
 
 
 class TagManagerDialog(QDialog):
@@ -19,7 +20,7 @@ class TagManagerDialog(QDialog):
     def __init__(self, db_path, parent=None):
         super().__init__(parent)
         self.db_path = db_path
-        self.setWindowTitle("Gestionar Etiquetas")
+        self.setWindowTitle(t("tag_manager.window_title"))
         self.resize(600, 440)
         self.setMinimumSize(520, 380)
 
@@ -35,7 +36,7 @@ class TagManagerDialog(QDialog):
         # --- Panel izquierdo: etiquetas (categorías) ---
         left = QVBoxLayout()
         left.setSpacing(6)
-        left.addWidget(QLabel("🏷️ <b>Etiquetas</b>"))
+        left.addWidget(QLabel(t("tag_manager.header")))
 
         self.cat_list = QListWidget()
         self.cat_list.currentItemChanged.connect(lambda *_: self.reload_values())
@@ -43,17 +44,17 @@ class TagManagerDialog(QDialog):
 
         cat_btns = QHBoxLayout()
         cat_btns.setSpacing(4)
-        add_cat_btn = QPushButton("＋ Nueva")
+        add_cat_btn = QPushButton(t("tag_manager.add_category_btn"))
         add_cat_btn.setCursor(Qt.PointingHandCursor)
         add_cat_btn.clicked.connect(self.add_category)
         rename_cat_btn = QPushButton("✎")
-        rename_cat_btn.setToolTip("Renombrar etiqueta")
+        rename_cat_btn.setToolTip(t("tag_manager.category_action_label"))
         rename_cat_btn.setFixedWidth(34)
         rename_cat_btn.setCursor(Qt.PointingHandCursor)
         rename_cat_btn.clicked.connect(self.rename_category)
         del_cat_btn = QPushButton("🗑")
         del_cat_btn.setObjectName("DangerButton")
-        del_cat_btn.setToolTip("Eliminar etiqueta")
+        del_cat_btn.setToolTip(t("tag_manager.delete_category_tooltip"))
         del_cat_btn.setFixedWidth(34)
         del_cat_btn.setCursor(Qt.PointingHandCursor)
         del_cat_btn.clicked.connect(self.delete_category)
@@ -67,7 +68,7 @@ class TagManagerDialog(QDialog):
         # --- Panel derecho: valores de la etiqueta seleccionada ---
         right = QVBoxLayout()
         right.setSpacing(6)
-        self.values_title = QLabel("<b>Valores</b>")
+        self.values_title = QLabel(t("tag_manager.values_title_default"))
         right.addWidget(self.values_title)
 
         self.values_scroll = QScrollArea()
@@ -84,15 +85,15 @@ class TagManagerDialog(QDialog):
         add_row = QHBoxLayout()
         add_row.setSpacing(6)
         self.new_value_input = QLineEdit()
-        self.new_value_input.setPlaceholderText("Nuevo valor (ej. Alta)…")
+        self.new_value_input.setPlaceholderText(t("tag_manager.new_value_placeholder"))
         self.new_value_input.returnPressed.connect(self.add_value)
         self.new_color_btn = QPushButton()
         self.new_color_btn.setFixedSize(30, 26)
         self.new_color_btn.setCursor(Qt.PointingHandCursor)
-        self.new_color_btn.setToolTip("Color del nuevo valor")
+        self.new_color_btn.setToolTip(t("tag_manager.new_value_color_tooltip"))
         self.new_color_btn.clicked.connect(self.pick_new_color)
         self._refresh_new_color_btn()
-        self.add_value_btn = QPushButton("Añadir valor")
+        self.add_value_btn = QPushButton(t("tag_manager.add_value_btn"))
         self.add_value_btn.setObjectName("PrimaryButton")
         self.add_value_btn.setCursor(Qt.PointingHandCursor)
         self.add_value_btn.clicked.connect(self.add_value)
@@ -106,7 +107,7 @@ class TagManagerDialog(QDialog):
 
         bottom = QHBoxLayout()
         bottom.addStretch()
-        close_btn = QPushButton("Cerrar")
+        close_btn = QPushButton(t("tag_manager.close_btn"))
         close_btn.setCursor(Qt.PointingHandCursor)
         close_btn.clicked.connect(self.accept)
         bottom.addWidget(close_btn)
@@ -140,7 +141,9 @@ class TagManagerDialog(QDialog):
         return item.text() if item else None
 
     def add_category(self):
-        name, ok = QInputDialog.getText(self, "Nueva etiqueta", "Nombre de la etiqueta (ej. Prioridad):")
+        name, ok = QInputDialog.getText(
+            self, t("tag_manager.add_category_dialog_title"), t("tag_manager.add_category_prompt")
+        )
         name = name.strip()
         if ok and name:
             new_id = database.create_tag_category(name, self.db_path)
@@ -151,7 +154,8 @@ class TagManagerDialog(QDialog):
         if cat_id is None:
             return
         name, ok = QInputDialog.getText(
-            self, "Renombrar etiqueta", "Nuevo nombre:", text=self.current_category_name()
+            self, t("tag_manager.category_action_label"), t("tag_manager.new_name_prompt"),
+            text=self.current_category_name()
         )
         name = name.strip()
         if ok and name:
@@ -163,9 +167,8 @@ class TagManagerDialog(QDialog):
         if cat_id is None:
             return
         confirm = QMessageBox.question(
-            self, "Eliminar etiqueta",
-            f"¿Eliminar la etiqueta «{self.current_category_name()}» y todos sus valores?\n"
-            "Se quitará de todas las tareas que la usen.",
+            self, t("tag_manager.delete_category_tooltip"),
+            t("tag_manager.delete_category_body", category=self.current_category_name()),
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No
         )
         if confirm == QMessageBox.Yes:
@@ -188,17 +191,17 @@ class TagManagerDialog(QDialog):
         self.add_value_btn.setEnabled(has_category)
 
         if not has_category:
-            self.values_title.setText("<b>Valores</b>")
-            hint = QLabel("Crea o selecciona una etiqueta a la izquierda para definir sus valores.")
+            self.values_title.setText(t("tag_manager.values_title_default"))
+            hint = QLabel(t("tag_manager.no_category_hint"))
             hint.setWordWrap(True)
             hint.setStyleSheet(f"color: {styles.COLORS['text_muted']}; padding: 8px;")
             self.values_layout.addWidget(hint)
             return
 
-        self.values_title.setText(f"<b>Valores de «{self.current_category_name()}»</b>")
+        self.values_title.setText(t("tag_manager.values_title_for_category", category=self.current_category_name()))
         values = database.get_tag_values(cat_id, self.db_path)
         if not values:
-            hint = QLabel("Aún no hay valores. Añade el primero abajo.")
+            hint = QLabel(t("tag_manager.no_values_hint"))
             hint.setWordWrap(True)
             hint.setStyleSheet(f"color: {styles.COLORS['text_muted']}; padding: 8px;")
             self.values_layout.addWidget(hint)
@@ -217,7 +220,7 @@ class TagManagerDialog(QDialog):
         swatch = QPushButton()
         swatch.setFixedSize(20, 20)
         swatch.setCursor(Qt.PointingHandCursor)
-        swatch.setToolTip("Cambiar color")
+        swatch.setToolTip(t("tag_manager.swatch_tooltip"))
         swatch.setStyleSheet(styles.color_swatch_css(value['color']))
         swatch.clicked.connect(lambda _=False, v=dict(value): self.change_value_color(v))
         h.addWidget(swatch)
@@ -230,7 +233,7 @@ class TagManagerDialog(QDialog):
         edit_btn = QPushButton("✎")
         edit_btn.setFixedSize(26, 24)
         edit_btn.setCursor(Qt.PointingHandCursor)
-        edit_btn.setToolTip("Renombrar valor")
+        edit_btn.setToolTip(t("tag_manager.rename_value_tooltip"))
         edit_btn.clicked.connect(lambda _=False, v=dict(value): self.rename_value(v))
         h.addWidget(edit_btn)
 
@@ -238,14 +241,14 @@ class TagManagerDialog(QDialog):
         del_btn.setObjectName("DangerButton")
         del_btn.setFixedSize(26, 24)
         del_btn.setCursor(Qt.PointingHandCursor)
-        del_btn.setToolTip("Eliminar valor")
+        del_btn.setToolTip(t("tag_manager.delete_value_tooltip"))
         del_btn.clicked.connect(lambda _=False, v=dict(value): self.delete_value(v))
         h.addWidget(del_btn)
 
         return row
 
     def pick_new_color(self):
-        color = QColorDialog.getColor(QColor(self.new_value_color), self, "Color del valor")
+        color = QColorDialog.getColor(QColor(self.new_value_color), self, t("tag_manager.color_dialog_title"))
         if color.isValid():
             self.new_value_color = color.name()
             self._refresh_new_color_btn()
@@ -261,34 +264,36 @@ class TagManagerDialog(QDialog):
         if not text:
             return
         if database.value_exists_in_category(cat_id, text, db_path=self.db_path):
-            QMessageBox.warning(self, "Atención", "Ya existe un valor con ese nombre en esta etiqueta.")
+            QMessageBox.warning(self, t("tag_manager.warn_title"), t("tag_manager.duplicate_value_body"))
             return
         database.create_tag_value(cat_id, text, self.new_value_color, self.db_path)
         self.new_value_input.clear()
         self.reload_values()
 
     def change_value_color(self, value):
-        color = QColorDialog.getColor(QColor(value["color"]), self, "Color del valor")
+        color = QColorDialog.getColor(QColor(value["color"]), self, t("tag_manager.color_dialog_title"))
         if color.isValid():
             database.update_tag_value(value["id"], value["value"], color.name(), self.db_path)
             self.reload_values()
 
     def rename_value(self, value):
         cat_id = self.current_category_id()
-        name, ok = QInputDialog.getText(self, "Renombrar valor", "Nuevo nombre:", text=value["value"])
+        name, ok = QInputDialog.getText(
+            self, t("tag_manager.rename_value_tooltip"), t("tag_manager.new_name_prompt"), text=value["value"]
+        )
         name = name.strip()
         if not (ok and name) or name == value["value"]:
             return
         if database.value_exists_in_category(cat_id, name, exclude_value_id=value["id"], db_path=self.db_path):
-            QMessageBox.warning(self, "Atención", "Ya existe un valor con ese nombre en esta etiqueta.")
+            QMessageBox.warning(self, t("tag_manager.warn_title"), t("tag_manager.duplicate_value_body"))
             return
         database.update_tag_value(value["id"], name, value["color"], self.db_path)
         self.reload_values()
 
     def delete_value(self, value):
         confirm = QMessageBox.question(
-            self, "Eliminar valor",
-            f"¿Eliminar el valor «{value['value']}»?\nSe quitará de las tareas que lo tengan asignado.",
+            self, t("tag_manager.delete_value_tooltip"),
+            t("tag_manager.delete_value_body", value=value['value']),
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No
         )
         if confirm == QMessageBox.Yes:

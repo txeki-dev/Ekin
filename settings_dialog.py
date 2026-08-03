@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 
 import database
 import styles
+from strings import t
 
 
 class SettingsDialog(QDialog):
@@ -17,22 +18,22 @@ class SettingsDialog(QDialog):
     def __init__(self, db_path, parent=None):
         super().__init__(parent)
         self.db_path = db_path
-        self.setWindowTitle("Ajustes")
+        self.setWindowTitle(t("settings.window_title"))
         self.setMinimumWidth(420)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 18, 18, 18)
         layout.setSpacing(14)
 
-        layout.addWidget(QLabel("⚙ <b>Ajustes de Ekin</b>"))
+        layout.addWidget(QLabel(t("settings.header")))
 
         # --- Tema ---
         theme_row = QHBoxLayout()
-        theme_row.addWidget(QLabel("🎨 Tema:"))
+        theme_row.addWidget(QLabel(t("settings.theme_label")))
         self.theme_combo = QComboBox()
         self._themes = ["dark", "light"]
-        self.theme_combo.addItem("Oscuro")
-        self.theme_combo.addItem("Claro")
+        self.theme_combo.addItem(t("settings.theme_dark"))
+        self.theme_combo.addItem(t("settings.theme_light"))
         current = database.get_setting("theme", "dark", self.db_path)
         self.theme_combo.setCurrentIndex(self._themes.index(current) if current in self._themes else 0)
         self.theme_combo.currentIndexChanged.connect(self._on_theme_changed)
@@ -40,16 +41,13 @@ class SettingsDialog(QDialog):
         theme_row.addStretch()
         layout.addLayout(theme_row)
 
-        theme_hint = QLabel(
-            "El tema claro es <i>experimental</i>: algunos colores de tarjetas/tableros están "
-            "afinados para el oscuro. Se aplica del todo al reiniciar la app."
-        )
+        theme_hint = QLabel(t("settings.theme_hint"))
         theme_hint.setWordWrap(True)
         theme_hint.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 11px;")
         layout.addWidget(theme_hint)
 
         # --- Notificaciones ---
-        self.notif_chk = QCheckBox("Mostrar avisos de Windows para tareas que vencen hoy")
+        self.notif_chk = QCheckBox(t("settings.notifications_checkbox"))
         self.notif_chk.setCursor(Qt.PointingHandCursor)
         self.notif_chk.setChecked(database.get_setting("notifications_enabled", "1", self.db_path) != "0")
         self.notif_chk.toggled.connect(
@@ -62,7 +60,7 @@ class SettingsDialog(QDialog):
         line.setStyleSheet(f"color: {styles.COLORS['border']};")
         layout.addWidget(line)
 
-        info = QLabel("El tamaño y la posición de la ventana se recuerdan automáticamente.")
+        info = QLabel(t("settings.geometry_hint"))
         info.setWordWrap(True)
         info.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 11px;")
         layout.addWidget(info)
@@ -71,7 +69,7 @@ class SettingsDialog(QDialog):
 
         btns = QHBoxLayout()
         btns.addStretch()
-        close_btn = QPushButton("Cerrar")
+        close_btn = QPushButton(t("settings.close_btn"))
         close_btn.setObjectName("PrimaryButton")
         close_btn.setCursor(Qt.PointingHandCursor)
         close_btn.clicked.connect(self.accept)

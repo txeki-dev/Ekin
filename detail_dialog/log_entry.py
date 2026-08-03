@@ -2,6 +2,7 @@ from PySide6.QtCore import Qt, QSize
 from PySide6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
 from datetime import datetime
 from widgets import make_glyph_icon
+from strings import t
 from .markdown_edit import MarkdownTextEdit, RichTextToolbar
 
 
@@ -54,12 +55,12 @@ class LogEntryWidget(QFrame):
         top_layout.addStretch()
 
         self.edit_btn = self._icon_button(
-            "pencil", "#94a3b8", "Editar comentario", "rgba(148, 163, 184, 0.20)")
+            "pencil", "#94a3b8", t("log_entry.edit_tooltip"), "rgba(148, 163, 184, 0.20)")
         self.edit_btn.clicked.connect(self._enter_edit_mode)
         top_layout.addWidget(self.edit_btn)
 
         self.delete_btn = self._icon_button(
-            "cross", "#ef4444", "Eliminar comentario", "rgba(239, 68, 68, 0.15)")
+            "cross", "#ef4444", t("log_entry.delete_tooltip"), "rgba(239, 68, 68, 0.15)")
         self.delete_btn.clicked.connect(lambda: self.delete_callback(self.log_id, self))
         top_layout.addWidget(self.delete_btn)
 
@@ -88,12 +89,12 @@ class LogEntryWidget(QFrame):
 
         btns = QHBoxLayout()
         btns.addStretch()
-        save_btn = QPushButton("Guardar")
+        save_btn = QPushButton(t("log_entry.save_btn"))
         save_btn.setObjectName("PrimaryButton")
         save_btn.setCursor(Qt.PointingHandCursor)
         save_btn.clicked.connect(lambda: self.save_edit_callback(self.log_id, self._editor.toHtml()))
         btns.addWidget(save_btn)
-        cancel_btn = QPushButton("Cancelar")
+        cancel_btn = QPushButton(t("log_entry.cancel_btn"))
         cancel_btn.setCursor(Qt.PointingHandCursor)
         cancel_btn.clicked.connect(lambda: self.save_edit_callback(self.log_id, None))
         btns.addWidget(cancel_btn)

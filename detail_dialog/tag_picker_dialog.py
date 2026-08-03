@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (
 )
 import database
 import styles
+from strings import t
 from .tag_pill import color_icon
 from .tag_manager_dialog import TagManagerDialog
 
@@ -24,14 +25,14 @@ class TagPickerDialog(QDialog):
         self._result_value_id = None
         self._is_none = False
 
-        self.setWindowTitle("Editar Etiqueta" if fixed_category else "Asignar Etiqueta")
+        self.setWindowTitle(t("tag_picker.title_edit") if fixed_category else t("tag_picker.title_assign"))
         self.setMinimumWidth(340)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(15, 15, 15, 15)
         layout.setSpacing(10)
 
-        layout.addWidget(QLabel("🏷️ <b>Etiqueta</b>"))
+        layout.addWidget(QLabel(t("tag_picker.category_label")))
         if fixed_category:
             cat_label = QLabel(fixed_category["name"])
             cat_label.setStyleSheet(
@@ -44,7 +45,7 @@ class TagPickerDialog(QDialog):
             self.category_combo.currentIndexChanged.connect(lambda *_: self.reload_values())
             layout.addWidget(self.category_combo)
 
-        layout.addWidget(QLabel("<b>Valor</b>"))
+        layout.addWidget(QLabel(t("tag_picker.value_label")))
         self.value_combo = QComboBox()
         layout.addWidget(self.value_combo)
 
@@ -53,7 +54,7 @@ class TagPickerDialog(QDialog):
         self.hint_label.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 10px;")
         layout.addWidget(self.hint_label)
 
-        manage_btn = QPushButton("⚙  Gestionar etiquetas…")
+        manage_btn = QPushButton(t("tag_picker.manage_btn"))
         manage_btn.setCursor(Qt.PointingHandCursor)
         manage_btn.clicked.connect(self.open_manager)
         layout.addWidget(manage_btn)
@@ -62,12 +63,12 @@ class TagPickerDialog(QDialog):
 
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        ok_btn = QPushButton("Aceptar")
+        ok_btn = QPushButton(t("tag_picker.accept_btn"))
         ok_btn.setObjectName("PrimaryButton")
         ok_btn.setCursor(Qt.PointingHandCursor)
         ok_btn.clicked.connect(self.on_accept)
         btn_layout.addWidget(ok_btn)
-        cancel_btn = QPushButton("Cancelar")
+        cancel_btn = QPushButton(t("tag_picker.cancel_btn"))
         cancel_btn.setCursor(Qt.PointingHandCursor)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
@@ -92,16 +93,16 @@ class TagPickerDialog(QDialog):
     def reload_values(self):
         self.value_combo.clear()
         if self.allow_none:
-            self.value_combo.addItem("— Ninguno (ocultar) —", None)
+            self.value_combo.addItem(t("tag_picker.none_option"), None)
 
         cat_id = self.selected_category_id()
         if cat_id is None:
-            self.hint_label.setText("No hay etiquetas definidas. Usa «Gestionar etiquetas…» para crear una.")
+            self.hint_label.setText(t("tag_picker.no_categories_hint"))
             return
 
         values = database.get_tag_values(cat_id, self.db_path)
         if not values:
-            self.hint_label.setText("Esta etiqueta no tiene valores. Añádelos en «Gestionar etiquetas…».")
+            self.hint_label.setText(t("tag_picker.no_values_hint"))
         else:
             self.hint_label.setText("")
 
@@ -120,11 +121,11 @@ class TagPickerDialog(QDialog):
     def on_accept(self):
         cat_id = self.selected_category_id()
         if cat_id is None:
-            QMessageBox.warning(self, "Atención", "Primero crea una etiqueta en «Gestionar etiquetas…».")
+            QMessageBox.warning(self, t("tag_picker.warn_title"), t("tag_picker.warn_no_category"))
             return
         data = self.value_combo.currentData()
         if data is None and not self.allow_none:
-            QMessageBox.warning(self, "Atención", "Selecciona un valor (o créalo en «Gestionar etiquetas…»).")
+            QMessageBox.warning(self, t("tag_picker.warn_title"), t("tag_picker.warn_no_value"))
             return
         self._result_value_id = data
         self._is_none = data is None

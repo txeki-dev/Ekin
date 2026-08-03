@@ -6,6 +6,7 @@ from PySide6.QtGui import (
 )
 import re
 import styles
+from strings import t
 
 
 class MarkdownTextEdit(QTextEdit):
@@ -233,7 +234,7 @@ class RichTextToolbar(QWidget):
 
         self.bold_btn = QPushButton("B")
         self.bold_btn.setObjectName("FormatButton")
-        self.bold_btn.setToolTip("Negrita (Ctrl+B o Ctrl+N)")
+        self.bold_btn.setToolTip(t("markdown_edit.bold_tooltip"))
         self.bold_btn.setCheckable(True)
         self.bold_btn.setCursor(Qt.PointingHandCursor)
         self.bold_btn.setFixedSize(28, 26)
@@ -246,7 +247,7 @@ class RichTextToolbar(QWidget):
         # Etiqueta "K" (Cursiva): una "I" en cursiva se ve como "/", que confunde.
         self.italic_btn = QPushButton("K")
         self.italic_btn.setObjectName("FormatButton")
-        self.italic_btn.setToolTip("Cursiva (Ctrl+K o Ctrl+I)")
+        self.italic_btn.setToolTip(t("markdown_edit.italic_tooltip"))
         self.italic_btn.setCheckable(True)
         self.italic_btn.setCursor(Qt.PointingHandCursor)
         self.italic_btn.setFixedSize(28, 26)
@@ -258,7 +259,7 @@ class RichTextToolbar(QWidget):
 
         self.strike_btn = QPushButton("S")
         self.strike_btn.setObjectName("FormatButton")
-        self.strike_btn.setToolTip("Tachado (Ctrl+Shift+X)")
+        self.strike_btn.setToolTip(t("markdown_edit.strike_tooltip"))
         self.strike_btn.setCheckable(True)
         self.strike_btn.setCursor(Qt.PointingHandCursor)
         self.strike_btn.setFixedSize(28, 26)
@@ -270,7 +271,7 @@ class RichTextToolbar(QWidget):
 
         self.bullet_btn = QPushButton("•")
         self.bullet_btn.setObjectName("FormatButton")
-        self.bullet_btn.setToolTip("Lista con viñetas  ·  también con «* », «- » o «+ »")
+        self.bullet_btn.setToolTip(t("markdown_edit.bullet_tooltip"))
         self.bullet_btn.setCursor(Qt.PointingHandCursor)
         self.bullet_btn.setFixedSize(28, 26)
         self.bullet_btn.clicked.connect(self.toggle_bullets)
@@ -278,7 +279,7 @@ class RichTextToolbar(QWidget):
 
         self.table_btn = QPushButton("▦")
         self.table_btn.setObjectName("FormatButton")
-        self.table_btn.setToolTip("Insertar tabla")
+        self.table_btn.setToolTip(t("markdown_edit.table_tooltip"))
         self.table_btn.setCursor(Qt.PointingHandCursor)
         self.table_btn.setFixedSize(28, 26)
         self.table_btn.clicked.connect(self.insert_table_dialog)
@@ -318,10 +319,14 @@ class RichTextToolbar(QWidget):
 
     def insert_table_dialog(self):
         """Pide filas y columnas y crea una tabla vacía en la posición del cursor."""
-        rows, ok = QInputDialog.getInt(self, "Insertar tabla", "Filas:", 3, 1, 20)
+        rows, ok = QInputDialog.getInt(
+            self, t("markdown_edit.table_dialog_title"), t("markdown_edit.table_rows_label"), 3, 1, 20
+        )
         if not ok:
             return
-        cols, ok = QInputDialog.getInt(self, "Insertar tabla", "Columnas:", 3, 1, 20)
+        cols, ok = QInputDialog.getInt(
+            self, t("markdown_edit.table_dialog_title"), t("markdown_edit.table_cols_label"), 3, 1, 20
+        )
         if not ok:
             return
         self.text_edit.insert_table(rows, cols)
