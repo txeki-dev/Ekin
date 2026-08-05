@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-05
+
 ### Added
 - **Board links on task cards.** A task can now link to a different board (e.g. a summary task
   "Desarrollo v2.0 SW X" living in a "Tareas" board that points at the dedicated "SW X" board
