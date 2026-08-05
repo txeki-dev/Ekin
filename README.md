@@ -14,10 +14,11 @@ Ekin Kanban is a sleek, resource-friendly, and offline-first personal Kanban boa
 - **Ultra-lightweight**: Operates with a minimal memory footprint (< 60MB RAM idle) compared to heavy Electron-based alternatives.
 - **Fluid Drag & Drop**: Native, smooth mouse controls to drag tasks across columns or reorder them.
 - **Task Journaling (Diario)**: A vertical, scrollable, timestamped diary inside each task card, perfect for keeping track of developer progress logs.
-- **Rich Notes**: The description and diary support **bold** (Ctrl+B), *italic* (Ctrl+K), ~~strikethrough~~ (Ctrl+Shift+X) and nested bullet lists (Tab to indent). External text pastes as **plain text**, and you can **paste images** and **tables** (from Excel/Sheets/Word, or tab-separated text) straight in — or insert an empty one from the toolbar.
+- **Rich Notes**: The description and diary support **bold** (Ctrl+B), *italic* (Ctrl+K), ~~strikethrough~~ (Ctrl+Shift+X), nested bullet lists (Tab to indent) and **arrows** (type `-->` or use the toolbar button). External text pastes as **plain text**, and you can **paste images** and **tables** (from Excel/Sheets/Word, or tab-separated text) straight in — or insert an empty one from the toolbar.
 - **Collapsible Columns**: Fold a column you're not working on down to a slim strip (just its name and task count) with the **◀** button to save horizontal space.
 - **Global Search & Filter**: A 🔍 button (or **Ctrl+F**) searches every board by title/description and filters by board, tag, or due date; click a result to jump straight to its card.
 - **Due Dates, Times & Recurring Tasks**: Assign a due date (and optional **time**), plus a **recurrence** (daily/weekly/monthly) — overdue recurring tasks roll forward automatically. Cards show **🔁** for recurring and multiple custom-colored tag pills.
+- **Priority**: A quick **🚩 Prioridad** selector in the task detail (Baja/Media/Alta by default, customizable) shows up as a pill on the board card, same as any other tag.
 - **Calendar View & Reminders**: **Month / Week / Day** views with a **board filter** and color legend; **drag a chip to reschedule**; a deadline **bell** that groups **overdue**, today's and tomorrow's tasks; and native **Windows notifications**.
 - **Calendar Sync (iCalendar)**: An always-updated `.ics` feed (with **timed events + `VALARM` reminders** and **per-board feeds**) you can **subscribe** to from Google/Apple/Outlook. A **"Subscribe"** helper copies the URL and opens the provider page.
 - **Attachments / Links**: Attach URLs or file paths to a card (**🔗**), open or remove them from the task detail.
@@ -130,6 +131,7 @@ The database (`ekin_board.db`) is automatically initialized on the first run, an
 * Click **➕ Nuevo Tablero** to create a board. You can name it and choose a unique background accent color.
 * Select a board and click **✏️ Editar** to rename or recolor it, or click **🗑️ Borrar** to remove it.
 * You can clone an entire board (including its columns, tasks, tags, and diaries) by clicking **✏️ Editar** and selecting the Copy/Clone options.
+* Use **Alt+Up / Alt+Down** anywhere to jump to the previous/next board without touching the sidebar.
 
 ### 2. Organizing Columns & Tasks
 * Inside a board, click **➕ Nueva Columna** to create stage headers (e.g., "To-Do", "In Progress", "Done").
@@ -142,9 +144,9 @@ The database (`ekin_board.db`) is automatically initialized on the first run, an
 ### 3. Detail View, Structured Tags & Due Dates
 * Click on a task card to open the **Detail View**.
 * On the **left panel**:
-  - Change the task title and description. The toolbar (and shortcuts) give **bold** (Ctrl+B), *italic* (Ctrl+K), ~~strikethrough~~ (Ctrl+Shift+X) and bullet lists — press **Tab** on a bullet to nest it. Text pasted from elsewhere comes in as **plain text**, and you can **paste images** directly into the notes. Pasting a **table** (from Excel/Sheets/Word, or plain tab-separated text) inserts a real table, and the **▦** toolbar button creates an empty one (asks for rows/columns) — press **Tab** in the last cell to add a row.
+  - Change the task title and description. The toolbar (and shortcuts) give **bold** (Ctrl+B), *italic* (Ctrl+K), ~~strikethrough~~ (Ctrl+Shift+X), bullet lists — press **Tab** on a bullet to nest it — and **arrows** (type `-->` or use the toolbar's **→** button). Text pasted from elsewhere comes in as **plain text**, and you can **paste images** directly into the notes. Pasting a **table** (from Excel/Sheets/Word, or plain tab-separated text) inserts a real table, and the **▦** toolbar button creates an empty one (asks for rows/columns) — press **Tab** in the last cell to add a row.
   - Set a **due date** using the calendar popup widget.
-  - Click **➕ Asignar Etiqueta** to add a tag as a **Category: Value** pair (e.g. "Prioridad: Alta"), with its own color. Reusing an existing value keeps its color consistent everywhere it's used; typing a new one creates it on the fly.
+  - Click **➕ Asignar Etiqueta** to add a tag as a **Category: Value** pair (e.g. "Prioridad: Alta"), with its own color. Reusing an existing value keeps its color consistent everywhere it's used; typing a new one creates it on the fly. Next to Etiquetas, the **🚩 Prioridad** dropdown is a one-click shortcut for the same "Prioridad" tag — pick Baja/Media/Alta (or "— Sin prioridad —") without going through the full tag picker.
 * On the **right panel (Diario)**, type notes or updates about what you did (same formatting, table paste/insert, plain-text paste and image paste), and press `Ctrl + Enter` (or click **✍️ Añadir al Diario**) to post it. Each note is saved with an automatic date and time stamp.
 * Each note has an **edit (✎)** and a **delete (×)** button — editing opens an inline editor (save or cancel); deleting removes the note.
 * Click **💾 Guardar Cambios** to apply your updates, or click **🗑️ Eliminar** to delete the entire task.

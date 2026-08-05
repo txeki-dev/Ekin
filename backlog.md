@@ -98,6 +98,13 @@ Ordered roughly by value/effort. Checkboxes track what's done.
   2026-08-03)*. Pasting a table (Excel/Sheets/Word, or tab-separated text) inserts a real table
   instead of flattening it to text; the toolbar's **▦** button inserts an empty one. Strikethrough
   via Ctrl+Shift+X or a toolbar button, alongside the existing bold/italic/bullets.
+- [x] **Arrows in rich text** *(Done 2026-08-05)*. Typing `-->` in the description or diary/chat
+  editor auto-converts it to `→`; a toolbar button (next to bullets) inserts one too.
+- [x] **Priority quick-selector** *(Done 2026-08-05)*. A **🚩 Prioridad** dropdown next to
+  Etiquetas in the task detail dialog (Baja/Media/Alta by default, seeded on first use and merged
+  with the pre-existing onboarding "Prioridad: Alta" demo tag rather than duplicating it). It's a
+  fast UI shortcut over the same tag system — no new DB schema — so the chosen priority shows up
+  as a pill on the board card automatically, through the existing tag-pill rendering.
 
 ### Data & safety
 - [x] **Automatic DB backups** *(Done in v0.4.0)* — `backups.py` writes a consistent SQLite snapshot
@@ -153,6 +160,9 @@ Ordered roughly by value/effort. Checkboxes track what's done.
    i18n string-extraction infrastructure (`strings.py`, ~280 strings); cross-platform notification
    audit (already portable, one documented macOS limitation); headless Qt widget smoke tests.~~
    ✅ 2026-08-03.
+9. ~~**Arrows + Priority selector** — `-->` auto-converts to `→` in rich text (+ toolbar button);
+   a **🚩 Prioridad** quick-selector in the task detail dialog, next to Etiquetas, that reuses the
+   tag system so it shows on board cards for free.~~ ✅ 2026-08-05.
 
 ### 🎯 Theme D — Distribution (parked)
 **PyInstaller** standalone build + **update-from-Releases** (replaces the `git pull` auto-updater).

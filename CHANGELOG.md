@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Arrows in rich text.** Typing `-->` in the task description or the diary/chat editor now
+  auto-converts it to `→` as you type; a new toolbar button (next to the bullet-list button)
+  inserts one on click.
+- **Priority quick-selector.** The task detail dialog now has a small **🚩 Prioridad** selector
+  next to Etiquetas (Baja/Media/Alta by default, customizable via **⚙ Gestionar**). It's backed
+  by the same tag system as any other tag, so the chosen priority automatically shows up as a
+  pill on the board-view card too.
+- **Alt+Up / Alt+Down** cycles between boards in the sidebar.
+- **Per-board auto-sync `.ics` feeds.** The always-up-to-date subscribable calendar feed
+  (Calendario → ⚙ Ajustes → 📂 Elegir archivo…) can now be configured per board, not just
+  globally, mirroring the existing per-board one-off export.
+- Internationalization infrastructure: every user-facing string (~290) now lives in `strings.py`
+  (a flat lookup + `t(key, **kwargs)`) instead of being hardcoded across the UI modules. Spanish
+  is still the only active language — this is extraction only, no translation/switcher yet — but
+  adding a second language now only touches one file.
+- Headless Qt widget smoke tests (calendar grid, deadline-bell popup, settings dialog).
+
+### Changed
+- Light theme: fixed several spots that stayed hardcoded to the dark palette (board title,
+  sidebar-toggle icon, task-card border, due-date badge), so switching to light theme no longer
+  leaves near-invisible text/icons.
+- Tag-pill styling centralized into `styles.tag_pill_css(color)` (previously duplicated between
+  board cards and the task detail dialog).
+
+### Fixed
+- `apply_theme()` now runs before `init_ui()` on startup, so a saved light-theme preference is
+  reflected immediately instead of only after the first manual theme toggle.
+
 ## [0.7.0] - 2026-08-03
 
 ### Added
