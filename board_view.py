@@ -192,6 +192,7 @@ class BoardSelectionDialog(QDialog):
 class BoardViewWidget(QFrame):
     toggle_sidebar_requested = Signal()
     data_changed = Signal()  # Emitida tras (re)cargar el tablero, para refrescar campana/calendario
+    board_link_activated = Signal(int)  # board_id: pulsada la pastilla de tablero enlazado de una tarjeta
 
     def __init__(self, db_path=database.DB_NAME, parent=None):
         super().__init__(parent)
@@ -384,6 +385,7 @@ class BoardViewWidget(QFrame):
                     if board_info:
                         card.set_card_style(board_color)
                     card.clicked.connect(self.open_task_details)
+                    card.board_link_clicked.connect(self.board_link_activated.emit)
                     col_widget.add_task_card(card)
 
             self.columns_layout.addWidget(col_widget)

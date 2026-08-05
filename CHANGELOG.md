@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Board links on task cards.** A task can now link to a different board (e.g. a summary task
+  "Desarrollo v2.0 SW X" living in a "Tareas" board that points at the dedicated "SW X" board
+  where the detailed work is tracked). Pick the target board from the new **🔗 Tablero
+  vinculado** selector in the task detail dialog, next to Etiquetas/Prioridad; the card then
+  shows a colored, clickable **🔗 <board name>** pill that jumps straight to that board instead
+  of opening the task's own detail. If the linked board is later deleted, the link is
+  automatically cleared.
 - **Arrows in rich text.** Typing `-->` in the task description or the diary/chat editor now
   auto-converts it to `→` as you type; a new toolbar button (next to the bullet-list button)
   inserts one on click.

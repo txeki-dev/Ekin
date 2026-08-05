@@ -569,6 +569,71 @@ def test_task_links_crud_and_bulk(db_path):
     assert database.get_task_links(t1, db_path=db_path) == []
 
 
+# --- Tablero vinculado (linked_board_id) ---
+
+def test_set_task_linked_board_and_get_tasks_exposes_it(db_path):
+    tareas = database.create_board("Tareas", db_path=db_path)
+    sw_x = database.create_board("SW X", "#22c55e", db_path=db_path)
+    col = database.create_column(tareas, "Col", db_path=db_path)
+    task = database.create_task(col, "Desarrollo v2.0 SW X", db_path=db_path)
+
+    assert database.get_task(task, db_path)["linked_board_id"] is None
+
+    database.set_task_linked_board(task, sw_x, db_path=db_path)
+    loaded = database.get_task(task, db_path)
+    assert loaded["linked_board_id"] == sw_x
+    assert loaded["linked_board_name"] == "SW X"
+    assert loaded["linked_board_color"] == "#22c55e"
+
+    by_id = {t["id"]: t for t in database.get_tasks(col, db_path=db_path)}
+    assert by_id[task]["linked_board_id"] == sw_x
+    assert by_id[task]["linked_board_name"] == "SW X"
+
+    database.set_task_linked_board(task, None, db_path=db_path)
+    assert database.get_task(task, db_path)["linked_board_id"] is None
+
+
+def test_deleting_linked_board_clears_the_link(db_path):
+    tareas = database.create_board("Tareas", db_path=db_path)
+    sw_x = database.create_board("SW X", db_path=db_path)
+    col = database.create_column(tareas, "Col", db_path=db_path)
+    task = database.create_task(col, "T", db_path=db_path)
+    database.set_task_linked_board(task, sw_x, db_path=db_path)
+
+    database.delete_board(sw_x, db_path=db_path)
+
+    assert database.get_task(task, db_path)["linked_board_id"] is None
+
+
+def test_snapshot_and_restore_task_preserves_linked_board(db_path):
+    tareas = database.create_board("Tareas", db_path=db_path)
+    sw_x = database.create_board("SW X", db_path=db_path)
+    col = database.create_column(tareas, "Col", db_path=db_path)
+    task = database.create_task(col, "T", db_path=db_path)
+    database.set_task_linked_board(task, sw_x, db_path=db_path)
+
+    snap = database.snapshot_task(task, db_path=db_path)
+    database.delete_task(task, db_path=db_path)
+    new_id = database.restore_task(snap, db_path=db_path)
+
+    assert database.get_task(new_id, db_path)["linked_board_id"] == sw_x
+
+
+def test_restore_task_drops_link_if_linked_board_was_deleted(db_path):
+    tareas = database.create_board("Tareas", db_path=db_path)
+    sw_x = database.create_board("SW X", db_path=db_path)
+    col = database.create_column(tareas, "Col", db_path=db_path)
+    task = database.create_task(col, "T", db_path=db_path)
+    database.set_task_linked_board(task, sw_x, db_path=db_path)
+
+    snap = database.snapshot_task(task, db_path=db_path)
+    database.delete_task(task, db_path=db_path)
+    database.delete_board(sw_x, db_path=db_path)  # el tablero enlazado desaparece mientras tanto
+
+    new_id = database.restore_task(snap, db_path=db_path)
+    assert database.get_task(new_id, db_path)["linked_board_id"] is None
+
+
 # --- Snapshot / restore (deshacer borrados, v0.6.0) ---
 
 def test_snapshot_and_restore_task(db_path):

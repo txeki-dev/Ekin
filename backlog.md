@@ -105,6 +105,13 @@ Ordered roughly by value/effort. Checkboxes track what's done.
   with the pre-existing onboarding "Prioridad: Alta" demo tag rather than duplicating it). It's a
   fast UI shortcut over the same tag system — no new DB schema — so the chosen priority shows up
   as a pill on the board card automatically, through the existing tag-pill rendering.
+- [x] **Board links on task cards** *(Done 2026-08-05)*. A task can point at a *different* board
+  (e.g. a summary task in "Tareas" linking to the dedicated "SW X" board tracking that work in
+  detail) via a new **🔗 Tablero vinculado** selector next to Etiquetas/Prioridad. The card then
+  shows a colored, clickable **🔗 <board>** pill that jumps to that board instead of opening the
+  task's own detail. New nullable `tasks.linked_board_id` column (`ON DELETE SET NULL`, so
+  deleting the target board just clears the link); included in the task snapshot/restore
+  (Ctrl+Z) round-trip.
 
 ### Data & safety
 - [x] **Automatic DB backups** *(Done in v0.4.0)* — `backups.py` writes a consistent SQLite snapshot
@@ -163,6 +170,9 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 9. ~~**Arrows + Priority selector** — `-->` auto-converts to `→` in rich text (+ toolbar button);
    a **🚩 Prioridad** quick-selector in the task detail dialog, next to Etiquetas, that reuses the
    tag system so it shows on board cards for free.~~ ✅ 2026-08-05.
+10. ~~**Board links on task cards** — a **🔗 Tablero vinculado** selector in the task detail dialog
+   links a task to a different board; the card shows a clickable pill that jumps straight there.~~
+   ✅ 2026-08-05.
 
 ### 🎯 Theme D — Distribution (parked)
 **PyInstaller** standalone build + **update-from-Releases** (replaces the `git pull` auto-updater).

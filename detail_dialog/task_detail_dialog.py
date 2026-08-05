@@ -150,10 +150,23 @@ class TaskDetailDialog(QDialog):
         priority_layout.addWidget(self.priority_combo)
         priority_layout.addStretch()
 
+        # Selector rápido de Tablero vinculado, junto a Etiquetas y Prioridad
+        board_link_section = QWidget()
+        board_link_layout = QVBoxLayout(board_link_section)
+        board_link_layout.setContentsMargins(0, 0, 0, 0)
+        board_link_layout.setSpacing(4)
+        board_link_layout.addWidget(QLabel(t("task_detail.linked_board_label")))
+        self.linked_board_combo = QComboBox()
+        self.linked_board_combo.setToolTip(t("task_detail.linked_board_tooltip"))
+        self.linked_board_combo.setCursor(Qt.PointingHandCursor)
+        board_link_layout.addWidget(self.linked_board_combo)
+        board_link_layout.addStretch()
+
         tags_priority_row = QHBoxLayout()
         tags_priority_row.setSpacing(12)
         tags_priority_row.addWidget(tags_section, 2)
         tags_priority_row.addWidget(priority_section, 1)
+        tags_priority_row.addWidget(board_link_section, 1)
         left_layout.addLayout(tags_priority_row)
 
         # 5. Enlaces / adjuntos
@@ -330,6 +343,9 @@ class TaskDetailDialog(QDialog):
         self.current_tags = task.get("tags", [])
         self.render_tags()
 
+        # Cargar tablero vinculado
+        self._refresh_linked_board_combo(task.get("linked_board_id"))
+
         # Cargar enlaces y logs
         self.reload_links()
         self.reload_logs()
@@ -451,6 +467,21 @@ class TaskDetailDialog(QDialog):
             if tag:
                 self._set_category_value(tag)
 
+    def _refresh_linked_board_combo(self, current_board_id):
+        """Rellena el selector de Tablero vinculado con el resto de tableros (excluyendo el
+        propio tablero de la tarea, para no poder enlazarla consigo misma) y selecciona el
+        vínculo actual de la tarea, si tiene uno."""
+        own_board_id = database.get_task_board_id(self.task_id, self.db_path)
+        self.linked_board_combo.blockSignals(True)
+        self.linked_board_combo.clear()
+        self.linked_board_combo.addItem(t("task_detail.linked_board_none"), None)
+        for board in database.get_boards(self.db_path):
+            if board["id"] != own_board_id:
+                self.linked_board_combo.addItem(color_icon(board["color"]), board["name"], board["id"])
+        idx = self.linked_board_combo.findData(current_board_id) if current_board_id else 0
+        self.linked_board_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        self.linked_board_combo.blockSignals(False)
+
     def _set_category_value(self, tag):
         """Asigna (o reemplaza) el valor de una etiqueta permanente, garantizando un
         único valor por etiqueta en la tarea y conservando la posición existente."""
@@ -561,6 +592,9 @@ class TaskDetailDialog(QDialog):
         database.set_task_recurrence(
             self.task_id, self._recurrence_values[self.recurrence_combo.currentIndex()], self.db_path
         )
+
+        # Guardar el tablero vinculado
+        database.set_task_linked_board(self.task_id, self.linked_board_combo.currentData(), self.db_path)
 
         self.modified = True
         self.accept()

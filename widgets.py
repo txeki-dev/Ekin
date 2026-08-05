@@ -153,6 +153,8 @@ def compute_drop_index(cards_geom, drop_y, dragged_id):
 class TaskCard(QFrame):
     # Emitido cuando se hace click en la tarjeta (y no se ha arrastrado)
     clicked = Signal(int)  # task_id
+    # Emitido al pulsar la pastilla de tablero enlazado (no abre el detalle de la tarea)
+    board_link_clicked = Signal(int)  # linked_board_id
 
     def __init__(self, task_data, parent=None):
         super().__init__(parent)
@@ -230,10 +232,63 @@ class TaskCard(QFrame):
         self.due_layout.addStretch()  # Empuja la fecha a la izquierda
         self.meta_layout.addWidget(self.due_container)
 
+        # Contenedor para la pastilla de tablero enlazado (Fila 3, opcional)
+        self.board_link_container = QWidget()
+        self.board_link_container.setStyleSheet("background: transparent; border: none;")
+        board_link_layout = QHBoxLayout(self.board_link_container)
+        board_link_layout.setContentsMargins(0, 0, 0, 0)
+        board_link_layout.setSpacing(6)
+
+        self.board_link_btn = QPushButton()
+        self.board_link_btn.setCursor(Qt.PointingHandCursor)
+        self.board_link_btn.setToolTip(t("widgets.card.board_link_tooltip"))
+        self.board_link_btn.clicked.connect(self._emit_board_link_clicked)
+        board_link_layout.addWidget(self.board_link_btn)
+        board_link_layout.addStretch()
+        self.meta_layout.addWidget(self.board_link_container)
+
         layout.addLayout(self.meta_layout)
 
         # Actualizar las etiquetas y vencimiento
         self.update_tags_and_due(self.task_data.get("tags", []), self.task_data.get("due_date"))
+        self._update_board_link()
+
+    def _emit_board_link_clicked(self):
+        board_id = self.task_data.get("linked_board_id")
+        if board_id:
+            self.board_link_clicked.emit(board_id)
+
+    def _update_board_link(self):
+        """Dibuja (o esconde) la pastilla clicable hacia el tablero enlazado, si lo hay."""
+        board_id = self.task_data.get("linked_board_id")
+        if not board_id:
+            self.board_link_container.hide()
+            return
+
+        name = self.task_data.get("linked_board_name") or "?"
+        color = self.task_data.get("linked_board_color") or "#3b82f6"
+        try:
+            r, g, b = hex_to_rgb(color)
+        except Exception:
+            r, g, b = 59, 130, 246
+
+        self.board_link_btn.setText(f"🔗 {name}")
+        self.board_link_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: rgba({r}, {g}, {b}, 0.15);
+                border: 1px solid rgba({r}, {g}, {b}, 0.5);
+                border-radius: 4px;
+                color: {color};
+                font-size: 10px;
+                font-weight: bold;
+                padding: 2px 6px;
+                text-align: left;
+            }}
+            QPushButton:hover {{
+                background-color: rgba({r}, {g}, {b}, 0.3);
+            }}
+        """)
+        self.board_link_container.show()
 
     def update_tags_and_due(self, tags, due_date):
         """Limpia y dibuja las etiquetas actuales y la fecha de vencimiento."""

@@ -22,6 +22,7 @@ def snapshot_task(task_id, db_path=None):
         "description": task["description"], "position": task["position"],
         "due_date": task.get("due_date"), "due_time": task.get("due_time"),
         "recurrence": task.get("recurrence", "none"),
+        "linked_board_id": task.get("linked_board_id"),
         "tag_value_ids": [t["tag_value_id"] for t in task.get("tags", [])],
         "logs": [{"content": lg["content"], "created_at": lg["created_at"]}
                  for lg in get_logs(task_id, db_path)],
@@ -32,15 +33,20 @@ def snapshot_task(task_id, db_path=None):
 def restore_task(snap, column_id=None, db_path=None):
     """Recrea una tarea a partir de un snapshot. Devuelve el nuevo id."""
     column_id = column_id if column_id is not None else snap["column_id"]
+    # Si el tablero enlazado ya no existe (se borró mientras tanto), no lo restauramos:
+    # violaría la clave foránea en vez de simplemente perder el vínculo.
+    linked_board_id = snap.get("linked_board_id")
+    if linked_board_id is not None and get_board(linked_board_id, db_path) is None:
+        linked_board_id = None
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT COALESCE(MAX(position), -1) FROM tasks WHERE column_id = ?", (column_id,))
         pos = cursor.fetchone()[0] + 1
         cursor.execute(
-            "INSERT INTO tasks (column_id, title, description, position, due_date, due_time, recurrence) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO tasks (column_id, title, description, position, due_date, due_time, recurrence, linked_board_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (column_id, snap["title"], snap["description"], pos, snap.get("due_date"),
-             snap.get("due_time"), snap.get("recurrence", "none"))
+             snap.get("due_time"), snap.get("recurrence", "none"), linked_board_id)
         )
         new_id = cursor.lastrowid
         for tvid in snap.get("tag_value_ids", []):

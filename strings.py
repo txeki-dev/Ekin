@@ -77,6 +77,7 @@ STRINGS = {
     "board_view.delete_task.undo_label": "Eliminar tarea",
 
     # --- widgets.py: tarjetas, columnas (tooltips/menú), etiquetas ---
+    "widgets.card.board_link_tooltip": "Ir al tablero vinculado",
     "widgets.column.collapse_tooltip": "Plegar columna",
     "widgets.column.expand_tooltip": "Desplegar columna",
     "widgets.column.edit_tooltip": "Editar columna (opciones: editar, copiar, eliminar)",
@@ -382,6 +383,9 @@ STRINGS = {
     "task_detail.priority_low": "Baja",
     "task_detail.priority_medium": "Media",
     "task_detail.priority_high": "Alta",
+    "task_detail.linked_board_label": "🔗 <b>Tablero vinculado:</b>",
+    "task_detail.linked_board_tooltip": "Enlaza esta tarea con otro tablero (aparece como pastilla clicable en la tarjeta)",
+    "task_detail.linked_board_none": "— Sin vincular —",
     "task_detail.links_label": "🔗 <b>Enlaces / adjuntos:</b>",
     "task_detail.link_url_placeholder": "URL o ruta…",
     "task_detail.link_label_placeholder": "Nombre (opcional)",

@@ -90,6 +90,13 @@ def init_db(db_path=None):
         if "recurrence" not in tasks_columns:
             cursor.execute("ALTER TABLE tasks ADD COLUMN recurrence TEXT NOT NULL DEFAULT 'none'")
 
+        # Migración: vínculo opcional de una tarea con OTRO tablero (p. ej. una tarea
+        # resumen en "Tareas" que enlaza al detalle en el tablero "SW X")
+        if "linked_board_id" not in tasks_columns:
+            cursor.execute(
+                "ALTER TABLE tasks ADD COLUMN linked_board_id INTEGER REFERENCES boards(id) ON DELETE SET NULL"
+            )
+
         # Tabla de logs/diario (task_logs)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS task_logs (

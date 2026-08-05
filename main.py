@@ -186,6 +186,9 @@ class MainWindow(QMainWindow):
         self.board_view.data_changed.connect(self.calendar_view.refresh)
         self.board_view.data_changed.connect(self.sync_ics)
 
+        # Pastilla de "tablero enlazado" en una tarjeta: saltar directamente a ese tablero
+        self.board_view.board_link_activated.connect(self.on_board_link_activated)
+
         # Cargar tablero seleccionado inicial (se maneja automáticamente por reload_boards() en la sidebar)
         if self.sidebar.active_board_id:
             self.board_view.load_board(self.sidebar.active_board_id, notify=False)
@@ -269,6 +272,12 @@ class MainWindow(QMainWindow):
             if self.sidebar.active_board_id:
                 self.board_view.load_board(self.sidebar.active_board_id)
             self.sidebar.refresh_notifications()
+
+    def on_board_link_activated(self, board_id):
+        """Desde la pastilla de tablero enlazado de una tarjeta: saltar a ese tablero."""
+        self.show_board_view()
+        if board_id and self.sidebar.active_board_id != board_id:
+            self.sidebar.select_board(board_id)
 
     def on_calendar_task(self, task_id, board_id):
         """Desde el calendario: abrir el detalle y quedarnos en el calendario."""
