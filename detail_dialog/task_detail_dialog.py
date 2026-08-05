@@ -11,7 +11,7 @@ from strings import t
 from widgets import make_glyph_icon
 from .markdown_edit import MarkdownTextEdit, RichTextToolbar
 from .log_entry import LogEntryWidget
-from .tag_pill import ClickableTagPill
+from .tag_pill import ClickableTagPill, color_icon
 from .tag_manager_dialog import TagManagerDialog
 from .tag_picker_dialog import TagPickerDialog
 
@@ -136,7 +136,25 @@ class TaskDetailDialog(QDialog):
         tag_btns_row.addStretch()
         tags_layout.addLayout(tag_btns_row)
 
-        left_layout.addWidget(tags_section)
+        # Selector rápido de Prioridad, a la derecha de Etiquetas
+        priority_section = QWidget()
+        priority_layout = QVBoxLayout(priority_section)
+        priority_layout.setContentsMargins(0, 0, 0, 0)
+        priority_layout.setSpacing(4)
+        priority_layout.addWidget(QLabel(t("task_detail.priority_label")))
+        self.priority_combo = QComboBox()
+        self.priority_combo.setToolTip(t("task_detail.priority_tooltip"))
+        self.priority_combo.setCursor(Qt.PointingHandCursor)
+        self._refresh_priority_combo()
+        self.priority_combo.currentIndexChanged.connect(self._on_priority_changed)
+        priority_layout.addWidget(self.priority_combo)
+        priority_layout.addStretch()
+
+        tags_priority_row = QHBoxLayout()
+        tags_priority_row.setSpacing(12)
+        tags_priority_row.addWidget(tags_section, 2)
+        tags_priority_row.addWidget(priority_section, 1)
+        left_layout.addLayout(tags_priority_row)
 
         # 5. Enlaces / adjuntos
         links_section = QWidget()
@@ -330,6 +348,7 @@ class TaskDetailDialog(QDialog):
             hint = QLabel(t("task_detail.no_tags_hint"))
             hint.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 11px; font-style: italic;")
             self.tags_container_layout.addWidget(hint)
+            self._sync_priority_combo_selection()
             return
 
         for index, tag in enumerate(self.current_tags):
@@ -370,6 +389,67 @@ class TaskDetailDialog(QDialog):
             pill_layout.addWidget(del_btn)
 
             self.tags_container_layout.addWidget(pill)
+
+        self._sync_priority_combo_selection()
+
+    def _ensure_priority_category(self):
+        """Devuelve el id de la etiqueta permanente «Prioridad», asegurando que existan sus
+        niveles por defecto (Baja/Media/Alta) sin duplicar valores que ya existan (p. ej. la
+        etiqueta de ejemplo «Prioridad: Alta» del onboarding)."""
+        cat_id = database.create_tag_category(t("task_detail.priority_category_name"), self.db_path)
+        defaults = (
+            (t("task_detail.priority_low"), "#10b981"),
+            (t("task_detail.priority_medium"), "#f59e0b"),
+            (t("task_detail.priority_high"), "#ef4444"),
+        )
+        for value, color in defaults:
+            if not database.value_exists_in_category(cat_id, value, db_path=self.db_path):
+                database.create_tag_value(cat_id, value, color, self.db_path)
+        return cat_id
+
+    def _refresh_priority_combo(self):
+        """Rellena el selector rápido de Prioridad con los valores actuales del catálogo
+        (categoría «Prioridad», creada bajo demanda) y refleja la prioridad de la tarea."""
+        self._priority_category_id = self._ensure_priority_category()
+        self.priority_combo.blockSignals(True)
+        self.priority_combo.clear()
+        self.priority_combo.addItem(t("task_detail.priority_none"), None)
+        # Orden Baja/Media/Alta para los niveles por defecto en vez del orden alfabético
+        # genérico del catálogo; cualquier valor adicional que el usuario añada va detrás.
+        order = [t("task_detail.priority_low"), t("task_detail.priority_medium"), t("task_detail.priority_high")]
+        values = database.get_tag_values(self._priority_category_id, self.db_path)
+        values.sort(key=lambda v: (order.index(v["value"]) if v["value"] in order else len(order), v["value"]))
+        for value in values:
+            self.priority_combo.addItem(color_icon(value["color"]), value["value"], value["id"])
+        self.priority_combo.blockSignals(False)
+        self._sync_priority_combo_selection()
+
+    def _sync_priority_combo_selection(self):
+        """Ajusta la selección del combo de Prioridad a lo que haya en current_tags,
+        sin disparar _on_priority_changed."""
+        current = next(
+            (tg for tg in self.current_tags if tg.get("category_id") == self._priority_category_id),
+            None
+        )
+        self.priority_combo.blockSignals(True)
+        if current:
+            idx = self.priority_combo.findData(current["tag_value_id"])
+            self.priority_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        else:
+            self.priority_combo.setCurrentIndex(0)
+        self.priority_combo.blockSignals(False)
+
+    def _on_priority_changed(self, index):
+        value_id = self.priority_combo.currentData()
+        if value_id is None:
+            self.current_tags = [
+                tg for tg in self.current_tags if tg.get("category_id") != self._priority_category_id
+            ]
+            self.render_tags()
+        else:
+            tag = database.get_tag_value(value_id, self.db_path)
+            if tag:
+                self._set_category_value(tag)
 
     def _set_category_value(self, tag):
         """Asigna (o reemplaza) el valor de una etiqueta permanente, garantizando un

@@ -89,6 +89,19 @@ class MarkdownTextEdit(QTextEdit):
                 event.accept()
                 return
 
+        # --- "-->" al escribir: se convierte en una flecha "→" ---
+        if event.text() == ">" and not cursor.hasSelection():
+            text_before = cursor.block().text()[:cursor.positionInBlock()]
+            if text_before.endswith("--"):
+                cursor.beginEditBlock()
+                cursor.movePosition(QTextCursor.Left, QTextCursor.KeepAnchor, 2)
+                cursor.removeSelectedText()
+                cursor.insertText("→")
+                cursor.endEditBlock()
+                self.setTextCursor(cursor)
+                event.accept()
+                return
+
         super().keyPressEvent(event)
 
     def insertFromMimeData(self, source):
@@ -277,6 +290,14 @@ class RichTextToolbar(QWidget):
         self.bullet_btn.clicked.connect(self.toggle_bullets)
         layout.addWidget(self.bullet_btn)
 
+        self.arrow_btn = QPushButton("→")
+        self.arrow_btn.setObjectName("FormatButton")
+        self.arrow_btn.setToolTip(t("markdown_edit.arrow_tooltip"))
+        self.arrow_btn.setCursor(Qt.PointingHandCursor)
+        self.arrow_btn.setFixedSize(28, 26)
+        self.arrow_btn.clicked.connect(self.insert_arrow)
+        layout.addWidget(self.arrow_btn)
+
         self.table_btn = QPushButton("▦")
         self.table_btn.setObjectName("FormatButton")
         self.table_btn.setToolTip(t("markdown_edit.table_tooltip"))
@@ -315,6 +336,11 @@ class RichTextToolbar(QWidget):
         list_format = QTextListFormat()
         list_format.setStyle(QTextListFormat.ListDisc)
         cursor.createList(list_format)
+        self.text_edit.setFocus()
+
+    def insert_arrow(self):
+        cursor = self.text_edit.textCursor()
+        cursor.insertText("→")
         self.text_edit.setFocus()
 
     def insert_table_dialog(self):
