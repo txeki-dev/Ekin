@@ -112,6 +112,13 @@ Ordered roughly by value/effort. Checkboxes track what's done.
   task's own detail. New nullable `tasks.linked_board_id` column (`ON DELETE SET NULL`, so
   deleting the target board just clears the link); included in the task snapshot/restore
   (Ctrl+Z) round-trip.
+- [x] **Hover-to-expand on collapsed columns** *(Done 2026-08-06)*. Extends the 0.5.1
+  "drop-to-expand" behavior (which always dropped the card at the end): holding a dragged card
+  over a collapsed column for ~650ms now unfolds it automatically so a real drop position can be
+  chosen, via the same `compute_drop_index` mechanism already used by expanded columns. A quick
+  drop before the timer fires still falls to the end (unchanged). If the drag ends without
+  dropping inside that column, it folds itself back up — temporary, not equivalent to manually
+  clicking unfold.
 
 ### Data & safety
 - [x] **Automatic DB backups** *(Done in v0.4.0)* — `backups.py` writes a consistent SQLite snapshot
@@ -173,6 +180,9 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 10. ~~**Board links on task cards** — a **🔗 Tablero vinculado** selector in the task detail dialog
    links a task to a different board; the card shows a clickable pill that jumps straight there.~~
    ✅ 2026-08-05.
+11. ~~**Hover-to-expand on collapsed columns** — holding a dragged card over a collapsed column
+   unfolds it temporarily so a drop position can be chosen, instead of always landing at the end;
+   folds back up if the drag ends without dropping there.~~ ✅ 2026-08-06.
 
 ### 🎯 Theme D — Distribution (parked)
 **PyInstaller** standalone build + **update-from-Releases** (replaces the `git pull` auto-updater).
