@@ -200,6 +200,9 @@ class BoardViewWidget(QFrame):
         self.board_id = None
         self.column_widgets = {}  # Guarda referencia a {column_id: ColumnWidget}
         self.undo_manager = None  # lo inyecta MainWindow
+        # Columna actualmente expandida por HOVER durante un arrastre en curso (o None).
+        # Vive aquí (no en ColumnWidget) porque load_board() recrea todos los ColumnWidget.
+        self._hover_expanded_column_id = None
         self.setObjectName("BoardViewWidget")
 
         self.init_ui()
@@ -377,6 +380,7 @@ class BoardViewWidget(QFrame):
             col_widget.copy_column_requested.connect(self.copy_column)
             col_widget.collapse_toggle_requested.connect(self.handle_column_collapse)
             col_widget.collapsed_card_drop.connect(self.handle_collapsed_card_drop)
+            col_widget.hover_expand_requested.connect(self.handle_hover_expand_requested)
 
             # Solo montamos las tarjetas si la columna está desplegada
             if not col_data.get("collapsed"):
@@ -386,6 +390,7 @@ class BoardViewWidget(QFrame):
                         card.set_card_style(board_color)
                     card.clicked.connect(self.open_task_details)
                     card.board_link_clicked.connect(self.board_link_activated.emit)
+                    card.drag_ended.connect(self.finalize_hover_expand)
                     col_widget.add_task_card(card)
 
             self.columns_layout.addWidget(col_widget)
@@ -502,6 +507,34 @@ class BoardViewWidget(QFrame):
         database.set_column_collapsed(column_id, False, self.db_path)
         # Posición muy alta -> handle_task_drop la recorta al final de la columna destino
         self.handle_task_drop(task_id, column_id, 10 ** 9)
+
+    def handle_hover_expand_requested(self, column_id):
+        """Expansión temporal (por hover durante un arrastre) de una columna
+        plegada: permite elegir la posición de destino en vez de caer siempre al
+        final. Si había otra columna expandida por hover en este mismo
+        arrastre, se repliega primero."""
+        if column_id == self._hover_expanded_column_id:
+            return
+        self._collapse_hover_expanded_column()
+        database.set_column_collapsed(column_id, False, self.db_path)
+        self._hover_expanded_column_id = column_id
+        self.load_board(self.board_id, notify=False)
+
+    def _collapse_hover_expanded_column(self):
+        """Repliega la columna actualmente expandida por hover (si la hay) sin
+        recargar el tablero — quien llama se encarga de recargar después."""
+        if self._hover_expanded_column_id is not None:
+            database.set_column_collapsed(self._hover_expanded_column_id, True, self.db_path)
+            self._hover_expanded_column_id = None
+
+    def finalize_hover_expand(self):
+        """Conectado a TaskCard.drag_ended: se ejecuta al terminar cualquier
+        arrastre de tarjeta (soltada donde sea, o cancelado). Si queda una
+        columna expandida por hover sin haber recibido el drop, se repliega."""
+        if self._hover_expanded_column_id is None:
+            return
+        self._collapse_hover_expanded_column()
+        self.load_board(self.board_id, notify=False)
 
     def handle_column_drop(self, column_id, target_position):
         """Reordena las columnas del tablero actual tras arrastrar una por su título."""
@@ -650,6 +683,11 @@ class BoardViewWidget(QFrame):
 
         # 3. Guardar las nuevas posiciones en la base de datos
         database.update_task_positions(updates, self.db_path)
+
+        # Un drop real dentro de la columna expandida por hover la deja expandida
+        # (no debe replegarse al terminar el arrastre).
+        if target_column_id == self._hover_expanded_column_id:
+            self._hover_expanded_column_id = None
 
         # 4. Recargar el tablero para actualizar la UI con la base de datos como fuente de verdad
         self.load_board(self.board_id)

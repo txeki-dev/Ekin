@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt, QMimeData, QPoint, Signal, QRect, QSize
+from PySide6.QtCore import Qt, QMimeData, QPoint, Signal, QRect, QSize, QTimer
 from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QWidget, QMenu, QApplication, QLayout
@@ -155,6 +155,9 @@ class TaskCard(QFrame):
     clicked = Signal(int)  # task_id
     # Emitido al pulsar la pastilla de tablero enlazado (no abre el detalle de la tarea)
     board_link_clicked = Signal(int)  # linked_board_id
+    # Emitido al terminar CUALQUIER arrastre de esta tarjeta (soltada donde sea, o cancelado):
+    # única señal fiable para saber que QDrag.exec() ha devuelto el control.
+    drag_ended = Signal()
 
     def __init__(self, task_data, parent=None):
         super().__init__(parent)
@@ -386,6 +389,11 @@ class TaskCard(QFrame):
         if drop_action == Qt.IgnoreAction:
             self.show()
 
+        # QDrag.exec() ha devuelto el control: el arrastre ha terminado del todo
+        # (soltada en cualquier sitio, o cancelada). Único punto fiable para que
+        # BoardViewWidget sepa que debe cerrar una posible expansión por hover.
+        self.drag_ended.emit()
+
     def mouseReleaseEvent(self, event):
         # Si se soltó el click izquierdo y no se inició drag, se considera un click normal
         if event.button() == Qt.LeftButton:
@@ -531,9 +539,11 @@ class ColumnWidget(QFrame):
     copy_column_requested = Signal(int)  # column_id
     collapse_toggle_requested = Signal(int)  # column_id (plegar/desplegar)
     collapsed_card_drop = Signal(int, int)   # task_id, column_id (soltar tarjeta en columna plegada)
+    hover_expand_requested = Signal(int)     # column_id (hover sostenido sobre columna plegada)
 
     COLLAPSED_WIDTH = 46
     EXPANDED_WIDTH = 280
+    HOVER_EXPAND_MS = 650
 
     def __init__(self, column_data, parent=None):
         super().__init__(parent)
@@ -544,7 +554,19 @@ class ColumnWidget(QFrame):
         self.setObjectName("ColumnContainer")
         self.setAttribute(Qt.WA_StyledBackground, True)
         self.setFixedWidth(self.COLLAPSED_WIDTH if self.collapsed else self.EXPANDED_WIDTH)
+
+        self._hover_timer = QTimer(self)
+        self._hover_timer.setSingleShot(True)
+        self._hover_timer.setInterval(self.HOVER_EXPAND_MS)
+        self._hover_timer.timeout.connect(self._on_hover_timeout)
+
         self.init_ui()
+
+    def _on_hover_timeout(self):
+        """Se ha mantenido el hover de un drag sobre esta columna PLEGADA lo
+        suficiente: pide que se despliegue para poder elegir posición."""
+        if self.collapsed:
+            self.hover_expand_requested.emit(self.column_id)
 
     def _column_icon_button(self, kind, tooltip):
         """Pequeño botón cuadrado con un icono PINTADO (left/right/pencil) a juego con
@@ -683,6 +705,7 @@ class ColumnWidget(QFrame):
         if self.collapsed and event.mimeData().hasFormat("application/x-ekin-task-id"):
             event.acceptProposedAction()
             self.set_column_style(dragging=True)
+            self._hover_timer.start()
         else:
             event.ignore()
 
@@ -695,11 +718,13 @@ class ColumnWidget(QFrame):
     def dragLeaveEvent(self, event):
         if self.collapsed:
             self.set_column_style(dragging=False)
+            self._hover_timer.stop()
         super().dragLeaveEvent(event)
 
     def dropEvent(self, event):
         mime = event.mimeData()
         if self.collapsed and mime.hasFormat("application/x-ekin-task-id"):
+            self._hover_timer.stop()
             task_id = int(mime.data("application/x-ekin-task-id").data().decode("utf-8"))
             event.acceptProposedAction()
             self.set_column_style(dragging=False)

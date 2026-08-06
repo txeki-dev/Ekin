@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Hover-to-expand on collapsed columns.** Dragging a task card and holding it over a collapsed
+  column for about a second now unfolds it automatically so you can pick exactly where in the
+  column to drop the card, instead of it always landing at the bottom. A quick drop (before the
+  column has had time to unfold) still works exactly as before. If the drag ends without dropping
+  inside that column — dropped elsewhere, or cancelled — the column folds itself back up.
+
 ## [0.8.0] - 2026-08-05
 
 ### Added

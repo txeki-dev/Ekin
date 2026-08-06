@@ -4,11 +4,40 @@ pocas propiedades estructurales, sin interacción profunda. Necesitan el fixture
 que en CI) o con un display real."""
 from datetime import date, timedelta
 
+from PySide6.QtCore import Qt, QPoint, QMimeData
+from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDropEvent
+
 import database
 from calendar_view import CalendarViewWidget
 from sidebar import NotificationsPopup
 from settings_dialog import SettingsDialog
+from widgets import ColumnWidget
 from strings import t
+
+
+def _task_drag_mime():
+    mime = QMimeData()
+    mime.setData("application/x-ekin-task-id", b"1")
+    return mime
+
+
+def _drag_enter_event():
+    # PySide6 no mantiene viva la QMimeData por su cuenta: si el único
+    # QMimeData pasado al constructor no se referencia desde ningún otro
+    # sitio, se recolecta en cuanto termina la expresión y event.mimeData()
+    # devuelve un QObject genérico (sin .hasFormat). _keepalive fija su vida a
+    # la del propio evento.
+    mime = _task_drag_mime()
+    ev = QDragEnterEvent(QPoint(5, 5), Qt.MoveAction, mime, Qt.LeftButton, Qt.NoModifier)
+    ev._keepalive = mime
+    return ev
+
+
+def _drop_event():
+    mime = _task_drag_mime()
+    ev = QDropEvent(QPoint(5, 5), Qt.MoveAction, mime, Qt.LeftButton, Qt.NoModifier)
+    ev._keepalive = mime
+    return ev
 
 
 # --- CalendarViewWidget ---
@@ -75,3 +104,63 @@ def test_settings_dialog_notification_checkbox_reflects_saved_value(qapp, db_pat
     database.set_setting("notifications_enabled", "0", db_path)
     dlg = SettingsDialog(db_path)
     assert dlg.notif_chk.isChecked() is False
+
+
+# --- ColumnWidget: temporizador de hover-expand sobre columna plegada ---
+# No se simula un QDrag.exec() nativo (no es viable en pytest/CI): se invocan los
+# manejadores de evento directamente con un QDragEnterEvent/QDragLeaveEvent real,
+# igual que haría Qt al despachar un drag en curso.
+
+def _collapsed_column_widget(column_id=1):
+    col_data = {
+        "id": column_id, "board_id": 1, "name": "Col", "color": "#3b82f6",
+        "position": 0, "collapsed": 1, "task_count": 0,
+    }
+    return ColumnWidget(col_data)
+
+
+def test_hover_timer_starts_on_drag_enter(qapp):
+    col = _collapsed_column_widget()
+    assert not col._hover_timer.isActive()
+
+    col.dragEnterEvent(_drag_enter_event())
+
+    assert col._hover_timer.isActive()
+
+
+def test_hover_timer_stops_on_drag_leave(qapp):
+    col = _collapsed_column_widget()
+    col.dragEnterEvent(_drag_enter_event())
+    assert col._hover_timer.isActive()
+
+    col.dragLeaveEvent(QDragLeaveEvent())
+
+    assert not col._hover_timer.isActive()
+
+
+def test_hover_timer_stops_on_drop_before_timeout(qapp):
+    col = _collapsed_column_widget()
+    col.dragEnterEvent(_drag_enter_event())
+    assert col._hover_timer.isActive()
+
+    dropped = []
+    col.collapsed_card_drop.connect(lambda task_id, col_id: dropped.append((task_id, col_id)))
+
+    col.dropEvent(_drop_event())
+
+    assert not col._hover_timer.isActive()
+    assert dropped == [(1, 1)]
+
+
+def test_hover_timeout_emits_signal_only_while_collapsed(qapp):
+    col = _collapsed_column_widget(column_id=7)
+    emitted = []
+    col.hover_expand_requested.connect(lambda cid: emitted.append(cid))
+
+    col._on_hover_timeout()
+    assert emitted == [7]
+
+    # Si mientras tanto ya se desplegó (collapsed=False), un timeout tardío no debe emitir nada.
+    col.collapsed = False
+    col._on_hover_timeout()
+    assert emitted == [7]

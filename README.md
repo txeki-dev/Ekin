@@ -138,7 +138,7 @@ The database (`ekin_board.db`) is automatically initialized on the first run, an
 * Inside a board, click **➕ Nueva Columna** to create stage headers (e.g., "To-Do", "In Progress", "Done").
 * **Reorder or move columns**: click and drag a column by its **title** to reorder it within the board, or drop it onto another board's button in the sidebar to move it there.
 * **Column Actions**: Click the **pencil (✎)** button in a column header to edit its name/color, delete it, or **copy** (clone) it and its tasks to another board.
-* **Collapse a column**: Click **◀** in the header to fold a column into a slim strip (name + task count); click **▶** on the strip to expand it again. The state is remembered per column, and **dropping a card onto a collapsed column expands it** and drops the card in.
+* **Collapse a column**: Click **◀** in the header to fold a column into a slim strip (name + task count); click **▶** on the strip to expand it again. The state is remembered per column, and **dropping a card onto a collapsed column expands it** and drops the card in. If you instead **hover a dragged card over the collapsed strip for about a second**, it unfolds automatically *while you're still dragging*, so you can pick exactly where in the column the card lands instead of it always going to the bottom — drag it away without dropping there and the column quietly folds back up.
 * Click **➕ Añadir Tarea** at the bottom of any column to quickly add a card.
 * **Drag & Drop**: Click and hold a task card to drag it to another column or change its vertical position.
 
