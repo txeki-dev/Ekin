@@ -294,6 +294,33 @@ STRINGS = {
     "settings.geometry_hint": "El tamaño y la posición de la ventana se recuerdan automáticamente.",
     "settings.close_btn": "Cerrar",
 
+    # --- shortcuts_dialog.py: diálogo "Atajos de teclado" (Ctrl+/) ---
+    "shortcuts.window_title": "Atajos de teclado",
+    "shortcuts.header": "⌨ <b>Atajos de teclado</b>",
+    "shortcuts.section_general": "General y navegación",
+    "shortcuts.section_editor": "Editor de texto enriquecido (descripción y diario)",
+    "shortcuts.item_search": "Ctrl+F — Búsqueda global de tareas",
+    "shortcuts.item_new_task": (
+        "Ctrl+N — Nueva tarea en la primera columna del tablero activo (fuera del editor de "
+        "texto; dentro de él, Ctrl+N es Negrita)"
+    ),
+    "shortcuts.item_new_column": "Ctrl+Shift+N — Nueva columna en el tablero activo",
+    "shortcuts.item_prev_next_board": "Alt+↑ / Alt+↓ — Tablero anterior / siguiente",
+    "shortcuts.item_jump_board": "Ctrl+1 … Ctrl+9 — Saltar directamente al tablero Nº de la barra lateral",
+    "shortcuts.item_calendar": "Ctrl+Shift+C — Abrir el Calendario",
+    "shortcuts.item_settings": "Ctrl+, — Abrir Ajustes",
+    "shortcuts.item_shortcuts": "Ctrl+/ — Mostrar esta ventana",
+    "shortcuts.item_undo_redo": "Ctrl+Z / Ctrl+Y (o Ctrl+Shift+Z) — Deshacer / Rehacer",
+    "shortcuts.item_close_dialog": "Esc — Cerrar el diálogo abierto",
+    "shortcuts.item_bold": "Ctrl+B o Ctrl+N — Negrita (dentro del editor)",
+    "shortcuts.item_italic": "Ctrl+K o Ctrl+I — Cursiva (dentro del editor)",
+    "shortcuts.item_strike": "Ctrl+Shift+X — Tachado (dentro del editor)",
+    "shortcuts.item_nest_bullet": "Tab (sobre una viñeta) — Anidar la viñeta (dentro del editor)",
+    "shortcuts.item_arrow": "Escribir «-->» se convierte en → automáticamente (dentro del editor)",
+    "shortcuts.item_add_log": "Ctrl+Enter — Añadir la nota al Diario (detalle de tarea)",
+    "shortcuts.hint": "Pulsa Ctrl+/ en cualquier momento para volver a ver esta ventana.",
+    "shortcuts.close_btn": "Cerrar",
+
     # --- detail_dialog/markdown_edit.py: editor de texto enriquecido (barra de formato) ---
     "markdown_edit.bold_tooltip": "Negrita (Ctrl+B o Ctrl+N)",
     "markdown_edit.italic_tooltip": "Cursiva (Ctrl+K o Ctrl+I)",

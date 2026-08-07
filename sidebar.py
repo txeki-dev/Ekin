@@ -622,6 +622,13 @@ class SidebarWidget(QFrame):
         if new_idx != idx:
             self.select_board(board_ids[new_idx])
 
+    def select_board_by_index(self, index):
+        """Selecciona el tablero en la posición `index` (0-based, mismo orden visual que
+        select_adjacent_board). No hace nada si el índice está fuera de rango."""
+        board_ids = list(self.board_buttons.keys())
+        if 0 <= index < len(board_ids):
+            self.select_board(board_ids[index])
+
     def add_board(self):
         """Abre el diálogo para crear un nuevo tablero con nombre y color."""
         dialog = BoardEditDialog(t("sidebar.board_edit.new_title"), name="", color="#3b82f6", parent=self)

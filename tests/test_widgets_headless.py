@@ -6,11 +6,13 @@ from datetime import date, timedelta
 
 from PySide6.QtCore import Qt, QPoint, QMimeData
 from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDropEvent
+from PySide6.QtWidgets import QLabel
 
 import database
 from calendar_view import CalendarViewWidget
 from sidebar import NotificationsPopup
 from settings_dialog import SettingsDialog
+from shortcuts_dialog import ShortcutsDialog
 from widgets import ColumnWidget
 from strings import t
 
@@ -164,3 +166,18 @@ def test_hover_timeout_emits_signal_only_while_collapsed(qapp):
     col.collapsed = False
     col._on_hover_timeout()
     assert emitted == [7]
+
+
+# --- ShortcutsDialog (Ctrl+/): referencia estática de atajos de teclado ---
+
+def test_shortcuts_dialog_constructs_with_both_sections(qapp):
+    dlg = ShortcutsDialog()
+    assert dlg.windowTitle() == t("shortcuts.window_title")
+
+    label_texts = [lbl.text() for lbl in dlg.findChildren(QLabel)]
+    assert any(t("shortcuts.section_general") in text for text in label_texts)
+    assert any(t("shortcuts.section_editor") in text for text in label_texts)
+    # Una muestra representativa de atajos (nuevos y preexistentes) debe aparecer en algún QLabel.
+    assert any(t("shortcuts.item_new_column") == text for text in label_texts)
+    assert any(t("shortcuts.item_jump_board") == text for text in label_texts)
+    assert any(t("shortcuts.item_bold") == text for text in label_texts)

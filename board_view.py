@@ -438,7 +438,7 @@ class BoardViewWidget(QFrame):
 
     def add_column(self):
         """Abre el diálogo para crear una columna."""
-        if not self.board_id:
+        if not self.board_id or self.board_id == -1:
             return
         
         dialog = ColumnEditDialog(t("board_view.column_edit.new_title"), name="", color="#3b82f6", parent=self)

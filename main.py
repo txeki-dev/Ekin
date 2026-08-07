@@ -18,6 +18,7 @@ from calendar_view import CalendarViewWidget
 from detail_dialog import TaskDetailDialog
 from search_dialog import SearchDialog
 from settings_dialog import SettingsDialog
+from shortcuts_dialog import ShortcutsDialog
 from undo import UndoManager
 import ics_export
 from version import __version__
@@ -115,6 +116,22 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Alt+Down"), self).activated.connect(
             lambda: self.sidebar.select_adjacent_board(1)
         )
+
+        # Ctrl+1..Ctrl+9: saltar directamente al tablero N-ésimo de la barra lateral
+        for _n in range(1, 10):
+            QShortcut(QKeySequence(f"Ctrl+{_n}"), self).activated.connect(
+                lambda index=_n - 1: self.sidebar.select_board_by_index(index)
+            )
+
+        # Ctrl+Shift+N: nueva columna en el tablero activo
+        QShortcut(QKeySequence("Ctrl+Shift+N"), self).activated.connect(self.board_view.add_column)
+
+        # Ctrl+,: abrir Ajustes; Ctrl+Shift+C: abrir el Calendario
+        QShortcut(QKeySequence("Ctrl+,"), self).activated.connect(self.show_settings)
+        QShortcut(QKeySequence("Ctrl+Shift+C"), self).activated.connect(self.show_calendar_view)
+
+        # Ctrl+/: ventana de referencia de atajos de teclado
+        QShortcut(QKeySequence("Ctrl+/"), self).activated.connect(self.show_shortcuts)
 
         # Comprobar actualizaciones tras 1 segundo
         QTimer.singleShot(1000, self.check_for_updates)
@@ -226,6 +243,10 @@ class MainWindow(QMainWindow):
         dlg = SettingsDialog(database.DB_NAME, self)
         dlg.theme_changed.connect(lambda theme: self.apply_theme(theme, reload=True))
         dlg.exec()
+
+    def show_shortcuts(self):
+        """Abre la ventana de referencia de atajos de teclado (Ctrl+/)."""
+        ShortcutsDialog(self).exec()
 
     def _do_undo(self):
         if self.undo_manager.undo():

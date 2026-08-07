@@ -24,6 +24,7 @@ Ekin Kanban is a sleek, resource-friendly, and offline-first personal Kanban boa
 - **Calendar Sync (iCalendar)**: An always-updated `.ics` feed (with **timed events + `VALARM` reminders** and **per-board feeds**) you can **subscribe** to from Google/Apple/Outlook. A **"Subscribe"** helper copies the URL and opens the provider page.
 - **Attachments / Links**: Attach URLs or file paths to a card (**🔗**), open or remove them from the task detail.
 - **Undo / Redo**: **Ctrl+Z / Ctrl+Y** restores a deleted task, column or board — with all its tags, diary and links.
+- **Keyboard Shortcuts**: Quick actions for new tasks/columns, jumping between boards, opening Settings/Calendar, and more — press **Ctrl+/** anytime to open a reference dialog listing every shortcut in the app.
 - **Board Archiving & Export**: Archive boards to declutter the sidebar; export everything to **JSON / CSV / Markdown**.
 - **Themes & Settings**: A ⚙ settings screen with a **dark/light theme** toggle, notification prefs, and a remembered window size.
 - **Automatic Backups**: On every startup Ekin snapshots your database into a `backups/` folder (keeping the most recent few) before applying any changes — a cheap safety net against accidents.
@@ -163,6 +164,14 @@ At the top of the sidebar there is a small utility bar:
 When the app starts (and once per day thereafter), Ekin also shows a **native Windows notification** listing the cards that are due today. Ekin lives in the system tray while running — double-click the tray icon to bring the window back.
 
 Every time Ekin starts it also writes an automatic **backup** of your database into a `backups/` folder next to `ekin_board.db` (the five most recent are kept), so an accidental delete is never fatal.
+
+### 5. Keyboard Shortcuts
+Press **Ctrl+/** anywhere to open a reference dialog listing every shortcut in the app, grouped by category — the list below is a summary:
+* **Ctrl+N** — new task in the active board's first column. **Ctrl+Shift+N** — new column in the active board.
+* **Ctrl+1** … **Ctrl+9** — jump straight to the 1st through 9th board in the sidebar. **Alt+↑ / Alt+↓** — previous/next board.
+* **Ctrl+F** — global search. **Ctrl+,** — open Ajustes. **Ctrl+Shift+C** — open the Calendar.
+* **Ctrl+Z / Ctrl+Y** (or **Ctrl+Shift+Z**) — undo/redo. **Esc** — close the open dialog.
+* Inside the description/diary editor: **bold** (Ctrl+B or Ctrl+N), *italic* (Ctrl+K or Ctrl+I), ~~strikethrough~~ (Ctrl+Shift+X), **Tab** to nest a bullet, typing `-->` for **→**, and **Ctrl+Enter** to post a diary note.
 
 ---
 

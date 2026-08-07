@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   column to drop the card, instead of it always landing at the bottom. A quick drop (before the
   column has had time to unfold) still works exactly as before. If the drag ends without dropping
   inside that column — dropped elsewhere, or cancelled — the column folds itself back up.
+- **New keyboard shortcuts + a shortcuts reference dialog.** `Ctrl+Shift+N` creates a new column
+  in the active board; `Ctrl+1`…`Ctrl+9` jump straight to the 1st through 9th board in the
+  sidebar; `Ctrl+,` opens Ajustes; `Ctrl+Shift+C` opens the Calendar. **Ctrl+/** opens a new
+  "Atajos de teclado" dialog listing every shortcut in the app — the new ones plus the
+  pre-existing global and rich-text-editor ones — grouped by category.
+
+### Fixed
+- `board_view.add_column`'s guard didn't treat `board_id == -1` (the "no board selected" state) as
+  "no board selected", because `not -1` is `False` in Python. Harmless while only reachable from a
+  button that's hidden in that state, but now that `Ctrl+Shift+N` can call it directly, the guard
+  was fixed to match the equivalent check already used by `Ctrl+N`'s quick-add-task shortcut.
 
 ## [0.8.0] - 2026-08-05
 
