@@ -191,6 +191,7 @@ class MainWindow(QMainWindow):
         self.sidebar.open_calendar_requested.connect(self.show_calendar_view)
         self.sidebar.open_search_requested.connect(self.show_search)
         self.sidebar.open_settings_requested.connect(self.show_settings)
+        self.sidebar.open_shortcuts_requested.connect(self.show_shortcuts)
         self.sidebar.open_task_requested.connect(self.on_notification_task)
         self.calendar_view.close_requested.connect(self.show_board_view)
         self.calendar_view.task_activated.connect(self.on_calendar_task)

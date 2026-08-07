@@ -160,13 +160,14 @@ At the top of the sidebar there is a small utility bar:
 * 🔔 A **deadline bell** with a count badge: click it to see the tasks (from **all** boards) grouped into **ATRASADAS** (overdue), **HOY** (today) and **MAÑANA** (tomorrow). Click any of them to jump straight to its board and open the card.
 * 🔍 A **search button** (or **Ctrl+F** anywhere) that opens global search: filter tasks across every board by text (title/description), board, tag, and "only with a due date", then click a result to jump to its card.
 * 📅 A **calendar button** that switches the main area to a **monthly calendar view**. Navigate months with `‹ › / Hoy`, click a task chip to open its card, **drag a chip onto another day to change its due date**, and use **✖ Cerrar** to return to the board or **⚙ Ajustes** to configure calendar sync (see below).
+* ❔ A **shortcuts button** that opens the "Atajos de teclado" reference dialog (same as pressing **Ctrl+/**).
 
 When the app starts (and once per day thereafter), Ekin also shows a **native Windows notification** listing the cards that are due today. Ekin lives in the system tray while running — double-click the tray icon to bring the window back.
 
 Every time Ekin starts it also writes an automatic **backup** of your database into a `backups/` folder next to `ekin_board.db` (the five most recent are kept), so an accidental delete is never fatal.
 
 ### 5. Keyboard Shortcuts
-Press **Ctrl+/** anywhere to open a reference dialog listing every shortcut in the app, grouped by category — the list below is a summary:
+Press **Ctrl+/** anywhere, or click the **❔** button in the sidebar utility bar, to open a reference dialog listing every shortcut in the app, grouped by category — the list below is a summary:
 * **Ctrl+N** — new task in the active board's first column. **Ctrl+Shift+N** — new column in the active board.
 * **Ctrl+1** … **Ctrl+9** — jump straight to the 1st through 9th board in the sidebar. **Alt+↑ / Alt+↓** — previous/next board.
 * **Ctrl+F** — global search. **Ctrl+,** — open Ajustes. **Ctrl+Shift+C** — open the Calendar.

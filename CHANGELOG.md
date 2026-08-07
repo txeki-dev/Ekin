@@ -17,9 +17,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   in the active board; `Ctrl+1`…`Ctrl+9` jump straight to the 1st through 9th board in the
   sidebar; `Ctrl+,` opens Ajustes; `Ctrl+Shift+C` opens the Calendar. **Ctrl+/** opens a new
   "Atajos de teclado" dialog listing every shortcut in the app — the new ones plus the
-  pre-existing global and rich-text-editor ones — grouped by category.
+  pre-existing global and rich-text-editor ones — grouped by category. A **❔** button in the
+  sidebar's utility bar (next to 🔍/📅/⚙) opens the same dialog — `Ctrl+/` alone had no visible
+  entry point anywhere in the UI, and typing `/` requires Shift on a Spanish keyboard layout, so it
+  wasn't an intuitive sole way to discover it.
 
 ### Fixed
+- **Critical: the app could crash when dropping a card into a hover-expanded column.**
+  Hover-to-expand (above) reloaded the *entire* board to reflect a column unfolding, which
+  destroyed and rebuilt every column widget — including the one the dragged card was still being
+  dragged out of. During a real drag this could get cleaned up mid-drag, and dropping the card
+  afterward crashed the app. Fixed by reconstructing only the one column whose collapsed state
+  actually changed, leaving every other column (in particular the drag's source column) completely
+  untouched. Also fixed a related visual glitch where the expanding column would briefly render
+  out of place relative to its neighbors.
 - `board_view.add_column`'s guard didn't treat `board_id == -1` (the "no board selected" state) as
   "no board selected", because `not -1` is `False` in Python. Harmless while only reachable from a
   button that's hidden in that state, but now that `Ctrl+Shift+N` can call it directly, the guard

@@ -287,6 +287,7 @@ class SidebarWidget(QFrame):
     open_calendar_requested = Signal()    # Emite al pulsar el botón de calendario
     open_search_requested = Signal()      # Emite al pulsar el botón de búsqueda
     open_settings_requested = Signal()    # Emite al pulsar el botón de ajustes
+    open_shortcuts_requested = Signal()   # Emite al pulsar el botón de atajos de teclado
     open_task_requested = Signal(int, int)  # (task_id, board_id) desde la campana o la búsqueda
 
     def __init__(self, db_path=database.DB_NAME, parent=None):
@@ -462,6 +463,14 @@ class SidebarWidget(QFrame):
         self.settings_btn.setToolTip(t("sidebar.settings_tooltip"))
         self.settings_btn.clicked.connect(self.open_settings_requested.emit)
         bar_layout.addWidget(self.settings_btn)
+
+        self.shortcuts_btn = QPushButton("❔")
+        self.shortcuts_btn.setObjectName("UtilityIconButton")
+        self.shortcuts_btn.setFixedSize(34, 28)
+        self.shortcuts_btn.setCursor(Qt.PointingHandCursor)
+        self.shortcuts_btn.setToolTip(t("sidebar.shortcuts_tooltip"))
+        self.shortcuts_btn.clicked.connect(self.open_shortcuts_requested.emit)
+        bar_layout.addWidget(self.shortcuts_btn)
 
         return bar
 

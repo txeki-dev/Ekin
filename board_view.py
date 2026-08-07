@@ -319,6 +319,68 @@ class BoardViewWidget(QFrame):
         # Por defecto ocultamos la zona del tablero hasta cargar uno
         self.board_scroll_area.hide()
 
+    def _build_column_widget(self, col_data, tasks, board_info):
+        """Construye un ColumnWidget completo (señales conectadas y, si está desplegada,
+        sus TaskCard) para una columna dada. No lo añade a ningún layout ni a
+        self.column_widgets -- eso lo decide el llamante: load_board() para reconstruir
+        el tablero entero, _rebuild_single_column() para sustituir solo una columna sin
+        tocar el resto (necesario para no destruir la columna de ORIGEN de un drag en
+        curso -- ver _rebuild_single_column)."""
+        col_widget = ColumnWidget(col_data, self)
+
+        col_widget.task_dropped.connect(self.handle_task_drop)
+        col_widget.add_task_requested.connect(self.add_task)
+        col_widget.edit_column_requested.connect(self.edit_column)
+        col_widget.delete_column_requested.connect(self.delete_column)
+        col_widget.copy_column_requested.connect(self.copy_column)
+        col_widget.collapse_toggle_requested.connect(self.handle_column_collapse)
+        col_widget.collapsed_card_drop.connect(self.handle_collapsed_card_drop)
+        col_widget.hover_expand_requested.connect(self.handle_hover_expand_requested)
+
+        if not col_data.get("collapsed"):
+            for task_data in tasks:
+                card = TaskCard(task_data, self)
+                if board_info:
+                    card.set_card_style(board_info["color"])
+                card.clicked.connect(self.open_task_details)
+                card.board_link_clicked.connect(self.board_link_activated.emit)
+                card.drag_ended.connect(self.finalize_hover_expand)
+                col_widget.add_task_card(card)
+
+        return col_widget
+
+    def _rebuild_single_column(self, column_id):
+        """Reconstruye el ColumnWidget de UNA sola columna (datos/tareas frescos de la
+        BD) y lo sustituye en su misma posición dentro de columns_layout, sin tocar
+        ninguna otra columna. A diferencia de load_board(), esto SÍ es seguro de llamar
+        a mitad de un QDrag.exec() nativo en curso: el hover-expand solo actúa sobre
+        columnas colapsadas, y una tarjeta solo puede arrastrarse desde una columna ya
+        desplegada, así que la columna de origen del arrastre nunca puede coincidir con
+        la columna que aquí se reconstruye -- nunca se le llama deleteLater()."""
+        old_widget = self.column_widgets.get(column_id)
+        if old_widget is None or not self.board_id or self.board_id == -1:
+            return
+
+        index = self.columns_layout.indexOf(old_widget)
+        if index == -1:
+            return
+
+        columns = database.get_columns(self.board_id, self.db_path)
+        col_data = next((c for c in columns if c["id"] == column_id), None)
+        if col_data is None:
+            return
+
+        tasks = database.get_tasks(column_id, self.db_path)
+        col_data["task_count"] = len(tasks)
+        board_info = database.get_board(self.board_id, self.db_path)
+
+        new_widget = self._build_column_widget(col_data, tasks, board_info)
+
+        self.columns_layout.removeWidget(old_widget)
+        old_widget.deleteLater()
+        self.columns_layout.insertWidget(index, new_widget)
+        self.column_widgets[column_id] = new_widget
+
     def load_board(self, board_id, notify=True):
         """Carga las columnas y tareas de un tablero específico. `notify=False` evita
         emitir data_changed cuando la carga es solo navegación (cambio de tablero,
@@ -370,28 +432,7 @@ class BoardViewWidget(QFrame):
             tasks = database.get_tasks(col_data["id"], self.db_path)
             col_data["task_count"] = len(tasks)
 
-            col_widget = ColumnWidget(col_data, self)  # fija su propio ancho según collapsed
-
-            # Conectar señales
-            col_widget.task_dropped.connect(self.handle_task_drop)
-            col_widget.add_task_requested.connect(self.add_task)
-            col_widget.edit_column_requested.connect(self.edit_column)
-            col_widget.delete_column_requested.connect(self.delete_column)
-            col_widget.copy_column_requested.connect(self.copy_column)
-            col_widget.collapse_toggle_requested.connect(self.handle_column_collapse)
-            col_widget.collapsed_card_drop.connect(self.handle_collapsed_card_drop)
-            col_widget.hover_expand_requested.connect(self.handle_hover_expand_requested)
-
-            # Solo montamos las tarjetas si la columna está desplegada
-            if not col_data.get("collapsed"):
-                for task_data in tasks:
-                    card = TaskCard(task_data, self)
-                    if board_info:
-                        card.set_card_style(board_color)
-                    card.clicked.connect(self.open_task_details)
-                    card.board_link_clicked.connect(self.board_link_activated.emit)
-                    card.drag_ended.connect(self.finalize_hover_expand)
-                    col_widget.add_task_card(card)
+            col_widget = self._build_column_widget(col_data, tasks, board_info)
 
             self.columns_layout.addWidget(col_widget)
             self.column_widgets[col_data["id"]] = col_widget
@@ -518,23 +559,22 @@ class BoardViewWidget(QFrame):
         self._collapse_hover_expanded_column()
         database.set_column_collapsed(column_id, False, self.db_path)
         self._hover_expanded_column_id = column_id
-        self.load_board(self.board_id, notify=False)
+        self._rebuild_single_column(column_id)
 
     def _collapse_hover_expanded_column(self):
-        """Repliega la columna actualmente expandida por hover (si la hay) sin
-        recargar el tablero — quien llama se encarga de recargar después."""
+        """Repliega (BD + widget) la columna actualmente expandida por hover, si la
+        hay. Reconstruye solo esa columna -- nunca toca el resto del tablero."""
         if self._hover_expanded_column_id is not None:
-            database.set_column_collapsed(self._hover_expanded_column_id, True, self.db_path)
+            column_id = self._hover_expanded_column_id
+            database.set_column_collapsed(column_id, True, self.db_path)
             self._hover_expanded_column_id = None
+            self._rebuild_single_column(column_id)
 
     def finalize_hover_expand(self):
         """Conectado a TaskCard.drag_ended: se ejecuta al terminar cualquier
         arrastre de tarjeta (soltada donde sea, o cancelado). Si queda una
         columna expandida por hover sin haber recibido el drop, se repliega."""
-        if self._hover_expanded_column_id is None:
-            return
         self._collapse_hover_expanded_column()
-        self.load_board(self.board_id, notify=False)
 
     def handle_column_drop(self, column_id, target_position):
         """Reordena las columnas del tablero actual tras arrastrar una por su título."""

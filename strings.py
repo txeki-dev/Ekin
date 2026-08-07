@@ -103,6 +103,7 @@ STRINGS = {
     "sidebar.search_tooltip": "Buscar tareas (Ctrl+F)",
     "sidebar.calendar_tooltip": "Abrir vista de calendario",
     "sidebar.settings_tooltip": "Ajustes (tema, notificaciones)",
+    "sidebar.shortcuts_tooltip": "Atajos de teclado (Ctrl+/)",
     "sidebar.notifications.header": "🔔  Vencimientos",
     "sidebar.notifications.empty": "No hay tareas atrasadas ni próximas. ✅",
     "sidebar.notifications.group_overdue": "ATRASADAS",
