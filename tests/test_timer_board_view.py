@@ -84,3 +84,26 @@ def test_refresh_timer_badges_noop_on_welcome_screen(qapp, db_path):
     board_view.load_board(-1)
 
     board_view.refresh_timer_badges()  # column_widgets está vacío: no debe reventar
+
+
+def test_load_board_reads_timer_alert_hours_once_regardless_of_column_count(qapp, db_path, monkeypatch):
+    """Antes del fix, _build_column_widget releía el ajuste una vez POR COLUMNA
+    desplegada; ahora load_board() lo lee una única vez y lo reparte a cada columna."""
+    board_id = database.create_board("B", db_path=db_path)
+    for i in range(4):
+        database.create_column(board_id, f"Col{i}", db_path=db_path)
+
+    calls = []
+    original_get_setting = database.get_setting
+
+    def counting_get_setting(key, default=None, db_path=None):
+        if key == "timer_alert_hours":
+            calls.append(1)
+        return original_get_setting(key, default, db_path)
+
+    monkeypatch.setattr(database, "get_setting", counting_get_setting)
+
+    board_view = BoardViewWidget(db_path=db_path)
+    board_view.load_board(board_id)
+
+    assert len(calls) == 1

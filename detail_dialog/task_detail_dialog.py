@@ -40,6 +40,11 @@ class TaskDetailDialog(QDialog):
         self._timer_refresh_timer.timeout.connect(self._refresh_timer_ui)
         self._timer_refresh_timer.start(30_000)
 
+        # El diálogo se parenta a MainWindow/BoardViewWidget (viven toda la sesión), así que
+        # nada lo destruye por sí solo cuando se cierra -- sin esto, cada tarea abierta deja un
+        # TaskDetailDialog zombi con su _timer_refresh_timer disparando para siempre.
+        self.finished.connect(self.deleteLater)
+
     def init_ui(self):
         # Layout principal horizontal (Izquierda: Formulario, Derecha: Diario/Log)
         main_layout = QHBoxLayout(self)

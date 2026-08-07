@@ -20,6 +20,55 @@ def move_column_to_board(column_id, target_board_id, db_path=None):
         )
         conn.commit()
 
+def _duplicate_task_into_column(cursor, task_row, new_column_id):
+    """Duplica una fila de `tasks` (con sus etiquetas, diario y enlaces) en
+    new_column_id. Usado tanto por copy_column_to_board como por copy_board para no
+    duplicar esta lógica dos veces. `task_row` debe incluir title, description,
+    tag_text, tag_color, position, due_date, due_time, recurrence, linked_board_id,
+    timer_started_at, e id (de la tarea origen)."""
+    cursor.execute(
+        """INSERT INTO tasks (column_id, title, description, tag_text, tag_color, position,
+                               due_date, due_time, recurrence, linked_board_id, timer_started_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (new_column_id, task_row["title"], task_row["description"], task_row["tag_text"],
+         task_row["tag_color"], task_row["position"], task_row["due_date"], task_row["due_time"],
+         task_row["recurrence"], task_row["linked_board_id"], task_row["timer_started_at"])
+    )
+    new_task_id = cursor.lastrowid
+    old_task_id = task_row["id"]
+
+    cursor.execute(
+        "SELECT tag_value_id FROM task_tags WHERE task_id = ? AND tag_value_id IS NOT NULL",
+        (old_task_id,)
+    )
+    for row in cursor.fetchall():
+        cursor.execute(
+            "INSERT INTO task_tags (task_id, tag_value_id, text, color) VALUES (?, ?, '', '#6b7280')",
+            (new_task_id, row["tag_value_id"])
+        )
+
+    cursor.execute(
+        "SELECT content, created_at FROM task_logs WHERE task_id = ? ORDER BY id ASC",
+        (old_task_id,)
+    )
+    for row in cursor.fetchall():
+        cursor.execute(
+            "INSERT INTO task_logs (task_id, content, created_at) VALUES (?, ?, ?)",
+            (new_task_id, row["content"], row["created_at"])
+        )
+
+    cursor.execute(
+        "SELECT url, label, position FROM task_links WHERE task_id = ? ORDER BY position ASC",
+        (old_task_id,)
+    )
+    for row in cursor.fetchall():
+        cursor.execute(
+            "INSERT INTO task_links (task_id, url, label, position) VALUES (?, ?, ?, ?)",
+            (new_task_id, row["url"], row["label"], row["position"])
+        )
+
+    return new_task_id
+
 def copy_column_to_board(column_id, target_board_id, db_path=None):
     """Crea una copia de la columna en el tablero de destino, incluyendo todas sus tareas y logs."""
     with get_connection(db_path) as conn:
@@ -46,48 +95,16 @@ def copy_column_to_board(column_id, target_board_id, db_path=None):
 
         # 4. Obtener todas las tareas de la columna de origen
         cursor.execute(
-            """SELECT id, title, description, tag_text, tag_color, position, due_date
+            """SELECT id, title, description, tag_text, tag_color, position, due_date,
+                      due_time, recurrence, linked_board_id, timer_started_at
                FROM tasks WHERE column_id = ? ORDER BY position ASC""",
             (column_id,)
         )
         tasks = [dict(row) for row in cursor.fetchall()]
 
-        # 5. Duplicar cada tarea, sus logs y etiquetas
+        # 5. Duplicar cada tarea, con sus etiquetas, diario y enlaces
         for task in tasks:
-            old_task_id = task["id"]
-
-            cursor.execute(
-                """INSERT INTO tasks (column_id, title, description, tag_text, tag_color, position, due_date)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (new_column_id, task["title"], task["description"], task["tag_text"], task["tag_color"], task["position"], task["due_date"])
-            )
-            new_task_id = cursor.lastrowid
-
-            # Duplicar etiquetas (enlazando a las mismas tag_values compartidas del catálogo)
-            cursor.execute(
-                "SELECT tag_value_id FROM task_tags WHERE task_id = ? AND tag_value_id IS NOT NULL",
-                (old_task_id,)
-            )
-            tag_value_ids = [row["tag_value_id"] for row in cursor.fetchall()]
-            for tag_value_id in tag_value_ids:
-                cursor.execute(
-                    "INSERT INTO task_tags (task_id, tag_value_id, text, color) VALUES (?, ?, '', '#6b7280')",
-                    (new_task_id, tag_value_id)
-                )
-
-            # Obtener logs de la tarea de origen
-            cursor.execute(
-                "SELECT content, created_at FROM task_logs WHERE task_id = ? ORDER BY id ASC",
-                (old_task_id,)
-            )
-            logs = [dict(row) for row in cursor.fetchall()]
-
-            # Insertar los logs duplicando el contenido y la fecha original
-            for log in logs:
-                cursor.execute(
-                    "INSERT INTO task_logs (task_id, content, created_at) VALUES (?, ?, ?)",
-                    (new_task_id, log["content"], log["created_at"])
-                )
+            _duplicate_task_into_column(cursor, task, new_column_id)
 
         conn.commit()
         return new_column_id
@@ -117,47 +134,16 @@ def copy_board(board_id, new_name, new_color, db_path=None):
 
             # 3. Obtener todas las tareas de la columna de origen
             cursor.execute(
-                """SELECT id, title, description, tag_text, tag_color, position, due_date
+                """SELECT id, title, description, tag_text, tag_color, position, due_date,
+                          due_time, recurrence, linked_board_id, timer_started_at
                    FROM tasks WHERE column_id = ? ORDER BY position ASC""",
                 (old_col_id,)
             )
             tasks = [dict(row) for row in cursor.fetchall()]
 
+            # 4. Duplicar cada tarea, con sus etiquetas, diario y enlaces
             for task in tasks:
-                old_task_id = task["id"]
-
-                # Crear nueva tarea
-                cursor.execute(
-                    """INSERT INTO tasks (column_id, title, description, tag_text, tag_color, position, due_date)
-                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                    (new_col_id, task["title"], task["description"], task["tag_text"], task["tag_color"], task["position"], task["due_date"])
-                )
-                new_task_id = cursor.lastrowid
-
-                # Duplicar etiquetas (enlazando a las mismas tag_values compartidas del catálogo)
-                cursor.execute(
-                    "SELECT tag_value_id FROM task_tags WHERE task_id = ? AND tag_value_id IS NOT NULL",
-                    (old_task_id,)
-                )
-                tag_value_ids = [row["tag_value_id"] for row in cursor.fetchall()]
-                for tag_value_id in tag_value_ids:
-                    cursor.execute(
-                        "INSERT INTO task_tags (task_id, tag_value_id, text, color) VALUES (?, ?, '', '#6b7280')",
-                        (new_task_id, tag_value_id)
-                    )
-
-                # 4. Obtener todos los logs de la tarea de origen
-                cursor.execute(
-                    "SELECT content, created_at FROM task_logs WHERE task_id = ? ORDER BY id ASC",
-                    (old_task_id,)
-                )
-                logs = [dict(row) for row in cursor.fetchall()]
-
-                for log in logs:
-                    cursor.execute(
-                        "INSERT INTO task_logs (task_id, content, created_at) VALUES (?, ?, ?)",
-                        (new_task_id, log["content"], log["created_at"])
-                    )
+                _duplicate_task_into_column(cursor, task, new_col_id)
 
         conn.commit()
         return new_board_id

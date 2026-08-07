@@ -37,7 +37,9 @@ def _gather(db_path=None):
         }
         for col in database.get_columns(board["id"], db_path):
             c = {"id": col["id"], "name": col["name"], "color": col["color"], "tasks": []}
-            for task in database.get_tasks(col["id"], db_path):
+            tasks = database.get_tasks(col["id"], db_path)
+            logs_by_task = database.get_logs_bulk([t["id"] for t in tasks], db_path)
+            for task in tasks:
                 c["tasks"].append({
                     "id": task["id"], "title": task["title"],
                     "description": _plain(task.get("description")),
@@ -46,7 +48,7 @@ def _gather(db_path=None):
                     "tags": [{"category": t["category"], "value": t["value"]} for t in task.get("tags", [])],
                     "logs": [
                         {"created_at": lg["created_at"], "content": _plain(lg["content"])}
-                        for lg in database.get_logs(task["id"], db_path)
+                        for lg in logs_by_task.get(task["id"], [])
                     ],
                 })
             b["columns"].append(c)

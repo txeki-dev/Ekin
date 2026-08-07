@@ -259,6 +259,38 @@ def test_create_log_updates_task_updated_at(db_path):
     assert database.get_task(task_id, db_path)["updated_at"] >= original_updated_at
 
 
+def test_create_log_has_a_single_commit_call():
+    """Antes del fix, create_log() tenía un commit() intermedio entre el INSERT del
+    log y el UPDATE de updated_at, rompiendo la atomicidad de la operación (el INSERT
+    quedaba confirmado en disco sin poder revertirse si el UPDATE fallase después).
+    Verificarlo en tiempo de ejecución no es práctico: sqlite3.Connection es un tipo
+    inmutable que no admite parchear su método commit; en su lugar comprobamos
+    directamente el cuerpo de la función."""
+    import inspect
+
+    source = inspect.getsource(database.create_log)
+    assert source.count(".commit()") == 1
+
+
+def test_get_logs_bulk_matches_single_and_groups(db_path):
+    board_id = database.create_board("B", db_path=db_path)
+    col_id = database.create_column(board_id, "Col", db_path=db_path)
+    t1 = database.create_task(col_id, "T1", db_path=db_path)
+    t2 = database.create_task(col_id, "T2", db_path=db_path)
+    database.create_log(t1, "primera", db_path=db_path)
+    database.create_log(t1, "segunda", db_path=db_path)
+    # t2 se queda sin ninguna entrada de diario.
+
+    bulk = database.get_logs_bulk([t1, t2], db_path)
+
+    assert [lg["content"] for lg in bulk[t1]] == [lg["content"] for lg in database.get_logs(t1, db_path)]
+    assert bulk[t2] == []
+
+
+def test_get_logs_bulk_with_empty_task_ids_returns_empty_dict(db_path):
+    assert database.get_logs_bulk([], db_path) == {}
+
+
 def test_delete_log(db_path):
     board_id = database.create_board("Board", db_path=db_path)
     col_id = database.create_column(board_id, "Col", db_path=db_path)
@@ -357,6 +389,58 @@ def test_copy_board_duplicates_full_hierarchy(db_path):
 
     # El tablero original sigue intacto
     assert len(database.get_columns(board_id, db_path)) == 1
+
+
+def test_copy_column_to_board_preserves_due_time_recurrence_link_and_timer(db_path):
+    board_a = database.create_board("A", db_path=db_path)
+    board_b = database.create_board("B", db_path=db_path)
+    other_board = database.create_board("Enlazado", db_path=db_path)
+    col_id = database.create_column(board_a, "Col", db_path=db_path)
+    task_id = database.create_task(col_id, "Tarea", due_date="2026-09-01", db_path=db_path)
+    database.set_task_due_time(task_id, "14:30", db_path=db_path)
+    database.set_task_recurrence(task_id, "weekly", db_path=db_path)
+    database.set_task_linked_board(task_id, other_board, db_path=db_path)
+    database.set_task_timer_started(task_id, "2026-01-01T10:00:00", db_path=db_path)
+    database.add_task_link(task_id, "https://x.com", "X", db_path=db_path)
+
+    new_col_id = database.copy_column_to_board(col_id, board_b, db_path=db_path)
+    copied_task = database.get_tasks(new_col_id, db_path)[0]
+
+    assert copied_task["due_date"] == "2026-09-01"
+    assert copied_task["due_time"] == "14:30"
+    assert copied_task["recurrence"] == "weekly"
+    assert copied_task["linked_board_id"] == other_board
+    assert copied_task["timer_started_at"] == "2026-01-01T10:00:00"
+
+    copied_links = database.get_task_links(copied_task["id"], db_path)
+    assert [lk["url"] for lk in copied_links] == ["https://x.com"]
+    assert [lk["label"] for lk in copied_links] == ["X"]
+
+
+def test_copy_board_preserves_due_time_recurrence_link_and_timer(db_path):
+    board_id = database.create_board("Original", db_path=db_path)
+    other_board = database.create_board("Enlazado", db_path=db_path)
+    col_id = database.create_column(board_id, "Col", db_path=db_path)
+    task_id = database.create_task(col_id, "Tarea", due_date="2026-09-01", db_path=db_path)
+    database.set_task_due_time(task_id, "09:15", db_path=db_path)
+    database.set_task_recurrence(task_id, "monthly", db_path=db_path)
+    database.set_task_linked_board(task_id, other_board, db_path=db_path)
+    database.set_task_timer_started(task_id, "2026-02-02T08:00:00", db_path=db_path)
+    database.add_task_link(task_id, "https://y.com", "Y", db_path=db_path)
+
+    new_board_id = database.copy_board(board_id, "Copia", "#654321", db_path=db_path)
+    new_col_id = database.get_columns(new_board_id, db_path)[0]["id"]
+    copied_task = database.get_tasks(new_col_id, db_path)[0]
+
+    assert copied_task["due_date"] == "2026-09-01"
+    assert copied_task["due_time"] == "09:15"
+    assert copied_task["recurrence"] == "monthly"
+    assert copied_task["linked_board_id"] == other_board
+    assert copied_task["timer_started_at"] == "2026-02-02T08:00:00"
+
+    copied_links = database.get_task_links(copied_task["id"], db_path)
+    assert [lk["url"] for lk in copied_links] == ["https://y.com"]
+    assert [lk["label"] for lk in copied_links] == ["Y"]
 
 
 # --- get_task_tags_bulk ---
@@ -725,6 +809,48 @@ def test_snapshot_and_restore_task_without_timer_stays_none(db_path):
 
     new_id = database.restore_task(snap, db_path=db_path)
     assert database.get_task(new_id, db_path)["timer_started_at"] is None
+
+
+# --- Regresión crítica: restore_task no debe reventar si una etiqueta del snapshot
+# ya no existe en el catálogo (borrada entre el borrado de la tarea y el Ctrl+Z) ---
+
+def test_restore_task_drops_deleted_tag_instead_of_raising(db_path):
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    t = database.create_task(c, "Tarea", db_path=db_path)
+    tv = database.get_or_create_tag_value("Estado", "Urgente", "#ef4444", db_path=db_path)
+    database.set_task_tags(t, [tv], db_path=db_path)
+
+    snap = database.snapshot_task(t, db_path=db_path)
+    database.delete_task(t, db_path=db_path)
+    # La etiqueta se borra del catálogo DESPUÉS de tomar el snapshot -- exactamente el
+    # escenario real: borrar la tarea (el snapshot guarda su tag_value_id), borrar luego
+    # esa etiqueta del catálogo, y solo entonces pulsar Ctrl+Z.
+    database.delete_tag_value(tv, db_path=db_path)
+
+    # Antes del fix, esto lanzaba sqlite3.IntegrityError (FK de task_tags.tag_value_id).
+    new_id = database.restore_task(snap, db_path=db_path)
+
+    restored = database.get_task(new_id, db_path)
+    assert restored is not None
+    assert restored["tags"] == []  # la etiqueta borrada se descarta, no revienta la restauración
+
+
+def test_restore_task_keeps_tags_that_still_exist(db_path):
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    t = database.create_task(c, "Tarea", db_path=db_path)
+    tv = database.get_or_create_tag_value("Prioridad", "Alta", "#ef4444", db_path=db_path)
+    database.set_task_tags(t, [tv], db_path=db_path)
+
+    snap = database.snapshot_task(t, db_path=db_path)
+    database.delete_task(t, db_path=db_path)
+
+    new_id = database.restore_task(snap, db_path=db_path)
+
+    restored = database.get_task(new_id, db_path)
+    assert len(restored["tags"]) == 1
+    assert restored["tags"][0]["value"] == "Alta"
 
 
 def test_snapshot_and_restore_board_hierarchy(db_path):

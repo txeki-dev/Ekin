@@ -309,8 +309,8 @@ STRINGS = {
     "shortcuts.section_editor": "Editor de texto enriquecido (descripción y diario)",
     "shortcuts.item_search": "Ctrl+F — Búsqueda global de tareas",
     "shortcuts.item_new_task": (
-        "Ctrl+N — Nueva tarea en la primera columna del tablero activo (fuera del editor de "
-        "texto; dentro de él, Ctrl+N es Negrita)"
+        "Ctrl+N — Nueva tarea en la última columna con la que interactuaste (si no hay "
+        "ninguna, la primera del tablero activo); dentro del editor de texto, Ctrl+N es Negrita"
     ),
     "shortcuts.item_new_column": "Ctrl+Shift+N — Nueva columna en el tablero activo",
     "shortcuts.item_prev_next_board": "Alt+↑ / Alt+↓ — Tablero anterior / siguiente",

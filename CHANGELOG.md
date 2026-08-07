@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-07
+
 ### Added
 - **Hover-to-expand on collapsed columns.** Dragging a task card and holding it over a collapsed
   column for about a second now unfolds it automatically so you can pick exactly where in the
@@ -33,11 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   the dialog — so tasks that have been sitting for too long are visible without opening each one.
   The badge turns red once it crosses a threshold, configurable in Ajustes (default 24h).
 
-### Changed
-- The sidebar's utility bar (🕐🔔🔍📅⚙❔) now spans two rows — the clock on its own line above a
-  centered row of icon buttons — instead of one cramped single row that didn't fit comfortably in
-  the sidebar's width.
-
 ### Fixed
 - **Critical: the app could crash when dropping a card into a hover-expanded column.**
   Hover-to-expand (above) reloaded the *entire* board to reflect a column unfolding, which
@@ -51,6 +48,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   "no board selected", because `not -1` is `False` in Python. Harmless while only reachable from a
   button that's hidden in that state, but now that `Ctrl+Shift+N` can call it directly, the guard
   was fixed to match the equivalent check already used by `Ctrl+N`'s quick-add-task shortcut.
+- **Critical: opening and closing task cards leaked a dialog and a `QTimer` forever.** Every task
+  opened from the board or calendar left a `TaskDetailDialog` alive in the background (with its
+  30s live-timer refresh still running) because nothing ever destroyed it after closing. Fixed by
+  destroying the dialog once it finishes, whether closed via Guardar, Cerrar, or Esc.
+- **Critical: `Ctrl+Z` could crash the app when undoing a deleted task whose tag had also been
+  deleted.** Restoring a task's tags during undo no longer assumes every tag it had still exists in
+  the catalog — a tag deleted in between is now silently skipped instead of raising a database
+  error that escaped uncaught and terminated the app.
+- The keyboard-shortcuts dialog (`Ctrl+/`) described `Ctrl+N` as always targeting the board's first
+  column; the text now matches its actual "last active column" behavior (see Added, above).
+- Editing a task from the Calendar (📅) no longer leaves its card stale on the board underneath —
+  the board view now refreshes when the edited task belongs to the currently active board.
+- **Copying a column or an entire board silently dropped a task's due time, recurrence, linked
+  board, timer, and any links.** All of these now survive both "Copiar columna" and "Copiar
+  tablero", matching what undo/redo has always preserved.
+- `create_log` (used for the task diary) no longer commits the new entry before also updating the
+  task's `updated_at`, closing a small window where a follow-up failure could leave the diary entry
+  permanently saved without its parent task's timestamp reflecting it.
+
+### Changed
+- The sidebar's utility bar (🕐🔔🔍📅⚙❔) now spans two rows — the clock on its own line above a
+  centered row of icon buttons — instead of one cramped single row that didn't fit comfortably in
+  the sidebar's width.
+- The task-card timer-alert threshold is now read from settings once per board load instead of
+  once per visible column — same behavior, fewer redundant database reads.
+- Exporting a board to Markdown/JSON now fetches every task's diary in one grouped query instead of
+  one query per task.
 
 ## [0.8.0] - 2026-08-05
 

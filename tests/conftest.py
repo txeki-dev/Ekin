@@ -1,3 +1,5 @@
+import gc
+
 import pytest
 from PySide6.QtWidgets import QApplication
 import database
@@ -9,6 +11,10 @@ def qapp():
     construya un widget de Qt (QDialog, QWidget, ...) debe pedir este fixture."""
     app = QApplication.instance() or QApplication([])
     yield app
+    app.closeAllWindows()
+    app.processEvents()
+    gc.collect()
+    app.processEvents()
 
 
 @pytest.fixture

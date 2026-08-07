@@ -4,6 +4,7 @@ from .logs import get_logs
 from .links import get_task_links
 from .boards import get_board, create_board, set_board_archived
 from .columns import get_columns
+from .tags import get_tag_value
 
 __all__ = [
     "snapshot_task", "restore_task", "snapshot_column", "restore_column",
@@ -39,6 +40,14 @@ def restore_task(snap, column_id=None, db_path=None):
     linked_board_id = snap.get("linked_board_id")
     if linked_board_id is not None and get_board(linked_board_id, db_path) is None:
         linked_board_id = None
+    # Mismo razonamiento para las etiquetas: si una tag_value del catálogo se borró
+    # mientras tanto, insertar su id violaría la FK de task_tags (ON DELETE CASCADE,
+    # PRAGMA foreign_keys = ON) y abortaría la restauración entera con una excepción
+    # sin capturar que además destruye la propia acción de deshacer (ver UndoManager.undo()).
+    tag_value_ids = [
+        tvid for tvid in snap.get("tag_value_ids", [])
+        if get_tag_value(tvid, db_path) is not None
+    ]
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT COALESCE(MAX(position), -1) FROM tasks WHERE column_id = ?", (column_id,))
@@ -51,7 +60,7 @@ def restore_task(snap, column_id=None, db_path=None):
              snap.get("timer_started_at"))
         )
         new_id = cursor.lastrowid
-        for tvid in snap.get("tag_value_ids", []):
+        for tvid in tag_value_ids:
             cursor.execute(
                 "INSERT INTO task_tags (task_id, tag_value_id, text, color) VALUES (?, ?, '', '#6b7280')",
                 (new_id, tvid))

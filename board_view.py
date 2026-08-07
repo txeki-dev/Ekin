@@ -329,7 +329,7 @@ class BoardViewWidget(QFrame):
         # Por defecto ocultamos la zona del tablero hasta cargar uno
         self.board_scroll_area.hide()
 
-    def _build_column_widget(self, col_data, tasks, board_info):
+    def _build_column_widget(self, col_data, tasks, board_info, timer_alert_hours):
         """Construye un ColumnWidget completo (señales conectadas y, si está desplegada,
         sus TaskCard) para una columna dada. No lo añade a ningún layout ni a
         self.column_widgets -- eso lo decide el llamante: load_board() para reconstruir
@@ -349,7 +349,6 @@ class BoardViewWidget(QFrame):
         col_widget.column_activated.connect(self._set_last_active_column)
 
         if not col_data.get("collapsed"):
-            timer_alert_hours = int(database.get_setting("timer_alert_hours", "24", self.db_path))
             for task_data in tasks:
                 card = TaskCard(task_data, self)
                 if board_info:
@@ -386,8 +385,9 @@ class BoardViewWidget(QFrame):
         tasks = database.get_tasks(column_id, self.db_path)
         col_data["task_count"] = len(tasks)
         board_info = database.get_board(self.board_id, self.db_path)
+        timer_alert_hours = int(database.get_setting("timer_alert_hours", "24", self.db_path))
 
-        new_widget = self._build_column_widget(col_data, tasks, board_info)
+        new_widget = self._build_column_widget(col_data, tasks, board_info, timer_alert_hours)
 
         self.columns_layout.removeWidget(old_widget)
         old_widget.deleteLater()
@@ -448,13 +448,14 @@ class BoardViewWidget(QFrame):
 
         # Obtener columnas de la DB
         columns = database.get_columns(board_id, self.db_path)
-        
+        timer_alert_hours = int(database.get_setting("timer_alert_hours", "24", self.db_path))
+
         for col_data in columns:
             # Cargar las tareas primero: hace falta el contador para la vista plegada.
             tasks = database.get_tasks(col_data["id"], self.db_path)
             col_data["task_count"] = len(tasks)
 
-            col_widget = self._build_column_widget(col_data, tasks, board_info)
+            col_widget = self._build_column_widget(col_data, tasks, board_info, timer_alert_hours)
 
             self.columns_layout.addWidget(col_widget)
             self.column_widgets[col_data["id"]] = col_widget

@@ -308,6 +308,12 @@ class MainWindow(QMainWindow):
             self.calendar_view.refresh()
             self.sidebar.refresh_notifications()
             self.sync_ics()
+            # Solo recargamos board_view si la tarea editada pertenece al tablero que
+            # tiene activo la sidebar -- si no, board_view.load_board() desincronizaría
+            # qué tablero muestra cargado respecto al que la sidebar resalta. notify=False
+            # porque ya hemos refrescado campana/.ics/calendario a mano justo arriba.
+            if board_id == self.sidebar.active_board_id:
+                self.board_view.load_board(board_id, notify=False)
 
     def sync_ics(self):
         """Reescribe cada feed .ics con auto-sync configurado (el global de todos los
@@ -502,9 +508,6 @@ def main():
 
     app = QApplication(sys.argv)
     app.setWindowIcon(app_icon())
-
-    # Aplicar hoja de estilos QSS global
-    app.setStyleSheet(styles.QSS)
 
     window = MainWindow()
     window.show()

@@ -4,9 +4,10 @@ pocas propiedades estructurales, sin interacción profunda. Necesitan el fixture
 que en CI) o con un display real."""
 from datetime import date, datetime, timedelta
 
-from PySide6.QtCore import Qt, QPoint, QMimeData
+import pytest
+from PySide6.QtCore import Qt, QPoint, QMimeData, QEvent
 from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDropEvent
-from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QLabel, QWidget
 
 import database
 import styles
@@ -185,6 +186,14 @@ def test_shortcuts_dialog_constructs_with_both_sections(qapp):
     assert any(t("shortcuts.item_bold") == text for text in label_texts)
 
 
+def test_shortcuts_item_new_task_describes_last_active_column_behavior():
+    """Regresión: el texto describía el comportamiento antiguo de Ctrl+N (siempre la
+    primera columna) después de que quick_add_task ya usara la última columna activa."""
+    text = t("shortcuts.item_new_task")
+    assert "última columna" in text
+    assert "primera columna del tablero activo" not in text
+
+
 # --- TaskCard.update_timer_badge / set_timer_alert_hours (v0.9.0) ---
 
 def _card_with_timer(started_at, alert_hours=24):
@@ -295,6 +304,37 @@ def test_task_detail_dialog_clear_timer_persists_instantly(qapp, db_path):
     assert dlg.modified is True
     assert dlg.timer_toggle_btn.text() == t("task_detail.timer_start_btn")
     assert dlg.timer_clear_btn.isHidden()
+
+
+def test_task_detail_dialog_is_destroyed_after_closing_when_parented(qapp, db_path):
+    """Regresión de la fuga de memoria: el diálogo real (parentado a MainWindow/
+    BoardViewWidget, como hacen los call sites reales) debe autodestruirse
+    (deleteLater vía self.finished) al cerrarse -- no debe quedar zombi con su
+    _timer_refresh_timer de 30s corriendo para siempre. Antes del fix, este mismo
+    escenario dejaba el diálogo vivo indefinidamente."""
+    task_id = _make_task(db_path)
+    parent = QWidget()
+    dlg = TaskDetailDialog(task_id, db_path, parent)
+
+    dlg.reject()  # equivalente a "Cerrar" o Esc
+    # Acotado a `dlg`: sendPostedEvents(None, ...) procesaría TODOS los DeferredDelete
+    # pendientes de toda la sesión de tests (qapp es de ámbito de sesión), arriesgando
+    # tocar objetos de otros módulos de test que ya estén a mitad de su propia limpieza.
+    qapp.sendPostedEvents(dlg, QEvent.Type.DeferredDelete)
+
+    with pytest.raises(RuntimeError):
+        dlg.windowTitle()
+
+
+def test_task_detail_dialog_without_parent_still_works_as_before(qapp, db_path):
+    """El nuevo self.finished.connect(self.deleteLater) no debe romper el patrón ya
+    usado por los tests existentes (diálogo sin padre, recogido por el GC de Python
+    normal): accept()/reject() deben seguir funcionando con normalidad."""
+    task_id = _make_task(db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+    dlg.reject()
+    qapp.sendPostedEvents(dlg, QEvent.Type.DeferredDelete)
+    # No debe lanzar ni comportarse de forma distinta a como ya lo hacía sin el fix.
 
 
 # --- SettingsDialog: umbral de aviso del temporizador (v0.9.0) ---
