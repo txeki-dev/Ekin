@@ -98,7 +98,12 @@ Ordered roughly by value/effort. Checkboxes track what's done.
   `SidebarWidget.select_board_by_index`), `Ctrl+,` (Ajustes), `Ctrl+Shift+C` (Calendar) — plus
   **Ctrl+/** opening a new `ShortcutsDialog` reference window that lists every shortcut in the
   app (new, pre-existing global, and rich-text-editor-local) grouped by category, since they'd
-  been scattered across tooltips/README with no in-app place to see them all. Also fixed a latent
+  been scattered across tooltips/README with no in-app place to see them all. **`Ctrl+N`
+  refined 2026-08-07** (user-requested): now targets `BoardViewWidget._last_active_column_id`
+  (the last column a card/`+ Añadir Tarea`/click touched, tracked via a new
+  `ColumnWidget.column_activated` signal + task-card click wrapper), re-validated against the
+  active board on every use so a stale or cross-board id safely falls back to the first column —
+  instead of always adding to the first column regardless of context. Also fixed a latent
   guard bug in `board_view.add_column` (`board_id == -1` wasn't rejected, since `not -1` is
   `False` in Python) surfaced by exposing it to a global shortcut with no UI-visibility gate.
   **2026-08-07:** added a visible **❔** button to the sidebar utility bar (next to 🔍/📅/⚙) that
@@ -126,14 +131,16 @@ Ordered roughly by value/effort. Checkboxes track what's done.
   "drop-to-expand" behavior (which always dropped the card at the end): holding a dragged card
   over a collapsed column for ~650ms now unfolds it automatically so a real drop position can be
   chosen, via the same `compute_drop_index` mechanism already used by expanded columns. A quick
-  drop before the timer fires still falls to the end (unchanged). If the drag ends without
-  dropping inside that column, it folds itself back up — temporary, not equivalent to manually
-  clicking unfold. **Critical crash fixed 2026-08-07** (user-reported, real production drag):
-  the initial implementation reloaded the *entire* board on hover-expand, which destroyed and
-  rebuilt every column — including the one the dragged card was still being dragged out of;
-  dropping the card afterward could crash the app. Fixed with a surgical
-  `BoardViewWidget._rebuild_single_column(column_id)` that only ever touches the one column
-  whose state actually changed, never the drag's source column.
+  drop before the timer fires still falls to the end (unchanged). **Critical crash fixed
+  2026-08-07** (user-reported, real production drag): the initial implementation reloaded the
+  *entire* board on hover-expand, which destroyed and rebuilt every column — including the one the
+  dragged card was still being dragged out of; dropping the card afterward could crash the app.
+  Fixed with a surgical `BoardViewWidget._rebuild_single_column(column_id)` that only ever touches
+  the one column whose state actually changed, never the drag's source column. **Behavior
+  finalized 2026-08-07** (same day, user-requested): the column now *always* folds back up once
+  the drag ends, whether the card was dropped inside it, elsewhere, or the drag was cancelled — it
+  no longer stays permanently unfolded just because the drop happened to land there. It's purely a
+  temporary peek, never equivalent to manually clicking unfold.
 
 ### Data & safety
 - [x] **Automatic DB backups** *(Done in v0.4.0)* — `backups.py` writes a consistent SQLite snapshot
@@ -143,6 +150,11 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 - [x] **Board archiving** (hide without deleting) *(Done in v0.6.0)*.
 
 ### UX & platform
+- [x] **Two-row sidebar utility bar** *(Done 2026-08-07, user-requested)*. `SidebarWidget.
+  _build_utility_bar()`'s clock + 5 icon buttons (🔔🔍📅⚙❔) were cramped into a single row that
+  didn't fit comfortably in the ~220px sidebar; now the clock sits on its own centered row above a
+  second, centered row of icon buttons. Purely a layout change (`QHBoxLayout` → `QVBoxLayout` +
+  a nested row) — no button's behavior, size, tooltip, or object name changed.
 - [x] **Settings screen** — persist window size/position, theme, notification prefs, sync path *(Done
   in v0.6.0 — `settings_dialog.py`; sync path already lived in `app_settings` since 0.4.0)*.
 - [x] **Light theme** + theme toggle *(Done in v0.6.0 — QSS was already centralized)*.
@@ -201,6 +213,11 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 12. ~~**More keyboard shortcuts + a shortcuts dialog** — `Ctrl+Shift+N` new column, `Ctrl+1..9`
    jump to a sidebar board, `Ctrl+,` Ajustes, `Ctrl+Shift+C` Calendar, and **Ctrl+/** opens a
    reference dialog listing every shortcut in the app.~~ ✅ 2026-08-07.
+13. ~~**Ctrl+N last-active column, two-row utility bar, hover-expand always re-collapses** —
+   three independent refinements: `Ctrl+N` targets the last column interacted with instead of
+   always the first; the sidebar utility bar spans two rows instead of one cramped one; a
+   hover-expanded column now always folds back up when the drag ends, even if the card was
+   dropped inside it.~~ ✅ 2026-08-07.
 
 ### 🎯 Theme D — Distribution (parked)
 **PyInstaller** standalone build + **update-from-Releases** (replaces the `git pull` auto-updater).
