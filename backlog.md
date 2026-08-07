@@ -101,6 +101,9 @@ Ordered roughly by value/effort. Checkboxes track what's done.
   been scattered across tooltips/README with no in-app place to see them all. Also fixed a latent
   guard bug in `board_view.add_column` (`board_id == -1` wasn't rejected, since `not -1` is
   `False` in Python) surfaced by exposing it to a global shortcut with no UI-visibility gate.
+  **2026-08-07:** added a visible **❔** button to the sidebar utility bar (next to 🔍/📅/⚙) that
+  opens the same shortcuts dialog — `Ctrl+/` alone had no UI entry point, and reads as
+  `Ctrl+Shift+/` on a Spanish keyboard layout since `/` requires Shift there.
 - [x] **Rich-text tables + strikethrough** in the description/diary editors *(Done post-0.6.0,
   2026-08-03)*. Pasting a table (Excel/Sheets/Word, or tab-separated text) inserts a real table
   instead of flattening it to text; the toolbar's **▦** button inserts an empty one. Strikethrough
@@ -125,7 +128,12 @@ Ordered roughly by value/effort. Checkboxes track what's done.
   chosen, via the same `compute_drop_index` mechanism already used by expanded columns. A quick
   drop before the timer fires still falls to the end (unchanged). If the drag ends without
   dropping inside that column, it folds itself back up — temporary, not equivalent to manually
-  clicking unfold.
+  clicking unfold. **Critical crash fixed 2026-08-07** (user-reported, real production drag):
+  the initial implementation reloaded the *entire* board on hover-expand, which destroyed and
+  rebuilt every column — including the one the dragged card was still being dragged out of;
+  dropping the card afterward could crash the app. Fixed with a surgical
+  `BoardViewWidget._rebuild_single_column(column_id)` that only ever touches the one column
+  whose state actually changed, never the drag's source column.
 
 ### Data & safety
 - [x] **Automatic DB backups** *(Done in v0.4.0)* — `backups.py` writes a consistent SQLite snapshot
