@@ -5,6 +5,50 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 
 ---
 
+## ✅ Fixed in the forensic pass (2026-08-07, pre-v0.9.0)
+
+Two independent audit agents (data/logic layer, UI layer), every finding individually re-verified
+against actual source before acceptance. Full writeup: `.agents/docs/archive/2026-08-07_forensic_fixes_pre_v0.9.0.md`.
+
+- [x] **Critical: `TaskDetailDialog` leaked forever** — every task opened from the board or
+  calendar left the dialog alive in the background with its 30s refresh `QTimer` still running,
+  because nothing destroyed it after closing. Fixed with `self.finished.connect(self.deleteLater)`.
+- [x] **Critical: `Ctrl+Z` could crash the app** — restoring a deleted task's tags during undo
+  assumed every tag it had still existed in the catalog; a tag deleted in between raised an
+  uncaught `sqlite3.IntegrityError` that escaped a Qt slot and terminated the process. Fixed by
+  filtering stale `tag_value_id`s before restoring, mirroring the existing `linked_board_id` guard.
+- [x] **Stale shortcuts help text** — `Ctrl+/`'s dialog still described `Ctrl+N`'s pre-"last active
+  column" behavior.
+- [x] **Calendar edits left the board card stale** — `on_calendar_task` never reloaded `board_view`
+  (only its sibling `on_notification_task` did); fixed, scoped to only reload when the edited
+  task's board matches the sidebar's active board.
+- [x] **Copying a column/board silently dropped due time, recurrence, linked board, timer, and
+  links** — `copy_column_to_board`/`copy_board` only ever carried title/description/tags/logs.
+  Fixed via a shared `_duplicate_task_into_column` helper (also removed ~35 lines of duplicated
+  logic between the two callers).
+- [x] **`create_log` broke transaction atomicity** with a premature `commit()` between the diary
+  insert and the parent task's `updated_at` update.
+- [x] **Efficiency: `timer_alert_hours` re-read once per column** on every `load_board()` — now
+  read once and passed down.
+- [x] **Efficiency: N+1 diary export** — added `database.get_logs_bulk()`, wired into
+  `exporter._gather()`.
+- [x] **Dead code**: `app.setStyleSheet(styles.QSS)` in `main()`, unreachable since
+  `apply_theme()` always overwrites it before any widget renders.
+- [x] **Test-harness only: `pytest` crashed with `STATUS_HEAP_CORRUPTION` at interpreter shutdown**,
+  after every test already reported `PASSED` — invisible until process exit codes were checked
+  directly. Confirmed pre-existing (not a regression from this wave) via `git stash` against
+  pristine pre-wave code. Root cause: the session-scoped `qapp` fixture never tore down
+  accumulated Qt widgets before `QApplication` teardown, racing against CPython's own interpreter
+  shutdown. Fixed with an explicit `qapp` fixture teardown in `tests/conftest.py`. Never affected
+  the shipped app (which exits via `sys.exit(app.exec())`, not a pytest fixture).
+
+**Explicitly deferred (documented, not acted on this wave — see "Code quality & tech debt" below):**
+systemic double-commit pattern beyond `create_log`, `get_task()`/`get_tasks()` shape inconsistency,
+an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link ordering loss on
+`restore_task()` (Ctrl+Z), `CalendarViewWidget.refresh()` running while hidden.
+
+---
+
 ## ✅ Fixed in the forensic pass (2026-07-16)
 
 - [x] **Board header showed a static "Mi Tablero"** — `load_board` never updated the title label; it
@@ -46,6 +90,20 @@ Ordered roughly by value/effort. Checkboxes track what's done.
   the drop-index calc (`widgets.compute_drop_index`), with a regression test. **(P2 — bug)**
 - [ ] **Auto-updater uses `git pull`** (`main.py`) — requires git + a clean tree on the user's machine.
   Consider updating from GitHub Release assets (ties into packaging, below). **(P2)**
+- [ ] **Systemic double-commit pattern beyond `create_log`** — found during the 2026-08-07 forensic
+  pass while fixing `create_log`'s premature commit; other `database/` functions may share the same
+  "commit, then a follow-up statement, then commit again" shape. Worth a dedicated audit pass rather
+  than fixing piecemeal. **(P2 — correctness/atomicity)**
+- [ ] **`get_task()` / `get_tasks()` return shape inconsistency** — flagged during the 2026-08-07
+  forensic pass as out of scope for that wave; the two functions don't expose task fields
+  identically, which is a trap for future code that assumes parity between them. **(P2 — consistency)**
+- [ ] **`backups._prune_backups(keep=0)` edge case** — currently unreachable (no UI path sets `keep`
+  to `0`), but the function doesn't guard against it explicitly. Low priority since it can't be hit
+  today. **(P3)**
+- [ ] **`restore_task()` loses `task_links` ordering on Ctrl+Z** — links are restored but not
+  guaranteed to come back in their original relative order. Minor, cosmetic. **(P3)**
+- [ ] **`CalendarViewWidget.refresh()` runs even while the calendar isn't visible** — wasteful but
+  harmless (no wrong output, just an avoidable recompute). **(P3 — efficiency)**
 
 ---
 
@@ -233,6 +291,12 @@ Ordered roughly by value/effort. Checkboxes track what's done.
    Reiniciar/Detener, instant-persist) shows the same elapsed time as a badge on the board card,
    turning red past a configurable Ajustes threshold — so stale tasks are visible without opening
    each one.~~ ✅ 2026-08-07.
+15. ~~**v0.9.0 — forensic bug-hunt pass** — 2 critical fixes (leaked `TaskDetailDialog`+`QTimer`;
+   uncaught `IntegrityError` crash on Ctrl+Z), 4 correctness fixes (stale shortcuts text, stale
+   calendar-edited board card, silent data loss on column/board copy, `create_log` atomicity), 3
+   efficiency/cleanup items, plus a pre-existing test-harness crash (`STATUS_HEAP_CORRUPTION` at
+   pytest shutdown) found and fixed along the way. 159/159 tests passing, clean exit code.~~
+   ✅ 2026-08-07.
 
 ### 🎯 Theme D — Distribution (parked)
 **PyInstaller** standalone build + **update-from-Releases** (replaces the `git pull` auto-updater).
