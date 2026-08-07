@@ -93,7 +93,14 @@ Ordered roughly by value/effort. Checkboxes track what's done.
   behavior — verified empirically with a headless `QTest.keyClick` sweep across all 9 dialogs, no
   code needed). Arrow-key board navigation added 2026-08-03: **Alt+Up/Alt+Down** cycle boards
   (`SidebarWidget.select_adjacent_board`) — bare arrows were unavailable, already claimed by every
-  text field and list widget in the app.
+  text field and list widget in the app. **Extended 2026-08-07**: `Ctrl+Shift+N` (new column),
+  `Ctrl+1`..`Ctrl+9` (jump to the Nth sidebar board via the new
+  `SidebarWidget.select_board_by_index`), `Ctrl+,` (Ajustes), `Ctrl+Shift+C` (Calendar) — plus
+  **Ctrl+/** opening a new `ShortcutsDialog` reference window that lists every shortcut in the
+  app (new, pre-existing global, and rich-text-editor-local) grouped by category, since they'd
+  been scattered across tooltips/README with no in-app place to see them all. Also fixed a latent
+  guard bug in `board_view.add_column` (`board_id == -1` wasn't rejected, since `not -1` is
+  `False` in Python) surfaced by exposing it to a global shortcut with no UI-visibility gate.
 - [x] **Rich-text tables + strikethrough** in the description/diary editors *(Done post-0.6.0,
   2026-08-03)*. Pasting a table (Excel/Sheets/Word, or tab-separated text) inserts a real table
   instead of flattening it to text; the toolbar's **▦** button inserts an empty one. Strikethrough
@@ -183,6 +190,9 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 11. ~~**Hover-to-expand on collapsed columns** — holding a dragged card over a collapsed column
    unfolds it temporarily so a drop position can be chosen, instead of always landing at the end;
    folds back up if the drag ends without dropping there.~~ ✅ 2026-08-06.
+12. ~~**More keyboard shortcuts + a shortcuts dialog** — `Ctrl+Shift+N` new column, `Ctrl+1..9`
+   jump to a sidebar board, `Ctrl+,` Ajustes, `Ctrl+Shift+C` Calendar, and **Ctrl+/** opens a
+   reference dialog listing every shortcut in the app.~~ ✅ 2026-08-07.
 
 ### 🎯 Theme D — Distribution (parked)
 **PyInstaller** standalone build + **update-from-Releases** (replaces the `git pull` auto-updater).
