@@ -168,7 +168,7 @@ Every time Ekin starts it also writes an automatic **backup** of your database i
 
 ### 5. Keyboard Shortcuts
 Press **Ctrl+/** anywhere, or click the **❔** button in the sidebar utility bar, to open a reference dialog listing every shortcut in the app, grouped by category — the list below is a summary:
-* **Ctrl+N** — new task in the active board's first column. **Ctrl+Shift+N** — new column in the active board.
+* **Ctrl+N** — new task in the last column you interacted with (opened a card in, clicked "+ Añadir Tarea" in, or just clicked); falls back to the first column if nothing qualifies yet. **Ctrl+Shift+N** — new column in the active board.
 * **Ctrl+1** … **Ctrl+9** — jump straight to the 1st through 9th board in the sidebar. **Alt+↑ / Alt+↓** — previous/next board.
 * **Ctrl+F** — global search. **Ctrl+,** — open Ajustes. **Ctrl+Shift+C** — open the Calendar.
 * **Ctrl+Z / Ctrl+Y** (or **Ctrl+Shift+Z**) — undo/redo. **Esc** — close the open dialog.

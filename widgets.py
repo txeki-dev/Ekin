@@ -540,6 +540,7 @@ class ColumnWidget(QFrame):
     collapse_toggle_requested = Signal(int)  # column_id (plegar/desplegar)
     collapsed_card_drop = Signal(int, int)   # task_id, column_id (soltar tarjeta en columna plegada)
     hover_expand_requested = Signal(int)     # column_id (hover sostenido sobre columna plegada)
+    column_activated = Signal(int)           # column_id (clic en cualquier parte "en blanco" de la columna)
 
     COLLAPSED_WIDTH = 46
     EXPANDED_WIDTH = 280
@@ -567,6 +568,13 @@ class ColumnWidget(QFrame):
         suficiente: pide que se despliegue para poder elegir posición."""
         if self.collapsed:
             self.hover_expand_requested.emit(self.column_id)
+
+    def mousePressEvent(self, event):
+        """Clic en cualquier parte de la columna no ya consumida por un botón/tarjeta
+        hijo (los widgets internos consumen su propio click y no burbujean aquí):
+        sirve de pista para "última columna activa" (ver BoardViewWidget.quick_add_task)."""
+        self.column_activated.emit(self.column_id)
+        super().mousePressEvent(event)
 
     def _column_icon_button(self, kind, tooltip):
         """Pequeño botón cuadrado con un icono PINTADO (left/right/pencil) a juego con

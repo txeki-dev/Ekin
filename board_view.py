@@ -199,6 +199,12 @@ class BoardViewWidget(QFrame):
         self.db_path = db_path
         self.board_id = None
         self.column_widgets = {}  # Guarda referencia a {column_id: ColumnWidget}
+        # Última columna con la que el usuario interactuó (tarjeta, "+ Añadir Tarea"
+        # o clic en la propia columna) -- pista para Ctrl+N; se revalida contra las
+        # columnas del tablero activo en el momento de usarla (quick_add_task), nunca
+        # se confía en ella a ciegas (puede apuntar a otro tablero o a una columna ya
+        # borrada).
+        self._last_active_column_id = None
         self.undo_manager = None  # lo inyecta MainWindow
         # Columna actualmente expandida por HOVER durante un arrastre en curso (o None).
         # Vive aquí (no en ColumnWidget) porque load_board() recrea todos los ColumnWidget.
@@ -336,13 +342,14 @@ class BoardViewWidget(QFrame):
         col_widget.collapse_toggle_requested.connect(self.handle_column_collapse)
         col_widget.collapsed_card_drop.connect(self.handle_collapsed_card_drop)
         col_widget.hover_expand_requested.connect(self.handle_hover_expand_requested)
+        col_widget.column_activated.connect(self._set_last_active_column)
 
         if not col_data.get("collapsed"):
             for task_data in tasks:
                 card = TaskCard(task_data, self)
                 if board_info:
                     card.set_card_style(board_info["color"])
-                card.clicked.connect(self.open_task_details)
+                card.clicked.connect(lambda tid, cid=col_data["id"]: self._handle_task_card_clicked(tid, cid))
                 card.board_link_clicked.connect(self.board_link_activated.emit)
                 card.drag_ended.connect(self.finalize_hover_expand)
                 col_widget.add_task_card(card)
@@ -630,15 +637,30 @@ class BoardViewWidget(QFrame):
     # --- ACCIONES DE TAREAS ---
 
     def quick_add_task(self):
-        """Atajo Ctrl+N: añade una tarea a la primera columna del tablero activo."""
+        """Atajo Ctrl+N: añade una tarea a la última columna con la que se ha
+        interactuado (tarjeta abierta, botón "+ Añadir Tarea", o clic en la propia
+        columna). Si no hay ninguna registrada -- o ya no pertenece al tablero
+        activo (p. ej. se borró, o se cambió de tablero desde entonces) -- cae a
+        la primera columna, como antes."""
         if not self.board_id or self.board_id == -1:
             return
         columns = database.get_columns(self.board_id, self.db_path)
-        if columns:
-            self.add_task(columns[0]["id"])
+        if not columns:
+            return
+        column_ids = [c["id"] for c in columns]
+        target_id = (
+            self._last_active_column_id
+            if self._last_active_column_id in column_ids
+            else column_ids[0]
+        )
+        self.add_task(target_id)
+
+    def _set_last_active_column(self, column_id):
+        self._last_active_column_id = column_id
 
     def add_task(self, column_id):
         """Crea una tarea solicitando el título rápidamente."""
+        self._last_active_column_id = column_id
         title, ok = QInputDialog.getText(
             self, t("board_view.add_task.title"), t("board_view.add_task.prompt"),
             text=""
@@ -646,6 +668,10 @@ class BoardViewWidget(QFrame):
         if ok and title.strip():
             database.create_task(column_id, title.strip(), db_path=self.db_path)
             self.load_board(self.board_id)
+
+    def _handle_task_card_clicked(self, task_id, column_id):
+        self._set_last_active_column(column_id)
+        self.open_task_details(task_id)
 
     def open_task_details(self, task_id):
         """Abre el diálogo de detalle/chat de una tarea."""
@@ -723,11 +749,6 @@ class BoardViewWidget(QFrame):
 
         # 3. Guardar las nuevas posiciones en la base de datos
         database.update_task_positions(updates, self.db_path)
-
-        # Un drop real dentro de la columna expandida por hover la deja expandida
-        # (no debe replegarse al terminar el arrastre).
-        if target_column_id == self._hover_expanded_column_id:
-            self._hover_expanded_column_id = None
 
         # 4. Recargar el tablero para actualizar la UI con la base de datos como fuente de verdad
         self.load_board(self.board_id)

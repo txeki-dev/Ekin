@@ -57,7 +57,12 @@ def test_finalize_is_noop_when_nothing_pending(qapp, db_path):
     assert board_view._hover_expanded_column_id is None
 
 
-def test_real_drop_inside_hover_expanded_column_sticks(qapp, db_path):
+def test_real_drop_inside_hover_expanded_column_still_recollapses(qapp, db_path):
+    """Por petición del usuario: incluso si el drop aterriza DENTRO de la columna
+    expandida por hover, esta debe replegarse igual que si el drag hubiera
+    terminado sin soltar ahí -- handle_task_drop ya no limpia el tracking por su
+    cuenta; es finalize_hover_expand() (disparado por TaskCard.drag_ended tras
+    QDrag.exec()) quien decide el estado final, siempre replegando."""
     board_id, (col_a, col_b) = _make_board_with_columns(db_path)
     database.set_column_collapsed(col_a, True, db_path)
     task_id = database.create_task(col_a, "Tarea", db_path=db_path)
@@ -69,11 +74,16 @@ def test_real_drop_inside_hover_expanded_column_sticks(qapp, db_path):
     # Simula que el drop realmente aterrizó dentro de la columna expandida por hover.
     board_view.handle_task_drop(task_id, col_a, 0)
 
-    assert board_view._hover_expanded_column_id is None
+    # El tracking NO se limpia en el propio drop: sigue pendiente de finalize_hover_expand.
+    assert board_view._hover_expanded_column_id == col_a
 
-    # Un finalize posterior (drag_ended tras el drop) no debe deshacer el drop real.
+    # drag_ended (QDrag.exec() ha devuelto el control) dispara el repliegue.
     board_view.finalize_hover_expand()
-    assert _collapsed_state(board_id, col_a, db_path) is False
+
+    assert board_view._hover_expanded_column_id is None
+    assert _collapsed_state(board_id, col_a, db_path) is True
+    # La tarea sigue en la columna -- solo se oculta al estar colapsada, no se pierde ni se mueve.
+    assert [t["id"] for t in database.get_tasks(col_a, db_path)] == [task_id]
 
 
 def test_hover_expand_switches_between_two_collapsed_columns(qapp, db_path):

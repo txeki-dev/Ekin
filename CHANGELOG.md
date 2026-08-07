@@ -11,8 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Hover-to-expand on collapsed columns.** Dragging a task card and holding it over a collapsed
   column for about a second now unfolds it automatically so you can pick exactly where in the
   column to drop the card, instead of it always landing at the bottom. A quick drop (before the
-  column has had time to unfold) still works exactly as before. If the drag ends without dropping
-  inside that column — dropped elsewhere, or cancelled — the column folds itself back up.
+  column has had time to unfold) still works exactly as before. The column always folds itself
+  back up once the drag ends, whether the card was dropped inside it, dropped elsewhere, or the
+  drag was cancelled — it's a temporary peek, not a way to permanently unfold it.
 - **New keyboard shortcuts + a shortcuts reference dialog.** `Ctrl+Shift+N` creates a new column
   in the active board; `Ctrl+1`…`Ctrl+9` jump straight to the 1st through 9th board in the
   sidebar; `Ctrl+,` opens Ajustes; `Ctrl+Shift+C` opens the Calendar. **Ctrl+/** opens a new
@@ -21,6 +22,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   sidebar's utility bar (next to 🔍/📅/⚙) opens the same dialog — `Ctrl+/` alone had no visible
   entry point anywhere in the UI, and typing `/` requires Shift on a Spanish keyboard layout, so it
   wasn't an intuitive sole way to discover it.
+- **`Ctrl+N` now targets the last column you interacted with** (opened a card in, clicked
+  "+ Añadir Tarea" in, or just clicked), instead of always adding to the board's first column. If
+  nothing qualifies yet — a fresh board load, the tracked column was deleted, or you've since
+  switched boards — it safely falls back to the first column of the currently active board.
+
+### Changed
+- The sidebar's utility bar (🕐🔔🔍📅⚙❔) now spans two rows — the clock on its own line above a
+  centered row of icon buttons — instead of one cramped single row that didn't fit comfortably in
+  the sidebar's width.
 
 ### Fixed
 - **Critical: the app could crash when dropping a card into a hover-expanded column.**

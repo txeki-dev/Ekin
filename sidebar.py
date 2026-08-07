@@ -410,17 +410,24 @@ class SidebarWidget(QFrame):
         layout.addLayout(btn_layout)
 
     def _build_utility_bar(self):
-        """Barra con reloj (fecha/hora), campana de vencimientos y acceso al calendario."""
+        """Barra con reloj (fecha/hora) en su propia fila arriba, y accesos rápidos
+        (campana, búsqueda, calendario, ajustes, atajos) centrados en una fila propia
+        debajo -- separados para que quepan con holgura en el ancho estrecho de la
+        sidebar."""
         bar = QFrame()
         bar.setObjectName("UtilityBar")
-        bar_layout = QHBoxLayout(bar)
-        bar_layout.setContentsMargins(10, 6, 8, 6)
-        bar_layout.setSpacing(6)
+        outer_layout = QVBoxLayout(bar)
+        outer_layout.setContentsMargins(10, 6, 8, 6)
+        outer_layout.setSpacing(6)
 
         self.clock_label = QLabel("")
         self.clock_label.setObjectName("ClockLabel")
-        bar_layout.addWidget(self.clock_label)
-        bar_layout.addStretch()
+        self.clock_label.setAlignment(Qt.AlignCenter)
+        outer_layout.addWidget(self.clock_label)
+
+        icons_row = QHBoxLayout()
+        icons_row.setSpacing(6)
+        icons_row.addStretch()
 
         # Campana con badge de conteo superpuesto
         bell_container = QWidget()
@@ -438,7 +445,7 @@ class SidebarWidget(QFrame):
         self.bell_badge.setFixedSize(15, 15)
         self.bell_badge.move(19, -1)
         self.bell_badge.hide()
-        bar_layout.addWidget(bell_container)
+        icons_row.addWidget(bell_container)
 
         self.search_btn = QPushButton("🔍")
         self.search_btn.setObjectName("UtilityIconButton")
@@ -446,7 +453,7 @@ class SidebarWidget(QFrame):
         self.search_btn.setCursor(Qt.PointingHandCursor)
         self.search_btn.setToolTip(t("sidebar.search_tooltip"))
         self.search_btn.clicked.connect(self.open_search_requested.emit)
-        bar_layout.addWidget(self.search_btn)
+        icons_row.addWidget(self.search_btn)
 
         self.calendar_btn = QPushButton("📅")
         self.calendar_btn.setObjectName("UtilityIconButton")
@@ -454,7 +461,7 @@ class SidebarWidget(QFrame):
         self.calendar_btn.setCursor(Qt.PointingHandCursor)
         self.calendar_btn.setToolTip(t("sidebar.calendar_tooltip"))
         self.calendar_btn.clicked.connect(self.open_calendar_requested.emit)
-        bar_layout.addWidget(self.calendar_btn)
+        icons_row.addWidget(self.calendar_btn)
 
         self.settings_btn = QPushButton("⚙")
         self.settings_btn.setObjectName("UtilityIconButton")
@@ -462,7 +469,7 @@ class SidebarWidget(QFrame):
         self.settings_btn.setCursor(Qt.PointingHandCursor)
         self.settings_btn.setToolTip(t("sidebar.settings_tooltip"))
         self.settings_btn.clicked.connect(self.open_settings_requested.emit)
-        bar_layout.addWidget(self.settings_btn)
+        icons_row.addWidget(self.settings_btn)
 
         self.shortcuts_btn = QPushButton("❔")
         self.shortcuts_btn.setObjectName("UtilityIconButton")
@@ -470,7 +477,10 @@ class SidebarWidget(QFrame):
         self.shortcuts_btn.setCursor(Qt.PointingHandCursor)
         self.shortcuts_btn.setToolTip(t("sidebar.shortcuts_tooltip"))
         self.shortcuts_btn.clicked.connect(self.open_shortcuts_requested.emit)
-        bar_layout.addWidget(self.shortcuts_btn)
+        icons_row.addWidget(self.shortcuts_btn)
+
+        icons_row.addStretch()
+        outer_layout.addLayout(icons_row)
 
         return bar
 

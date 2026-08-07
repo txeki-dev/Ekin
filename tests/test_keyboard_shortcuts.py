@@ -94,3 +94,52 @@ def test_add_column_shortcut_works_normally_with_board_selected(qapp, db_path, m
     cols = database.get_columns(board_id, db_path)
     assert len(cols) == 1
     assert cols[0]["name"] == "Nueva columna"
+
+
+# --- SidebarWidget._build_utility_bar: reloj y botones en dos filas ---
+
+def test_utility_bar_widgets_survive_two_row_layout(qapp, db_path):
+    """La reestructuración en dos filas (reloj arriba, iconos abajo) no debe perder
+    ni renombrar ningún widget/atributo, tooltip o comportamiento existente."""
+    sidebar = SidebarWidget(db_path=db_path)
+
+    for attr in ("clock_label", "bell_btn", "bell_badge", "search_btn",
+                 "calendar_btn", "settings_btn", "shortcuts_btn"):
+        assert hasattr(sidebar, attr), f"falta el atributo {attr} tras reestructurar la barra"
+
+    from strings import t
+    assert sidebar.search_btn.toolTip() == t("sidebar.search_tooltip")
+    assert sidebar.calendar_btn.toolTip() == t("sidebar.calendar_tooltip")
+    assert sidebar.settings_btn.toolTip() == t("sidebar.settings_tooltip")
+    assert sidebar.shortcuts_btn.toolTip() == t("sidebar.shortcuts_tooltip")
+
+    for btn in (sidebar.bell_btn, sidebar.search_btn, sidebar.calendar_btn,
+                sidebar.settings_btn, sidebar.shortcuts_btn):
+        assert btn.size().width() == 34
+        assert btn.size().height() == 28
+
+
+def test_utility_bar_clock_is_on_its_own_row_above_the_icons(qapp, db_path):
+    """El reloj debe estar en una fila propia (fila 0 del layout exterior), separada
+    de la fila que agrupa los botones de icono."""
+    sidebar = SidebarWidget(db_path=db_path)
+    bar = sidebar.clock_label.parentWidget()
+    outer_layout = bar.layout()
+
+    # Fila 0: el propio clock_label como item directo del layout exterior.
+    assert outer_layout.itemAt(0).widget() is sidebar.clock_label
+
+    # Fila 1: un sub-layout (no un widget) que contiene los botones de icono.
+    second_item = outer_layout.itemAt(1)
+    assert second_item.widget() is None
+    icons_row = second_item.layout()
+    assert icons_row is not None
+    icon_widgets = [
+        icons_row.itemAt(i).widget()
+        for i in range(icons_row.count())
+        if icons_row.itemAt(i).widget() is not None
+    ]
+    assert sidebar.search_btn in icon_widgets
+    assert sidebar.calendar_btn in icon_widgets
+    assert sidebar.settings_btn in icon_widgets
+    assert sidebar.shortcuts_btn in icon_widgets
