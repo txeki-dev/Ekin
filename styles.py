@@ -67,6 +67,19 @@ def tag_pill_css(color):
     return f"background-color: {color}; border-radius: 4px;"
 
 
+def format_elapsed_time(total_seconds):
+    """Da formato compacto a una duración en segundos: '45m', '3h 20m', '2d 5h'."""
+    total_seconds = max(0, int(total_seconds))
+    minutes = total_seconds // 60
+    hours = minutes // 60
+    days = hours // 24
+    if days > 0:
+        return f"{days}d {hours % 24}h"
+    if hours > 0:
+        return f"{hours}h {minutes % 60}m"
+    return f"{minutes}m"
+
+
 def build_qss(c):
     return f"""
 /* --- Estilos Generales --- */

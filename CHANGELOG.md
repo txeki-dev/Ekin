@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   "+ Añadir Tarea" in, or just clicked), instead of always adding to the board's first column. If
   nothing qualifies yet — a fresh board load, the tracked column was deleted, or you've since
   switched boards — it safely falls back to the first column of the currently active board.
+- **Task timer.** A new **⏱ Temporizador** control in the task detail: **▶ Iniciar** records the
+  start time and shows a live "time elapsed" counter next to it; **↺ Reiniciar** resets it to now,
+  **✕ Detener** clears it. All three take effect immediately, without needing "💾 Guardar
+  Cambios". The same elapsed time shows as a badge directly on the task's board card — not just in
+  the dialog — so tasks that have been sitting for too long are visible without opening each one.
+  The badge turns red once it crosses a threshold, configurable in Ajustes (default 24h).
 
 ### Changed
 - The sidebar's utility bar (🕐🔔🔍📅⚙❔) now spans two rows — the clock on its own line above a

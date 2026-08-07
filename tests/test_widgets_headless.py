@@ -2,18 +2,20 @@
 pocas propiedades estructurales, sin interacción profunda. Necesitan el fixture
 `qapp` (ver conftest.py) y se ejecutan bien con QT_QPA_PLATFORM=offscreen (igual
 que en CI) o con un display real."""
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from PySide6.QtCore import Qt, QPoint, QMimeData
 from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDropEvent
 from PySide6.QtWidgets import QLabel
 
 import database
+import styles
 from calendar_view import CalendarViewWidget
 from sidebar import NotificationsPopup
 from settings_dialog import SettingsDialog
 from shortcuts_dialog import ShortcutsDialog
-from widgets import ColumnWidget
+from detail_dialog import TaskDetailDialog
+from widgets import ColumnWidget, TaskCard
 from strings import t
 
 
@@ -181,3 +183,134 @@ def test_shortcuts_dialog_constructs_with_both_sections(qapp):
     assert any(t("shortcuts.item_new_column") == text for text in label_texts)
     assert any(t("shortcuts.item_jump_board") == text for text in label_texts)
     assert any(t("shortcuts.item_bold") == text for text in label_texts)
+
+
+# --- TaskCard.update_timer_badge / set_timer_alert_hours (v0.9.0) ---
+
+def _card_with_timer(started_at, alert_hours=24):
+    card = TaskCard({"id": 1, "title": "Tarea", "timer_started_at": started_at})
+    card.set_timer_alert_hours(alert_hours)
+    return card
+
+
+def test_timer_badge_hidden_when_no_timer(qapp):
+    card = _card_with_timer(started_at=None)
+    assert card.timer_container.isHidden()
+    assert card.timer_badge_label.text() == ""
+
+
+def test_timer_badge_shown_muted_under_threshold(qapp):
+    started = (datetime.now() - timedelta(hours=1)).isoformat()
+    card = _card_with_timer(started_at=started, alert_hours=24)
+
+    assert not card.timer_container.isHidden()
+    assert "⏱" in card.timer_badge_label.text()
+    assert styles.COLORS['danger'] not in card.timer_badge_label.styleSheet()
+    assert styles.COLORS['text_muted'] in card.timer_badge_label.styleSheet()
+
+
+def test_timer_badge_shown_danger_at_or_above_threshold(qapp):
+    started = (datetime.now() - timedelta(hours=30)).isoformat()
+    card = _card_with_timer(started_at=started, alert_hours=24)
+
+    assert not card.timer_container.isHidden()
+    assert styles.COLORS['danger'] in card.timer_badge_label.styleSheet()
+
+
+def test_timer_badge_updates_when_threshold_changed(qapp):
+    started = (datetime.now() - timedelta(hours=10)).isoformat()
+    card = _card_with_timer(started_at=started, alert_hours=24)
+    assert styles.COLORS['danger'] not in card.timer_badge_label.styleSheet()
+
+    card.set_timer_alert_hours(5)  # ahora 10h ya supera el nuevo umbral de 5h
+    assert styles.COLORS['danger'] in card.timer_badge_label.styleSheet()
+
+
+def test_timer_badge_hides_on_invalid_timestamp(qapp):
+    card = _card_with_timer(started_at="no-es-una-fecha-valida")
+    assert card.timer_container.isHidden()
+
+
+# --- TaskDetailDialog: temporizador (v0.9.0) ---
+
+def _make_task(db_path):
+    board_id = database.create_board("B", db_path=db_path)
+    col_id = database.create_column(board_id, "C", db_path=db_path)
+    return database.create_task(col_id, "Tarea", db_path=db_path)
+
+
+def test_task_detail_dialog_starts_with_no_timer(qapp, db_path):
+    task_id = _make_task(db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+
+    assert dlg.timer_toggle_btn.text() == t("task_detail.timer_start_btn")
+    assert dlg.timer_clear_btn.isHidden()
+    assert dlg.timer_elapsed_label.text() == ""
+
+
+def test_task_detail_dialog_loads_existing_timer(qapp, db_path):
+    task_id = _make_task(db_path)
+    database.set_task_timer_started(task_id, datetime.now().isoformat(), db_path=db_path)
+
+    dlg = TaskDetailDialog(task_id, db_path)
+
+    assert dlg.timer_toggle_btn.text() == t("task_detail.timer_restart_btn")
+    assert not dlg.timer_clear_btn.isHidden()
+    assert dlg.timer_elapsed_label.text() != ""
+
+
+def test_task_detail_dialog_start_timer_persists_instantly(qapp, db_path):
+    task_id = _make_task(db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+
+    dlg._on_timer_toggle_clicked()
+
+    assert database.get_task(task_id, db_path)["timer_started_at"] is not None
+    assert dlg.modified is True
+    assert dlg.timer_toggle_btn.text() == t("task_detail.timer_restart_btn")
+    assert not dlg.timer_clear_btn.isHidden()
+
+
+def test_task_detail_dialog_restart_timer_updates_timestamp(qapp, db_path):
+    task_id = _make_task(db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+
+    dlg._on_timer_toggle_clicked()
+    first = database.get_task(task_id, db_path)["timer_started_at"]
+
+    dlg._on_timer_toggle_clicked()
+    second = database.get_task(task_id, db_path)["timer_started_at"]
+
+    assert second >= first  # timestamps ISO son comparables lexicográficamente
+
+
+def test_task_detail_dialog_clear_timer_persists_instantly(qapp, db_path):
+    task_id = _make_task(db_path)
+    database.set_task_timer_started(task_id, datetime.now().isoformat(), db_path=db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+
+    dlg._on_timer_clear_clicked()
+
+    assert database.get_task(task_id, db_path)["timer_started_at"] is None
+    assert dlg.modified is True
+    assert dlg.timer_toggle_btn.text() == t("task_detail.timer_start_btn")
+    assert dlg.timer_clear_btn.isHidden()
+
+
+# --- SettingsDialog: umbral de aviso del temporizador (v0.9.0) ---
+
+def test_settings_dialog_timer_alert_spin_reflects_saved_value(qapp, db_path):
+    database.set_setting("timer_alert_hours", "48", db_path)
+    dlg = SettingsDialog(db_path)
+    assert dlg.timer_alert_spin.value() == 48
+
+
+def test_settings_dialog_timer_alert_spin_defaults_to_24(qapp, db_path):
+    dlg = SettingsDialog(db_path)
+    assert dlg.timer_alert_spin.value() == 24
+
+
+def test_settings_dialog_timer_alert_spin_persists_on_change(qapp, db_path):
+    dlg = SettingsDialog(db_path)
+    dlg.timer_alert_spin.setValue(72)
+    assert database.get_setting("timer_alert_hours", None, db_path) == "72"

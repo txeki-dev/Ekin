@@ -97,6 +97,10 @@ def init_db(db_path=None):
                 "ALTER TABLE tasks ADD COLUMN linked_board_id INTEGER REFERENCES boards(id) ON DELETE SET NULL"
             )
 
+        # Migración: temporizador de una tarea (fecha/hora de inicio, o NULL si no está en marcha)
+        if "timer_started_at" not in tasks_columns:
+            cursor.execute("ALTER TABLE tasks ADD COLUMN timer_started_at TEXT")
+
         # Tabla de logs/diario (task_logs)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS task_logs (

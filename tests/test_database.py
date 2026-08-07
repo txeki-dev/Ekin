@@ -660,6 +660,73 @@ def test_snapshot_and_restore_task(db_path):
     assert [lk["url"] for lk in database.get_task_links(new_id, db_path)] == ["https://x.com"]
 
 
+# --- Temporizador de tareas (v0.9.0) ---
+
+def test_task_has_no_timer_by_default(db_path):
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    t = database.create_task(c, "Tarea", db_path=db_path)
+    assert database.get_task(t, db_path)["timer_started_at"] is None
+
+
+def test_set_task_timer_started_sets_and_clears(db_path):
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    t = database.create_task(c, "Tarea", db_path=db_path)
+
+    database.set_task_timer_started(t, "2026-01-01T10:00:00", db_path=db_path)
+    assert database.get_task(t, db_path)["timer_started_at"] == "2026-01-01T10:00:00"
+
+    database.set_task_timer_started(t, None, db_path=db_path)
+    assert database.get_task(t, db_path)["timer_started_at"] is None
+
+
+def test_get_tasks_exposes_timer_started_at(db_path):
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    t = database.create_task(c, "Tarea", db_path=db_path)
+    database.set_task_timer_started(t, "2026-01-01T10:00:00", db_path=db_path)
+
+    tasks = database.get_tasks(c, db_path=db_path)
+    assert tasks[0]["timer_started_at"] == "2026-01-01T10:00:00"
+
+
+def test_timer_migration_is_idempotent_and_preserves_existing_values(db_path):
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    t = database.create_task(c, "Tarea", db_path=db_path)
+    database.set_task_timer_started(t, "2026-01-01T10:00:00", db_path=db_path)
+
+    database.init_db(db_path)  # re-ejecutar la migración no debe borrar ni fallar
+
+    assert database.get_task(t, db_path)["timer_started_at"] == "2026-01-01T10:00:00"
+
+
+def test_snapshot_and_restore_task_keeps_timer_started_at(db_path):
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    t = database.create_task(c, "Tarea", db_path=db_path)
+    database.set_task_timer_started(t, "2026-01-01T10:00:00", db_path=db_path)
+
+    snap = database.snapshot_task(t, db_path=db_path)
+    database.delete_task(t, db_path=db_path)
+
+    new_id = database.restore_task(snap, db_path=db_path)
+    assert database.get_task(new_id, db_path)["timer_started_at"] == "2026-01-01T10:00:00"
+
+
+def test_snapshot_and_restore_task_without_timer_stays_none(db_path):
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    t = database.create_task(c, "Tarea", db_path=db_path)
+
+    snap = database.snapshot_task(t, db_path=db_path)
+    database.delete_task(t, db_path=db_path)
+
+    new_id = database.restore_task(snap, db_path=db_path)
+    assert database.get_task(new_id, db_path)["timer_started_at"] is None
+
+
 def test_snapshot_and_restore_board_hierarchy(db_path):
     b = database.create_board("Original", "#123456", db_path=db_path)
     c = database.create_column(b, "Col", db_path=db_path)

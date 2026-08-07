@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt, Signal, QSize
+from PySide6.QtCore import Qt, Signal, QSize, QTimer
 from PySide6.QtWidgets import (
     QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QInputDialog, QMessageBox, QDialog, QLineEdit, QColorDialog,
@@ -211,6 +211,10 @@ class BoardViewWidget(QFrame):
         self._hover_expanded_column_id = None
         self.setObjectName("BoardViewWidget")
 
+        self._timer_badge_refresh_timer = QTimer(self)
+        self._timer_badge_refresh_timer.timeout.connect(self.refresh_timer_badges)
+        self._timer_badge_refresh_timer.start(60_000)  # refresca las insignias cada 60s
+
         self.init_ui()
 
     def _refresh_current(self):
@@ -345,10 +349,12 @@ class BoardViewWidget(QFrame):
         col_widget.column_activated.connect(self._set_last_active_column)
 
         if not col_data.get("collapsed"):
+            timer_alert_hours = int(database.get_setting("timer_alert_hours", "24", self.db_path))
             for task_data in tasks:
                 card = TaskCard(task_data, self)
                 if board_info:
                     card.set_card_style(board_info["color"])
+                card.set_timer_alert_hours(timer_alert_hours)
                 card.clicked.connect(lambda tid, cid=col_data["id"]: self._handle_task_card_clicked(tid, cid))
                 card.board_link_clicked.connect(self.board_link_activated.emit)
                 card.drag_ended.connect(self.finalize_hover_expand)
@@ -387,6 +393,15 @@ class BoardViewWidget(QFrame):
         old_widget.deleteLater()
         self.columns_layout.insertWidget(index, new_widget)
         self.column_widgets[column_id] = new_widget
+
+    def refresh_timer_badges(self):
+        """Refresca la insignia de tiempo transcurrido en todas las tarjetas con un
+        temporizador activo, sin recargar el tablero -- el tiempo transcurrido cambia solo
+        con el paso del tiempo, no hay datos nuevos que leer de la BD; solo hace falta
+        recalcular el texto/color ya mostrado en cada TaskCard viva."""
+        for col_widget in self.column_widgets.values():
+            for card in col_widget.findChildren(TaskCard):
+                card.update_timer_badge()
 
     def load_board(self, board_id, notify=True):
         """Carga las columnas y tareas de un tablero específico. `notify=False` evita

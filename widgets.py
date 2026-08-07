@@ -165,7 +165,8 @@ class TaskCard(QFrame):
         self.task_id = task_data["id"]
         self.drag_start_position = QPoint()
         self.board_color_hex = "#3b82f6"
-        
+        self._timer_alert_hours = 24
+
         self.setObjectName("TaskCardFrame")
         self.setAttribute(Qt.WA_StyledBackground, True)
         self.init_ui()
@@ -250,11 +251,23 @@ class TaskCard(QFrame):
         board_link_layout.addStretch()
         self.meta_layout.addWidget(self.board_link_container)
 
+        # Contenedor para la insignia del temporizador (Fila 4, opcional)
+        self.timer_container = QWidget()
+        self.timer_container.setStyleSheet("background: transparent; border: none;")
+        timer_row_layout = QHBoxLayout(self.timer_container)
+        timer_row_layout.setContentsMargins(0, 0, 0, 0)
+        timer_row_layout.setSpacing(6)
+        self.timer_badge_label = QLabel()
+        timer_row_layout.addWidget(self.timer_badge_label)
+        timer_row_layout.addStretch()
+        self.meta_layout.addWidget(self.timer_container)
+
         layout.addLayout(self.meta_layout)
 
         # Actualizar las etiquetas y vencimiento
         self.update_tags_and_due(self.task_data.get("tags", []), self.task_data.get("due_date"))
         self._update_board_link()
+        self.update_timer_badge()
 
     def _emit_board_link_clicked(self):
         board_id = self.task_data.get("linked_board_id")
@@ -292,6 +305,46 @@ class TaskCard(QFrame):
             }}
         """)
         self.board_link_container.show()
+
+    def set_timer_alert_hours(self, hours):
+        """Umbral (en horas) a partir del cual la insignia del temporizador se resalta en
+        rojo. Se fija externamente tras construir la tarjeta -- TaskCard no tiene acceso
+        directo a app_settings (ver BoardViewWidget._build_column_widget)."""
+        self._timer_alert_hours = hours
+        self.update_timer_badge()
+
+    def update_timer_badge(self):
+        """Dibuja (o esconde) la insignia de tiempo transcurrido del temporizador, en rojo
+        si supera self._timer_alert_hours -- mismo patrón visual que la fecha de vencimiento
+        vencida/no vencida en update_tags_and_due."""
+        started_at = self.task_data.get("timer_started_at")
+        if not started_at:
+            self.timer_container.hide()
+            return
+        try:
+            started = datetime.fromisoformat(started_at)
+        except ValueError:
+            self.timer_container.hide()
+            return
+
+        elapsed = datetime.now() - started
+        elapsed_hours = elapsed.total_seconds() / 3600
+        is_stale = elapsed_hours >= self._timer_alert_hours
+
+        self.timer_badge_label.setText(f"⏱ {styles.format_elapsed_time(elapsed.total_seconds())}")
+        if is_stale:
+            dr, dg, db = hex_to_rgb(styles.COLORS['danger'])
+            self.timer_badge_label.setStyleSheet(
+                f"color: {styles.COLORS['danger']}; font-weight: bold; font-size: 10px; "
+                f"background-color: rgba({dr}, {dg}, {db}, 0.15); border-radius: 4px; padding: 2px 4px;"
+            )
+        else:
+            mr, mg, mb = hex_to_rgb(styles.COLORS['text_muted'])
+            self.timer_badge_label.setStyleSheet(
+                f"color: {styles.COLORS['text_muted']}; font-size: 10px; "
+                f"background-color: rgba({mr}, {mg}, {mb}, 0.15); border-radius: 4px; padding: 2px 4px;"
+            )
+        self.timer_container.show()
 
     def update_tags_and_due(self, tags, due_date):
         """Limpia y dibuja las etiquetas actuales y la fecha de vencimiento."""

@@ -23,6 +23,7 @@ def snapshot_task(task_id, db_path=None):
         "due_date": task.get("due_date"), "due_time": task.get("due_time"),
         "recurrence": task.get("recurrence", "none"),
         "linked_board_id": task.get("linked_board_id"),
+        "timer_started_at": task.get("timer_started_at"),
         "tag_value_ids": [t["tag_value_id"] for t in task.get("tags", [])],
         "logs": [{"content": lg["content"], "created_at": lg["created_at"]}
                  for lg in get_logs(task_id, db_path)],
@@ -43,10 +44,11 @@ def restore_task(snap, column_id=None, db_path=None):
         cursor.execute("SELECT COALESCE(MAX(position), -1) FROM tasks WHERE column_id = ?", (column_id,))
         pos = cursor.fetchone()[0] + 1
         cursor.execute(
-            "INSERT INTO tasks (column_id, title, description, position, due_date, due_time, recurrence, linked_board_id) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO tasks (column_id, title, description, position, due_date, due_time, "
+            "recurrence, linked_board_id, timer_started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (column_id, snap["title"], snap["description"], pos, snap.get("due_date"),
-             snap.get("due_time"), snap.get("recurrence", "none"), linked_board_id)
+             snap.get("due_time"), snap.get("recurrence", "none"), linked_board_id,
+             snap.get("timer_started_at"))
         )
         new_id = cursor.lastrowid
         for tvid in snap.get("tag_value_ids", []):

@@ -292,6 +292,13 @@ STRINGS = {
         "afinados para el oscuro. Se aplica del todo al reiniciar la app."
     ),
     "settings.notifications_checkbox": "Mostrar avisos de Windows para tareas que vencen hoy",
+    "settings.timer_alert_label": "⏱ Avisar en la tarjeta si un temporizador lleva más de:",
+    "settings.timer_alert_suffix": " h",
+    "settings.timer_alert_hint": (
+        "Las tarjetas con un temporizador activo se resaltan en rojo al superar este tiempo. "
+        "Las que ya estén abiertas no se recolorean al cambiar este valor hasta que se "
+        "recarguen (cambiar de tablero, editar una tarea, etc.)."
+    ),
     "settings.geometry_hint": "El tamaño y la posición de la ventana se recuerdan automáticamente.",
     "settings.close_btn": "Cerrar",
 
@@ -391,6 +398,12 @@ STRINGS = {
     "task_detail.title_placeholder": "Ej. Escribir informe mensual...",
     "task_detail.description_label": "📄 <b>Descripción / Notas</b>",
     "task_detail.description_placeholder": "Añade detalles sobre esta tarea...",
+    "task_detail.timer_label": "⏱ <b>Temporizador:</b>",
+    "task_detail.timer_start_btn": "▶ Iniciar",
+    "task_detail.timer_restart_btn": "↺ Reiniciar",
+    "task_detail.timer_clear_btn": "✕ Detener",
+    "task_detail.timer_clear_tooltip": "Detiene el temporizador y quita la insignia de la tarjeta",
+    "task_detail.timer_elapsed": "En marcha desde hace {elapsed}",
     "task_detail.due_label": "📅 <b>Vencimiento:</b>",
     "task_detail.due_enable_checkbox": "Habilitar",
     "task_detail.due_time_checkbox": "Hora",

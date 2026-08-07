@@ -8,7 +8,7 @@ __all__ = [
     "create_task", "get_tasks", "get_task", "update_task", "update_task_due_date",
     "set_task_due_time", "next_occurrence", "set_task_recurrence", "advance_recurrence",
     "advance_overdue_recurring", "update_task_position", "update_task_positions", "delete_task",
-    "set_task_linked_board",
+    "set_task_linked_board", "set_task_timer_started",
 ]  # get_task_board_id vive en scheduling.py (junto a get_scheduled_tasks)
 
 # --- OPERACIONES DE TAREAS (TASKS) ---
@@ -32,6 +32,7 @@ def create_task(column_id, title, description="", tag_text="", tag_color="#6b728
 _TASK_SELECT_COLUMNS = """
     t.id, t.column_id, t.title, t.description, t.tag_text, t.tag_color, t.position,
     t.created_at, t.updated_at, t.due_date, t.due_time, t.recurrence, t.linked_board_id,
+    t.timer_started_at,
     b.name AS linked_board_name, b.color AS linked_board_color
 """
 
@@ -73,6 +74,13 @@ def set_task_linked_board(task_id, board_id, db_path=None):
     """Vincula una tarea con otro tablero (o None para quitar el vínculo)."""
     with get_connection(db_path) as conn:
         conn.execute("UPDATE tasks SET linked_board_id = ? WHERE id = ?", (board_id, task_id))
+        conn.commit()
+
+def set_task_timer_started(task_id, started_at, db_path=None):
+    """Inicia (started_at = timestamp ISO de datetime.now()) o borra (started_at = None)
+    el temporizador de una tarea."""
+    with get_connection(db_path) as conn:
+        conn.execute("UPDATE tasks SET timer_started_at = ? WHERE id = ?", (started_at, task_id))
         conn.commit()
 
 def update_task(task_id, title, description, tag_text, tag_color, due_date, db_path=None):

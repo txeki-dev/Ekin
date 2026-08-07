@@ -4,7 +4,7 @@ Guarda las preferencias en la tabla `app_settings`. El tamaño/posición de la v
 se persiste desde `main` (al cerrar/abrir), aquí solo se gestionan tema y avisos."""
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox, QPushButton, QFrame
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox, QPushButton, QFrame, QSpinBox
 )
 
 import database
@@ -54,6 +54,25 @@ class SettingsDialog(QDialog):
             lambda on: database.set_setting("notifications_enabled", "1" if on else "0", self.db_path)
         )
         layout.addWidget(self.notif_chk)
+
+        # --- Temporizador de tareas ---
+        timer_row = QHBoxLayout()
+        timer_row.addWidget(QLabel(t("settings.timer_alert_label")))
+        self.timer_alert_spin = QSpinBox()
+        self.timer_alert_spin.setRange(1, 720)
+        self.timer_alert_spin.setSuffix(t("settings.timer_alert_suffix"))
+        self.timer_alert_spin.setValue(int(database.get_setting("timer_alert_hours", "24", self.db_path)))
+        self.timer_alert_spin.valueChanged.connect(
+            lambda hours: database.set_setting("timer_alert_hours", str(hours), self.db_path)
+        )
+        timer_row.addWidget(self.timer_alert_spin)
+        timer_row.addStretch()
+        layout.addLayout(timer_row)
+
+        timer_hint = QLabel(t("settings.timer_alert_hint"))
+        timer_hint.setWordWrap(True)
+        timer_hint.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 11px;")
+        layout.addWidget(timer_hint)
 
         line = QFrame()
         line.setFrameShape(QFrame.HLine)

@@ -1,4 +1,5 @@
-from PySide6.QtCore import Qt, QDate, QTime, QUrl, QSize
+from datetime import datetime
+from PySide6.QtCore import Qt, QDate, QTime, QUrl, QSize, QTimer
 from PySide6.QtWidgets import (
     QDialog, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QScrollArea, QWidget,
@@ -24,6 +25,7 @@ class TaskDetailDialog(QDialog):
         self.current_tags = []      # Lista de diccionarios {'text': '...', 'color': '...'}
         self.task_deleted = False  # Indica si se borró la tarea desde este diálogo
         self.modified = False      # Indica si hubo algún cambio real (título, tags, diario, enlaces...)
+        self._timer_started_at = None  # Timestamp ISO del temporizador en marcha, o None
 
         self.setWindowTitle(t("task_detail.window_title"))
         self.resize(1120, 720)
@@ -31,6 +33,12 @@ class TaskDetailDialog(QDialog):
 
         self.init_ui()
         self.load_task_data()
+
+        # Refresco periódico (solo UI, sin leer la BD) para que el contador de tiempo
+        # transcurrido avance en vivo mientras el diálogo está abierto.
+        self._timer_refresh_timer = QTimer(self)
+        self._timer_refresh_timer.timeout.connect(self._refresh_timer_ui)
+        self._timer_refresh_timer.start(30_000)
 
     def init_ui(self):
         # Layout principal horizontal (Izquierda: Formulario, Derecha: Diario/Log)
@@ -58,6 +66,32 @@ class TaskDetailDialog(QDialog):
         self.desc_input.setPlaceholderText(t("task_detail.description_placeholder"))
         left_layout.addWidget(RichTextToolbar(self.desc_input))
         left_layout.addWidget(self.desc_input)
+
+        # 2.5 Temporizador
+        timer_section = QWidget()
+        timer_section_layout = QHBoxLayout(timer_section)
+        timer_section_layout.setContentsMargins(0, 0, 0, 0)
+        timer_section_layout.setSpacing(10)
+
+        timer_section_layout.addWidget(QLabel(t("task_detail.timer_label")))
+
+        self.timer_toggle_btn = QPushButton(t("task_detail.timer_start_btn"))
+        self.timer_toggle_btn.setCursor(Qt.PointingHandCursor)
+        self.timer_toggle_btn.clicked.connect(self._on_timer_toggle_clicked)
+        timer_section_layout.addWidget(self.timer_toggle_btn)
+
+        self.timer_clear_btn = QPushButton(t("task_detail.timer_clear_btn"))
+        self.timer_clear_btn.setCursor(Qt.PointingHandCursor)
+        self.timer_clear_btn.setToolTip(t("task_detail.timer_clear_tooltip"))
+        self.timer_clear_btn.clicked.connect(self._on_timer_clear_clicked)
+        timer_section_layout.addWidget(self.timer_clear_btn)
+
+        self.timer_elapsed_label = QLabel("")
+        self.timer_elapsed_label.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 11px;")
+        timer_section_layout.addWidget(self.timer_elapsed_label)
+        timer_section_layout.addStretch()
+
+        left_layout.addWidget(timer_section)
 
         # 3. Fecha de Vencimiento
         due_section = QWidget()
@@ -312,6 +346,10 @@ class TaskDetailDialog(QDialog):
 
         self.title_input.setText(task["title"])
         self.desc_input.setHtml(task["description"] or "")
+
+        # Cargar temporizador
+        self._timer_started_at = task.get("timer_started_at")
+        self._refresh_timer_ui()
 
         # Cargar fecha de vencimiento
         due_date = task.get("due_date")
@@ -598,6 +636,42 @@ class TaskDetailDialog(QDialog):
 
         self.modified = True
         self.accept()
+
+    def _on_timer_toggle_clicked(self):
+        """Inicia el temporizador, o lo reinicia a ahora si ya estaba en marcha. Acción
+        instantánea (como añadir una nota al diario o un enlace): se persiste en el
+        momento, no espera a "Guardar Cambios"."""
+        self._timer_started_at = datetime.now().isoformat()
+        database.set_task_timer_started(self.task_id, self._timer_started_at, self.db_path)
+        self.modified = True
+        self._refresh_timer_ui()
+
+    def _on_timer_clear_clicked(self):
+        """Detiene y borra el temporizador: deja de contar y quita la insignia de la tarjeta."""
+        self._timer_started_at = None
+        database.set_task_timer_started(self.task_id, None, self.db_path)
+        self.modified = True
+        self._refresh_timer_ui()
+
+    def _refresh_timer_ui(self):
+        """Actualiza el botón y la etiqueta de tiempo transcurrido según self._timer_started_at.
+        Se llama al cargar la tarea, tras cada acción, y cada 30s mientras el diálogo está
+        abierto (self._timer_refresh_timer) para que el contador avance en vivo."""
+        if self._timer_started_at:
+            self.timer_toggle_btn.setText(t("task_detail.timer_restart_btn"))
+            self.timer_clear_btn.show()
+            try:
+                started = datetime.fromisoformat(self._timer_started_at)
+                elapsed = datetime.now() - started
+                self.timer_elapsed_label.setText(
+                    t("task_detail.timer_elapsed", elapsed=styles.format_elapsed_time(elapsed.total_seconds()))
+                )
+            except ValueError:
+                self.timer_elapsed_label.setText("")
+        else:
+            self.timer_toggle_btn.setText(t("task_detail.timer_start_btn"))
+            self.timer_clear_btn.hide()
+            self.timer_elapsed_label.setText("")
 
     def delete_task(self):
         """Borra definitivamente la tarea actual de la base de datos."""
