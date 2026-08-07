@@ -141,6 +141,17 @@ Ordered roughly by value/effort. Checkboxes track what's done.
   the drag ends, whether the card was dropped inside it, elsewhere, or the drag was cancelled — it
   no longer stays permanently unfolded just because the drop happened to land there. It's purely a
   temporary peek, never equivalent to manually clicking unfold.
+- [x] **Task timer with a board-card badge + configurable alert threshold** *(Done 2026-08-07,
+  user-requested)*. New **⏱ Temporizador** control in the task detail: **▶ Iniciar** records the
+  start time (`tasks.timer_started_at`, nullable ISO timestamp) and shows a live elapsed-time
+  counter; **↺ Reiniciar** resets it to now; **✕ Detener** clears it. All three are instant-persist
+  (write to the DB immediately, like a diary entry or a link) rather than deferred to "Guardar
+  Cambios". The same elapsed time shows as a badge directly on the board-view card — not just in
+  the dialog — so tasks running too long are visible without opening each one; the badge turns red
+  once it crosses `app_settings.timer_alert_hours` (a `QSpinBox` in Ajustes, default 24h, global
+  for the whole app). `BoardViewWidget.refresh_timer_badges()` (a 60s `QTimer`) keeps visible
+  badges' elapsed text current without any DB query or widget reconstruction. Carried through
+  `snapshot_task`/`restore_task` for Ctrl+Z undo, same as `linked_board_id`.
 
 ### Data & safety
 - [x] **Automatic DB backups** *(Done in v0.4.0)* — `backups.py` writes a consistent SQLite snapshot
@@ -218,6 +229,10 @@ Ordered roughly by value/effort. Checkboxes track what's done.
    always the first; the sidebar utility bar spans two rows instead of one cramped one; a
    hover-expanded column now always folds back up when the drag ends, even if the card was
    dropped inside it.~~ ✅ 2026-08-07.
+14. ~~**Task timer + board-card badge** — a **⏱ Temporizador** in the task detail (Iniciar/
+   Reiniciar/Detener, instant-persist) shows the same elapsed time as a badge on the board card,
+   turning red past a configurable Ajustes threshold — so stale tasks are visible without opening
+   each one.~~ ✅ 2026-08-07.
 
 ### 🎯 Theme D — Distribution (parked)
 **PyInstaller** standalone build + **update-from-Releases** (replaces the `git pull` auto-updater).
