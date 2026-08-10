@@ -20,4 +20,3 @@ def set_setting(key, value, db_path=None):
             "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             (key, value)
         )
-        conn.commit()

@@ -351,12 +351,15 @@ def test_is_local_link_classifies_urls_vs_paths():
 
 
 def test_browse_local_file_fills_url_and_autofills_empty_label(qapp, db_path):
+    # Qt's QFileDialog always returns "/"-separated paths, even on Windows (native
+    # backslashes are only produced by QDir.toNativeSeparators()) -- use that shape here
+    # so os.path.basename() behaves the same on every OS/CI runner this test executes on.
     task_id = _make_task(db_path)
     dlg = TaskDetailDialog(task_id, db_path)
 
-    dlg._apply_browsed_file(r"C:\docs\report.pdf")
+    dlg._apply_browsed_file("C:/docs/report.pdf")
 
-    assert dlg.link_url_input.text() == r"C:\docs\report.pdf"
+    assert dlg.link_url_input.text() == "C:/docs/report.pdf"
     assert dlg.link_label_input.text() == "report.pdf"
 
 
@@ -365,7 +368,7 @@ def test_browse_local_file_does_not_overwrite_existing_label(qapp, db_path):
     dlg = TaskDetailDialog(task_id, db_path)
     dlg.link_label_input.setText("Mi informe")
 
-    dlg._apply_browsed_file(r"C:\docs\report.pdf")
+    dlg._apply_browsed_file("C:/docs/report.pdf")
 
     assert dlg.link_label_input.text() == "Mi informe"
 

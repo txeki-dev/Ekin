@@ -852,9 +852,13 @@ class TaskDetailDialog(QDialog):
 
     def scroll_to_bottom(self):
         """Mueve la barra de desplazamiento del diario hasta abajo."""
-        # Usamos un timer de un solo disparo o directamente el valor del scrollbar
-        # ya que Qt a veces tarda un instante en actualizar el scroll máximo
+        # Usamos un timer de un solo disparo ya que Qt a veces tarda un instante en
+        # actualizar el scroll máximo tras repintar. Parentado a self (en vez de un
+        # QTimer.singleShot suelto) para que Qt lo destruya junto con el diálogo -- uno
+        # sin padre sigue vivo y puede disparar más tarde contra un scrollbar ya
+        # destruido si el diálogo se cierra antes de que pasen los 50ms.
         scrollbar = self.scroll_area.verticalScrollBar()
-        # Conectamos de forma asíncrona sutil para que se ejecute después del repaint
-        from PySide6.QtCore import QTimer
-        QTimer.singleShot(50, lambda: scrollbar.setValue(scrollbar.maximum()))
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        timer.timeout.connect(lambda: scrollbar.setValue(scrollbar.maximum()))
+        timer.start(50)

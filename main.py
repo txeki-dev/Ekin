@@ -460,9 +460,9 @@ class MainWindow(QMainWindow):
                         t("main.update.done_body")
                     )
                     
-                    # Reiniciar el script actual de python
+                    # Reiniciar el script actual de python (execv solo retorna si falla,
+                    # lo que cae al except de abajo; en éxito reemplaza el proceso entero)
                     os.execv(sys.executable, [sys.executable] + sys.argv)
-                    sys.exit(0)
         except Exception as e:
             # Fallar en silencio si no hay conexión o no es una instalación Git
             print(f"Error al comprobar actualizaciones: {e}")

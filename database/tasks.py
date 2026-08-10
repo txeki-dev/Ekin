@@ -26,7 +26,6 @@ def create_task(column_id, title, description="", tag_text="", tag_color="#6b728
                VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (column_id, title, description, tag_text, tag_color, next_pos, due_date)
         )
-        conn.commit()
         return cursor.lastrowid
 
 _TASK_SELECT_COLUMNS = """
@@ -74,14 +73,12 @@ def set_task_linked_board(task_id, board_id, db_path=None):
     """Vincula una tarea con otro tablero (o None para quitar el vínculo)."""
     with get_connection(db_path) as conn:
         conn.execute("UPDATE tasks SET linked_board_id = ? WHERE id = ?", (board_id, task_id))
-        conn.commit()
 
 def set_task_timer_started(task_id, started_at, db_path=None):
     """Inicia (started_at = timestamp ISO de datetime.now()) o borra (started_at = None)
     el temporizador de una tarea."""
     with get_connection(db_path) as conn:
         conn.execute("UPDATE tasks SET timer_started_at = ? WHERE id = ?", (started_at, task_id))
-        conn.commit()
 
 def update_task(task_id, title, description, tag_text, tag_color, due_date, db_path=None):
     with get_connection(db_path) as conn:
@@ -91,7 +88,6 @@ def update_task(task_id, title, description, tag_text, tag_color, due_date, db_p
                WHERE id = ?""",
             (title, description, tag_text, tag_color, due_date, task_id)
         )
-        conn.commit()
 
 def update_task_due_date(task_id, due_date, db_path=None):
     """Actualiza solo la fecha de vencimiento de una tarea (usado por el arrastre en el calendario).
@@ -101,13 +97,11 @@ def update_task_due_date(task_id, due_date, db_path=None):
             "UPDATE tasks SET due_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (due_date, task_id)
         )
-        conn.commit()
 
 def set_task_due_time(task_id, due_time, db_path=None):
     """Fija la hora de vencimiento ('HH:MM') de una tarea, o None para dejarla de día completo."""
     with get_connection(db_path) as conn:
         conn.execute("UPDATE tasks SET due_time = ? WHERE id = ?", (due_time or None, task_id))
-        conn.commit()
 
 # --- RECURRENCIA DE TAREAS ---
 
@@ -138,7 +132,6 @@ def set_task_recurrence(task_id, recurrence, db_path=None):
     """Fija la recurrencia de una tarea ('none'/'daily'/'weekly'/'monthly')."""
     with get_connection(db_path) as conn:
         conn.execute("UPDATE tasks SET recurrence = ? WHERE id = ?", (recurrence or "none", task_id))
-        conn.commit()
 
 def advance_recurrence(task_id, db_path=None):
     """Avanza la fecha de vencimiento de una tarea recurrente a su siguiente ocurrencia.
@@ -156,7 +149,6 @@ def advance_recurrence(task_id, db_path=None):
             "UPDATE tasks SET due_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (nxt, task_id)
         )
-        conn.commit()
         return nxt
 
 def advance_overdue_recurring(today_iso, db_path=None):
@@ -181,7 +173,6 @@ def advance_overdue_recurring(today_iso, db_path=None):
             if nxt is not None and nxt != row["due_date"]:
                 conn.execute("UPDATE tasks SET due_date = ? WHERE id = ?", (nxt, row["id"]))
                 advanced += 1
-        conn.commit()
     return advanced
 
 def update_task_position(task_id, new_column_id, new_position, db_path=None):
@@ -190,7 +181,6 @@ def update_task_position(task_id, new_column_id, new_position, db_path=None):
             "UPDATE tasks SET column_id = ?, position = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (new_column_id, new_position, task_id)
         )
-        conn.commit()
 
 def update_task_positions(task_positions, db_path=None):
     """Actualiza de golpe la columna y posición de varias tareas (para reordenación drag-and-drop).
@@ -203,9 +193,7 @@ def update_task_positions(task_positions, db_path=None):
                 "UPDATE tasks SET column_id = ?, position = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (col_id, pos, task_id)
             )
-        conn.commit()
 
 def delete_task(task_id, db_path=None):
     with get_connection(db_path) as conn:
         conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
-        conn.commit()

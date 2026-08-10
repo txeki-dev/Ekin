@@ -18,7 +18,6 @@ def move_column_to_board(column_id, target_board_id, db_path=None):
             "UPDATE columns SET board_id = ?, position = ? WHERE id = ?",
             (target_board_id, next_pos, column_id)
         )
-        conn.commit()
 
 def _duplicate_task_into_column(cursor, task_row, new_column_id):
     """Duplica una fila de `tasks` (con sus etiquetas, diario y enlaces) en
@@ -106,7 +105,6 @@ def copy_column_to_board(column_id, target_board_id, db_path=None):
         for task in tasks:
             _duplicate_task_into_column(cursor, task, new_column_id)
 
-        conn.commit()
         return new_column_id
 
 def copy_board(board_id, new_name, new_color, db_path=None):
@@ -145,5 +143,4 @@ def copy_board(board_id, new_name, new_color, db_path=None):
             for task in tasks:
                 _duplicate_task_into_column(cursor, task, new_col_id)
 
-        conn.commit()
         return new_board_id

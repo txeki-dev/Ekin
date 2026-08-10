@@ -28,7 +28,7 @@ def snapshot_task(task_id, db_path=None):
         "tag_value_ids": [t["tag_value_id"] for t in task.get("tags", [])],
         "logs": [{"content": lg["content"], "created_at": lg["created_at"]}
                  for lg in get_logs(task_id, db_path)],
-        "links": [{"url": lk["url"], "label": lk["label"]}
+        "links": [{"url": lk["url"], "label": lk["label"], "position": lk["position"]}
                   for lk in get_task_links(task_id, db_path)],
     }
 
@@ -68,9 +68,8 @@ def restore_task(snap, column_id=None, db_path=None):
             cursor.execute("INSERT INTO task_logs (task_id, content, created_at) VALUES (?, ?, ?)",
                            (new_id, lg["content"], lg["created_at"]))
         for lk in snap.get("links", []):
-            cursor.execute("INSERT INTO task_links (task_id, url, label, position) VALUES (?, ?, ?, 0)",
-                           (new_id, lk["url"], lk["label"]))
-        conn.commit()
+            cursor.execute("INSERT INTO task_links (task_id, url, label, position) VALUES (?, ?, ?, ?)",
+                           (new_id, lk["url"], lk["label"], lk["position"]))
         return new_id
 
 def snapshot_column(column_id, db_path=None):
@@ -94,7 +93,6 @@ def restore_column(snap, board_id=None, db_path=None):
             "INSERT INTO columns (board_id, name, color, position, collapsed) VALUES (?, ?, ?, ?, ?)",
             (board_id, snap["name"], snap["color"], pos, snap.get("collapsed", 0)))
         new_col = cursor.lastrowid
-        conn.commit()
     for task_snap in snap.get("tasks", []):
         if task_snap:
             restore_task(task_snap, column_id=new_col, db_path=db_path)

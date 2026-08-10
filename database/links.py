@@ -14,7 +14,6 @@ def add_task_link(task_id, url, label=None, db_path=None):
             "INSERT INTO task_links (task_id, url, label, position) VALUES (?, ?, ?, ?)",
             (task_id, url, label or None, pos)
         )
-        conn.commit()
         return cursor.lastrowid
 
 def get_task_links(task_id, db_path=None):
@@ -29,7 +28,6 @@ def get_task_links(task_id, db_path=None):
 def delete_task_link(link_id, db_path=None):
     with get_connection(db_path) as conn:
         conn.execute("DELETE FROM task_links WHERE id = ?", (link_id,))
-        conn.commit()
 
 def get_task_links_bulk(task_ids, db_path=None):
     """{task_id: [enlaces]} para varias tareas en una consulta (evita N+1 al pintar el tablero)."""

@@ -512,6 +512,3 @@ def set_theme(name):
     COLORS.clear()
     COLORS.update(LIGHT if name == "light" else DARK)
     return build_qss(COLORS)
-
-
-QSS = build_qss(COLORS)

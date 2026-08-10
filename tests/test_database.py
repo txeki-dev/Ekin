@@ -259,17 +259,21 @@ def test_create_log_updates_task_updated_at(db_path):
     assert database.get_task(task_id, db_path)["updated_at"] >= original_updated_at
 
 
-def test_create_log_has_a_single_commit_call():
+def test_create_log_has_no_intermediate_commit_call():
     """Antes del fix, create_log() tenía un commit() intermedio entre el INSERT del
     log y el UPDATE de updated_at, rompiendo la atomicidad de la operación (el INSERT
     quedaba confirmado en disco sin poder revertirse si el UPDATE fallase después).
-    Verificarlo en tiempo de ejecución no es práctico: sqlite3.Connection es un tipo
-    inmutable que no admite parchear su método commit; en su lugar comprobamos
-    directamente el cuerpo de la función."""
+    Tras la limpieza de commits redundantes en todo el paquete database/ (get_connection
+    ya confirma en su __exit__ sobre éxito), create_log ya no llama a commit() en
+    absoluto -- la atomicidad depende únicamente del context manager, así que la
+    invariante a proteger pasó de "un solo commit, al final" a "ningún commit
+    explícito". Verificarlo en tiempo de ejecución no es práctico: sqlite3.Connection
+    es un tipo inmutable que no admite parchear su método commit; en su lugar
+    comprobamos directamente el cuerpo de la función."""
     import inspect
 
     source = inspect.getsource(database.create_log)
-    assert source.count(".commit()") == 1
+    assert source.count(".commit()") == 0
 
 
 def test_get_logs_bulk_matches_single_and_groups(db_path):
@@ -742,6 +746,25 @@ def test_snapshot_and_restore_task(db_path):
     assert r["tags"][0]["value"] == "Alta"
     assert [lg["content"] for lg in database.get_logs(new_id, db_path)] == ["una nota"]
     assert [lk["url"] for lk in database.get_task_links(new_id, db_path)] == ["https://x.com"]
+
+
+def test_snapshot_and_restore_task_preserves_link_order(db_path):
+    """Regresión: restore_task insertaba todos los enlaces restaurados en position=0,
+    perdiendo su orden relativo original tras un Ctrl+Z."""
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    t = database.create_task(c, "Tarea", db_path=db_path)
+    database.add_task_link(t, "https://a.com", "A", db_path=db_path)
+    database.add_task_link(t, "https://b.com", "B", db_path=db_path)
+    database.add_task_link(t, "https://c.com", "C", db_path=db_path)
+
+    snap = database.snapshot_task(t, db_path=db_path)
+    database.delete_task(t, db_path=db_path)
+    new_id = database.restore_task(snap, db_path=db_path)
+
+    restored = database.get_task_links(new_id, db_path)
+    assert [lk["url"] for lk in restored] == ["https://a.com", "https://b.com", "https://c.com"]
+    assert [lk["position"] for lk in restored] == [0, 1, 2]
 
 
 # --- Temporizador de tareas (v0.9.0) ---

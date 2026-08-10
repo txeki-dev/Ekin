@@ -17,7 +17,6 @@ def create_log(task_id, content, db_path=None):
             "UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (task_id,)
         )
-        conn.commit()
         return cursor.lastrowid
 
 def get_logs(task_id, db_path=None):
@@ -58,7 +57,6 @@ def update_log(log_id, content, db_path=None):
             "WHERE id = (SELECT task_id FROM task_logs WHERE id = ?)",
             (log_id,)
         )
-        conn.commit()
 
 def delete_log(log_id, db_path=None):
     with get_connection(db_path) as conn:
@@ -75,4 +73,3 @@ def delete_log(log_id, db_path=None):
                 "UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (task_id,)
             )
-        conn.commit()

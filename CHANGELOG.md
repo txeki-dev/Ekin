@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-08-10
+
 ### Added
 - **Local file attachments on task links.** The "🔗 Enlaces / adjuntos" section in the task detail
   now has a **📁** button that opens a native file picker so you can attach a file from your PC
@@ -19,6 +21,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   handed a raw path instead of a proper `file://` URL. Fixed by routing local attachments through
   `QUrl.fromLocalFile(...)`. Any link (local or web) that still fails to open now shows a warning
   dialog instead of silently doing nothing.
+- **CI: intermittent test-suite crash on Linux (a different Python 3.10/3.11/3.12 job failing on
+  different runs since the task-timer feature).** Root cause: a stray, unparented
+  `QTimer.singleShot` in the task-diary "scroll to bottom" logic held a closure over a child
+  scrollbar widget; if the dialog was destroyed before the 50ms elapsed, the timer could still fire
+  later — during the test suite's own teardown — against an already-destroyed widget, corrupting
+  the process heap. Fixed by parenting the timer to the dialog so Qt cancels it automatically when
+  the dialog is destroyed, instead of leaving it dangling.
+- Tests constructing `MainWindow()` directly left two more real, unparented timers pending — one of
+  which runs live `git fetch`/`git status` subprocess calls — that could also fire unpredictably
+  during test teardown. Now mocked out and the window is properly closed after each test.
+- `restore_task` (Ctrl+Z undo) always restored every link at `position = 0`, losing their original
+  relative order. The original position is now captured and restored.
+
+### Changed
+- Removed ~40 redundant trailing `conn.commit()` calls across the `database/` package — the
+  connection context manager already commits on clean exit, so these were dead weight.
+- Removed the unused `styles.QSS` module-level constant (the app has gotten its stylesheet via
+  `set_theme()` since the previous forensic pass) and an unreachable `sys.exit(0)` after
+  `os.execv()` in the update-checker.
 
 ## [0.9.0] - 2026-08-07
 

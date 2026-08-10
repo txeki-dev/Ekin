@@ -23,13 +23,11 @@ def set_board_ics_sync_path(board_id, path, db_path=None):
             "ON CONFLICT(board_id) DO UPDATE SET path = excluded.path",
             (board_id, path)
         )
-        conn.commit()
 
 def delete_board_ics_sync_path(board_id, db_path=None):
     """Desactiva la sincronización automática de un tablero."""
     with get_connection(db_path) as conn:
         conn.execute("DELETE FROM board_ics_sync WHERE board_id = ?", (board_id,))
-        conn.commit()
 
 def get_all_board_ics_sync_paths(db_path=None):
     """Devuelve {board_id: path} para todos los tableros con auto-sync configurado."""
