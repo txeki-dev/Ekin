@@ -41,14 +41,21 @@ deterministic cross-platform bug.
 - [x] **Dead code**: unused `styles.QSS` module-level constant (nothing has read it since
   `set_theme()` took over in the previous forensic pass) and an unreachable `sys.exit(0)` after
   `os.execv()` in `main.check_for_updates`.
+- [x] **CI still red after the fix above (py3.10 only) — the broader "no shared cleanup" pattern
+  really was load-bearing, not just theoretical.** The first push (timer fix + `MainWindow` cleanup)
+  flipped CI from "all 3 Python versions fail" to "2 of 3 pass," confirming the mechanism but
+  exposing that it wasn't the *only* source: dozens of other tests construct a
+  `BoardViewWidget`/`TaskDetailDialog` and never close it, so hundreds of orphaned widgets still
+  converged on one final teardown burst. Fixed with a `tests/conftest.py` autouse fixture that
+  closes every top-level widget after *each* test instead of letting them all accumulate to
+  session end — the fix originally logged below as "deferred, provably safe today" turned out not
+  to be safe enough; it's done now, verified by re-polling GitHub Actions after the follow-up push
+  (all 3 Python versions + lint + release green).
 
 **New tech debt found this pass, deferred on purpose (see "Code quality & tech debt" below):**
 `restore_column`/`restore_board` aren't atomic across their children (each nested
 `restore_task`/`restore_column` call opens its own connection/transaction) — low practical impact,
-not acted on; and the broader pattern behind the `MainWindow` fix above — dozens of other tests
-construct a `BoardViewWidget`/`TaskDetailDialog` without any equivalent cleanup, which is provably
-safe *today* now that the one confirmed crash source is fixed, but is still worth a proper test
-fixture (auto-tracks and closes every widget it creates) rather than fixing call sites one at a time.
+not acted on.
 
 ---
 
@@ -163,12 +170,12 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
   connection/transaction, so a failure partway through an undo of a multi-task column/board leaves
   a partially-restored result instead of all-or-nothing. Low practical impact (would need a
   mid-restore failure, e.g. disk full) — not acted on this pass. **(P3 — atomicity)**
-- [ ] **No shared cleanup fixture for widget-constructing tests** — found during the 2026-08-10
-  CI-flakiness investigation: dozens of tests construct a `BoardViewWidget`/`TaskDetailDialog`
-  without ever closing/deleting it, relying entirely on the session-end `qapp` teardown. Provably
-  safe today now that the one confirmed crash source (the stray `scroll_to_bottom` timer) is fixed,
-  but a fixture that auto-tracks and closes every widget a test creates would be more robust than
-  continuing to rely on each new test remembering to clean up by hand. **(P2 — test infra)**
+- [x] **No shared cleanup fixture for widget-constructing tests** *(Done 2026-08-10 — see the
+  forensic-pass section above.)* Found during the CI-flakiness investigation: dozens of tests
+  construct a `BoardViewWidget`/`TaskDetailDialog` without ever closing/deleting it, relying
+  entirely on the session-end `qapp` teardown — turned out to still be a live CI-flakiness source
+  (py3.10 kept failing even after the first fix), not just a theoretical one. Fixed with an
+  autouse `tests/conftest.py` fixture that closes every top-level widget after each test.
 
 ---
 
@@ -379,12 +386,15 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
    tests passing (7 new).~~ ✅ 2026-08-10.
 17. ~~**v0.9.1 — forensic bug-hunt pass + CI fix** — found and fixed the root cause of CI
    intermittently failing since 2026-08-07 (a stray, unparented `QTimer.singleShot` that could fire
-   against an already-destroyed widget, reproduced down to the actual native crash); cleaned up
-   `tests/test_main_window.py` leaking real timers (incl. live `git` subprocess calls) across the
-   whole test session; fixed `restore_task()` losing link order on Ctrl+Z; removed ~40 redundant
-   `conn.commit()` calls across `database/` (doubling as the dedicated double-commit audit an
-   earlier item asked for) plus two confirmed dead-code spots. 167/167 tests passing, ruff clean.~~
-   ✅ 2026-08-10.
+   against an already-destroyed widget, reproduced down to the actual native crash); a first push
+   fixed that plus `tests/test_main_window.py` leaking real timers (incl. live `git` subprocess
+   calls), which flipped CI from "all 3 Python versions fail" to "2 of 3 pass" — confirming the
+   mechanism but exposing a second, broader source (dozens of tests never closing the widgets they
+   construct), fixed with a follow-up push adding an autouse test-cleanup fixture, landing CI fully
+   green (3 Python versions + lint + release), verified via the GitHub Actions API after each push.
+   Also fixed `restore_task()` losing link order on Ctrl+Z; removed ~40 redundant `conn.commit()`
+   calls across `database/` (doubling as the dedicated double-commit audit an earlier item asked
+   for) plus two confirmed dead-code spots. 167/167 tests passing, ruff clean.~~ ✅ 2026-08-10.
 
 ### 🎯 Theme D — Distribution (parked)
 **PyInstaller** standalone build + **update-from-Releases** (replaces the `git pull` auto-updater).
