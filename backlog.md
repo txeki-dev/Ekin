@@ -5,6 +5,53 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 
 ---
 
+## ✅ Fixed in the forensic pass (2026-08-10, v0.9.1)
+
+Same two-independent-agent format as the 2026-08-07 pass (data/logic layer, UI layer + a dedicated
+CI-flakiness investigation), every finding re-verified against actual source before acceptance.
+Triggered by CI intermittently failing since the 2026-08-07 task-timer commit — pinpointed via the
+GitHub Actions check-runs API (no `gh` CLI / log access available) to a different single
+Python-version job failing on different runs, which pointed at a race/leak rather than a
+deterministic cross-platform bug.
+
+- [x] **CI crash root cause found and fixed: a stray, unparented `QTimer.singleShot` could fire
+  against an already-destroyed widget.** `detail_dialog/task_detail_dialog.py`'s
+  `scroll_to_bottom()` (called on every dialog open and every diary edit) scheduled a bare
+  `QTimer.singleShot(50, lambda: scrollbar.setValue(...))` holding a closure over a child
+  scrollbar. If the dialog was destroyed before the 50ms elapsed — which never happens during
+  normal use, but routinely happens across a 166-test session where the event loop is only pumped
+  once, at the very end — the timer fires later against a deleted C++ object. Reproduced directly
+  (including the actual `STATUS_HEAP_CORRUPTION`/`0xC0000374` crash) against a realistic population
+  of leftover dialogs. Fixed by parenting the timer to the dialog (`QTimer(self)`), so Qt cancels
+  it automatically when the dialog is destroyed instead of leaving it dangling.
+- [x] **Contributing hazard: `tests/test_main_window.py` left 3 `MainWindow()` instances alive with
+  two more real, unparented timers pending** — one of which (`check_for_updates`) runs live `git
+  fetch`/`git status` subprocess calls. Fixed by monkeypatching both to no-ops before construction
+  and explicitly closing/deleting each window after its test.
+- [x] **`restore_task()` (Ctrl+Z) loses `task_links` ordering** — was hardcoding every restored
+  link's `position` to `0`; now the original position is captured in the snapshot and restored.
+  Closes the item of the same name below. New regression test:
+  `test_snapshot_and_restore_task_preserves_link_order`.
+- [x] **Systemic double-commit pattern, audited and ruled out** — the dedicated audit this backlog
+  asked for (below) happened as a side effect of removing ~40 redundant trailing `conn.commit()`
+  calls across the whole `database/` package: every one of them was individually verified to be
+  the *last* statement before its function returns (the connection context manager already commits
+  on clean exit), never a *premature* mid-transaction commit like the original `create_log` bug.
+  No other atomicity-breaking commits found.
+- [x] **Dead code**: unused `styles.QSS` module-level constant (nothing has read it since
+  `set_theme()` took over in the previous forensic pass) and an unreachable `sys.exit(0)` after
+  `os.execv()` in `main.check_for_updates`.
+
+**New tech debt found this pass, deferred on purpose (see "Code quality & tech debt" below):**
+`restore_column`/`restore_board` aren't atomic across their children (each nested
+`restore_task`/`restore_column` call opens its own connection/transaction) — low practical impact,
+not acted on; and the broader pattern behind the `MainWindow` fix above — dozens of other tests
+construct a `BoardViewWidget`/`TaskDetailDialog` without any equivalent cleanup, which is provably
+safe *today* now that the one confirmed crash source is fixed, but is still worth a proper test
+fixture (auto-tracks and closes every widget it creates) rather than fixing call sites one at a time.
+
+---
+
 ## ✅ Fixed in the forensic pass (2026-08-07, pre-v0.9.0)
 
 Two independent audit agents (data/logic layer, UI layer), every finding individually re-verified
@@ -90,18 +137,19 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
   the drop-index calc (`widgets.compute_drop_index`), with a regression test. **(P2 — bug)**
 - [ ] **Auto-updater uses `git pull`** (`main.py`) — requires git + a clean tree on the user's machine.
   Consider updating from GitHub Release assets (ties into packaging, below). **(P2)**
-- [ ] **Systemic double-commit pattern beyond `create_log`** — found during the 2026-08-07 forensic
-  pass while fixing `create_log`'s premature commit; other `database/` functions may share the same
-  "commit, then a follow-up statement, then commit again" shape. Worth a dedicated audit pass rather
-  than fixing piecemeal. **(P2 — correctness/atomicity)**
+- [x] **Systemic double-commit pattern beyond `create_log`** *(Audited and ruled out 2026-08-10 —
+  see the forensic-pass section above.)* Found during the 2026-08-07 forensic pass while fixing
+  `create_log`'s premature commit; the dedicated audit this item asked for happened as a side
+  effect of removing ~40 redundant *trailing* commits — none were premature/mid-transaction.
+  **(P2 — correctness/atomicity)**
 - [ ] **`get_task()` / `get_tasks()` return shape inconsistency** — flagged during the 2026-08-07
   forensic pass as out of scope for that wave; the two functions don't expose task fields
   identically, which is a trap for future code that assumes parity between them. **(P2 — consistency)**
 - [ ] **`backups._prune_backups(keep=0)` edge case** — currently unreachable (no UI path sets `keep`
   to `0`), but the function doesn't guard against it explicitly. Low priority since it can't be hit
   today. **(P3)**
-- [ ] **`restore_task()` loses `task_links` ordering on Ctrl+Z** — links are restored but not
-  guaranteed to come back in their original relative order. Minor, cosmetic. **(P3)**
+- [x] **`restore_task()` loses `task_links` ordering on Ctrl+Z** *(Done 2026-08-10 — see the
+  forensic-pass section above.)* Links are now captured and restored with their real `position`.
 - [ ] **`CalendarViewWidget.refresh()` runs even while the calendar isn't visible** — wasteful but
   harmless (no wrong output, just an avoidable recompute). **(P3 — efficiency)**
 - [ ] **Missing-file link rendering has no automated regression test** — flagged during QA on the
@@ -110,6 +158,17 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
   DB) but the Architect's own test list for that wave didn't include a dedicated `pytest` case for
   it. Low risk (simple, already-verified logic) but worth locking in next time this file is
   touched. **(P3 — test coverage)**
+- [ ] **`restore_column`/`restore_board` aren't atomic across their children** — found during the
+  2026-08-10 forensic pass: each nested `restore_task`/`restore_column` call opens its own
+  connection/transaction, so a failure partway through an undo of a multi-task column/board leaves
+  a partially-restored result instead of all-or-nothing. Low practical impact (would need a
+  mid-restore failure, e.g. disk full) — not acted on this pass. **(P3 — atomicity)**
+- [ ] **No shared cleanup fixture for widget-constructing tests** — found during the 2026-08-10
+  CI-flakiness investigation: dozens of tests construct a `BoardViewWidget`/`TaskDetailDialog`
+  without ever closing/deleting it, relying entirely on the session-end `qapp` teardown. Provably
+  safe today now that the one confirmed crash source (the stray `scroll_to_bottom` timer) is fixed,
+  but a fixture that auto-tracks and closes every widget a test creates would be more robust than
+  continuing to rely on each new test remembering to clean up by hand. **(P2 — test infra)**
 
 ---
 
@@ -318,6 +377,14 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
    local file in red, and fixed a latent bug where local paths never actually opened
    (`QUrl.fromLocalFile` instead of a malformed raw-path `QUrl`). No DB schema change. 166/166
    tests passing (7 new).~~ ✅ 2026-08-10.
+17. ~~**v0.9.1 — forensic bug-hunt pass + CI fix** — found and fixed the root cause of CI
+   intermittently failing since 2026-08-07 (a stray, unparented `QTimer.singleShot` that could fire
+   against an already-destroyed widget, reproduced down to the actual native crash); cleaned up
+   `tests/test_main_window.py` leaking real timers (incl. live `git` subprocess calls) across the
+   whole test session; fixed `restore_task()` losing link order on Ctrl+Z; removed ~40 redundant
+   `conn.commit()` calls across `database/` (doubling as the dedicated double-commit audit an
+   earlier item asked for) plus two confirmed dead-code spots. 167/167 tests passing, ruff clean.~~
+   ✅ 2026-08-10.
 
 ### 🎯 Theme D — Distribution (parked)
 **PyInstaller** standalone build + **update-from-Releases** (replaces the `git pull` auto-updater).
