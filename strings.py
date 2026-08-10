@@ -431,6 +431,13 @@ STRINGS = {
     "task_detail.link_url_placeholder": "URL o ruta…",
     "task_detail.link_label_placeholder": "Nombre (opcional)",
     "task_detail.add_link_tooltip": "Añadir enlace",
+    "task_detail.browse_file_tooltip": "Buscar un archivo local del PC para adjuntar",
+    "task_detail.browse_file_title": "Seleccionar archivo para adjuntar",
+    "task_detail.link_missing_tooltip": "⚠ Archivo no encontrado: {path}",
+    "task_detail.link_open_failed_title": "No se pudo abrir",
+    "task_detail.link_open_failed_msg": (
+        "No se pudo abrir el enlace o el archivo adjunto. Puede que se haya movido o eliminado."
+    ),
     "task_detail.delete_task_btn": "🗑️ Eliminar",
     "task_detail.save_btn": "💾 Guardar Cambios",
     "task_detail.close_btn": "❌ Cerrar",

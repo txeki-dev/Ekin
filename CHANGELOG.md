@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Local file attachments on task links.** The "🔗 Enlaces / adjuntos" section in the task detail
+  now has a **📁** button that opens a native file picker so you can attach a file from your PC
+  instead of only pasting a URL — the label auto-fills with the file's name when left blank. Local
+  attachments render with a **📎** icon (web links keep **🔗**); one whose file has since been moved
+  or deleted shows in red with a tooltip explaining why.
+
+### Fixed
+- Local file paths attached as a "link" never actually opened — `QDesktopServices.openUrl` was being
+  handed a raw path instead of a proper `file://` URL. Fixed by routing local attachments through
+  `QUrl.fromLocalFile(...)`. Any link (local or web) that still fails to open now shows a warning
+  dialog instead of silently doing nothing.
+
 ## [0.9.0] - 2026-08-07
 
 ### Added

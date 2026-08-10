@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta
 import pytest
 from PySide6.QtCore import Qt, QPoint, QMimeData, QEvent
 from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDropEvent
-from PySide6.QtWidgets import QLabel, QWidget
+from PySide6.QtWidgets import QLabel, QPushButton, QWidget
 
 import database
 import styles
@@ -16,6 +16,7 @@ from sidebar import NotificationsPopup
 from settings_dialog import SettingsDialog
 from shortcuts_dialog import ShortcutsDialog
 from detail_dialog import TaskDetailDialog
+import detail_dialog.task_detail_dialog as task_detail_dialog_module
 from widgets import ColumnWidget, TaskCard
 from strings import t
 
@@ -335,6 +336,92 @@ def test_task_detail_dialog_without_parent_still_works_as_before(qapp, db_path):
     dlg.reject()
     qapp.sendPostedEvents(dlg, QEvent.Type.DeferredDelete)
     # No debe lanzar ni comportarse de forma distinta a como ya lo hacía sin el fix.
+
+
+# --- TaskDetailDialog: adjuntar archivos locales a los enlaces (post-v0.9.0) ---
+
+def test_is_local_link_classifies_urls_vs_paths():
+    _is_local_link = task_detail_dialog_module._is_local_link
+    assert _is_local_link("https://x.com") is False
+    assert _is_local_link("http://x.com") is False
+    assert _is_local_link("mailto:a@b.com") is False
+    assert _is_local_link("file://C:/x.txt") is False
+    assert _is_local_link(r"C:\Users\foo\bar.pdf") is True
+    assert _is_local_link("/home/user/file.txt") is True
+
+
+def test_browse_local_file_fills_url_and_autofills_empty_label(qapp, db_path):
+    task_id = _make_task(db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+
+    dlg._apply_browsed_file(r"C:\docs\report.pdf")
+
+    assert dlg.link_url_input.text() == r"C:\docs\report.pdf"
+    assert dlg.link_label_input.text() == "report.pdf"
+
+
+def test_browse_local_file_does_not_overwrite_existing_label(qapp, db_path):
+    task_id = _make_task(db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+    dlg.link_label_input.setText("Mi informe")
+
+    dlg._apply_browsed_file(r"C:\docs\report.pdf")
+
+    assert dlg.link_label_input.text() == "Mi informe"
+
+
+def test_add_link_with_local_path_renders_with_attachment_icon(qapp, db_path, tmp_path):
+    task_id = _make_task(db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+    file_path = tmp_path / "adjunto.txt"
+    file_path.write_text("contenido")
+
+    dlg.link_url_input.setText(str(file_path))
+    dlg.add_link()
+
+    buttons = dlg.links_container.findChildren(QPushButton)
+    assert any(b.text().startswith("📎") for b in buttons)
+
+
+def test_add_link_with_web_url_renders_with_link_icon(qapp, db_path):
+    task_id = _make_task(db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+
+    dlg.link_url_input.setText("https://example.com")
+    dlg.add_link()
+
+    buttons = dlg.links_container.findChildren(QPushButton)
+    assert any(b.text().startswith("🔗") for b in buttons)
+
+
+def test_open_link_warns_when_target_cannot_be_opened(qapp, db_path, monkeypatch):
+    task_id = _make_task(db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+    monkeypatch.setattr(task_detail_dialog_module.QDesktopServices, "openUrl", lambda *_a: False)
+    warnings = []
+    monkeypatch.setattr(
+        task_detail_dialog_module.QMessageBox, "warning",
+        lambda *a, **k: warnings.append((a, k))
+    )
+
+    dlg._open_link(r"C:\nope.txt", True)
+
+    assert len(warnings) == 1
+
+
+def test_open_link_no_warning_when_openurl_succeeds(qapp, db_path, monkeypatch):
+    task_id = _make_task(db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+    monkeypatch.setattr(task_detail_dialog_module.QDesktopServices, "openUrl", lambda *_a: True)
+    warnings = []
+    monkeypatch.setattr(
+        task_detail_dialog_module.QMessageBox, "warning",
+        lambda *a, **k: warnings.append((a, k))
+    )
+
+    dlg._open_link(r"C:\nope.txt", True)
+
+    assert warnings == []
 
 
 # --- SettingsDialog: umbral de aviso del temporizador (v0.9.0) ---

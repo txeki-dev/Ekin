@@ -1,9 +1,10 @@
+import os
 from datetime import datetime
 from PySide6.QtCore import Qt, QDate, QTime, QUrl, QSize, QTimer
 from PySide6.QtWidgets import (
     QDialog, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QScrollArea, QWidget,
-    QMessageBox, QCheckBox, QDateEdit, QTimeEdit, QComboBox
+    QMessageBox, QCheckBox, QDateEdit, QTimeEdit, QComboBox, QFileDialog
 )
 from PySide6.QtGui import QKeySequence, QShortcut, QDesktopServices
 import database
@@ -15,6 +16,13 @@ from .log_entry import LogEntryWidget
 from .tag_pill import ClickableTagPill, color_icon
 from .tag_manager_dialog import TagManagerDialog
 from .tag_picker_dialog import TagPickerDialog
+
+_WEB_LINK_SCHEMES = ("http://", "https://", "ftp://", "mailto:", "file://")
+
+
+def _is_local_link(url):
+    """True a menos que la cadena empiece por un esquema web reconocido (case-insensitive)."""
+    return not url.lower().startswith(_WEB_LINK_SCHEMES)
 
 
 class TaskDetailDialog(QDialog):
@@ -223,6 +231,12 @@ class TaskDetailDialog(QDialog):
 
         add_link_row = QHBoxLayout()
         add_link_row.setSpacing(6)
+        self.browse_link_btn = QPushButton("📁")
+        self.browse_link_btn.setFixedWidth(30)
+        self.browse_link_btn.setCursor(Qt.PointingHandCursor)
+        self.browse_link_btn.setToolTip(t("task_detail.browse_file_tooltip"))
+        self.browse_link_btn.clicked.connect(self.browse_local_file)
+        add_link_row.addWidget(self.browse_link_btn)
         self.link_url_input = QLineEdit()
         self.link_url_input.setPlaceholderText(t("task_detail.link_url_placeholder"))
         self.link_url_input.returnPressed.connect(self.add_link)
@@ -717,14 +731,22 @@ class TaskDetailDialog(QDialog):
         h = QHBoxLayout(row)
         h.setContentsMargins(0, 0, 0, 0)
         h.setSpacing(6)
-        open_btn = QPushButton("🔗 " + (link["label"] or link["url"]))
+
+        is_local = _is_local_link(link["url"])
+        missing = is_local and not os.path.exists(link["url"])
+        icon = "📎" if is_local else "🔗"
+
+        open_btn = QPushButton(icon + " " + (link["label"] or link["url"]))
         open_btn.setCursor(Qt.PointingHandCursor)
-        open_btn.setToolTip(link["url"])
+        open_btn.setToolTip(
+            t("task_detail.link_missing_tooltip", path=link["url"]) if missing else link["url"]
+        )
+        text_color = styles.COLORS["danger"] if missing else "#60a5fa"
         open_btn.setStyleSheet(
-            "QPushButton { background: transparent; border: none; color: #60a5fa; text-align: left; }"
+            f"QPushButton {{ background: transparent; border: none; color: {text_color}; text-align: left; }}"
             "QPushButton:hover { text-decoration: underline; }"
         )
-        open_btn.clicked.connect(lambda _=False, url=link["url"]: QDesktopServices.openUrl(QUrl(url)))
+        open_btn.clicked.connect(lambda _=False, url=link["url"], loc=is_local: self._open_link(url, loc))
         h.addWidget(open_btn, 1)
         del_btn = QPushButton()
         del_btn.setFixedSize(18, 18)
@@ -736,6 +758,23 @@ class TaskDetailDialog(QDialog):
         del_btn.clicked.connect(lambda _=False, lid=link["id"]: self.remove_link(lid))
         h.addWidget(del_btn)
         return row
+
+    def _open_link(self, url, is_local):
+        qurl = QUrl.fromLocalFile(url) if is_local else QUrl(url)
+        if not QDesktopServices.openUrl(qurl):
+            QMessageBox.warning(
+                self, t("task_detail.link_open_failed_title"), t("task_detail.link_open_failed_msg")
+            )
+
+    def browse_local_file(self):
+        path, _ = QFileDialog.getOpenFileName(self, t("task_detail.browse_file_title"))
+        if path:
+            self._apply_browsed_file(path)
+
+    def _apply_browsed_file(self, path):
+        self.link_url_input.setText(path)
+        if not self.link_label_input.text().strip():
+            self.link_label_input.setText(os.path.basename(path))
 
     def add_link(self):
         url = self.link_url_input.text().strip()
