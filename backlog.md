@@ -104,6 +104,12 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
   guaranteed to come back in their original relative order. Minor, cosmetic. **(P3)**
 - [ ] **`CalendarViewWidget.refresh()` runs even while the calendar isn't visible** — wasteful but
   harmless (no wrong output, just an avoidable recompute). **(P3 — efficiency)**
+- [ ] **Missing-file link rendering has no automated regression test** — flagged during QA on the
+  2026-08-10 local-file-attachments wave: `_build_link_row`'s red/tooltip path for a local
+  attachment whose file no longer exists on disk was verified manually (real dialog against a temp
+  DB) but the Architect's own test list for that wave didn't include a dedicated `pytest` case for
+  it. Low risk (simple, already-verified logic) but worth locking in next time this file is
+  touched. **(P3 — test coverage)**
 
 ---
 
@@ -144,7 +150,16 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
 - [~] **Subtasks / checklists** inside a card — shipped in **v0.5.0** but **removed in v0.5.1** (product
   decision; the nested-checklist approach wasn't a fit). Could be revisited later with a different UX.
 - [x] **Recurring tasks** (daily/weekly/monthly) *(Done in v0.6.0)*.
-- [x] **Attachments / links** on cards *(Done in v0.6.0 — `task_links` table)*.
+- [x] **Attachments / links** on cards *(Done in v0.6.0 — `task_links` table)*. **Extended
+  2026-08-10** (user-requested): a **📁** browse button next to the existing URL/label inputs opens
+  the native OS file picker to attach a local file instead of only pasting a URL (label auto-fills
+  from the file name if left blank). Link rows now render **📎** for local attachments vs **🔗** for
+  web links, and flag a local attachment in red with a tooltip if its file has since been moved or
+  deleted (`os.path.exists` check at render time). Also fixed a latent bug where opening a local
+  path silently did nothing — `QDesktopServices.openUrl(QUrl(raw_path))` is malformed for a bare
+  Windows path; local links now go through `QUrl.fromLocalFile(...)`, and any link that still fails
+  to open shows a warning dialog. No DB schema change (`task_links.url` already held either kind);
+  classification is a scheme heuristic (`_is_local_link`) at render/open time.
 - [x] **Undo/redo** for destructive actions (delete task/column/board) *(Done in v0.6.0 — snapshot/restore + `undo.py`)*.
 - [x] **Keyboard shortcuts** — ~~`Ctrl+N` new task~~, ~~`Ctrl+F` search~~, ~~`Ctrl+Z`/`Ctrl+Y`
   undo/redo~~ all done earlier. `Esc` to close dialogs was already free (Qt's default `QDialog`
@@ -297,6 +312,12 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
    efficiency/cleanup items, plus a pre-existing test-harness crash (`STATUS_HEAP_CORRUPTION` at
    pytest shutdown) found and fixed along the way. 159/159 tests passing, clean exit code.~~
    ✅ 2026-08-07.
+16. ~~**Local file attachments on task links** — a **📁** browse button next to the existing
+   enlaces/adjuntos inputs opens the native OS file picker to attach a local file instead of only
+   pasting a URL; link rows render 📎 for local attachments vs 🔗 for web links, flag a missing
+   local file in red, and fixed a latent bug where local paths never actually opened
+   (`QUrl.fromLocalFile` instead of a malformed raw-path `QUrl`). No DB schema change. 166/166
+   tests passing (7 new).~~ ✅ 2026-08-10.
 
 ### 🎯 Theme D — Distribution (parked)
 **PyInstaller** standalone build + **update-from-Releases** (replaces the `git pull` auto-updater).
