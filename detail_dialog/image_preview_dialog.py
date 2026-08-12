@@ -37,6 +37,10 @@ class ImagePreviewDialog(QDialog):
         layout.addWidget(label)
         self.resize(pixmap.size())
 
+        # Sin esto, cada imagen previsualizada deja un ImagePreviewDialog zombi (con su
+        # QPixmap, potencialmente de varios MB) colgado para siempre del widget que lo abrió.
+        self.finished.connect(self.deleteLater)
+
     def mousePressEvent(self, event):
         self.close()
 

@@ -722,6 +722,40 @@ def test_restore_task_drops_link_if_linked_board_was_deleted(db_path):
     assert database.get_task(new_id, db_path)["linked_board_id"] is None
 
 
+def test_restore_task_returns_none_if_column_was_deleted_in_the_meantime(db_path):
+    """Regresión: antes de este fix, restore_task reventaba con sqlite3.IntegrityError si
+    la columna original ya no existía (p. ej.: borrar tarea, borrar su columna, deshacer
+    el borrado de la columna -- que crea una columna NUEVA con otro id -- y luego deshacer
+    el borrado de la tarea, que seguía apuntando a la columna vieja)."""
+    board_id = database.create_board("B", db_path=db_path)
+    col_id = database.create_column(board_id, "C", db_path=db_path)
+    task_id = database.create_task(col_id, "Tarea", db_path=db_path)
+
+    task_snap = database.snapshot_task(task_id, db_path=db_path)
+    database.delete_task(task_id, db_path=db_path)
+    database.delete_column(col_id, db_path=db_path)  # la columna original ya no existe
+
+    result = database.restore_task(task_snap, db_path=db_path)
+
+    assert result is None
+
+
+def test_restore_column_returns_none_if_board_was_deleted_in_the_meantime(db_path):
+    """Mismo escenario que el de arriba, un nivel más arriba en la jerarquía: borrar
+    columna, borrar su tablero, deshacer el borrado de la columna debe degradar con
+    gracia (None) en vez de reventar con sqlite3.IntegrityError."""
+    board_id = database.create_board("B", db_path=db_path)
+    col_id = database.create_column(board_id, "C", db_path=db_path)
+
+    col_snap = database.snapshot_column(col_id, db_path=db_path)
+    database.delete_column(col_id, db_path=db_path)
+    database.delete_board(board_id, db_path=db_path)  # el tablero original ya no existe
+
+    result = database.restore_column(col_snap, db_path=db_path)
+
+    assert result is None
+
+
 # --- Snapshot / restore (deshacer borrados, v0.6.0) ---
 
 def test_snapshot_and_restore_task(db_path):

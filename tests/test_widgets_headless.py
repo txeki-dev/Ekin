@@ -500,6 +500,28 @@ def test_image_preview_dialog_upscales_small_pixmap(qapp):
     assert shown.width() > 20 and shown.height() > 20
 
 
+def test_image_preview_dialog_is_destroyed_after_closing_when_parented(qapp):
+    """Regresión de fuga de memoria: igual que TaskDetailDialog, ImagePreviewDialog debe
+    autodestruirse (deleteLater vía self.finished) al cerrarse en vez de quedar colgado
+    para siempre del widget que lo abrió."""
+    from PySide6.QtGui import QPixmap
+
+    parent = QWidget()
+    pixmap = QPixmap(10, 10)
+    pixmap.fill(Qt.GlobalColor.red)
+    dlg = image_preview_module.ImagePreviewDialog(pixmap, parent)
+
+    # reject(), no close(): un QDialog nunca mostrado no emite finished() al cerrarse con
+    # close() (Qt lo trata como no-op sobre un widget invisible), pero reject() sí lo hace
+    # incondicionalmente -- mismo motivo por el que test_task_detail_dialog_is_destroyed_
+    # after_closing_when_parented usa reject() en vez de close().
+    dlg.reject()
+    qapp.sendPostedEvents(dlg, QEvent.Type.DeferredDelete)
+
+    with pytest.raises(RuntimeError):
+        dlg.windowTitle()
+
+
 def test_markdown_text_edit_wraps_pasted_image_in_anchor(qapp):
     editor = markdown_edit_module.MarkdownTextEdit()
 

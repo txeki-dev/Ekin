@@ -3,7 +3,7 @@ from .tasks import get_task, get_tasks
 from .logs import get_logs
 from .links import get_task_links
 from .boards import get_board, create_board, set_board_archived
-from .columns import get_columns
+from .columns import get_columns, get_column
 from .tags import get_tag_value
 
 __all__ = [
@@ -35,6 +35,11 @@ def snapshot_task(task_id, db_path=None):
 def restore_task(snap, column_id=None, db_path=None):
     """Recrea una tarea a partir de un snapshot. Devuelve el nuevo id."""
     column_id = column_id if column_id is not None else snap["column_id"]
+    # Si la columna de destino ya no existe (p. ej. se borró mientras esta acción seguía
+    # pendiente en la pila de deshacer), no hay dónde insertar la tarea -- devolver None en
+    # vez de violar la FK de tasks.column_id y reventar sin capturar.
+    if get_column(column_id, db_path) is None:
+        return None
     # Si el tablero enlazado ya no existe (se borró mientras tanto), no lo restauramos:
     # violaría la clave foránea en vez de simplemente perder el vínculo.
     linked_board_id = snap.get("linked_board_id")
@@ -85,6 +90,10 @@ def snapshot_column(column_id, db_path=None):
 
 def restore_column(snap, board_id=None, db_path=None):
     board_id = board_id if board_id is not None else snap["board_id"]
+    # Mismo razonamiento que en restore_task: si el tablero de destino ya no existe, no hay
+    # dónde insertar la columna -- devolver None en vez de violar la FK de columns.board_id.
+    if get_board(board_id, db_path) is None:
+        return None
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT COALESCE(MAX(position), -1) FROM columns WHERE board_id = ?", (board_id,))

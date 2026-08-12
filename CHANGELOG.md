@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **Critical: undoing a deleted task or column could crash the app.** If you deleted a task
+  and then deleted its column (or deleted a column and then deleted its board) before
+  undoing, undoing the older deletion tried to restore it into the original, no-longer-existing
+  column/board and crashed. It now degrades gracefully instead — the task/column just doesn't
+  come back, rather than the whole app going down.
+- **`ImagePreviewDialog` (the click-to-enlarge image view) was never destroyed after
+  closing.** Every image you previewed left a hidden, permanently-alive copy of the dialog (and
+  its image data) behind for the rest of the session.
+
 ## [0.9.3] - 2026-08-12
 
 ### Fixed
