@@ -459,8 +459,8 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
    URI; `_insert_image` now stores a separate, higher-resolution copy (capped at 1920px) just
    for the preview, so `ImagePreviewDialog` scales down from real detail instead of up from a
    thumbnail. Manually verified end-to-end (3000×2000 → 1920×1280 preview vs. 614×409 inline).
-   180/180 tests passing (2 new), ruff clean. Not versioned as a new release — folded into
-   `[Unreleased]` for the next cut.~~ ✅ 2026-08-12.
+   180/180 tests passing (2 new), ruff clean. Cut as **v0.9.3**, tag + GitHub Release confirmed
+   published.~~ ✅ 2026-08-12.
 
 ### 🎯 Theme D — Distribution (parked)
 **PyInstaller** standalone build + **update-from-Releases** (replaces the `git pull` auto-updater).
