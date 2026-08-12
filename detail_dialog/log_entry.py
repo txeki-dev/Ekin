@@ -71,7 +71,13 @@ class LogEntryWidget(QFrame):
         self.content_label = QLabel(log_data["content"])
         self.content_label.setObjectName("LogContent")
         self.content_label.setWordWrap(True)
-        self.content_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        # TextSelectableByMouse a solas SUSTITUYE el conjunto de flags (no lo amplía),
+        # anulando LinksAccessibleByMouse -- sin él, linkActivated nunca se dispara con un
+        # clic real aunque el resto del cableado esté bien (bug confirmado: la vista ampliada
+        # funcionaba al componer una entrada pero no en una ya enviada).
+        self.content_label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.LinksAccessibleByMouse
+        )
         self.content_label.setOpenExternalLinks(False)
         self.content_label.linkActivated.connect(self._on_content_link_activated)
         if "<img" in log_data["content"]:

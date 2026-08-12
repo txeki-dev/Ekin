@@ -20,11 +20,13 @@ class ImagePreviewDialog(QDialog):
         available = screen.availableGeometry()
         max_w = int(available.width() * 0.9)
         max_h = int(available.height() * 0.9)
-        if pixmap.width() > max_w or pixmap.height() > max_h:
-            pixmap = pixmap.scaled(
-                max_w, max_h, Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            )
+        # Siempre se escala (hacia arriba o hacia abajo) al recuadro objetivo -- una imagen
+        # pequeña (ya reducida al ancho del chat/descripción al pegarla) debe verse
+        # notablemente más grande aquí, no quedarse a su tamaño nativo.
+        pixmap = pixmap.scaled(
+            max_w, max_h, Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
+        )
 
         label = QLabel()
         label.setPixmap(pixmap)

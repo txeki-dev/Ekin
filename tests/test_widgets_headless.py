@@ -484,6 +484,21 @@ def test_show_image_preview_noop_for_invalid_uri(qapp, monkeypatch):
     assert calls == []
 
 
+def test_image_preview_dialog_upscales_small_pixmap(qapp):
+    """Regresión: antes solo se escalaba hacia abajo, así que una imagen ya pequeña (como
+    las pegadas en el chat/descripción, reducidas al pegarlas) se mostraba a su tamaño
+    nativo en la vista ampliada -- lejos de sentirse "más grande"."""
+    from PySide6.QtGui import QPixmap
+
+    small = QPixmap(20, 20)
+    small.fill(Qt.GlobalColor.red)
+
+    dlg = image_preview_module.ImagePreviewDialog(small)
+
+    shown = dlg.findChild(QLabel).pixmap()
+    assert shown.width() > 20 and shown.height() > 20
+
+
 def test_markdown_text_edit_wraps_pasted_image_in_anchor(qapp):
     editor = markdown_edit_module.MarkdownTextEdit()
 
@@ -546,6 +561,34 @@ def test_log_entry_widget_routes_image_link_to_preview(qapp, monkeypatch):
 
     assert calls == [_TINY_PNG_DATA_URI]
     assert widget.content_label.cursor().shape() == Qt.CursorShape.PointingHandCursor
+
+
+def test_log_entry_widget_real_click_on_posted_image_opens_preview(qapp, monkeypatch):
+    """Regresión: setTextInteractionFlags(Qt.TextSelectableByMouse) A SOLAS anulaba
+    LinksAccessibleByMouse y linkActivated nunca se disparaba con un clic real, aunque
+    _on_content_link_activated (probado por separado arriba) funcionase perfectamente si
+    se llamaba a mano. Este test dispara un QMouseEvent real para que un futuro cambio de
+    flags no pueda romper esto en silencio otra vez."""
+    calls = []
+    monkeypatch.setattr(log_entry_module, "show_image_preview", lambda uri, parent=None: calls.append(uri))
+    log_data = {
+        "id": 1,
+        "content": f'<a href="{_TINY_PNG_DATA_URI}"><img src="{_TINY_PNG_DATA_URI}" width="80" height="80"/></a>',
+        "created_at": "2026-08-12 10:00:00",
+    }
+
+    widget = LogEntryWidget(log_data, lambda *a: None, lambda *a: None)
+    widget.show()
+    qapp.processEvents()
+
+    pos = QPoint(20, 20)
+    press = QMouseEvent(QEvent.Type.MouseButtonPress, pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+    release = QMouseEvent(QEvent.Type.MouseButtonRelease, pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+    qapp.sendEvent(widget.content_label, press)
+    qapp.sendEvent(widget.content_label, release)
+    qapp.processEvents()
+
+    assert calls == [_TINY_PNG_DATA_URI]
 
 
 def test_log_entry_widget_plain_text_keeps_default_cursor(qapp):

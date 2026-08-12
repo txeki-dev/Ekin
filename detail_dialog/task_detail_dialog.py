@@ -76,6 +76,10 @@ class TaskDetailDialog(QDialog):
         # 2. Descripción
         left_layout.addWidget(QLabel(t("task_detail.description_label")))
         self.desc_input = MarkdownTextEdit()
+        # Mismo ancho por defecto para imágenes pegadas que en el chat (self._chat_image_width,
+        # asignado también a log_input más abajo) -- evita que una imagen pegada aquí desborde
+        # si el diálogo se redimensiona más estrecho después de pegarla.
+        self.desc_input.image_width_provider = self._chat_image_width
         self.desc_input.setPlaceholderText(t("task_detail.description_placeholder"))
         left_layout.addWidget(RichTextToolbar(self.desc_input))
         left_layout.addWidget(self.desc_input)

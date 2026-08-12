@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-08-12
+
 ### Added
 - **Click-to-enlarge pasted images.** An image pasted into the task description or the
   diary/chat — while composing, while editing an existing entry, or once it's already been
@@ -23,6 +25,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **App icon redesigned**: `ekin_icon.png`/`.ico` no longer carry a baked-in white
   background/drop-shadow — both now have a genuinely transparent background, for a cleaner
   look in the taskbar and desktop shortcut.
+- **Click-to-enlarge did nothing on an already-posted diary/chat entry** (it worked fine while
+  composing). A `QLabel` interaction-flag call was overwriting the flag Qt needs to fire link
+  clicks at all, instead of adding to it — fixed, and locked in with a test that simulates a
+  real click instead of calling the handler directly.
+- **The image preview only ever scaled images down**, so a small pasted image (already
+  downscaled to fit the chat/description width) showed at its native, still-small size instead
+  of feeling like an enlargement. It now always scales to fill most of the screen, up or down.
+- **Images pasted into the task description could overflow** if the dialog was resized smaller
+  afterward, since they embedded at a fixed pixel width with no cap. They now default to the
+  same width as chat-pasted images.
+- **App icon still had a visible grayish background** instead of being fully transparent. The
+  first pass's threshold left much of a soft drop-shadow gradient partially opaque; retuned to
+  a tighter threshold for a crisp, fully-transparent background.
 
 ## [0.9.1] - 2026-08-10
 
