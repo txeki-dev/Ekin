@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-08-12
+
 ### Fixed
 - **The enlarged image preview looked blurry.** A pasted image was only ever stored at its
   small inline (chat/description) size, so opening it larger meant stretching that same tiny
