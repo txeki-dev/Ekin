@@ -4,6 +4,7 @@ from datetime import datetime
 from widgets import make_glyph_icon
 from strings import t
 from .markdown_edit import MarkdownTextEdit, RichTextToolbar
+from .image_preview_dialog import show_image_preview
 
 
 class LogEntryWidget(QFrame):
@@ -71,6 +72,10 @@ class LogEntryWidget(QFrame):
         self.content_label.setObjectName("LogContent")
         self.content_label.setWordWrap(True)
         self.content_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.content_label.setOpenExternalLinks(False)
+        self.content_label.linkActivated.connect(self._on_content_link_activated)
+        if "<img" in log_data["content"]:
+            self.content_label.setCursor(Qt.PointingHandCursor)
         self._layout.addWidget(self.content_label)
 
     def _enter_edit_mode(self):
@@ -100,3 +105,11 @@ class LogEntryWidget(QFrame):
         btns.addWidget(cancel_btn)
         self._layout.addLayout(btns)
         self._editor.setFocus()
+
+    def _on_content_link_activated(self, url):
+        """Maneja los enlaces clicados dentro de una entrada ya enviada. Hoy el único
+        tipo de enlace que insertan los editores es una imagen pegada (data URI); el
+        guard explícito deja la puerta abierta a otros tipos de enlace en el futuro sin
+        que acaben abriéndose por error como si fueran una imagen."""
+        if url.startswith("data:image/"):
+            show_image_preview(url, self)

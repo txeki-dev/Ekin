@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 
 import pytest
 from PySide6.QtCore import Qt, QPoint, QMimeData, QEvent
-from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDropEvent
+from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDropEvent, QImage, QMouseEvent
 from PySide6.QtWidgets import QLabel, QPushButton, QWidget
 
 import database
@@ -16,7 +16,11 @@ from sidebar import NotificationsPopup
 from settings_dialog import SettingsDialog
 from shortcuts_dialog import ShortcutsDialog
 from detail_dialog import TaskDetailDialog
+from detail_dialog.log_entry import LogEntryWidget
 import detail_dialog.task_detail_dialog as task_detail_dialog_module
+import detail_dialog.markdown_edit as markdown_edit_module
+import detail_dialog.image_preview_dialog as image_preview_module
+import detail_dialog.log_entry as log_entry_module
 from widgets import ColumnWidget, TaskCard
 from strings import t
 
@@ -444,3 +448,109 @@ def test_settings_dialog_timer_alert_spin_persists_on_change(qapp, db_path):
     dlg = SettingsDialog(db_path)
     dlg.timer_alert_spin.setValue(72)
     assert database.get_setting("timer_alert_hours", None, db_path) == "72"
+
+
+# --- Click-to-enlarge pasted images (post-v0.9.1) ---
+
+_TINY_PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+_TINY_PNG_DATA_URI = f"data:image/png;base64,{_TINY_PNG_B64}"
+
+
+def test_pixmap_from_data_uri_decodes_valid_png():
+    pixmap = image_preview_module.pixmap_from_data_uri(_TINY_PNG_DATA_URI)
+    assert not pixmap.isNull()
+
+
+def test_pixmap_from_data_uri_returns_null_for_garbage():
+    assert image_preview_module.pixmap_from_data_uri("not-a-data-uri").isNull()
+    assert image_preview_module.pixmap_from_data_uri("data:image/png;base64,not-valid-base64!!").isNull()
+
+
+def test_show_image_preview_opens_dialog_for_valid_image(qapp, monkeypatch):
+    calls = []
+    monkeypatch.setattr(image_preview_module.ImagePreviewDialog, "exec", lambda self: calls.append(1))
+
+    image_preview_module.show_image_preview(_TINY_PNG_DATA_URI)
+
+    assert len(calls) == 1
+
+
+def test_show_image_preview_noop_for_invalid_uri(qapp, monkeypatch):
+    calls = []
+    monkeypatch.setattr(image_preview_module.ImagePreviewDialog, "exec", lambda self: calls.append(1))
+
+    image_preview_module.show_image_preview("garbage")
+
+    assert calls == []
+
+
+def test_markdown_text_edit_wraps_pasted_image_in_anchor(qapp):
+    editor = markdown_edit_module.MarkdownTextEdit()
+
+    editor._insert_image(QImage(4, 4, QImage.Format.Format_RGB32))
+
+    assert '<a href="data:image/png;base64,' in editor.toHtml()
+
+
+def test_markdown_text_edit_click_on_image_anchor_opens_preview(qapp, monkeypatch):
+    """anchorAt() se parchea directamente: probar esto contra la geometría real del
+    layout de texto sería frágil y no es lo que este test necesita verificar -- el
+    comportamiento bajo prueba es la distinción click/arrastre y el despacho a
+    show_image_preview, no el motor de layout de Qt."""
+    editor = markdown_edit_module.MarkdownTextEdit()
+    editor._insert_image(QImage(4, 4, QImage.Format.Format_RGB32))
+    monkeypatch.setattr(editor, "anchorAt", lambda pos: _TINY_PNG_DATA_URI)
+    calls = []
+    monkeypatch.setattr(markdown_edit_module, "show_image_preview", lambda uri, parent=None: calls.append(uri))
+
+    pos = QPoint(10, 10)
+    press = QMouseEvent(QEvent.Type.MouseButtonPress, pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+    release = QMouseEvent(QEvent.Type.MouseButtonRelease, pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+    editor.mousePressEvent(press)
+    editor.mouseReleaseEvent(release)
+
+    assert calls == [_TINY_PNG_DATA_URI]
+
+
+def test_markdown_text_edit_drag_does_not_open_preview(qapp, monkeypatch):
+    """Regresión: un arrastre de selección que termine sobre una imagen no debe
+    abrir la vista ampliada -- solo un clic real (press y release casi en el mismo
+    punto) debe hacerlo."""
+    editor = markdown_edit_module.MarkdownTextEdit()
+    editor._insert_image(QImage(4, 4, QImage.Format.Format_RGB32))
+    monkeypatch.setattr(editor, "anchorAt", lambda pos: _TINY_PNG_DATA_URI)
+    calls = []
+    monkeypatch.setattr(markdown_edit_module, "show_image_preview", lambda uri, parent=None: calls.append(uri))
+
+    press_pos = QPoint(10, 10)
+    release_pos = QPoint(50, 60)
+    press = QMouseEvent(QEvent.Type.MouseButtonPress, press_pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+    release = QMouseEvent(QEvent.Type.MouseButtonRelease, release_pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+    editor.mousePressEvent(press)
+    editor.mouseReleaseEvent(release)
+
+    assert calls == []
+
+
+def test_log_entry_widget_routes_image_link_to_preview(qapp, monkeypatch):
+    calls = []
+    monkeypatch.setattr(log_entry_module, "show_image_preview", lambda uri, parent=None: calls.append(uri))
+    log_data = {
+        "id": 1,
+        "content": f'<a href="{_TINY_PNG_DATA_URI}"><img src="{_TINY_PNG_DATA_URI}" /></a>',
+        "created_at": "2026-08-12 10:00:00",
+    }
+
+    widget = LogEntryWidget(log_data, lambda *a: None, lambda *a: None)
+    widget._on_content_link_activated(_TINY_PNG_DATA_URI)
+
+    assert calls == [_TINY_PNG_DATA_URI]
+    assert widget.content_label.cursor().shape() == Qt.CursorShape.PointingHandCursor
+
+
+def test_log_entry_widget_plain_text_keeps_default_cursor(qapp):
+    log_data = {"id": 1, "content": "solo texto, sin imagen", "created_at": "2026-08-12 10:00:00"}
+
+    widget = LogEntryWidget(log_data, lambda *a: None, lambda *a: None)
+
+    assert widget.content_label.cursor().shape() != Qt.CursorShape.PointingHandCursor

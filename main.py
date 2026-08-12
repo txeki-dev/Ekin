@@ -499,10 +499,15 @@ class MainWindow(QMainWindow):
 def main():
     if os.name == 'nt':
         # En Windows, pythonw.exe agrupa la ventana bajo su propio icono genérico en la
-        # barra de tareas a menos que el proceso declare un AppUserModelID propio.
+        # barra de tareas a menos que el proceso declare un AppUserModelID propio. El sufijo
+        # ".2" es deliberado: en máquinas que ejecutaron Ekin antes del fix de icono por ruta
+        # absoluta (2026-07-29), Windows pudo cachear el icono genérico bajo el identificador
+        # antiguo "EkinKanban.TrelloLite" -- ese caché sobrevive a un `git pull` porque nada lo
+        # invalida. Cambiar el identificador fuerza a Windows a tratarlo como una app nueva y
+        # resolver el icono de cero en vez de servir el cacheado.
         try:
             import ctypes
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("EkinKanban.TrelloLite")
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("EkinKanban.TrelloLite.2")
         except Exception:
             pass
 

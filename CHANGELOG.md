@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Click-to-enlarge pasted images.** An image pasted into the task description or the
+  diary/chat — while composing, while editing an existing entry, or once it's already been
+  posted — now opens in a larger centered view when clicked, instead of staying tiny and
+  inline forever. Closes with a click anywhere on it, `Esc`, or the window's close button.
+
+### Fixed
+- **Taskbar icon showing as the generic Python icon on some PCs.** The underlying code
+  (absolute icon paths, an explicit AppUserModelID) was already correct as of 2026-07-29, but
+  a machine that ran an older Ekin build before that fix could have Windows caching the wrong
+  icon under the old AppUserModelID — a cache nothing since had invalidated, even after
+  updating. The AppUserModelID is now versioned (`EkinKanban.TrelloLite.2`) so Windows treats
+  it as a fresh identity and re-resolves the icon instead of serving the stale cached one.
+- **App icon redesigned**: `ekin_icon.png`/`.ico` no longer carry a baked-in white
+  background/drop-shadow — both now have a genuinely transparent background, for a cleaner
+  look in the taskbar and desktop shortcut.
+
 ## [0.9.1] - 2026-08-10
 
 ### Added

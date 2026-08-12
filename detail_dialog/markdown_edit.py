@@ -7,6 +7,7 @@ from PySide6.QtGui import (
 import re
 import styles
 from strings import t
+from .image_preview_dialog import show_image_preview
 
 
 class MarkdownTextEdit(QTextEdit):
@@ -26,6 +27,37 @@ class MarkdownTextEdit(QTextEdit):
         # Si se define, devuelve el ancho máximo (px) para imágenes pegadas. Sirve para
         # que las imágenes del chat quepan en el histórico (más estrecho que el editor).
         self.image_width_provider = None
+        # Necesario para que mouseMoveEvent reciba eventos sin botón pulsado (cursor de
+        # mano al pasar sobre una imagen pegada).
+        self.setMouseTracking(True)
+        self.viewport().setMouseTracking(True)
+        self._press_pos = None
+
+    def mousePressEvent(self, event):
+        self._press_pos = event.position().toPoint()
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        """Un clic (no un arrastre de selección) sobre una imagen pegada la abre en
+        grande; se distingue de un arrastre por el desplazamiento entre press y release,
+        para no interceptar una selección de texto que termine sobre una imagen."""
+        pos = event.position().toPoint()
+        if event.button() == Qt.LeftButton and self._press_pos is not None:
+            moved = (pos - self._press_pos).manhattanLength()
+            if moved < 4:
+                anchor = self.anchorAt(pos)
+                if anchor.startswith("data:image/"):
+                    show_image_preview(anchor, self)
+                    return
+        super().mouseReleaseEvent(event)
+
+    def mouseMoveEvent(self, event):
+        anchor = self.anchorAt(event.position().toPoint())
+        self.viewport().setCursor(
+            Qt.CursorShape.PointingHandCursor if anchor.startswith("data:image/")
+            else Qt.CursorShape.IBeamCursor
+        )
+        super().mouseMoveEvent(event)
 
     def keyPressEvent(self, event):
         cursor = self.textCursor()
@@ -174,7 +206,11 @@ class MarkdownTextEdit(QTextEdit):
         image.save(buffer, "PNG")
         b64 = bytes(buffer.data().toBase64()).decode("ascii")
         buffer.close()
-        self.textCursor().insertHtml(f'<img src="data:image/png;base64,{b64}" />')
+        # Envolver en un <a> con el mismo data URI: no cambia el aspecto (Qt no añade
+        # subrayado/borde a una imagen-enlace) pero la hace clicable vía anchorAt() en
+        # los QTextEdit editables y linkActivated en el QLabel del diario ya enviado.
+        data_uri = f"data:image/png;base64,{b64}"
+        self.textCursor().insertHtml(f'<a href="{data_uri}"><img src="{data_uri}" /></a>')
 
     def _convert_line_to_list(self, style):
         """Elimina el marcador escrito y convierte la línea actual en una lista."""

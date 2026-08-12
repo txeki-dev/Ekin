@@ -346,6 +346,9 @@ STRINGS = {
     "log_entry.save_btn": "Guardar",
     "log_entry.cancel_btn": "Cancelar",
 
+    # --- detail_dialog/image_preview_dialog.py: vista ampliada de una imagen pegada ---
+    "image_preview.window_title": "Vista previa de imagen",
+
     # --- detail_dialog/tag_manager_dialog.py: gestor del catálogo de etiquetas ---
     "tag_manager.window_title": "Gestionar Etiquetas",
     "tag_manager.header": "🏷️ <b>Etiquetas</b>",
