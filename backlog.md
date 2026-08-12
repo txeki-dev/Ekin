@@ -300,6 +300,16 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
   `content_label`). New `detail_dialog/image_preview_dialog.py::ImagePreviewDialog` scales to
   90% of screen size and closes on click/Esc/close button. A press/release position-delta
   check keeps normal text-selection drags from being hijacked into opening the preview.
+  **Fixed in v0.9.2** (same-day user feedback): a real bug — `content_label`'s
+  `setTextInteractionFlags(Qt.TextSelectableByMouse)` was *replacing* the flag set instead of
+  adding to it, silently stripping `LinksAccessibleByMouse`, so the preview silently did
+  nothing on an already-posted entry despite working fine while composing (closed with a test
+  that fires a real click, verified via `git stash` to fail against the pre-fix code — the
+  original test only called the handler directly, missing this entirely). Also: the preview
+  now always scales small images *up* instead of only ever scaling large ones down; and
+  description-pasted images default to the same width as chat images
+  (`desc_input.image_width_provider = self._chat_image_width`) instead of risking overflow on
+  dialog resize.
 
 ### Data & safety
 - [x] **Automatic DB backups** *(Done in v0.4.0)* — `backups.py` writes a consistent SQLite snapshot
@@ -340,7 +350,13 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
 - [x] **App icon redesigned with a transparent background** *(Done 2026-08-12,
   user-requested)*. `ekin_icon.png`/`.ico` no longer carry a baked-in white background/drop
   shadow — regenerated via a one-off Pillow script (per-pixel whiteness threshold, not a new
-  runtime dependency) at all 7 `.ico` resolutions.
+  runtime dependency) at all 7 `.ico` resolutions. **Retuned same day (v0.9.2)**: the first
+  threshold (170–225) still left a visible grayish halo — most background pixels actually sit
+  in 195–225 per a finer histogram of the true original (re-pulled from git history, since the
+  file had already been overwritten once). Tightened to 140–165; outer-edge alpha is now
+  uniformly `0` (was `0`–`97`). An opacity-mask visualization clarified along the way that what
+  looked like a stray white shape was actually the badge's own intentional torn-corner design,
+  correctly kept opaque — not something to remove.
 
 ### Packaging & distribution
 - [ ] **Standalone executable** (PyInstaller) so non-developers don't need Python/git.
@@ -422,6 +438,15 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
    traced to Windows caching an icon under a since-fixed AppUserModelID, addressed by
    versioning the identifier; `ekin_icon.png`/`.ico` regenerated with a real transparent
    background instead of a baked-in white one. 176/176 tests passing (9 new), ruff clean.~~
+   ✅ 2026-08-12.
+19. ~~**v0.9.2 — same-day fixes to the wave above, from direct user feedback** — a real bug
+   (a `QLabel` interaction-flag call silently stripping `LinksAccessibleByMouse`) meant
+   click-to-enlarge did nothing on an already-posted diary entry, fixed and locked in with a
+   test proven via `git stash` to fail against the pre-fix code; the preview now upscales
+   small images instead of only ever scaling large ones down; description-pasted images
+   default to the same width as chat images; the icon's transparency threshold retuned
+   (140–165, was 170–225) for a genuinely crisp, halo-free background. 178/178 tests passing
+   (2 new), ruff clean. Cut as **v0.9.2**, tag + GitHub Release confirmed published.~~
    ✅ 2026-08-12.
 
 ### 🎯 Theme D — Distribution (parked)
