@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **The enlarged image preview looked blurry.** A pasted image was only ever stored at its
+  small inline (chat/description) size, so opening it larger meant stretching that same tiny
+  source upward. A separate, higher-resolution copy (up to 1920px wide) is now stored
+  specifically for the preview, so it scales down from real detail instead of up from a
+  thumbnail.
+
 ## [0.9.2] - 2026-08-12
 
 ### Added

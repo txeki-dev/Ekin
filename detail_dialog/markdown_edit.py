@@ -21,6 +21,9 @@ class MarkdownTextEdit(QTextEdit):
     # Marcadores que disparan cada tipo de lista al pulsar espacio
     _BULLET_MARKERS = ("*", "-", "+")
     _ORDERED_RE = re.compile(r"\d+[.)]")
+    # Ancho máximo (px) de la copia de mayor resolución guardada para la vista ampliada
+    # (detail_dialog/image_preview_dialog.py) -- ver _insert_image.
+    _PREVIEW_MAX_WIDTH = 1920
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -191,26 +194,41 @@ class MarkdownTextEdit(QTextEdit):
                     if r < rows and c < cols:
                         table.cellAt(r, c).firstCursorPosition().insertText(text)
 
+    @staticmethod
+    def _image_to_data_uri(image):
+        """Codifica un QImage como data URI PNG en base64."""
+        buffer = QBuffer()
+        buffer.open(QIODevice.WriteOnly)
+        image.save(buffer, "PNG")
+        b64 = bytes(buffer.data().toBase64()).decode("ascii")
+        buffer.close()
+        return f"data:image/png;base64,{b64}"
+
     def _insert_image(self, image):
-        """Embebe un QImage como data URI base64 (queda guardado dentro del HTML).
-        Ajusta la imagen al ancho útil (el del histórico del chat si se ha configurado
-        un `image_width_provider`, que es más estrecho que el editor)."""
+        """Embebe un QImage como data URI base64 (queda guardado dentro del HTML). Se
+        guardan DOS copias: una ajustada al ancho útil (el del histórico del chat si se ha
+        configurado un `image_width_provider`, más estrecho que el editor) para mostrarla
+        inline, y otra de mayor resolución (hasta _PREVIEW_MAX_WIDTH) para la vista
+        ampliada -- así ImagePreviewDialog escala hacia ABAJO desde una fuente con detalle
+        real al pulsar la imagen, en vez de estirar (y emborronar) la miniatura ya reducida."""
+        preview_image = image
+        if preview_image.width() > self._PREVIEW_MAX_WIDTH:
+            preview_image = preview_image.scaledToWidth(self._PREVIEW_MAX_WIDTH, Qt.SmoothTransformation)
+        preview_uri = self._image_to_data_uri(preview_image)
+
         if self.image_width_provider:
             avail = max(120, self.image_width_provider())
         else:
             avail = max(120, self.viewport().width() - 24)
         if image.width() > avail:
             image = image.scaledToWidth(avail, Qt.SmoothTransformation)
-        buffer = QBuffer()
-        buffer.open(QIODevice.WriteOnly)
-        image.save(buffer, "PNG")
-        b64 = bytes(buffer.data().toBase64()).decode("ascii")
-        buffer.close()
-        # Envolver en un <a> con el mismo data URI: no cambia el aspecto (Qt no añade
-        # subrayado/borde a una imagen-enlace) pero la hace clicable vía anchorAt() en
-        # los QTextEdit editables y linkActivated en el QLabel del diario ya enviado.
-        data_uri = f"data:image/png;base64,{b64}"
-        self.textCursor().insertHtml(f'<a href="{data_uri}"><img src="{data_uri}" /></a>')
+        inline_uri = self._image_to_data_uri(image)
+
+        # <a href> con la copia de alta resolución, <img src> con la miniatura inline: no
+        # cambia el aspecto (Qt no añade subrayado/borde a una imagen-enlace) pero la hace
+        # clicable vía anchorAt() en los QTextEdit editables y linkActivated en el QLabel
+        # del diario ya enviado -- y ahora abre con detalle real en vez de emborronarse.
+        self.textCursor().insertHtml(f'<a href="{preview_uri}"><img src="{inline_uri}" /></a>')
 
     def _convert_line_to_list(self, style):
         """Elimina el marcador escrito y convierte la línea actual en una lista."""

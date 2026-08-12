@@ -2,6 +2,7 @@
 pocas propiedades estructurales, sin interacción profunda. Necesitan el fixture
 `qapp` (ver conftest.py) y se ejecutan bien con QT_QPA_PLATFORM=offscreen (igual
 que en CI) o con un display real."""
+import re
 from datetime import date, datetime, timedelta
 
 import pytest
@@ -505,6 +506,42 @@ def test_markdown_text_edit_wraps_pasted_image_in_anchor(qapp):
     editor._insert_image(QImage(4, 4, QImage.Format.Format_RGB32))
 
     assert '<a href="data:image/png;base64,' in editor.toHtml()
+
+
+def test_markdown_text_edit_stores_higher_res_copy_for_preview(qapp):
+    """Regresión: antes href y src eran el MISMO data URI (la miniatura ya reducida al
+    ancho del chat/descripción), así que ImagePreviewDialog tenía que estirarla hacia
+    arriba y se veía borrosa. Ahora href guarda una copia de mayor resolución aparte."""
+    editor = markdown_edit_module.MarkdownTextEdit()
+    big_image = QImage(2400, 1600, QImage.Format.Format_RGB32)
+    big_image.fill(Qt.GlobalColor.blue)
+
+    editor._insert_image(big_image)
+    html = editor.toHtml()
+
+    href = re.search(r'<a href="(data:image/[^"]+)"', html).group(1)
+    src = re.search(r'<img src="(data:image/[^"]+)"', html).group(1)
+    href_pixmap = image_preview_module.pixmap_from_data_uri(href)
+    src_pixmap = image_preview_module.pixmap_from_data_uri(src)
+
+    assert href_pixmap.width() > src_pixmap.width()
+    assert href_pixmap.width() <= markdown_edit_module.MarkdownTextEdit._PREVIEW_MAX_WIDTH
+
+
+def test_markdown_text_edit_small_image_reuses_same_data_for_preview_and_inline(qapp):
+    """Cuando la imagen original ya es más pequeña que ambos objetivos (inline y
+    preview), href y src acaban siendo el mismo data URI -- comportamiento correcto,
+    no un caso a evitar: no hay ninguna resolución mayor que guardar."""
+    editor = markdown_edit_module.MarkdownTextEdit()
+    tiny = QImage(50, 50, QImage.Format.Format_RGB32)
+    tiny.fill(Qt.GlobalColor.green)
+
+    editor._insert_image(tiny)
+    html = editor.toHtml()
+
+    href = re.search(r'<a href="(data:image/[^"]+)"', html).group(1)
+    src = re.search(r'<img src="(data:image/[^"]+)"', html).group(1)
+    assert href == src
 
 
 def test_markdown_text_edit_click_on_image_anchor_opens_preview(qapp, monkeypatch):
