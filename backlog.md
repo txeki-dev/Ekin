@@ -309,7 +309,13 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
   now always scales small images *up* instead of only ever scaling large ones down; and
   description-pasted images default to the same width as chat images
   (`desc_input.image_width_provider = self._chat_image_width`) instead of risking overflow on
-  dialog resize.
+  dialog resize. **Fixed same day, follow-up**: the preview still looked blurry — v0.9.2's
+  "always scale up-or-down" fix addressed the dialog's scaling logic correctly, but `<a href>`
+  and `<img src>` were still the *same* small, already-downscaled data URI, so enlarging meant
+  interpolating detail an earlier downscale had already thrown away. `_insert_image` now stores
+  a second, separately-scaled copy (capped at 1920px) specifically for the `href`, so the
+  dialog scales down from real detail instead of up from a thumbnail. Manually verified: a
+  3000×2000 paste now yields a 1920×1280 preview vs. a 614×409 inline thumbnail.
 
 ### Data & safety
 - [x] **Automatic DB backups** *(Done in v0.4.0)* — `backups.py` writes a consistent SQLite snapshot
@@ -448,6 +454,13 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
    (140–165, was 170–225) for a genuinely crisp, halo-free background. 178/178 tests passing
    (2 new), ruff clean. Cut as **v0.9.2**, tag + GitHub Release confirmed published.~~
    ✅ 2026-08-12.
+20. ~~**Image preview resolution fix — same-day follow-up on v0.9.2** — the enlarged preview
+   still looked blurry because `<a href>`/`<img src>` shared the same already-downscaled data
+   URI; `_insert_image` now stores a separate, higher-resolution copy (capped at 1920px) just
+   for the preview, so `ImagePreviewDialog` scales down from real detail instead of up from a
+   thumbnail. Manually verified end-to-end (3000×2000 → 1920×1280 preview vs. 614×409 inline).
+   180/180 tests passing (2 new), ruff clean. Not versioned as a new release — folded into
+   `[Unreleased]` for the next cut.~~ ✅ 2026-08-12.
 
 ### 🎯 Theme D — Distribution (parked)
 **PyInstaller** standalone build + **update-from-Releases** (replaces the `git pull` auto-updater).
