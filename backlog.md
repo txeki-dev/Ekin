@@ -291,6 +291,15 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
   for the whole app). `BoardViewWidget.refresh_timer_badges()` (a 60s `QTimer`) keeps visible
   badges' elapsed text current without any DB query or widget reconstruction. Carried through
   `snapshot_task`/`restore_task` for Ctrl+Z undo, same as `linked_board_id`.
+- [x] **Click-to-enlarge pasted images** *(Done 2026-08-12, user-requested)*. An image pasted
+  into the task description or diary/chat now opens in a larger centered view when clicked —
+  while composing, while editing an existing entry, or once it's already been posted.
+  `MarkdownTextEdit._insert_image` wraps the pasted image's data URI in a same-URI `<a href>`
+  at insertion time, clickable via `QTextEdit.anchorAt()` (the three editable surfaces, all
+  sharing `MarkdownTextEdit`) or `QLabel.linkActivated` (an already-posted entry's read-only
+  `content_label`). New `detail_dialog/image_preview_dialog.py::ImagePreviewDialog` scales to
+  90% of screen size and closes on click/Esc/close button. A press/release position-delta
+  check keeps normal text-selection drags from being hijacked into opening the preview.
 
 ### Data & safety
 - [x] **Automatic DB backups** *(Done in v0.4.0)* — `backups.py` writes a consistent SQLite snapshot
@@ -320,6 +329,18 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
   `os.name == 'nt'`, and `QSystemTrayIcon` usage already checks `isSystemTrayAvailable()`. One
   documented, unfixable-from-here limitation: `QSystemTrayIcon.showMessage()` has weak Notification
   Center integration on macOS (a Qt/OS gap — would need a native bridge like PyObjC).
+- [x] **Taskbar icon showing as the generic Python icon on a second PC** *(Done 2026-08-12,
+  user-reported)*. The code (absolute icon paths, an explicit AppUserModelID) was already
+  correct as of 2026-07-29 — likely explanation is Windows caching the wrong icon on that PC
+  under the *old* AppUserModelID from before that fix, a cache nothing since had invalidated.
+  Versioned the AppUserModelID (`"EkinKanban.TrelloLite.2"`, `main.py`) so Windows treats it
+  as a fresh identity. **Not fully verifiable from here** — the affected PC needs a `git pull`
+  + relaunch; if the icon still doesn't refresh, the user needs to unpin/re-pin the taskbar
+  icon or reboot, since no app-level code can force-clear another machine's OS icon cache.
+- [x] **App icon redesigned with a transparent background** *(Done 2026-08-12,
+  user-requested)*. `ekin_icon.png`/`.ico` no longer carry a baked-in white background/drop
+  shadow — regenerated via a one-off Pillow script (per-pixel whiteness threshold, not a new
+  runtime dependency) at all 7 `.ico` resolutions.
 
 ### Packaging & distribution
 - [ ] **Standalone executable** (PyInstaller) so non-developers don't need Python/git.
@@ -395,6 +416,13 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
    Also fixed `restore_task()` losing link order on Ctrl+Z; removed ~40 redundant `conn.commit()`
    calls across `database/` (doubling as the dedicated double-commit audit an earlier item asked
    for) plus two confirmed dead-code spots. 167/167 tests passing, ruff clean.~~ ✅ 2026-08-10.
+18. ~~**Click-to-enlarge pasted images, taskbar icon cache fix, transparent icon redesign** —
+   pasted images in the description/diary now open larger on click (new
+   `ImagePreviewDialog`); the taskbar showing Ekin as a generic Python icon on a second PC
+   traced to Windows caching an icon under a since-fixed AppUserModelID, addressed by
+   versioning the identifier; `ekin_icon.png`/`.ico` regenerated with a real transparent
+   background instead of a baked-in white one. 176/176 tests passing (9 new), ruff clean.~~
+   ✅ 2026-08-12.
 
 ### 🎯 Theme D — Distribution (parked)
 **PyInstaller** standalone build + **update-from-Releases** (replaces the `git pull` auto-updater).
