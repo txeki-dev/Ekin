@@ -5,6 +5,36 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 
 ---
 
+## ✅ Fixed in the forensic pass (2026-08-12, third pass)
+
+Same two-independent-agent format as the two prior passes — this time, both planned parallel
+audit agents hit an API session-limit mid-run (one produced zero output, the other was cut off
+with only a one-line hint recovered: "restore_column with a deleted board"). Rather than wait
+for the limit to reset, continued the audit directly with `Read`/`Grep`/`Bash`, using that hint
+as a starting point. Full writeup:
+`.agents/docs/archive/2026-08-12_forensic-pass-restore-fk-and-imagepreview-leak.md`.
+
+- [x] **Critical, systemic (two manifestations): `restore_task`/`restore_column` could crash
+  the app on Ctrl+Z** — both functions fall back to the snapshot's own stored parent id
+  (`column_id`/`board_id`) when none is passed explicitly, with no guard that it still exists;
+  `tasks.column_id`/`columns.board_id` are `NOT NULL` FKs with `ON DELETE CASCADE`. Same
+  failure class already fixed once for `restore_task`'s `linked_board_id`/`tag_value_ids`,
+  never applied to either function's own required parent-id fallback. Reachable via an
+  ordinary sequence: delete a task, delete its column, Ctrl+Z twice (or one level up: delete a
+  column, delete its board, Ctrl+Z twice). Both crashes manually reproduced against the real
+  `database` module before the fix, and reproduced again via `git stash` against the pre-fix
+  code as part of QA. Fixed with a new `database/columns.py::get_column` (symmetric with the
+  existing `get_board`) plus a guard in each `restore_*` function returning `None` instead of
+  crashing — required zero caller changes, since `board_view.py`'s `_push_delete_undo` was
+  already written to tolerate a `None` return.
+- [x] **`ImagePreviewDialog` was never destroyed after closing** — same leak class already
+  fixed once for `TaskDetailDialog`, never applied to this newer dialog (added 2026-08-12,
+  first forensic pass to touch it). Confirmed via a direct repro (5 open+close cycles, all 5
+  left as permanent children) before and after the fix. Fixed with the identical
+  `self.finished.connect(self.deleteLater)` pattern.
+
+---
+
 ## ✅ Fixed in the forensic pass (2026-08-10, v0.9.1)
 
 Same two-independent-agent format as the 2026-08-07 pass (data/logic layer, UI layer + a dedicated
@@ -461,6 +491,15 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
    thumbnail. Manually verified end-to-end (3000×2000 → 1920×1280 preview vs. 614×409 inline).
    180/180 tests passing (2 new), ruff clean. Cut as **v0.9.3**, tag + GitHub Release confirmed
    published.~~ ✅ 2026-08-12.
+21. ~~**Third forensic bug-hunt pass** — a critical, systemic Ctrl+Z crash
+   (`restore_task`/`restore_column` could raise an uncaught FK `IntegrityError` if a
+   task's/column's parent was also deleted before the undo ran) and the `ImagePreviewDialog`
+   memory leak (never destroyed after closing, same class already fixed once for
+   `TaskDetailDialog`). Both bugs manually reproduced before the fix, and reproduced again via
+   `git stash` against the pre-fix code during QA. Two planned parallel audit agents hit an API
+   session limit mid-run; the audit continued directly rather than waiting for it to reset.
+   183/183 tests passing (3 new), ruff clean. Not versioned as a new release — folded into
+   `[Unreleased]` for the next cut.~~ ✅ 2026-08-12.
 
 ### 🎯 Theme D — Distribution (parked)
 **PyInstaller** standalone build + **update-from-Releases** (replaces the `git pull` auto-updater).
