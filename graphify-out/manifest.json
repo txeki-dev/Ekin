@@ -140,9 +140,9 @@
     "semantic_hash": "59eea183f0b0b5d851eb66ff1509c2bf"
   },
   "install.ps1": {
-    "mtime": 1783932298.3665376,
-    "ast_hash": "e3c3b0f787d64b4ca62f4b40ba5baf14",
-    "semantic_hash": "e3c3b0f787d64b4ca62f4b40ba5baf14"
+    "mtime": 1786622317.7350907,
+    "ast_hash": "fb5794d0561f2a710b1eaf1a9c21b039",
+    "semantic_hash": ""
   },
   "main.py": {
     "mtime": 1786531285.326909,
@@ -255,9 +255,9 @@
     "semantic_hash": "3eaeaf5d929f761f1b4c54b18c207592"
   },
   "version.py": {
-    "mtime": 1786541134.2146983,
-    "ast_hash": "d01972a2833bcb846cad67cdf74403c7",
-    "semantic_hash": "d01972a2833bcb846cad67cdf74403c7"
+    "mtime": 1786622363.1924083,
+    "ast_hash": "a2bf2fc9797455a970cbcc3a2afe4154",
+    "semantic_hash": ""
   },
   "widgets.py": {
     "mtime": 1786085295.7441409,
@@ -355,9 +355,9 @@
     "semantic_hash": "9df94b2427b6a74deecc1a8c2a1d7c0a"
   },
   "CHANGELOG.md": {
-    "mtime": 1786570517.852988,
-    "ast_hash": "1869b35c4992ddcaf6d9a81cbd90dab2",
-    "semantic_hash": "1869b35c4992ddcaf6d9a81cbd90dab2"
+    "mtime": 1786622360.7993498,
+    "ast_hash": "612b6f001eda20e70f4f405c15a1031f",
+    "semantic_hash": ""
   },
   "README.md": {
     "mtime": 1786531310.8837974,
@@ -365,13 +365,53 @@
     "semantic_hash": "4c72cc3e8fb3a7ce4f412ad6a1cdbec2"
   },
   "backlog.md": {
-    "mtime": 1786570894.0790944,
-    "ast_hash": "699be31de346b45ae51317cea149bbeb",
-    "semantic_hash": "699be31de346b45ae51317cea149bbeb"
+    "mtime": 1786622381.017941,
+    "ast_hash": "9bd6b600ddb92bf2afb331d4ee22e39a",
+    "semantic_hash": ""
   },
   "ekin_icon.png": {
     "mtime": 1786533985.3729756,
     "ast_hash": "c39f84f1578d9c762f95ae429591564a",
     "semantic_hash": "c39f84f1578d9c762f95ae429591564a"
+  },
+  ".agents/docs/archive/2026-08-07_last_active_column_utility_bar_recollapse.md": {
+    "mtime": 1786389950.8376288,
+    "ast_hash": "865bd1ddcfbee82f263e4634ceb27a7d",
+    "semantic_hash": ""
+  },
+  ".agents/docs/archive/2026-08-07_task_timer_feature.md": {
+    "mtime": 1786389950.8376288,
+    "ast_hash": "777eac26b704dbd181f35bd705417c41",
+    "semantic_hash": ""
+  },
+  ".agents/docs/archive/2026-08-10_local-file-attachments-in-task-links.md": {
+    "mtime": 1786389950.8376288,
+    "ast_hash": "d48eac48df26e8c0a1b425004dce6074",
+    "semantic_hash": ""
+  },
+  ".agents/docs/archive/2026-08-12_forensic-pass-restore-fk-and-imagepreview-leak.md": {
+    "mtime": 1786570762.9644637,
+    "ast_hash": "66549647205f3eefef0a2a4d7a4c68a8",
+    "semantic_hash": ""
+  },
+  ".agents/docs/archive/2026-08-12_image-preview-resolution-fix.md": {
+    "mtime": 1786535617.886094,
+    "ast_hash": "fbf3d45596622aac7d9fecd905abcee5",
+    "semantic_hash": ""
+  },
+  ".agents/docs/archive/2026-08-12_image-preview-taskbar-icon-transparent-icon.md": {
+    "mtime": 1786531668.4506817,
+    "ast_hash": "5e756ceed3d328b7e0c26d1cb6111023",
+    "semantic_hash": ""
+  },
+  ".agents/docs/archive/2026-08-12_v0.9.2-image-preview-fixes-icon-tuning.md": {
+    "mtime": 1786534361.550998,
+    "ast_hash": "1f74b32a28b993f8eb6c00c81c4b1e62",
+    "semantic_hash": ""
+  },
+  ".claude/CLAUDE.md": {
+    "mtime": 1786599301.742384,
+    "ast_hash": "63f4985d4c9633e59b0d2c5a70f5b6db",
+    "semantic_hash": ""
   }
 }
