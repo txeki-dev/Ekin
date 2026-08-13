@@ -3,6 +3,10 @@ context.md
 diary.md
 diary_archive.md
 
+# graphify - machine-specific interpreter path + regenerable build cache
+graphify-out/.graphify_python
+graphify-out/cache/
+
 # Ideas
 business_model_and_financial_projection.md
 legal_commercial_licensing.md
