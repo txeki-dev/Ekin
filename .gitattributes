@@ -1,1 +1,5 @@
 graphify-out/graph.json merge=graphify
+
+# App icons are binary - never let autocrlf/text normalization touch them
+*.ico binary
+*.png binary

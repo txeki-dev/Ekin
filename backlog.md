@@ -5,6 +5,30 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 
 ---
 
+## ✅ Fixed (2026-08-13, v0.9.4 — installer icon bug, user-reported)
+
+- [x] **Desktop shortcut showing a blank icon + taskbar falling back to Python's generic icon
+  on a colleague's machine.** Previously (2026-08-12) a similar taskbar-icon report on a second
+  PC was traced to Windows icon-cache staleness with the app code already correct. This report
+  paired a *blank* desktop icon (not even a generic one) with the taskbar issue — a symptom the
+  cache-staleness explanation doesn't cover, since a cached-but-wrong icon still renders as
+  *some* icon. Root cause: `install.ps1`'s `git pull`/`git clone` had zero error/exit-code
+  checking, so a failed or partial update on a repeat install (existing `~/EkinKanban` folder)
+  silently left the local checkout outdated or incomplete — including possibly missing
+  `ekin_icon.ico` — while the script carried on regardless and built a shortcut against that
+  broken checkout: `IconLocation` pointing at a nonexistent file renders as Windows' blank
+  generic icon, and `main.py`'s `app_icon()` finding neither `.ico` nor `.png` returns a null
+  `QIcon`, so the taskbar falls back to `pythonw.exe`'s own icon. Fixed by checking
+  `$LASTEXITCODE` after `git pull`/`git clone` (stop with a clear message instead of continuing
+  silently) and verifying `ekin_icon.ico` exists right before shortcut creation (warn explicitly
+  if not, instead of producing a shortcut with a dead icon path). Also marked `*.ico`/`*.png` as
+  `binary` in `.gitattributes`, defensively ruling out autocrlf line-ending corruption on
+  checkout as a contributing factor. **Immediate workaround for the affected machine** (doesn't
+  need to wait for a re-run): delete `~/EkinKanban` and re-run the installer for a clean clone,
+  since the existing folder's `git pull` history/state is unknown.
+
+---
+
 ## ✅ Fixed in the forensic pass (2026-08-12, third pass)
 
 Same two-independent-agent format as the two prior passes — this time, both planned parallel

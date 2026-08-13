@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-08-13
+
 ### Fixed
 - **Critical: undoing a deleted task or column could crash the app.** If you deleted a task
   and then deleted its column (or deleted a column and then deleted its board) before
@@ -16,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **`ImagePreviewDialog` (the click-to-enlarge image view) was never destroyed after
   closing.** Every image you previewed left a hidden, permanently-alive copy of the dialog (and
   its image data) behind for the rest of the session.
+- **Desktop shortcut could show a blank icon, and the taskbar could fall back to Python's
+  generic icon.** `install.ps1`'s `git pull`/`git clone` had no error checking, so a failed or
+  incomplete update silently left an existing install (`~/EkinKanban`) outdated or missing
+  files — including the app icon — while the installer carried on and built a shortcut against
+  that broken checkout anyway. The installer now stops with a clear message if `git pull`/`git
+  clone` fails, and warns explicitly if `ekin_icon.ico` is still missing afterwards, instead of
+  silently producing a shortcut with no working icon. Also marked `*.ico`/`*.png` as binary in
+  `.gitattributes` as a defensive measure against line-ending corruption on checkout.
 
 ## [0.9.3] - 2026-08-12
 

@@ -25,9 +25,17 @@ if (Test-Path $installDir) {
     Write-Host "📂 La carpeta de instalación ya existe en $installDir. Actualizando el código..." -ForegroundColor Yellow
     Set-Location $installDir
     git pull origin main
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "❌ 'git pull' ha fallado (¿cambios locales o conflicto?). La instalación existente en $installDir puede estar desactualizada o rota. Resuelve el error de git manualmente, o borra la carpeta $installDir y vuelve a ejecutar este instalador para clonar desde cero."
+        exit
+    }
 } else {
     Write-Host "📥 Clonando el repositorio desde GitHub..." -ForegroundColor Green
     git clone https://github.com/txeki-dev/Ekin.git $installDir
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "❌ 'git clone' ha fallado. Revisa tu conexión a internet y vuelve a intentarlo."
+        exit
+    }
     Set-Location $installDir
 }
 
@@ -50,13 +58,19 @@ start "" "venv\Scripts\pythonw.exe" main.py
 $launchScript | Out-File -FilePath "lanzar.bat" -Encoding ascii
 
 # 6. Crear Acceso Directo en el Escritorio
+$iconPath = Join-Path $installDir "ekin_icon.ico"
+if (-not (Test-Path $iconPath)) {
+    Write-Host "⚠️ No se encontró ekin_icon.ico en $installDir tras clonar/actualizar -- el acceso directo se creará sin icono personalizado (Windows mostrará un icono genérico). Esto indica que la copia local del repositorio está incompleta." -ForegroundColor Yellow
+}
 try {
     $WshShell = New-Object -ComObject WScript.Shell
     $DesktopPath = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Desktop)
     $Shortcut = $WshShell.CreateShortcut((Join-Path $DesktopPath "Ekin Kanban.lnk"))
     $Shortcut.TargetPath = (Join-Path $installDir "lanzar.bat")
     $Shortcut.WorkingDirectory = $installDir
-    $Shortcut.IconLocation = (Join-Path $installDir "ekin_icon.ico")
+    if (Test-Path $iconPath) {
+        $Shortcut.IconLocation = "$iconPath,0"
+    }
     $Shortcut.Description = "Ekin Kanban Board"
     $Shortcut.Save()
     Write-Host "✨ Acceso directo creado con éxito en tu Escritorio." -ForegroundColor Green
