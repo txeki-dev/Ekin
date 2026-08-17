@@ -1,8 +1,8 @@
 {
   ".claude/settings.local.json": {
     "mtime": 1785338761.0323222,
-    "ast_hash": "6e617c27d42818e94811485c0ad4d667",
-    "semantic_hash": "6e617c27d42818e94811485c0ad4d667"
+    "ast_hash": "",
+    "semantic_hash": ""
   },
   ".github/scripts/extract_release_notes.py": {
     "mtime": 1783935748.5580263,
@@ -140,14 +140,14 @@
     "semantic_hash": "59eea183f0b0b5d851eb66ff1509c2bf"
   },
   "install.ps1": {
-    "mtime": 1786622317.7350907,
-    "ast_hash": "fb5794d0561f2a710b1eaf1a9c21b039",
-    "semantic_hash": ""
+    "mtime": 1786964342.388734,
+    "ast_hash": "7130dba7d9eed4113ccfb12d6aff53de",
+    "semantic_hash": "7130dba7d9eed4113ccfb12d6aff53de"
   },
   "main.py": {
-    "mtime": 1786531285.326909,
-    "ast_hash": "662136ba8712817b8739c1a3171d38c5",
-    "semantic_hash": "662136ba8712817b8739c1a3171d38c5"
+    "mtime": 1786964337.8840413,
+    "ast_hash": "a131d26dc6a6a31ebaa82cd0e51c64ee",
+    "semantic_hash": "a131d26dc6a6a31ebaa82cd0e51c64ee"
   },
   "pyproject.toml": {
     "mtime": 1786079473.830325,
@@ -255,9 +255,9 @@
     "semantic_hash": "3eaeaf5d929f761f1b4c54b18c207592"
   },
   "version.py": {
-    "mtime": 1786622363.1924083,
-    "ast_hash": "a2bf2fc9797455a970cbcc3a2afe4154",
-    "semantic_hash": ""
+    "mtime": 1786964323.6564627,
+    "ast_hash": "10c776519ccc2f439d9b77a26d8202ae",
+    "semantic_hash": "10c776519ccc2f439d9b77a26d8202ae"
   },
   "widgets.py": {
     "mtime": 1786085295.7441409,

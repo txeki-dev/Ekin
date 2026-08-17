@@ -6,6 +6,10 @@ diary_archive.md
 # graphify - machine-specific interpreter path + regenerable build cache
 graphify-out/.graphify_python
 graphify-out/cache/
+graphify-out/.graphify_analysis.json
+graphify-out/.graphify_labels.json.sig
+graphify-out/.graphify_root
+graphify-out/[0-9][0-9][0-9][0-9]-*/
 
 # Ideas
 business_model_and_financial_projection.md

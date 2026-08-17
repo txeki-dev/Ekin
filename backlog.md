@@ -5,6 +5,20 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 
 ---
 
+## ✅ Fixed (2026-08-17, v0.9.5 — Windows taskbar icon hardening & installer direct binding)
+
+- [x] **Windows taskbar icon fallback to generic Python script icon + installer launcher indirection.**
+  Root cause (1): `SetCurrentProcessExplicitAppUserModelID` was executed inside `def main()` after
+  `PySide6` imports had already loaded Qt's Windows platform plugin (`qwindows.dll`), which registered
+  the process under the default `pythonw.exe` identity before the AppUserModelID was set. Fixed by moving
+  the call to line 1 of `main.py` before any Qt/GUI imports, paired with an explicit `apply_win32_icon(window)`
+  native `WM_SETICON` injection directly onto the window `HWND`.
+  Root cause (2): `install.ps1` created desktop `.lnk` shortcuts targeting `lanzar.bat`, which spawned a detached
+  `pythonw.exe` subprocess that Windows could not associate with the shortcut's icon. Fixed by making the
+  desktop shortcut target `venv\Scripts\pythonw.exe` directly with `Arguments = "main.py"` and `IconLocation = ekin_icon.ico,0`.
+
+---
+
 ## ✅ Fixed (2026-08-13, v0.9.4 — installer icon bug, user-reported)
 
 - [x] **Desktop shortcut showing a blank icon + taskbar falling back to Python's generic icon
