@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-08-17
+
+### Fixed
+- **Taskbar icon fallback to Python script icon on Windows.** `SetCurrentProcessExplicitAppUserModelID`
+  was previously called inside `def main()`, which executed after `PySide6` and Qt's Windows
+  platform plugin (`qwindows.dll`) had already imported and initialized the process under
+  `pythonw.exe`. The call is now placed at the very top of `main.py` before any GUI/Qt imports.
+- **Native Win32 taskbar icon enforcement.** Added `apply_win32_icon(window)` calling
+  `user32.SendMessageW(hwnd, WM_SETICON, ...)` directly on the window `HWND` to guarantee the
+  taskbar button renders `ekin_icon.ico` at the OS window manager level.
+- **Installer shortcut direct binding.** `install.ps1` previously pointed the desktop shortcut to
+  `lanzar.bat`, which spawned a detached child process that Windows could not associate with the
+  shortcut's icon. The shortcut now targets `pythonw.exe` directly with `Arguments = "main.py"`
+  and `IconLocation = ekin_icon.ico,0`.
+
 ## [0.9.4] - 2026-08-13
 
 ### Fixed

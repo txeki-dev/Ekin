@@ -1,5 +1,16 @@
 import sys
 import os
+
+# En Windows, fijar el AppUserModelID ANTES de importar PySide6/Qt para que el plugin
+# de plataforma nativo (qwindows.dll) no registre el proceso con la identidad genérica
+# de pythonw.exe en la barra de tareas.
+if os.name == "nt":
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("TxekSystems.EkinKanban.Board.v1")
+    except Exception:
+        pass
+
 import subprocess
 from datetime import date
 from PySide6.QtWidgets import (
@@ -496,27 +507,38 @@ class MainWindow(QMainWindow):
             database.create_log(task_id, t("main.onboarding.log_entry"))
 
 
-def main():
-    if os.name == 'nt':
-        # En Windows, pythonw.exe agrupa la ventana bajo su propio icono genérico en la
-        # barra de tareas a menos que el proceso declare un AppUserModelID propio. El sufijo
-        # ".2" es deliberado: en máquinas que ejecutaron Ekin antes del fix de icono por ruta
-        # absoluta (2026-07-29), Windows pudo cachear el icono genérico bajo el identificador
-        # antiguo "EkinKanban.TrelloLite" -- ese caché sobrevive a un `git pull` porque nada lo
-        # invalida. Cambiar el identificador fuerza a Windows a tratarlo como una app nueva y
-        # resolver el icono de cero en vez de servir el cacheado.
-        try:
-            import ctypes
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("EkinKanban.TrelloLite.2")
-        except Exception:
-            pass
+def apply_win32_icon(window):
+    """Fuerza los iconos nativos de Win32 (WM_SETICON) directamente en el HWND de Windows."""
+    if os.name != "nt":
+        return
+    try:
+        import ctypes
+        ico_path = os.path.join(_APP_DIR, "ekin_icon.ico")
+        if not os.path.exists(ico_path):
+            return
+        hwnd = int(window.winId())
+        IMAGE_ICON = 1
+        LR_LOADFROMFILE = 0x00000010
+        WM_SETICON = 0x0080
+        hicon_big = ctypes.windll.user32.LoadImageW(None, ico_path, IMAGE_ICON, 32, 32, LR_LOADFROMFILE)
+        hicon_small = ctypes.windll.user32.LoadImageW(None, ico_path, IMAGE_ICON, 16, 16, LR_LOADFROMFILE)
+        if hicon_big:
+            ctypes.windll.user32.SendMessageW(hwnd, WM_SETICON, 1, hicon_big)
+        if hicon_small:
+            ctypes.windll.user32.SendMessageW(hwnd, WM_SETICON, 0, hicon_small)
+    except Exception:
+        pass
 
+
+def main():
     app = QApplication(sys.argv)
     app.setWindowIcon(app_icon())
 
     window = MainWindow()
     window.show()
+    apply_win32_icon(window)
     sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     main()

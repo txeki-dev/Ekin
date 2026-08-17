@@ -66,7 +66,8 @@ try {
     $WshShell = New-Object -ComObject WScript.Shell
     $DesktopPath = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Desktop)
     $Shortcut = $WshShell.CreateShortcut((Join-Path $DesktopPath "Ekin Kanban.lnk"))
-    $Shortcut.TargetPath = (Join-Path $installDir "lanzar.bat")
+    $Shortcut.TargetPath = (Join-Path $installDir "venv\Scripts\pythonw.exe")
+    $Shortcut.Arguments = "main.py"
     $Shortcut.WorkingDirectory = $installDir
     if (Test-Path $iconPath) {
         $Shortcut.IconLocation = "$iconPath,0"
