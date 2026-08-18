@@ -9,7 +9,7 @@ idioma más adelante sin tocar el resto del código.
 
 STRINGS = {
     # --- main.py: ventana principal, bandeja, actualizaciones, datos de ejemplo ---
-    "main.window_title": "Ekin Kanban - Trello Lite v{version}",
+    "main.window_title": "Ekin v{version}",
     "main.tray.tooltip": "Ekin Kanban",
     "main.tray.open": "Abrir Ekin",
     "main.tray.quit": "Salir",

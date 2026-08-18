@@ -1,10 +1,11 @@
 import os
 from datetime import datetime
-from PySide6.QtCore import Qt, QDate, QTime, QUrl, QSize, QTimer
+from PySide6.QtCore import Qt, QDate, QTime, QUrl, QSize, QTimer, QEvent, QObject, QEventLoop
 from PySide6.QtWidgets import (
     QDialog, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QScrollArea, QWidget,
-    QMessageBox, QCheckBox, QDateEdit, QTimeEdit, QComboBox, QFileDialog
+    QMessageBox, QCheckBox, QDateEdit, QTimeEdit, QComboBox, QFileDialog,
+    QApplication
 )
 from PySide6.QtGui import QKeySequence, QShortcut, QDesktopServices
 import database
@@ -25,6 +26,36 @@ def _is_local_link(url):
     return not url.lower().startswith(_WEB_LINK_SCHEMES)
 
 
+class _ClickOutsideFilter(QObject):
+    """Filtro de eventos que detecta clics fuera del diálogo dentro de la ventana
+    principal de Ekin. Al hacer clic fuera, guarda automáticamente los cambios y
+    cierra el diálogo (equivalente a pulsar el botón 'Guardar Cambios')."""
+    def __init__(self, dialog):
+        super().__init__()
+        self.dialog = dialog
+
+    def eventFilter(self, obj, event):
+        if event.type() in (QEvent.MouseButtonPress, QEvent.NonClientAreaMouseButtonPress):
+            # Si hay un diálogo modal hijo abierto (ej. selector de etiquetas, confirmación), no cerrar
+            if QApplication.activeModalWidget() is not None:
+                return False
+            # Si hay un menú o popup desplegable activo (ej. combo box), permitir que Qt lo cierre primero
+            if QApplication.activePopupWidget() is not None:
+                return False
+            if isinstance(obj, QWidget):
+                # Si el clic es dentro del propio diálogo o de alguno de sus hijos
+                if obj == self.dialog or self.dialog.isAncestorOf(obj):
+                    return False
+                top_level = obj.window()
+                if top_level == self.dialog or self.dialog.isAncestorOf(top_level):
+                    return False
+
+                # Clic fuera del diálogo dentro de la aplicación principal: autoguardar y cerrar
+                self.dialog.save_changes()
+                return True
+        return False
+
+
 class TaskDetailDialog(QDialog):
     def __init__(self, task_id, db_path=database.DB_NAME, parent=None):
         super().__init__(parent)
@@ -34,6 +65,7 @@ class TaskDetailDialog(QDialog):
         self.task_deleted = False  # Indica si se borró la tarea desde este diálogo
         self.modified = False      # Indica si hubo algún cambio real (título, tags, diario, enlaces...)
         self._timer_started_at = None  # Timestamp ISO del temporizador en marcha, o None
+        self._click_outside_filter = None
 
         self.setWindowTitle(t("task_detail.window_title"))
         self.resize(1120, 720)
@@ -52,6 +84,24 @@ class TaskDetailDialog(QDialog):
         # nada lo destruye por sí solo cuando se cierra -- sin esto, cada tarea abierta deja un
         # TaskDetailDialog zombi con su _timer_refresh_timer disparando para siempre.
         self.finished.connect(self.deleteLater)
+
+    def exec(self):
+        """Abre el diálogo de forma síncrona sin bloquear la ventana padre, permitiendo
+        que al hacer clic fuera se guarden automáticamente los cambios."""
+        self.setWindowModality(Qt.NonModal)
+        self.show()
+        self._click_outside_filter = _ClickOutsideFilter(self)
+        QApplication.instance().installEventFilter(self._click_outside_filter)
+
+        loop = QEventLoop(self)
+        self.finished.connect(lambda _: loop.quit())
+        loop.exec()
+
+        if getattr(self, "_click_outside_filter", None):
+            QApplication.instance().removeEventFilter(self._click_outside_filter)
+            self._click_outside_filter = None
+
+        return self.result()
 
     def init_ui(self):
         # Layout principal horizontal (Izquierda: Formulario, Derecha: Diario/Log)
@@ -305,6 +355,7 @@ class TaskDetailDialog(QDialog):
         self.scroll_area = QScrollArea()
         self.scroll_area.setObjectName("ChatScrollArea")
         self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
         self.logs_container = QWidget()
         self.logs_layout = QVBoxLayout(self.logs_container)

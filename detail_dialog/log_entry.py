@@ -1,10 +1,25 @@
+import re
 from PySide6.QtCore import Qt, QSize
-from PySide6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
+from PySide6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QSizePolicy
 from datetime import datetime
 from widgets import make_glyph_icon
 from strings import t
 from .markdown_edit import MarkdownTextEdit, RichTextToolbar
 from .image_preview_dialog import show_image_preview
+
+
+def fit_html_images(html, max_width=None):
+    """Ajusta o añade el atributo width a las etiquetas <img> para que nunca
+    desborden el ancho del contenedor de chat."""
+    if not html or "<img" not in html.lower():
+        return html
+    if max_width is None:
+        return html
+    def _repl(match):
+        attrs = match.group(1)
+        attrs_clean = re.sub(r'\bwidth\s*=\s*["\']?[^"\'>\s]+["\']?', '', attrs, flags=re.IGNORECASE).strip()
+        return f'<img width="{int(max_width)}" {attrs_clean}>'
+    return re.sub(r'<img\s+([^>]*?)>', _repl, html, flags=re.IGNORECASE)
 
 
 class LogEntryWidget(QFrame):
@@ -35,8 +50,11 @@ class LogEntryWidget(QFrame):
         return btn
 
     def init_ui(self, log_data):
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        self.setMinimumWidth(0)
+
         self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(8, 8, 8, 8)
+        self._layout.setContentsMargins(10, 8, 10, 8)
         self._layout.setSpacing(4)
 
         # Fila superior: Fecha/Hora + botones de editar y eliminar
@@ -67,10 +85,18 @@ class LogEntryWidget(QFrame):
 
         self._layout.addLayout(top_layout)
 
-        # Contenido de la entrada
-        self.content_label = QLabel(log_data["content"])
+        # Contenido de la entrada: ajustar imágenes para que no desborden
+        parent = self.parent()
+        max_w = None
+        if parent and hasattr(parent, "_chat_image_width"):
+            max_w = parent._chat_image_width()
+        content = fit_html_images(log_data["content"], max_w)
+
+        self.content_label = QLabel(content)
         self.content_label.setObjectName("LogContent")
         self.content_label.setWordWrap(True)
+        self.content_label.setMinimumWidth(0)
+        self.content_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         # TextSelectableByMouse a solas SUSTITUYE el conjunto de flags (no lo amplía),
         # anulando LinksAccessibleByMouse -- sin él, linkActivated nunca se dispara con un
         # clic real aunque el resto del cableado esté bien (bug confirmado: la vista ampliada
@@ -93,6 +119,8 @@ class LogEntryWidget(QFrame):
         self.edit_btn.setEnabled(False)
 
         self._editor = MarkdownTextEdit()
+        if self.parent() and hasattr(self.parent(), "_chat_image_width"):
+            self._editor.image_width_provider = self.parent()._chat_image_width
         self._editor.setHtml(self.log_data["content"])
         self._editor.setMinimumHeight(90)
         self._layout.addWidget(RichTextToolbar(self._editor))

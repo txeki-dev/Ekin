@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.6] - 2026-08-18
+
+### Added
+- **Click-outside to auto-save and close task detail popup.** When opening a task card in the
+  detail popup (`TaskDetailDialog`), clicking outside the popup within the main Ekin window
+  (e.g., clicking on the board, background, or sidebar) now automatically saves all changes and
+  closes the dialog returning to the board view, behaving identically to clicking the "Guardar
+  Cambios" button. Child modals (like the tag picker or delete confirmation) and dropdown popups
+  remain protected and do not trigger unexpected closes.
+
+### Changed
+- **Window title simplified to `Ekin v{version}`.** Updated the application window title string
+  from `"Ekin Kanban - Trello Lite v{version}"` to `"Ekin v{version}"`, and updated the README
+  title to `# Ekin Kanban`.
+
+### Fixed
+- **Log / Diario text clipping after editing comments.** Corrected an invalid fractional font size
+  (`font-size: 12.5px;` changed to `13px`) in `styles.py` on `#LogContent`. Qt CSS does not support
+  fractional pixel sizes, which previously caused an internal font point size error (-1) that broke
+  rich text font metrics in `QLabel` and caused edited comments to collapse vertically in the chat.
+- **Log / Diario horizontal overflow.** Removed `margin: 4px; padding: 8px;` in QSS on `#LogEntryWidget`
+  (relying purely on Qt's layout margins in Python) to prevent box-model expansion beyond `QScrollArea`.
+- **Wide images or tables overflowing behind the chat area.** Added `fit_html_images()` in
+  `detail_dialog/log_entry.py` to bound all `<img>` tags to the chat viewport's usable width,
+  configured `image_width_provider` on the inline editor during comment editing, set
+  `QSizePolicy.Ignored` on `content_label`, and enabled `ScrollBarAlwaysOff` horizontally.
+
 ## [0.9.5] - 2026-08-17
 
 ### Fixed

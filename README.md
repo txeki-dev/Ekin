@@ -1,4 +1,4 @@
-# Ekin Kanban (Trello Lite)
+# Ekin Kanban
 
 [![CI](https://github.com/txeki-dev/Ekin/actions/workflows/ci.yml/badge.svg)](https://github.com/txeki-dev/Ekin/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/txeki-dev/Ekin?label=release&sort=semver)](https://github.com/txeki-dev/Ekin/releases/latest)

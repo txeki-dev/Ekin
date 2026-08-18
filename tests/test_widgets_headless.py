@@ -656,3 +656,93 @@ def test_log_entry_widget_plain_text_keeps_default_cursor(qapp):
     widget = LogEntryWidget(log_data, lambda *a: None, lambda *a: None)
 
     assert widget.content_label.cursor().shape() != Qt.CursorShape.PointingHandCursor
+
+
+def test_task_detail_dialog_click_outside_auto_saves_and_closes(qapp, db_path):
+    """Al hacer clic fuera de TaskDetailDialog en la ventana principal, se guardan
+    automáticamente los cambios y se cierra el diálogo (equivalente a pulsar Guardar)."""
+    board_id = database.create_board("Tablero Test", db_path=db_path)
+    col_id = database.create_column(board_id, "Col", db_path=db_path)
+    task_id = database.create_task(col_id, "Titulo Original", db_path=db_path)
+
+    parent_window = QWidget()
+    parent_window.resize(1000, 800)
+    parent_window.show()
+    qapp.processEvents()
+
+    dlg = TaskDetailDialog(task_id, db_path=db_path, parent=parent_window)
+
+    def _simulate_outside_click():
+        # Modificar título
+        dlg.title_input.setText("Titulo Modificado")
+        # Simular clic en la ventana padre fuera del diálogo
+        pos = QPoint(10, 10)
+        press = QMouseEvent(QEvent.Type.MouseButtonPress, pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+        qapp.sendEvent(parent_window, press)
+
+    from PySide6.QtCore import QTimer
+    QTimer.singleShot(50, _simulate_outside_click)
+    res = dlg.exec()
+
+    assert res == TaskDetailDialog.Accepted
+    assert dlg.modified is True
+    updated_task = database.get_task(task_id, db_path)
+    assert updated_task["title"] == "Titulo Modificado"
+    parent_window.close()
+
+
+def test_task_detail_dialog_click_inside_does_not_close(qapp, db_path):
+    """Clics dentro de los controles de TaskDetailDialog no deben disparar el autoguardado/cierre prematuro."""
+    board_id = database.create_board("Tablero Test", db_path=db_path)
+    col_id = database.create_column(board_id, "Col", db_path=db_path)
+    task_id = database.create_task(col_id, "Titulo", db_path=db_path)
+
+    dlg = TaskDetailDialog(task_id, db_path=db_path)
+    dlg.show()
+    qapp.processEvents()
+
+    pos = QPoint(5, 5)
+    press = QMouseEvent(QEvent.Type.MouseButtonPress, pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+    qapp.sendEvent(dlg.title_input, press)
+    qapp.processEvents()
+
+    assert dlg.isVisible()
+    dlg.reject()
+
+
+def test_log_entry_widget_fit_html_images_constrains_width():
+    """fit_html_images ajusta o añade width para evitar desbordamiento horizontal."""
+    from detail_dialog.log_entry import fit_html_images
+
+    html_in = '<p><img src="data:image/png;base64,1234" /></p>'
+    html_out = fit_html_images(html_in, max_width=320)
+    assert 'width="320"' in html_out
+
+    # Con width previo mayor
+    html_in2 = '<p><img width="800" src="data:image/png;base64,1234" /></p>'
+    html_out2 = fit_html_images(html_in2, max_width=300)
+    assert 'width="300"' in html_out2
+    assert 'width="800"' not in html_out2
+
+
+def test_log_entry_widget_multiline_text_vertical_sizing(qapp):
+    """Verifica que un comentario multilínea tiene tamaño vertical y no se colapsa."""
+    log_data = {
+        "id": 1,
+        "content": "<p>Primera línea de texto largo editado.</p><p>Segunda línea de texto.</p><p>Tercera línea.</p>",
+        "created_at": "2026-08-18 10:00:00",
+    }
+    widget = LogEntryWidget(log_data, lambda *a: None, lambda *a: None)
+    widget.show()
+    qapp.processEvents()
+
+    assert widget.content_label.wordWrap() is True
+    assert widget.content_label.sizePolicy().horizontalPolicy() == widget.content_label.sizePolicy().Policy.Ignored
+
+
+def test_qss_font_sizes_valid_integers():
+    """Verifica que los estilos QSS no contienen tamaños de fuente fraccionales inválidos (ej. 12.5px)."""
+    qss = styles.build_qss(styles.COLORS)
+    # Buscar patrones como font-size: X.Ypx
+    fractional_font_sizes = re.findall(r"font-size:\s*\d+\.\d+px", qss)
+    assert fractional_font_sizes == []

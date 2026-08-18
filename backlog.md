@@ -5,6 +5,15 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 
 ---
 
+## ✅ Fixed (2026-08-18, v0.9.6 — TaskDetailDialog click-outside auto-save, title simplification, log layout fixes)
+
+- [x] **Task card popup click-outside auto-save and close:** Clicking outside `TaskDetailDialog` within the main window now automatically executes `save_changes()` and closes returning to board view without forcing the user to press "Guardar Cambios".
+- [x] **Window title simplified:** Changed `"main.window_title"` from `"Ekin Kanban - Trello Lite v{version}"` to `"Ekin v{version}"` and updated README title.
+- [x] **Task diary/log text clipping after editing:** Fixed `styles.py` `#LogContent` font-size from invalid fractional `12.5px` to `13px`, removing Qt `setPointSize <= 0 (-1)` font metric calculation error that broke QLabel rich text height calculations.
+- [x] **Task diary/log horizontal card overflow:** Removed QSS margin/padding from `#LogEntryWidget`, added `fit_html_images` to constrain images to chat width, wired `image_width_provider` in edit mode, and set `QSizePolicy.Ignored` on `content_label`. 189/189 tests passing, ruff clean.
+
+---
+
 ## ✅ Fixed (2026-08-17, v0.9.5 — Windows taskbar icon hardening & installer direct binding)
 
 - [x] **Windows taskbar icon fallback to generic Python script icon + installer launcher indirection.**
@@ -538,6 +547,12 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
    session limit mid-run; the audit continued directly rather than waiting for it to reset.
    183/183 tests passing (3 new), ruff clean. Not versioned as a new release — folded into
    `[Unreleased]` for the next cut.~~ ✅ 2026-08-12.
+22. ~~**Task card popup click-outside auto-save, title simplification, log layout fixes** —
+   clicking outside `TaskDetailDialog` within the main window auto-saves and closes into board view;
+   simplified window title to `Ekin v{version}` and README title; fixed `#LogContent` font-size
+   from invalid `12.5px` to `13px` (resolving vertical text collapse on edited comments);
+   eliminated horizontal overflow on chat cards with image bounding and margin cleanup.
+   189/189 tests passing (6 new), ruff clean. Cut as **v0.9.6**.~~ ✅ 2026-08-18.
 
 ### 🎯 Theme D — Distribution (parked)
 **PyInstaller** standalone build + **update-from-Releases** (replaces the `git pull` auto-updater).

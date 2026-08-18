@@ -94,3 +94,12 @@ def test_on_calendar_task_does_nothing_when_dialog_reports_no_changes(qapp, db_p
 
     assert calls == []
     _close_window(qapp, window)
+
+
+def test_main_window_title(qapp, db_path, monkeypatch):
+    """Verifica que el título de la ventana principal es 'Ekin vX.X.X'."""
+    from version import __version__
+    monkeypatch.setattr(database, "DB_NAME", db_path)
+    window = _make_window(monkeypatch)
+    assert window.windowTitle() == f"Ekin v{__version__}"
+    _close_window(qapp, window)

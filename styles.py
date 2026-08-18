@@ -341,8 +341,6 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
 #LogEntryWidget {{
     background-color: {c["bg_card"]};
     border-radius: 8px;
-    margin: 4px;
-    padding: 8px;
 }}
 
 #LogTimestamp {{
@@ -352,7 +350,7 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
 }}
 
 #LogContent {{
-    font-size: 12.5px;
+    font-size: 13px;
     color: {c["text_main"]};
 }}
 
