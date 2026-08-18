@@ -360,7 +360,7 @@ class TaskDetailDialog(QDialog):
 
         self.logs_container = QWidget()
         self.logs_layout = QVBoxLayout(self.logs_container)
-        self.logs_layout.setContentsMargins(6, 6, 6, 6)
+        self.logs_layout.setContentsMargins(8, 8, 12, 8)
         self.logs_layout.setSpacing(8)
 
         self.scroll_area.setWidget(self.logs_container)
@@ -874,11 +874,12 @@ class TaskDetailDialog(QDialog):
         self.reload_logs()
 
     def _chat_image_width(self):
-        """Ancho máximo (px) para imágenes pegadas en el chat: el del histórico (más
-        estrecho que el editor), reservando márgenes y la barra de scroll para que no
-        aparezca scroll horizontal ni tape los botones de la entrada."""
+        """Ancho máximo (px) para imágenes y tablas en el chat: reservando márgenes y la
+        barra de scroll para que nunca aparezca scroll horizontal ni desborden las tarjetas."""
         w = self.scroll_area.viewport().width()
-        return max(120, w - 44)
+        if w > self.width() * 0.5 or w <= 0:
+            w = int(self.width() * 5 / 11) - 40
+        return max(120, min(360, w - 48))
 
     def add_log_entry(self):
         """Crea una nueva entrada de diario con el texto del input."""

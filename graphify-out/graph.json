@@ -160,32 +160,6 @@
       "norm_label": "columneditdialog"
     },
     {
-      "label": "_ClickOutsideFilter",
-      "file_type": "code",
-      "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L29",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_clickoutsidefilter",
-      "community": 121,
-      "community_name": "_ClickOutsideFilter",
-      "norm_label": "_clickoutsidefilter"
-    },
-    {
-      "label": "ClickableTagPill",
-      "file_type": "code",
-      "source_file": "detail_dialog/tag_pill.py",
-      "source_location": "L13",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "id": "detail_dialog_tag_pill_clickabletagpill",
-      "community": 124,
-      "community_name": "ClickableTagPill",
-      "norm_label": "clickabletagpill"
-    },
-    {
       "label": "TagManagerDialog",
       "file_type": "code",
       "source_file": "detail_dialog/tag_manager_dialog.py",
@@ -210,6 +184,19 @@
       "community": 15,
       "community_name": "QLabel",
       "norm_label": "tagpickerdialog"
+    },
+    {
+      "label": "_ClickOutsideFilter",
+      "file_type": "code",
+      "source_file": "detail_dialog/task_detail_dialog.py",
+      "source_location": "L29",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "detail_dialog_task_detail_dialog_clickoutsidefilter",
+      "community": 15,
+      "community_name": "QLabel",
+      "norm_label": "_clickoutsidefilter"
     },
     {
       "label": "SearchDialog",
@@ -329,6 +316,19 @@
       "norm_label": "mainwindow"
     },
     {
+      "label": "ClickableTagPill",
+      "file_type": "code",
+      "source_file": "detail_dialog/tag_pill.py",
+      "source_location": "L13",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "detail_dialog_tag_pill_clickabletagpill",
+      "community": 30,
+      "community_name": "styles.py",
+      "norm_label": "clickabletagpill"
+    },
+    {
       "label": "TaskCard",
       "file_type": "code",
       "source_file": "widgets.py",
@@ -345,7 +345,7 @@
       "label": "LogEntryWidget",
       "file_type": "code",
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L25",
+      "source_location": "L35",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
@@ -433,19 +433,6 @@
       "norm_label": "imagepreviewdialog"
     },
     {
-      "label": "TaskListArea",
-      "file_type": "code",
-      "source_file": "widgets.py",
-      "source_location": "L459",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "id": "widgets_tasklistarea",
-      "community": 54,
-      "community_name": "TaskListArea",
-      "norm_label": "tasklistarea"
-    },
-    {
       "label": "VerticalLabel",
       "file_type": "code",
       "source_file": "widgets.py",
@@ -455,7 +442,7 @@
       "_origin": "ast",
       "id": "widgets_verticallabel",
       "community": 54,
-      "community_name": "TaskListArea",
+      "community_name": "VerticalLabel",
       "norm_label": "verticallabel"
     },
     {
@@ -519,9 +506,22 @@
       "_callable_class": true,
       "_origin": "ast",
       "id": "detail_dialog_task_detail_dialog_taskdetaildialog",
-      "community": 76,
+      "community": 77,
       "community_name": "TaskDetailDialog",
       "norm_label": "taskdetaildialog"
+    },
+    {
+      "label": "TaskListArea",
+      "file_type": "code",
+      "source_file": "widgets.py",
+      "source_location": "L459",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "widgets_tasklistarea",
+      "community": 82,
+      "community_name": "TaskListArea",
+      "norm_label": "tasklistarea"
     },
     {
       "label": ".__init__()",
@@ -2204,30 +2204,6 @@
       "norm_label": "test_tasks_to_csv()"
     },
     {
-      "label": ".eventFilter()",
-      "file_type": "code",
-      "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L37",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_clickoutsidefilter_eventfilter",
-      "community": 121,
-      "community_name": "_ClickOutsideFilter",
-      "norm_label": ".eventfilter()"
-    },
-    {
-      "label": ".__init__()",
-      "file_type": "code",
-      "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L33",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_clickoutsidefilter_init",
-      "community": 121,
-      "community_name": "_ClickOutsideFilter",
-      "norm_label": ".__init__()"
-    },
-    {
       "label": "build_qss()",
       "file_type": "code",
       "source_file": "styles.py",
@@ -2255,7 +2231,7 @@
       "label": "test_qss_font_sizes_valid_integers()",
       "file_type": "code",
       "source_file": "tests/test_widgets_headless.py",
-      "source_location": "L785",
+      "source_location": "L795",
       "_callable": true,
       "_origin": "ast",
       "id": "tests_test_widgets_headless_test_qss_font_sizes_valid_integers",
@@ -2286,18 +2262,6 @@
       "community": 123,
       "community_name": "fit_html_images",
       "norm_label": "test_log_entry_widget_fit_html_images_constrains_width()"
-    },
-    {
-      "label": ".mousePressEvent()",
-      "file_type": "code",
-      "source_file": "detail_dialog/tag_pill.py",
-      "source_location": "L18",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "detail_dialog_tag_pill_clickabletagpill_mousepressevent",
-      "community": 124,
-      "community_name": "ClickableTagPill",
-      "norm_label": ".mousepressevent()"
     },
     {
       "label": "app_icon()",
@@ -2814,6 +2778,30 @@
       "community": 15,
       "community_name": "QLabel",
       "norm_label": ".selected_category_id()"
+    },
+    {
+      "label": ".eventFilter()",
+      "file_type": "code",
+      "source_file": "detail_dialog/task_detail_dialog.py",
+      "source_location": "L37",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "detail_dialog_task_detail_dialog_clickoutsidefilter_eventfilter",
+      "community": 15,
+      "community_name": "QLabel",
+      "norm_label": ".eventfilter()"
+    },
+    {
+      "label": ".__init__()",
+      "file_type": "code",
+      "source_file": "detail_dialog/task_detail_dialog.py",
+      "source_location": "L33",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "detail_dialog_task_detail_dialog_clickoutsidefilter_init",
+      "community": 15,
+      "community_name": "QLabel",
+      "norm_label": ".__init__()"
     },
     {
       "label": ".show_search()",
@@ -4388,46 +4376,10 @@
       "norm_label": ".open_task_details()"
     },
     {
-      "label": "_is_local_link()",
-      "file_type": "code",
-      "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L24",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_is_local_link",
-      "community": 3,
-      "community_name": "t",
-      "norm_label": "_is_local_link()"
-    },
-    {
-      "label": ".add_link()",
-      "file_type": "code",
-      "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L834",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_add_link",
-      "community": 3,
-      "community_name": "t",
-      "norm_label": ".add_link()"
-    },
-    {
-      "label": "._build_link_row()",
-      "file_type": "code",
-      "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L783",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_build_link_row",
-      "community": 3,
-      "community_name": "t",
-      "norm_label": "._build_link_row()"
-    },
-    {
       "label": ".delete_log_entry()",
       "file_type": "code",
       "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L895",
+      "source_location": "L896",
       "_callable": true,
       "_origin": "ast",
       "id": "detail_dialog_task_detail_dialog_taskdetaildialog_delete_log_entry",
@@ -4448,40 +4400,52 @@
       "norm_label": ".delete_task()"
     },
     {
-      "label": "._open_link()",
+      "label": "._ensure_priority_category()",
       "file_type": "code",
       "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L817",
+      "source_location": "L523",
       "_callable": true,
       "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_open_link",
+      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_ensure_priority_category",
       "community": 3,
       "community_name": "t",
-      "norm_label": "._open_link()"
+      "norm_label": "._ensure_priority_category()"
     },
     {
-      "label": ".reload_links()",
+      "label": ".__init__()",
       "file_type": "code",
       "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L768",
+      "source_location": "L60",
       "_callable": true,
       "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_reload_links",
+      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_init",
       "community": 3,
       "community_name": "t",
-      "norm_label": ".reload_links()"
+      "norm_label": ".__init__()"
     },
     {
-      "label": ".remove_link()",
+      "label": ".init_ui()",
       "file_type": "code",
       "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L845",
+      "source_location": "L107",
       "_callable": true,
       "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_remove_link",
+      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_init_ui",
       "community": 3,
       "community_name": "t",
-      "norm_label": ".remove_link()"
+      "norm_label": ".init_ui()"
+    },
+    {
+      "label": "._refresh_priority_combo()",
+      "file_type": "code",
+      "source_file": "detail_dialog/task_detail_dialog.py",
+      "source_location": "L538",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_refresh_priority_combo",
+      "community": 3,
+      "community_name": "t",
+      "norm_label": "._refresh_priority_combo()"
     },
     {
       "label": ".save_changes()",
@@ -4496,6 +4460,18 @@
       "norm_label": ".save_changes()"
     },
     {
+      "label": "._sync_priority_combo_selection()",
+      "file_type": "code",
+      "source_file": "detail_dialog/task_detail_dialog.py",
+      "source_location": "L555",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_sync_priority_combo_selection",
+      "community": 3,
+      "community_name": "t",
+      "norm_label": "._sync_priority_combo_selection()"
+    },
+    {
       "label": "t()",
       "file_type": "code",
       "source_file": "strings.py",
@@ -4506,18 +4482,6 @@
       "community": 3,
       "community_name": "t",
       "norm_label": "t()"
-    },
-    {
-      "label": "test_is_local_link_classifies_urls_vs_paths()",
-      "file_type": "code",
-      "source_file": "tests/test_widgets_headless.py",
-      "source_location": "L348",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "tests_test_widgets_headless_test_is_local_link_classifies_urls_vs_paths",
-      "community": 3,
-      "community_name": "t",
-      "norm_label": "test_is_local_link_classifies_urls_vs_paths()"
     },
     {
       "label": "test_shortcuts_dialog_constructs_with_both_sections()",
@@ -4542,6 +4506,18 @@
       "community": 3,
       "community_name": "t",
       "norm_label": "test_shortcuts_item_new_task_describes_last_active_column_behavior()"
+    },
+    {
+      "label": ".mousePressEvent()",
+      "file_type": "code",
+      "source_file": "detail_dialog/tag_pill.py",
+      "source_location": "L18",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "detail_dialog_tag_pill_clickabletagpill_mousepressevent",
+      "community": 30,
+      "community_name": "styles.py",
+      "norm_label": ".mousepressevent()"
     },
     {
       "label": "color_icon()",
@@ -4590,18 +4566,6 @@
       "community": 30,
       "community_name": "styles.py",
       "norm_label": "tag_pill_css()"
-    },
-    {
-      "label": "make_glyph_icon()",
-      "file_type": "code",
-      "source_file": "widgets.py",
-      "source_location": "L92",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "widgets_make_glyph_icon",
-      "community": 30,
-      "community_name": "styles.py",
-      "norm_label": "make_glyph_icon()"
     },
     {
       "label": "._grid_from_plain_text()",
@@ -4674,6 +4638,18 @@
       "community": 32,
       "community_name": "TaskCard",
       "norm_label": "hex_to_rgb()"
+    },
+    {
+      "label": "make_glyph_icon()",
+      "file_type": "code",
+      "source_file": "widgets.py",
+      "source_location": "L92",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "widgets_make_glyph_icon",
+      "community": 32,
+      "community_name": "TaskCard",
+      "norm_label": "make_glyph_icon()"
     },
     {
       "label": "._emit_board_link_clicked()",
@@ -4859,7 +4835,7 @@
       "label": "._icon_button()",
       "file_type": "code",
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L39",
+      "source_location": "L49",
       "_callable": true,
       "_origin": "ast",
       "id": "detail_dialog_log_entry_logentrywidget_icon_button",
@@ -4871,7 +4847,7 @@
       "label": ".__init__()",
       "file_type": "code",
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L28",
+      "source_location": "L38",
       "_callable": true,
       "_origin": "ast",
       "id": "detail_dialog_log_entry_logentrywidget_init",
@@ -4883,7 +4859,7 @@
       "label": ".init_ui()",
       "file_type": "code",
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L52",
+      "source_location": "L62",
       "_callable": true,
       "_origin": "ast",
       "id": "detail_dialog_log_entry_logentrywidget_init_ui",
@@ -4895,7 +4871,7 @@
       "label": "test_log_entry_widget_multiline_text_vertical_sizing()",
       "file_type": "code",
       "source_file": "tests/test_widgets_headless.py",
-      "source_location": "L728",
+      "source_location": "L738",
       "_callable": true,
       "_origin": "ast",
       "id": "tests_test_widgets_headless_test_log_entry_widget_multiline_text_vertical_sizing",
@@ -5207,7 +5183,7 @@
       "label": "._on_content_link_activated()",
       "file_type": "code",
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L143",
+      "source_location": "L153",
       "_callable": true,
       "_origin": "ast",
       "id": "detail_dialog_log_entry_logentrywidget_on_content_link_activated",
@@ -5255,7 +5231,7 @@
       "label": "._enter_edit_mode()",
       "file_type": "code",
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L113",
+      "source_location": "L123",
       "_callable": true,
       "_origin": "ast",
       "id": "detail_dialog_log_entry_logentrywidget_enter_edit_mode",
@@ -5924,18 +5900,6 @@
       "norm_label": "compute_drop_index()"
     },
     {
-      "label": ".dropEvent()",
-      "file_type": "code",
-      "source_file": "widgets.py",
-      "source_location": "L496",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "widgets_tasklistarea_dropevent",
-      "community": 44,
-      "community_name": "compute_drop_index",
-      "norm_label": ".dropevent()"
-    },
-    {
       "label": "copy_board()",
       "file_type": "code",
       "source_file": "database/board_ops.py",
@@ -6400,7 +6364,7 @@
       "_origin": "ast",
       "id": "widgets_columnwidget_init",
       "community": 54,
-      "community_name": "TaskListArea",
+      "community_name": "VerticalLabel",
       "norm_label": ".__init__()"
     },
     {
@@ -6412,7 +6376,7 @@
       "_origin": "ast",
       "id": "widgets_flowlayout_init",
       "community": 54,
-      "community_name": "TaskListArea",
+      "community_name": "VerticalLabel",
       "norm_label": ".__init__()"
     },
     {
@@ -6424,44 +6388,8 @@
       "_origin": "ast",
       "id": "widgets_taskcard_init",
       "community": 54,
-      "community_name": "TaskListArea",
+      "community_name": "VerticalLabel",
       "norm_label": ".__init__()"
-    },
-    {
-      "label": ".dragEnterEvent()",
-      "file_type": "code",
-      "source_file": "widgets.py",
-      "source_location": "L479",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "widgets_tasklistarea_dragenterevent",
-      "community": 54,
-      "community_name": "TaskListArea",
-      "norm_label": ".dragenterevent()"
-    },
-    {
-      "label": ".dragLeaveEvent()",
-      "file_type": "code",
-      "source_file": "widgets.py",
-      "source_location": "L492",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "widgets_tasklistarea_dragleaveevent",
-      "community": 54,
-      "community_name": "TaskListArea",
-      "norm_label": ".dragleaveevent()"
-    },
-    {
-      "label": ".dragMoveEvent()",
-      "file_type": "code",
-      "source_file": "widgets.py",
-      "source_location": "L486",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "widgets_tasklistarea_dragmoveevent",
-      "community": 54,
-      "community_name": "TaskListArea",
-      "norm_label": ".dragmoveevent()"
     },
     {
       "label": ".__init__()",
@@ -6472,7 +6400,7 @@
       "_origin": "ast",
       "id": "widgets_tasklistarea_init",
       "community": 54,
-      "community_name": "TaskListArea",
+      "community_name": "VerticalLabel",
       "norm_label": ".__init__()"
     },
     {
@@ -6484,7 +6412,7 @@
       "_origin": "ast",
       "id": "widgets_verticallabel_init",
       "community": 54,
-      "community_name": "TaskListArea",
+      "community_name": "VerticalLabel",
       "norm_label": ".__init__()"
     },
     {
@@ -6496,7 +6424,7 @@
       "_origin": "ast",
       "id": "widgets_verticallabel_minimumsizehint",
       "community": 54,
-      "community_name": "TaskListArea",
+      "community_name": "VerticalLabel",
       "norm_label": ".minimumsizehint()"
     },
     {
@@ -6508,7 +6436,7 @@
       "_origin": "ast",
       "id": "widgets_verticallabel_paintevent",
       "community": 54,
-      "community_name": "TaskListArea",
+      "community_name": "VerticalLabel",
       "norm_label": ".paintevent()"
     },
     {
@@ -6520,14 +6448,14 @@
       "_origin": "ast",
       "id": "widgets_verticallabel_sizehint",
       "community": 54,
-      "community_name": "TaskListArea",
+      "community_name": "VerticalLabel",
       "norm_label": ".sizehint()"
     },
     {
       "label": ".add_log_entry()",
       "file_type": "code",
       "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L883",
+      "source_location": "L884",
       "_callable": true,
       "_origin": "ast",
       "id": "detail_dialog_task_detail_dialog_taskdetaildialog_add_log_entry",
@@ -6575,7 +6503,7 @@
       "label": ".scroll_to_bottom()",
       "file_type": "code",
       "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L909",
+      "source_location": "L910",
       "_callable": true,
       "_origin": "ast",
       "id": "detail_dialog_task_detail_dialog_taskdetaildialog_scroll_to_bottom",
@@ -7424,18 +7352,6 @@
       "norm_label": "._update_clock()"
     },
     {
-      "label": "._apply_browsed_file()",
-      "file_type": "code",
-      "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L829",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_apply_browsed_file",
-      "community": 76,
-      "community_name": "TaskDetailDialog",
-      "norm_label": "._apply_browsed_file()"
-    },
-    {
       "label": ".assign_tag_dialog()",
       "file_type": "code",
       "source_file": "detail_dialog/task_detail_dialog.py",
@@ -7444,32 +7360,8 @@
       "_origin": "ast",
       "id": "detail_dialog_task_detail_dialog_taskdetaildialog_assign_tag_dialog",
       "community": 76,
-      "community_name": "TaskDetailDialog",
+      "community_name": ".render_tags",
       "norm_label": ".assign_tag_dialog()"
-    },
-    {
-      "label": ".browse_local_file()",
-      "file_type": "code",
-      "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L824",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_browse_local_file",
-      "community": 76,
-      "community_name": "TaskDetailDialog",
-      "norm_label": ".browse_local_file()"
-    },
-    {
-      "label": "._chat_image_width()",
-      "file_type": "code",
-      "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L876",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_chat_image_width",
-      "community": 76,
-      "community_name": "TaskDetailDialog",
-      "norm_label": "._chat_image_width()"
     },
     {
       "label": ".delete_tag_at()",
@@ -7480,7 +7372,7 @@
       "_origin": "ast",
       "id": "detail_dialog_task_detail_dialog_taskdetaildialog_delete_tag_at",
       "community": 76,
-      "community_name": "TaskDetailDialog",
+      "community_name": ".render_tags",
       "norm_label": ".delete_tag_at()"
     },
     {
@@ -7492,44 +7384,8 @@
       "_origin": "ast",
       "id": "detail_dialog_task_detail_dialog_taskdetaildialog_edit_tag_at",
       "community": 76,
-      "community_name": "TaskDetailDialog",
+      "community_name": ".render_tags",
       "norm_label": ".edit_tag_at()"
-    },
-    {
-      "label": "._ensure_priority_category()",
-      "file_type": "code",
-      "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L523",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_ensure_priority_category",
-      "community": 76,
-      "community_name": "TaskDetailDialog",
-      "norm_label": "._ensure_priority_category()"
-    },
-    {
-      "label": ".__init__()",
-      "file_type": "code",
-      "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L60",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_init",
-      "community": 76,
-      "community_name": "TaskDetailDialog",
-      "norm_label": ".__init__()"
-    },
-    {
-      "label": ".init_ui()",
-      "file_type": "code",
-      "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L107",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_init_ui",
-      "community": 76,
-      "community_name": "TaskDetailDialog",
-      "norm_label": ".init_ui()"
     },
     {
       "label": "._on_priority_changed()",
@@ -7540,7 +7396,7 @@
       "_origin": "ast",
       "id": "detail_dialog_task_detail_dialog_taskdetaildialog_on_priority_changed",
       "community": 76,
-      "community_name": "TaskDetailDialog",
+      "community_name": ".render_tags",
       "norm_label": "._on_priority_changed()"
     },
     {
@@ -7552,7 +7408,7 @@
       "_origin": "ast",
       "id": "detail_dialog_task_detail_dialog_taskdetaildialog_open_tag_manager",
       "community": 76,
-      "community_name": "TaskDetailDialog",
+      "community_name": ".render_tags",
       "norm_label": ".open_tag_manager()"
     },
     {
@@ -7564,20 +7420,8 @@
       "_origin": "ast",
       "id": "detail_dialog_task_detail_dialog_taskdetaildialog_refresh_current_tags_from_db",
       "community": 76,
-      "community_name": "TaskDetailDialog",
+      "community_name": ".render_tags",
       "norm_label": ".refresh_current_tags_from_db()"
-    },
-    {
-      "label": "._refresh_priority_combo()",
-      "file_type": "code",
-      "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L538",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_refresh_priority_combo",
-      "community": 76,
-      "community_name": "TaskDetailDialog",
-      "norm_label": "._refresh_priority_combo()"
     },
     {
       "label": ".render_tags()",
@@ -7588,7 +7432,7 @@
       "_origin": "ast",
       "id": "detail_dialog_task_detail_dialog_taskdetaildialog_render_tags",
       "community": 76,
-      "community_name": "TaskDetailDialog",
+      "community_name": ".render_tags",
       "norm_label": ".render_tags()"
     },
     {
@@ -7600,20 +7444,104 @@
       "_origin": "ast",
       "id": "detail_dialog_task_detail_dialog_taskdetaildialog_set_category_value",
       "community": 76,
-      "community_name": "TaskDetailDialog",
+      "community_name": ".render_tags",
       "norm_label": "._set_category_value()"
     },
     {
-      "label": "._sync_priority_combo_selection()",
+      "label": ".add_link()",
       "file_type": "code",
       "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L555",
+      "source_location": "L834",
       "_callable": true,
       "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_sync_priority_combo_selection",
-      "community": 76,
+      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_add_link",
+      "community": 77,
       "community_name": "TaskDetailDialog",
-      "norm_label": "._sync_priority_combo_selection()"
+      "norm_label": ".add_link()"
+    },
+    {
+      "label": "._apply_browsed_file()",
+      "file_type": "code",
+      "source_file": "detail_dialog/task_detail_dialog.py",
+      "source_location": "L829",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_apply_browsed_file",
+      "community": 77,
+      "community_name": "TaskDetailDialog",
+      "norm_label": "._apply_browsed_file()"
+    },
+    {
+      "label": ".browse_local_file()",
+      "file_type": "code",
+      "source_file": "detail_dialog/task_detail_dialog.py",
+      "source_location": "L824",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_browse_local_file",
+      "community": 77,
+      "community_name": "TaskDetailDialog",
+      "norm_label": ".browse_local_file()"
+    },
+    {
+      "label": "._build_link_row()",
+      "file_type": "code",
+      "source_file": "detail_dialog/task_detail_dialog.py",
+      "source_location": "L783",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_build_link_row",
+      "community": 77,
+      "community_name": "TaskDetailDialog",
+      "norm_label": "._build_link_row()"
+    },
+    {
+      "label": "._chat_image_width()",
+      "file_type": "code",
+      "source_file": "detail_dialog/task_detail_dialog.py",
+      "source_location": "L876",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_chat_image_width",
+      "community": 77,
+      "community_name": "TaskDetailDialog",
+      "norm_label": "._chat_image_width()"
+    },
+    {
+      "label": "._open_link()",
+      "file_type": "code",
+      "source_file": "detail_dialog/task_detail_dialog.py",
+      "source_location": "L817",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_open_link",
+      "community": 77,
+      "community_name": "TaskDetailDialog",
+      "norm_label": "._open_link()"
+    },
+    {
+      "label": ".reload_links()",
+      "file_type": "code",
+      "source_file": "detail_dialog/task_detail_dialog.py",
+      "source_location": "L768",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_reload_links",
+      "community": 77,
+      "community_name": "TaskDetailDialog",
+      "norm_label": ".reload_links()"
+    },
+    {
+      "label": ".remove_link()",
+      "file_type": "code",
+      "source_file": "detail_dialog/task_detail_dialog.py",
+      "source_location": "L845",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "detail_dialog_task_detail_dialog_taskdetaildialog_remove_link",
+      "community": 77,
+      "community_name": "TaskDetailDialog",
+      "norm_label": ".remove_link()"
     },
     {
       "label": "test_task_detail_dialog_click_inside_does_not_close()",
@@ -7623,7 +7551,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "tests_test_widgets_headless_test_task_detail_dialog_click_inside_does_not_close",
-      "community": 76,
+      "community": 77,
       "community_name": "TaskDetailDialog",
       "norm_label": "test_task_detail_dialog_click_inside_does_not_close()"
     },
@@ -7635,7 +7563,7 @@
       "_callable": true,
       "_origin": "ast",
       "id": "tests_test_widgets_headless_test_task_detail_dialog_click_outside_auto_saves_and_closes",
-      "community": 76,
+      "community": 77,
       "community_name": "TaskDetailDialog",
       "norm_label": "test_task_detail_dialog_click_outside_auto_saves_and_closes()"
     },
@@ -7643,11 +7571,11 @@
       "label": "test_task_detail_dialog_logs_scroll_to_latest()",
       "file_type": "code",
       "source_file": "tests/test_widgets_headless.py",
-      "source_location": "L743",
+      "source_location": "L753",
       "_callable": true,
       "_origin": "ast",
       "id": "tests_test_widgets_headless_test_task_detail_dialog_logs_scroll_to_latest",
-      "community": 76,
+      "community": 77,
       "community_name": "TaskDetailDialog",
       "norm_label": "test_task_detail_dialog_logs_scroll_to_latest()"
     },
@@ -7904,6 +7832,54 @@
       "norm_label": "get_tasks()"
     },
     {
+      "label": ".dragEnterEvent()",
+      "file_type": "code",
+      "source_file": "widgets.py",
+      "source_location": "L479",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "widgets_tasklistarea_dragenterevent",
+      "community": 82,
+      "community_name": "TaskListArea",
+      "norm_label": ".dragenterevent()"
+    },
+    {
+      "label": ".dragLeaveEvent()",
+      "file_type": "code",
+      "source_file": "widgets.py",
+      "source_location": "L492",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "widgets_tasklistarea_dragleaveevent",
+      "community": 82,
+      "community_name": "TaskListArea",
+      "norm_label": ".dragleaveevent()"
+    },
+    {
+      "label": ".dragMoveEvent()",
+      "file_type": "code",
+      "source_file": "widgets.py",
+      "source_location": "L486",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "widgets_tasklistarea_dragmoveevent",
+      "community": 82,
+      "community_name": "TaskListArea",
+      "norm_label": ".dragmoveevent()"
+    },
+    {
+      "label": ".dropEvent()",
+      "file_type": "code",
+      "source_file": "widgets.py",
+      "source_location": "L496",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "widgets_tasklistarea_dropevent",
+      "community": 82,
+      "community_name": "TaskListArea",
+      "norm_label": ".dropevent()"
+    },
+    {
       "label": "extract()",
       "file_type": "code",
       "source_file": ".github/scripts/extract_release_notes.py",
@@ -7926,6 +7902,30 @@
       "community": 83,
       "community_name": "extract_release_notes.py",
       "norm_label": "main()"
+    },
+    {
+      "label": "_is_local_link()",
+      "file_type": "code",
+      "source_file": "detail_dialog/task_detail_dialog.py",
+      "source_location": "L24",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "detail_dialog_task_detail_dialog_is_local_link",
+      "community": 98,
+      "community_name": "_is_local_link",
+      "norm_label": "_is_local_link()"
+    },
+    {
+      "label": "test_is_local_link_classifies_urls_vs_paths()",
+      "file_type": "code",
+      "source_file": "tests/test_widgets_headless.py",
+      "source_location": "L348",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "tests_test_widgets_headless_test_is_local_link_classifies_urls_vs_paths",
+      "community": 98,
+      "community_name": "_is_local_link",
+      "norm_label": "test_is_local_link_classifies_urls_vs_paths()"
     },
     {
       "label": "calendar_view.py",
@@ -8535,28 +8535,6 @@
       "norm_label": "pruebas del exportador (json / csv / informe markdown)."
     },
     {
-      "label": "QObject",
-      "file_type": "code",
-      "source_file": "",
-      "source_location": "",
-      "_origin": "ast",
-      "id": "qobject",
-      "community": 121,
-      "community_name": "_ClickOutsideFilter",
-      "norm_label": "qobject"
-    },
-    {
-      "label": "Filtro de eventos que detecta clics fuera del di\u00e1logo dentro de la ventana\u2026",
-      "file_type": "rationale",
-      "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L30",
-      "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_rationale_30",
-      "community": 121,
-      "community_name": "_ClickOutsideFilter",
-      "norm_label": "filtro de eventos que detecta clics fuera del dialogo dentro de la ventana..."
-    },
-    {
       "label": "Cambia la paleta activa (COLORS) in-place y devuelve el QSS correspondiente.",
       "file_type": "rationale",
       "source_file": "styles.py",
@@ -8571,15 +8549,15 @@
       "label": "Verifica que los estilos QSS no contienen tama\u00f1os de fuente fraccionales\u2026",
       "file_type": "rationale",
       "source_file": "tests/test_widgets_headless.py",
-      "source_location": "L786",
+      "source_location": "L796",
       "_origin": "ast",
-      "id": "tests_test_widgets_headless_rationale_786",
+      "id": "tests_test_widgets_headless_rationale_796",
       "community": 122,
       "community_name": "build_qss",
       "norm_label": "verifica que los estilos qss no contienen tamanos de fuente fraccionales..."
     },
     {
-      "label": "Ajusta o a\u00f1ade el atributo width a las etiquetas <img> para que nunca desborden\u2026",
+      "label": "Ajusta o a\u00f1ade el atributo width a las etiquetas <img> y <table> para que nunca\u2026",
       "file_type": "rationale",
       "source_file": "detail_dialog/log_entry.py",
       "source_location": "L12",
@@ -8587,7 +8565,7 @@
       "id": "detail_dialog_log_entry_rationale_12",
       "community": 123,
       "community_name": "fit_html_images",
-      "norm_label": "ajusta o anade el atributo width a las etiquetas <img> para que nunca desborden..."
+      "norm_label": "ajusta o anade el atributo width a las etiquetas <img> y <table> para que nunca..."
     },
     {
       "label": "fit_html_images ajusta o a\u00f1ade width para evitar desbordamiento horizontal.",
@@ -8599,28 +8577,6 @@
       "community": 123,
       "community_name": "fit_html_images",
       "norm_label": "fit_html_images ajusta o anade width para evitar desbordamiento horizontal."
-    },
-    {
-      "label": "QFrame",
-      "file_type": "code",
-      "source_file": "",
-      "source_location": "",
-      "_origin": "ast",
-      "id": "detail_dialog_tag_pill_py_qframe",
-      "community": 124,
-      "community_name": "ClickableTagPill",
-      "norm_label": "qframe"
-    },
-    {
-      "label": "Pastilla de etiqueta cuyo cuerpo emite `clicked` (para editar el valor). El\u2026",
-      "file_type": "rationale",
-      "source_file": "detail_dialog/tag_pill.py",
-      "source_location": "L14",
-      "_origin": "ast",
-      "id": "detail_dialog_tag_pill_rationale_14",
-      "community": 124,
-      "community_name": "ClickableTagPill",
-      "norm_label": "pastilla de etiqueta cuyo cuerpo emite `clicked` (para editar el valor). el..."
     },
     {
       "label": "main.py",
@@ -8832,6 +8788,17 @@
       "norm_label": "qlabel"
     },
     {
+      "label": "QObject",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "id": "qobject",
+      "community": 15,
+      "community_name": "QLabel",
+      "norm_label": "qobject"
+    },
+    {
       "label": "QPushButton",
       "file_type": "code",
       "source_file": "",
@@ -8907,6 +8874,17 @@
       "community": 15,
       "community_name": "QLabel",
       "norm_label": "devuelve (tag_value_id | none, is_none). is_none indica que se eligio \u00abninguno\u00bb."
+    },
+    {
+      "label": "Filtro de eventos que detecta clics fuera del di\u00e1logo dentro de la ventana\u2026",
+      "file_type": "rationale",
+      "source_file": "detail_dialog/task_detail_dialog.py",
+      "source_location": "L30",
+      "_origin": "ast",
+      "id": "detail_dialog_task_detail_dialog_rationale_30",
+      "community": 15,
+      "community_name": "QLabel",
+      "norm_label": "filtro de eventos que detecta clics fuera del dialogo dentro de la ventana..."
     },
     {
       "label": "Abre el di\u00e1logo de b\u00fasqueda global; al elegir un resultado salta a su tarjeta.",
@@ -9712,15 +9690,37 @@
       "norm_label": "abre el dialogo de detalle/chat de una tarea."
     },
     {
-      "label": "True a menos que la cadena empiece por un esquema web reconocido (case-\u2026",
+      "label": "Devuelve el id de la etiqueta permanente \u00abPrioridad\u00bb, asegurando que existan\u2026",
       "file_type": "rationale",
       "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L25",
+      "source_location": "L524",
       "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_rationale_25",
+      "id": "detail_dialog_task_detail_dialog_rationale_524",
       "community": 3,
       "community_name": "t",
-      "norm_label": "true a menos que la cadena empiece por un esquema web reconocido (case-..."
+      "norm_label": "devuelve el id de la etiqueta permanente \u00abprioridad\u00bb, asegurando que existan..."
+    },
+    {
+      "label": "Rellena el selector r\u00e1pido de Prioridad con los valores actuales del cat\u00e1logo\u2026",
+      "file_type": "rationale",
+      "source_file": "detail_dialog/task_detail_dialog.py",
+      "source_location": "L539",
+      "_origin": "ast",
+      "id": "detail_dialog_task_detail_dialog_rationale_539",
+      "community": 3,
+      "community_name": "t",
+      "norm_label": "rellena el selector rapido de prioridad con los valores actuales del catalogo..."
+    },
+    {
+      "label": "Ajusta la selecci\u00f3n del combo de Prioridad a lo que haya en current_tags, sin\u2026",
+      "file_type": "rationale",
+      "source_file": "detail_dialog/task_detail_dialog.py",
+      "source_location": "L556",
+      "_origin": "ast",
+      "id": "detail_dialog_task_detail_dialog_rationale_556",
+      "community": 3,
+      "community_name": "t",
+      "norm_label": "ajusta la seleccion del combo de prioridad a lo que haya en current_tags, sin..."
     },
     {
       "label": "Guarda el t\u00edtulo, descripci\u00f3n, etiquetas y fecha de vencimiento.",
@@ -9748,9 +9748,9 @@
       "label": "Elimina una entrada de diario tras confirmaci\u00f3n.",
       "file_type": "rationale",
       "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L896",
+      "source_location": "L897",
       "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_rationale_896",
+      "id": "detail_dialog_task_detail_dialog_rationale_897",
       "community": 3,
       "community_name": "t",
       "norm_label": "elimina una entrada de diario tras confirmacion."
@@ -9776,17 +9776,6 @@
       "community": 3,
       "community_name": "t",
       "norm_label": "regresion: el texto describia el comportamiento antiguo de ctrl+n (siempre la..."
-    },
-    {
-      "label": "board_view.py",
-      "file_type": "code",
-      "source_file": "board_view.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "board_view",
-      "community": 30,
-      "community_name": "styles.py",
-      "norm_label": "board_view.py"
     },
     {
       "label": "image_preview_dialog.py",
@@ -9866,6 +9855,17 @@
       "norm_label": "tag_pill.py"
     },
     {
+      "label": "QFrame",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "id": "detail_dialog_tag_pill_py_qframe",
+      "community": 30,
+      "community_name": "styles.py",
+      "norm_label": "qframe"
+    },
+    {
       "label": "task_detail_dialog.py",
       "file_type": "code",
       "source_file": "detail_dialog/task_detail_dialog.py",
@@ -9910,15 +9910,15 @@
       "norm_label": "styles.py"
     },
     {
-      "label": "widgets.py",
-      "file_type": "code",
-      "source_file": "widgets.py",
-      "source_location": "L1",
+      "label": "Pastilla de etiqueta cuyo cuerpo emite `clicked` (para editar el valor). El\u2026",
+      "file_type": "rationale",
+      "source_file": "detail_dialog/tag_pill.py",
+      "source_location": "L14",
       "_origin": "ast",
-      "id": "widgets",
+      "id": "detail_dialog_tag_pill_rationale_14",
       "community": 30,
       "community_name": "styles.py",
-      "norm_label": "widgets.py"
+      "norm_label": "pastilla de etiqueta cuyo cuerpo emite `clicked` (para editar el valor). el..."
     },
     {
       "label": "Genera un peque\u00f1o icono cuadrado del color indicado (para combos y listas).",
@@ -9987,17 +9987,6 @@
       "norm_label": "css base para una pastilla de etiqueta coloreada (fondo + esquinas..."
     },
     {
-      "label": "Dibuja un icono (tri\u00e1ngulo o l\u00e1piz) como QPixmap, sin depender de fuentes. Los\u2026",
-      "file_type": "rationale",
-      "source_file": "widgets.py",
-      "source_location": "L93",
-      "_origin": "ast",
-      "id": "widgets_rationale_93",
-      "community": 30,
-      "community_name": "styles.py",
-      "norm_label": "dibuja un icono (triangulo o lapiz) como qpixmap, sin depender de fuentes. los..."
-    },
-    {
       "label": "Al pegar: las im\u00e1genes se insertan como imagen; una tabla (de Excel/Sheets/Word\u2026",
       "file_type": "rationale",
       "source_file": "detail_dialog/markdown_edit.py",
@@ -10051,6 +10040,28 @@
       "community": 31,
       "community_name": ".insertFromMimeData",
       "norm_label": "embebe un qimage como data uri base64 (queda guardado dentro del html). se..."
+    },
+    {
+      "label": "board_view.py",
+      "file_type": "code",
+      "source_file": "board_view.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "board_view",
+      "community": 32,
+      "community_name": "TaskCard",
+      "norm_label": "board_view.py"
+    },
+    {
+      "label": "widgets.py",
+      "file_type": "code",
+      "source_file": "widgets.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "widgets",
+      "community": 32,
+      "community_name": "TaskCard",
+      "norm_label": "widgets.py"
     },
     {
       "label": "QFrame",
@@ -10141,6 +10152,17 @@
       "norm_label": "limpia y dibuja las etiquetas actuales y la fecha de vencimiento."
     },
     {
+      "label": "Dibuja un icono (tri\u00e1ngulo o l\u00e1piz) como QPixmap, sin depender de fuentes. Los\u2026",
+      "file_type": "rationale",
+      "source_file": "widgets.py",
+      "source_location": "L93",
+      "_origin": "ast",
+      "id": "widgets_rationale_93",
+      "community": 32,
+      "community_name": "TaskCard",
+      "norm_label": "dibuja un icono (triangulo o lapiz) como qpixmap, sin depender de fuentes. los..."
+    },
+    {
       "label": "backups.py",
       "file_type": "code",
       "source_file": "backups.py",
@@ -10221,9 +10243,9 @@
       "label": "Una entrada del diario/chat, con botones (pintados) de editar y eliminar y\u2026",
       "file_type": "rationale",
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L26",
+      "source_location": "L36",
       "_origin": "ast",
-      "id": "detail_dialog_log_entry_rationale_26",
+      "id": "detail_dialog_log_entry_rationale_36",
       "community": 34,
       "community_name": "LogEntryWidget",
       "norm_label": "una entrada del diario/chat, con botones (pintados) de editar y eliminar y..."
@@ -10243,9 +10265,9 @@
       "label": "Verifica que un comentario multil\u00ednea tiene tama\u00f1o vertical y no se colapsa.",
       "file_type": "rationale",
       "source_file": "tests/test_widgets_headless.py",
-      "source_location": "L729",
+      "source_location": "L739",
       "_origin": "ast",
-      "id": "tests_test_widgets_headless_rationale_729",
+      "id": "tests_test_widgets_headless_rationale_739",
       "community": 34,
       "community_name": "LogEntryWidget",
       "norm_label": "verifica que un comentario multilinea tiene tamano vertical y no se colapsa."
@@ -10397,9 +10419,9 @@
       "label": "Maneja los enlaces clicados dentro de una entrada ya enviada. Hoy el \u00fanico tipo\u2026",
       "file_type": "rationale",
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L144",
+      "source_location": "L154",
       "_origin": "ast",
-      "id": "detail_dialog_log_entry_rationale_144",
+      "id": "detail_dialog_log_entry_rationale_154",
       "community": 38,
       "community_name": "show_image_preview",
       "norm_label": "maneja los enlaces clicados dentro de una entrada ya enviada. hoy el unico tipo..."
@@ -10430,9 +10452,9 @@
       "label": "Sustituye el contenido por un editor en l\u00ednea con Guardar/Cancelar.",
       "file_type": "rationale",
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L114",
+      "source_location": "L124",
       "_origin": "ast",
-      "id": "detail_dialog_log_entry_rationale_114",
+      "id": "detail_dialog_log_entry_rationale_124",
       "community": 39,
       "community_name": "RichTextToolbar",
       "norm_label": "sustituye el contenido por un editor en linea con guardar/cancelar."
@@ -11193,7 +11215,7 @@
       "_origin": "ast",
       "id": "widgets_rationale_561",
       "community": 54,
-      "community_name": "TaskListArea",
+      "community_name": "VerticalLabel",
       "norm_label": "etiqueta con el texto girado 90\u00b0 (nombre de una columna plegada)."
     },
     {
@@ -11299,9 +11321,9 @@
       "label": "Crea una nueva entrada de diario con el texto del input.",
       "file_type": "rationale",
       "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L884",
+      "source_location": "L885",
       "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_rationale_884",
+      "id": "detail_dialog_task_detail_dialog_rationale_885",
       "community": 56,
       "community_name": ".reload_logs",
       "norm_label": "crea una nueva entrada de diario con el texto del input."
@@ -11321,9 +11343,9 @@
       "label": "Mueve la barra de desplazamiento del diario hasta abajo.",
       "file_type": "rationale",
       "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L910",
+      "source_location": "L911",
       "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_rationale_910",
+      "id": "detail_dialog_task_detail_dialog_rationale_911",
       "community": 56,
       "community_name": ".reload_logs",
       "norm_label": "mueve la barra de desplazamiento del diario hasta abajo."
@@ -11945,17 +11967,6 @@
       "norm_label": "barra con reloj (fecha/hora) en su propia fila arriba, y accesos rapidos..."
     },
     {
-      "label": "QDialog",
-      "file_type": "code",
-      "source_file": "",
-      "source_location": "",
-      "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_py_qdialog",
-      "community": 76,
-      "community_name": "TaskDetailDialog",
-      "norm_label": "qdialog"
-    },
-    {
       "label": "Dibuja las etiquetas asignadas como pastillas. Clic en la pastilla = editar el\u2026",
       "file_type": "rationale",
       "source_file": "detail_dialog/task_detail_dialog.py",
@@ -11963,41 +11974,8 @@
       "_origin": "ast",
       "id": "detail_dialog_task_detail_dialog_rationale_466",
       "community": 76,
-      "community_name": "TaskDetailDialog",
+      "community_name": ".render_tags",
       "norm_label": "dibuja las etiquetas asignadas como pastillas. clic en la pastilla = editar el..."
-    },
-    {
-      "label": "Devuelve el id de la etiqueta permanente \u00abPrioridad\u00bb, asegurando que existan\u2026",
-      "file_type": "rationale",
-      "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L524",
-      "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_rationale_524",
-      "community": 76,
-      "community_name": "TaskDetailDialog",
-      "norm_label": "devuelve el id de la etiqueta permanente \u00abprioridad\u00bb, asegurando que existan..."
-    },
-    {
-      "label": "Rellena el selector r\u00e1pido de Prioridad con los valores actuales del cat\u00e1logo\u2026",
-      "file_type": "rationale",
-      "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L539",
-      "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_rationale_539",
-      "community": 76,
-      "community_name": "TaskDetailDialog",
-      "norm_label": "rellena el selector rapido de prioridad con los valores actuales del catalogo..."
-    },
-    {
-      "label": "Ajusta la selecci\u00f3n del combo de Prioridad a lo que haya en current_tags, sin\u2026",
-      "file_type": "rationale",
-      "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L556",
-      "_origin": "ast",
-      "id": "detail_dialog_task_detail_dialog_rationale_556",
-      "community": 76,
-      "community_name": "TaskDetailDialog",
-      "norm_label": "ajusta la seleccion del combo de prioridad a lo que haya en current_tags, sin..."
     },
     {
       "label": "Asigna (o reemplaza) el valor de una etiqueta permanente, garantizando un \u00fanico\u2026",
@@ -12007,7 +11985,7 @@
       "_origin": "ast",
       "id": "detail_dialog_task_detail_dialog_rationale_598",
       "community": 76,
-      "community_name": "TaskDetailDialog",
+      "community_name": ".render_tags",
       "norm_label": "asigna (o reemplaza) el valor de una etiqueta permanente, garantizando un unico..."
     },
     {
@@ -12018,7 +11996,7 @@
       "_origin": "ast",
       "id": "detail_dialog_task_detail_dialog_rationale_617",
       "community": 76,
-      "community_name": "TaskDetailDialog",
+      "community_name": ".render_tags",
       "norm_label": "retira una etiqueta de la tarea (localmente) y re-renderiza."
     },
     {
@@ -12029,7 +12007,7 @@
       "_origin": "ast",
       "id": "detail_dialog_task_detail_dialog_rationale_623",
       "community": 76,
-      "community_name": "TaskDetailDialog",
+      "community_name": ".render_tags",
       "norm_label": "edita el valor de una etiqueta ya asignada: cambiarlo o poner \u00abninguno\u00bb..."
     },
     {
@@ -12040,7 +12018,7 @@
       "_origin": "ast",
       "id": "detail_dialog_task_detail_dialog_rationale_648",
       "community": 76,
-      "community_name": "TaskDetailDialog",
+      "community_name": ".render_tags",
       "norm_label": "asigna una etiqueta permanente (categoria) con uno de sus valores a la tarea."
     },
     {
@@ -12051,7 +12029,7 @@
       "_origin": "ast",
       "id": "detail_dialog_task_detail_dialog_rationale_662",
       "community": 76,
-      "community_name": "TaskDetailDialog",
+      "community_name": ".render_tags",
       "norm_label": "abre el gestor del catalogo de etiquetas y re-sincroniza las etiquetas..."
     },
     {
@@ -12062,19 +12040,30 @@
       "_origin": "ast",
       "id": "detail_dialog_task_detail_dialog_rationale_667",
       "community": 76,
-      "community_name": "TaskDetailDialog",
+      "community_name": ".render_tags",
       "norm_label": "refresca los datos (valor/color) de las etiquetas asignadas y descarta las que..."
     },
     {
-      "label": "Ancho m\u00e1ximo (px) para im\u00e1genes pegadas en el chat: el del hist\u00f3rico (m\u00e1s\u2026",
+      "label": "QDialog",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "id": "detail_dialog_task_detail_dialog_py_qdialog",
+      "community": 77,
+      "community_name": "TaskDetailDialog",
+      "norm_label": "qdialog"
+    },
+    {
+      "label": "Ancho m\u00e1ximo (px) para im\u00e1genes y tablas en el chat: reservando m\u00e1rgenes y la\u2026",
       "file_type": "rationale",
       "source_file": "detail_dialog/task_detail_dialog.py",
       "source_location": "L877",
       "_origin": "ast",
       "id": "detail_dialog_task_detail_dialog_rationale_877",
-      "community": 76,
+      "community": 77,
       "community_name": "TaskDetailDialog",
-      "norm_label": "ancho maximo (px) para imagenes pegadas en el chat: el del historico (mas..."
+      "norm_label": "ancho maximo (px) para imagenes y tablas en el chat: reservando margenes y la..."
     },
     {
       "label": "Al hacer clic fuera de TaskDetailDialog en la ventana principal, se guardan\u2026",
@@ -12083,7 +12072,7 @@
       "source_location": "L662",
       "_origin": "ast",
       "id": "tests_test_widgets_headless_rationale_662",
-      "community": 76,
+      "community": 77,
       "community_name": "TaskDetailDialog",
       "norm_label": "al hacer clic fuera de taskdetaildialog en la ventana principal, se guardan..."
     },
@@ -12094,7 +12083,7 @@
       "source_location": "L695",
       "_origin": "ast",
       "id": "tests_test_widgets_headless_rationale_695",
-      "community": 76,
+      "community": 77,
       "community_name": "TaskDetailDialog",
       "norm_label": "clics dentro de los controles de taskdetaildialog no deben disparar el..."
     },
@@ -12102,10 +12091,10 @@
       "label": "Al abrir TaskDetailDialog con m\u00faltiples comentarios, el scroll muestra el\u2026",
       "file_type": "rationale",
       "source_file": "tests/test_widgets_headless.py",
-      "source_location": "L744",
+      "source_location": "L754",
       "_origin": "ast",
-      "id": "tests_test_widgets_headless_rationale_744",
-      "community": 76,
+      "id": "tests_test_widgets_headless_rationale_754",
+      "community": 77,
       "community_name": "TaskDetailDialog",
       "norm_label": "al abrir taskdetaildialog con multiples comentarios, el scroll muestra el..."
     },
@@ -12372,6 +12361,17 @@
       "community": 9,
       "community_name": "2. Implementation Tasks",
       "norm_label": "`widgets.py` \u2014 `taskcard` board-view badge"
+    },
+    {
+      "label": "True a menos que la cadena empiece por un esquema web reconocido (case-\u2026",
+      "file_type": "rationale",
+      "source_file": "detail_dialog/task_detail_dialog.py",
+      "source_location": "L25",
+      "_origin": "ast",
+      "id": "detail_dialog_task_detail_dialog_rationale_25",
+      "community": 98,
+      "community_name": "_is_local_link",
+      "norm_label": "true a menos que la cadena empiece por un esquema web reconocido (case-..."
     },
     {
       "label": "create_log() Atomicity Fix (Fix 6)",
@@ -17331,7 +17331,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L121",
+      "source_location": "L131",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_log_entry_logentrywidget_enter_edit_mode",
@@ -17343,7 +17343,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L126",
+      "source_location": "L136",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_log_entry_logentrywidget_enter_edit_mode",
@@ -17355,7 +17355,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L131",
+      "source_location": "L141",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_log_entry_logentrywidget_enter_edit_mode",
@@ -17367,7 +17367,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L44",
+      "source_location": "L54",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_log_entry_logentrywidget_icon_button",
@@ -17378,7 +17378,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L37",
+      "source_location": "L47",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_log_entry_logentrywidget_init",
@@ -17390,7 +17390,19 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L76",
+      "source_location": "L103",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "detail_dialog_log_entry_logentrywidget_init_ui",
+      "target": "detail_dialog_log_entry_fit_html_images",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "detail_dialog/log_entry.py",
+      "source_location": "L86",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_log_entry_logentrywidget_init_ui",
@@ -17403,7 +17415,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L77",
+      "source_location": "L87",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_log_entry_logentrywidget_init_ui",
@@ -17413,21 +17425,9 @@
       "relation": "calls",
       "context": "call",
       "confidence": "EXTRACTED",
-      "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L93",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "detail_dialog_log_entry_logentrywidget_init_ui",
-      "target": "detail_dialog_log_entry_fit_html_images",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L149",
+      "source_location": "L159",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_log_entry_logentrywidget_on_content_link_activated",
@@ -18170,7 +18170,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L893",
+      "source_location": "L894",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_task_detail_dialog_taskdetaildialog_add_log_entry",
@@ -18291,7 +18291,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L899",
+      "source_location": "L900",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_task_detail_dialog_taskdetaildialog_delete_log_entry",
@@ -21842,7 +21842,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_widgets_headless.py",
-      "source_location": "L735",
+      "source_location": "L745",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_test_widgets_headless_test_log_entry_widget_multiline_text_vertical_sizing",
@@ -22059,7 +22059,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_widgets_headless.py",
-      "source_location": "L787",
+      "source_location": "L797",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_test_widgets_headless_test_qss_font_sizes_valid_integers",
@@ -22322,7 +22322,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_widgets_headless.py",
-      "source_location": "L752",
+      "source_location": "L762",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_test_widgets_headless_test_task_detail_dialog_logs_scroll_to_latest",
@@ -27090,7 +27090,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L25",
+      "source_location": "L35",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_log_entry",
@@ -29796,7 +29796,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_widgets_headless.py",
-      "source_location": "L728",
+      "source_location": "L738",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_test_widgets_headless",
@@ -29807,7 +29807,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_widgets_headless.py",
-      "source_location": "L743",
+      "source_location": "L753",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_test_widgets_headless",
@@ -29818,7 +29818,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_widgets_headless.py",
-      "source_location": "L785",
+      "source_location": "L795",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_test_widgets_headless",
@@ -30104,7 +30104,7 @@
       "relation": "inherits",
       "confidence": "EXTRACTED",
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L25",
+      "source_location": "L35",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_log_entry_logentrywidget",
@@ -31193,7 +31193,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L113",
+      "source_location": "L123",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_log_entry_logentrywidget",
@@ -31204,7 +31204,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L143",
+      "source_location": "L153",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_log_entry_logentrywidget",
@@ -31215,7 +31215,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L28",
+      "source_location": "L38",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_log_entry_logentrywidget",
@@ -31226,7 +31226,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L39",
+      "source_location": "L49",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_log_entry_logentrywidget",
@@ -31237,7 +31237,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L52",
+      "source_location": "L62",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_log_entry_logentrywidget",
@@ -32117,7 +32117,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L883",
+      "source_location": "L884",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_task_detail_dialog_taskdetaildialog",
@@ -32128,7 +32128,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L895",
+      "source_location": "L896",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_task_detail_dialog_taskdetaildialog",
@@ -32139,7 +32139,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L909",
+      "source_location": "L910",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_task_detail_dialog_taskdetaildialog",
@@ -34570,17 +34570,6 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L114",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "detail_dialog_log_entry_rationale_114",
-      "target": "detail_dialog_log_entry_logentrywidget_enter_edit_mode",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "detail_dialog/log_entry.py",
       "source_location": "L12",
       "weight": 1.0,
       "_origin": "ast",
@@ -34592,10 +34581,21 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L144",
+      "source_location": "L124",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "detail_dialog_log_entry_rationale_144",
+      "source": "detail_dialog_log_entry_rationale_124",
+      "target": "detail_dialog_log_entry_logentrywidget_enter_edit_mode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "detail_dialog/log_entry.py",
+      "source_location": "L154",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "detail_dialog_log_entry_rationale_154",
       "target": "detail_dialog_log_entry_logentrywidget_on_content_link_activated",
       "confidence_score": 1.0
     },
@@ -34603,10 +34603,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L26",
+      "source_location": "L36",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "detail_dialog_log_entry_rationale_26",
+      "source": "detail_dialog_log_entry_rationale_36",
       "target": "detail_dialog_log_entry_logentrywidget",
       "confidence_score": 1.0
     },
@@ -35065,10 +35065,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L884",
+      "source_location": "L885",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "detail_dialog_task_detail_dialog_rationale_884",
+      "source": "detail_dialog_task_detail_dialog_rationale_885",
       "target": "detail_dialog_task_detail_dialog_taskdetaildialog_add_log_entry",
       "confidence_score": 1.0
     },
@@ -35087,10 +35087,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L896",
+      "source_location": "L897",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "detail_dialog_task_detail_dialog_rationale_896",
+      "source": "detail_dialog_task_detail_dialog_rationale_897",
       "target": "detail_dialog_task_detail_dialog_taskdetaildialog_delete_log_entry",
       "confidence_score": 1.0
     },
@@ -35098,10 +35098,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "detail_dialog/task_detail_dialog.py",
-      "source_location": "L910",
+      "source_location": "L911",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "detail_dialog_task_detail_dialog_rationale_910",
+      "source": "detail_dialog_task_detail_dialog_rationale_911",
       "target": "detail_dialog_task_detail_dialog_taskdetaildialog_scroll_to_bottom",
       "confidence_score": 1.0
     },
@@ -36275,10 +36275,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_widgets_headless.py",
-      "source_location": "L729",
+      "source_location": "L739",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "tests_test_widgets_headless_rationale_729",
+      "source": "tests_test_widgets_headless_rationale_739",
       "target": "tests_test_widgets_headless_test_log_entry_widget_multiline_text_vertical_sizing",
       "confidence_score": 1.0
     },
@@ -36286,10 +36286,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_widgets_headless.py",
-      "source_location": "L744",
+      "source_location": "L754",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "tests_test_widgets_headless_rationale_744",
+      "source": "tests_test_widgets_headless_rationale_754",
       "target": "tests_test_widgets_headless_test_task_detail_dialog_logs_scroll_to_latest",
       "confidence_score": 1.0
     },
@@ -36297,10 +36297,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_widgets_headless.py",
-      "source_location": "L786",
+      "source_location": "L796",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "tests_test_widgets_headless_rationale_786",
+      "source": "tests_test_widgets_headless_rationale_796",
       "target": "tests_test_widgets_headless_test_qss_font_sizes_valid_integers",
       "confidence_score": 1.0
     },
@@ -37127,7 +37127,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L131",
+      "source_location": "L141",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_log_entry_logentrywidget_enter_edit_mode",
@@ -37139,7 +37139,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L40",
+      "source_location": "L50",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_log_entry_logentrywidget_icon_button",
@@ -37151,7 +37151,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "detail_dialog/log_entry.py",
-      "source_location": "L71",
+      "source_location": "L81",
       "weight": 1.0,
       "_origin": "ast",
       "source": "detail_dialog_log_entry_logentrywidget_init_ui",
@@ -39277,5 +39277,5 @@
       "source_file": ".agents/docs/archive/2026-08-07_hover_expand_crash_fix_and_shortcuts_button.md"
     }
   ],
-  "built_at_commit": "e5a213034e931b355375af31526b7850cc7f0393"
+  "built_at_commit": "a0708b55164fde681fdd788c9bf173acdc9c375b"
 }

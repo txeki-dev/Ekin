@@ -9,17 +9,27 @@ from .image_preview_dialog import show_image_preview
 
 
 def fit_html_images(html, max_width=None):
-    """Ajusta o añade el atributo width a las etiquetas <img> para que nunca
+    """Ajusta o añade el atributo width a las etiquetas <img> y <table> para que nunca
     desborden el ancho del contenedor de chat."""
-    if not html or "<img" not in html.lower():
+    if not html:
         return html
     if max_width is None:
-        return html
-    def _repl(match):
-        attrs = match.group(1)
-        attrs_clean = re.sub(r'\bwidth\s*=\s*["\']?[^"\'>\s]+["\']?', '', attrs, flags=re.IGNORECASE).strip()
-        return f'<img width="{int(max_width)}" {attrs_clean}>'
-    return re.sub(r'<img\s+([^>]*?)>', _repl, html, flags=re.IGNORECASE)
+        max_width = 360
+    # Ajustar etiquetas <img>
+    if "<img" in html.lower():
+        def _repl_img(match):
+            attrs = match.group(1)
+            attrs_clean = re.sub(r'\bwidth\s*=\s*["\']?[^"\'>\s]+["\']?', '', attrs, flags=re.IGNORECASE).strip()
+            return f'<img width="{int(max_width)}" {attrs_clean}>'
+        html = re.sub(r'<img\s+([^>]*?)>', _repl_img, html, flags=re.IGNORECASE)
+    # Ajustar etiquetas <table> para evitar tablas con ancho rígido superior
+    if "<table" in html.lower():
+        def _repl_tbl(match):
+            attrs = match.group(1)
+            attrs_clean = re.sub(r'\bwidth\s*=\s*["\']?[^"\'>\s]+["\']?', '', attrs, flags=re.IGNORECASE).strip()
+            return f'<table width="{int(max_width)}" {attrs_clean}>'
+        html = re.sub(r'<table\s+([^>]*?)>', _repl_tbl, html, flags=re.IGNORECASE)
+    return html
 
 
 class LogEntryWidget(QFrame):

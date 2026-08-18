@@ -724,6 +724,16 @@ def test_log_entry_widget_fit_html_images_constrains_width():
     assert 'width="300"' in html_out2
     assert 'width="800"' not in html_out2
 
+    # Con tabla con width previo mayor
+    html_tbl = '<table width="900"><tr><td>A</td></tr></table>'
+    html_tbl_out = fit_html_images(html_tbl, max_width=350)
+    assert 'width="350"' in html_tbl_out
+    assert 'width="900"' not in html_tbl_out
+
+    # Con max_width=None usa el valor por defecto seguro
+    html_def = fit_html_images('<p><img width="800" src="test.png" /></p>', max_width=None)
+    assert 'width="360"' in html_def
+
 
 def test_log_entry_widget_multiline_text_vertical_sizing(qapp):
     """Verifica que un comentario multilínea tiene tamaño vertical y no se colapsa."""
