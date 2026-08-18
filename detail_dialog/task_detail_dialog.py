@@ -876,13 +876,35 @@ class TaskDetailDialog(QDialog):
             self.modified = True
         self.reload_logs()
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._adjust_logs_width()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._adjust_logs_width()
+
+    def _adjust_logs_width(self):
+        """Ajusta dinámicamente las imágenes y tablas de todos los comentarios cargados
+        al ancho real disponible en el viewport de chat."""
+        if not hasattr(self, "scroll_area") or not hasattr(self, "logs_layout"):
+            return
+        w = self.scroll_area.viewport().width()
+        if w <= 0:
+            return
+        content_w = max(100, min(330, w - 68))
+        for i in range(self.logs_layout.count()):
+            item = self.logs_layout.itemAt(i)
+            if item and item.widget() and isinstance(item.widget(), LogEntryWidget):
+                item.widget().update_content_width(content_w)
+
     def _chat_image_width(self):
         """Ancho máximo (px) para imágenes y tablas en el chat: reservando márgenes y la
         barra de scroll para que nunca aparezca scroll horizontal ni desborden las tarjetas."""
         w = self.scroll_area.viewport().width()
         if w > self.width() * 0.5 or w <= 0:
             w = int(self.width() * 5 / 11) - 40
-        return max(120, min(330, w - 64))
+        return max(100, min(330, w - 68))
 
     def add_log_entry(self):
         """Crea una nueva entrada de diario con el texto del input."""

@@ -15,14 +15,21 @@ def fit_html_images(html, max_width=None):
     if not html:
         return html
     if max_width is None:
-        max_width = 330
+        max_width = 280
+    max_w_int = int(max_width)
 
     # Ajustar etiquetas <img>
     if "<img" in html.lower():
         def _repl_img(match):
             attrs = match.group(1)
+            w_match = re.search(r'\bwidth\s*=\s*["\']?(\d+)["\']?', attrs, re.IGNORECASE)
+            if w_match:
+                orig_w = int(w_match.group(1))
+                target_w = min(orig_w, max_w_int)
+            else:
+                target_w = max_w_int
             attrs_clean = re.sub(r'\bwidth\s*=\s*["\']?[^"\'>\s]+["\']?', '', attrs, flags=re.IGNORECASE).strip()
-            return f'<img width="{int(max_width)}" {attrs_clean}>'
+            return f'<img width="{target_w}" {attrs_clean}>'
 
         html = re.sub(r'<img\s+([^>]*?)>', _repl_img, html, flags=re.IGNORECASE)
 
@@ -43,8 +50,14 @@ def fit_html_images(html, max_width=None):
     if "<table" in html.lower():
         def _repl_tbl(match):
             attrs = match.group(1)
+            w_match = re.search(r'\bwidth\s*=\s*["\']?(\d+)["\']?', attrs, re.IGNORECASE)
+            if w_match:
+                orig_w = int(w_match.group(1))
+                target_w = min(orig_w, max_w_int)
+            else:
+                target_w = max_w_int
             attrs_clean = re.sub(r'\bwidth\s*=\s*["\']?[^"\'>\s]+["\']?', '', attrs, flags=re.IGNORECASE).strip()
-            return f'<table width="{int(max_width)}" {attrs_clean}>'
+            return f'<table width="{target_w}" {attrs_clean}>'
 
         html = re.sub(r'<table\s+([^>]*?)>', _repl_tbl, html, flags=re.IGNORECASE)
 
@@ -138,6 +151,20 @@ class LogEntryWidget(QFrame):
         if "<img" in log_data["content"]:
             self.content_label.setCursor(Qt.PointingHandCursor)
         self._layout.addWidget(self.content_label)
+
+    def update_content_width(self, max_w=None):
+        """Actualiza el ancho de las imágenes y tablas del comentario para ajustarse
+        al ancho dinámico disponible en el contenedor del chat."""
+        if self._editing:
+            return
+        if max_w is None:
+            parent = self.parent()
+            if parent and hasattr(parent, "_chat_image_width"):
+                max_w = parent._chat_image_width()
+            else:
+                max_w = 280
+        content = fit_html_images(self.log_data["content"], max_w)
+        self.content_label.setText(content)
 
     def _enter_edit_mode(self):
         """Sustituye el contenido por un editor en línea con Guardar/Cancelar."""
