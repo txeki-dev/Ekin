@@ -151,11 +151,14 @@ class MarkdownTextEdit(QTextEdit):
             if isinstance(image, QImage) and not image.isNull():
                 self._insert_image(image)
                 return
-        if source.hasHtml() and "<table" in source.html().lower():
-            # Se conserva el HTML de la tabla tal cual: Qt reconstruye una QTextTable real
-            # (con celdas combinadas, etc.) y así se preserva su aspecto de origen.
-            self.textCursor().insertHtml(source.html())
-            return
+        if source.hasHtml():
+            html = source.html()
+            if "<img" in html.lower() or "<table" in html.lower():
+                from .log_entry import fit_html_images
+                target_w = self.image_width_provider() if self.image_width_provider else max(100, self.viewport().width() - 24)
+                fitted = fit_html_images(html, target_w)
+                self.textCursor().insertHtml(fitted)
+                return
         if source.hasText():
             grid = self._grid_from_plain_text(source.text())
             if grid is not None:
@@ -217,9 +220,9 @@ class MarkdownTextEdit(QTextEdit):
         preview_uri = self._image_to_data_uri(preview_image)
 
         if self.image_width_provider:
-            avail = max(120, self.image_width_provider())
+            avail = max(100, self.image_width_provider())
         else:
-            avail = max(120, self.viewport().width() - 24)
+            avail = max(100, self.viewport().width() - 24)
         if image.width() > avail:
             image = image.scaledToWidth(avail, Qt.SmoothTransformation)
         inline_uri = self._image_to_data_uri(image)

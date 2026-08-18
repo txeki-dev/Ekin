@@ -10,25 +10,44 @@ from .image_preview_dialog import show_image_preview
 
 def fit_html_images(html, max_width=None):
     """Ajusta o añade el atributo width a las etiquetas <img> y <table> para que nunca
-    desborden el ancho del contenedor de chat."""
+    desborden el ancho del contenedor de chat, y asegura que las imágenes queden
+    envueltas en un enlace clicable para abrir la vista previa."""
     if not html:
         return html
     if max_width is None:
         max_width = 330
+
     # Ajustar etiquetas <img>
     if "<img" in html.lower():
         def _repl_img(match):
             attrs = match.group(1)
             attrs_clean = re.sub(r'\bwidth\s*=\s*["\']?[^"\'>\s]+["\']?', '', attrs, flags=re.IGNORECASE).strip()
             return f'<img width="{int(max_width)}" {attrs_clean}>'
+
         html = re.sub(r'<img\s+([^>]*?)>', _repl_img, html, flags=re.IGNORECASE)
+
+        # Envolver cualquier <img ...> que no esté dentro de un <a href="..."> con su propio src
+        def _wrap_img(match):
+            full_match = match.group(0)
+            if full_match.lower().startswith("<a"):
+                return full_match
+            img_tag = match.group(2) if match.group(2) else match.group(0)
+            src_m = re.search(r'src=["\']([^"\']+)["\']', img_tag, re.IGNORECASE)
+            if src_m:
+                return f'<a href="{src_m.group(1)}">{img_tag}</a>'
+            return img_tag
+
+        html = re.sub(r'(<a\s+[^>]*?>[\s\S]*?</a>)|(<img\s+[^>]*?>)', _wrap_img, html, flags=re.IGNORECASE)
+
     # Ajustar etiquetas <table> para evitar tablas con ancho rígido superior
     if "<table" in html.lower():
         def _repl_tbl(match):
             attrs = match.group(1)
             attrs_clean = re.sub(r'\bwidth\s*=\s*["\']?[^"\'>\s]+["\']?', '', attrs, flags=re.IGNORECASE).strip()
             return f'<table width="{int(max_width)}" {attrs_clean}>'
+
         html = re.sub(r'<table\s+([^>]*?)>', _repl_tbl, html, flags=re.IGNORECASE)
+
     return html
 
 
@@ -129,9 +148,13 @@ class LogEntryWidget(QFrame):
         self.edit_btn.setEnabled(False)
 
         self._editor = MarkdownTextEdit()
+        target_w = None
         if self.parent() and hasattr(self.parent(), "_chat_image_width"):
             self._editor.image_width_provider = self.parent()._chat_image_width
-        self._editor.setHtml(self.log_data["content"])
+            target_w = self.parent()._chat_image_width()
+        # Reajustar imágenes en el contenido cargado al ancho actual de la caja de edición
+        content = fit_html_images(self.log_data["content"], target_w)
+        self._editor.setHtml(content)
         self._editor.setMinimumHeight(90)
         self._layout.addWidget(RichTextToolbar(self._editor))
         self._layout.addWidget(self._editor)
@@ -141,7 +164,7 @@ class LogEntryWidget(QFrame):
         save_btn = QPushButton(t("log_entry.save_btn"))
         save_btn.setObjectName("PrimaryButton")
         save_btn.setCursor(Qt.PointingHandCursor)
-        save_btn.clicked.connect(lambda: self.save_edit_callback(self.log_id, self._editor.toHtml()))
+        save_btn.clicked.connect(lambda: self.save_edit_callback(self.log_id, fit_html_images(self._editor.toHtml(), target_w)))
         btns.addWidget(save_btn)
         cancel_btn = QPushButton(t("log_entry.cancel_btn"))
         cancel_btn.setCursor(Qt.PointingHandCursor)

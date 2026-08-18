@@ -49,6 +49,9 @@ class _ClickOutsideFilter(QObject):
                 top_level = obj.window()
                 if top_level == self.dialog or self.dialog.isAncestorOf(top_level):
                     return False
+                # Si el clic es en cualquier diálogo secundario/flotante (ej. ImagePreviewDialog, TagPickerDialog)
+                if isinstance(top_level, QDialog) or isinstance(obj, QDialog):
+                    return False
 
                 # Clic fuera del diálogo dentro de la aplicación principal: autoguardar y cerrar
                 self.dialog.save_changes()

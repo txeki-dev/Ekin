@@ -100,14 +100,14 @@
     "semantic_hash": "931ddfd2974c7fe1ab7938474fc8bf2d"
   },
   "detail_dialog/log_entry.py": {
-    "mtime": 1787042152.7830558,
-    "ast_hash": "b470dcc5b7f2648a563a86348e315a2f",
+    "mtime": 1787043410.8925927,
+    "ast_hash": "def4db8fd925478abbc9af98c835e51d",
     "semantic_hash": ""
   },
   "detail_dialog/markdown_edit.py": {
-    "mtime": 1786534881.4940844,
-    "ast_hash": "5b4a1000e3d4c07bd0f225ca52fa3419",
-    "semantic_hash": "5b4a1000e3d4c07bd0f225ca52fa3419"
+    "mtime": 1787043424.0099337,
+    "ast_hash": "01fa54eb50fdfb1730d1e7650e7b5d31",
+    "semantic_hash": ""
   },
   "detail_dialog/tag_manager_dialog.py": {
     "mtime": 1785788199.6308262,
@@ -125,8 +125,8 @@
     "semantic_hash": "18171b8520d1520329fba7ab6645610b"
   },
   "detail_dialog/task_detail_dialog.py": {
-    "mtime": 1787042166.1412194,
-    "ast_hash": "8b02371151b93e8e27701cd420dc49c5",
+    "mtime": 1787043429.0588825,
+    "ast_hash": "a46d0d991ae2910bb8800bd25e2b9bd8",
     "semantic_hash": ""
   },
   "exporter.py": {
