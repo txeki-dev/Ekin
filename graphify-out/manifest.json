@@ -100,8 +100,8 @@
     "semantic_hash": "931ddfd2974c7fe1ab7938474fc8bf2d"
   },
   "detail_dialog/log_entry.py": {
-    "mtime": 1787035298.2080965,
-    "ast_hash": "c710a0df9cdc23dde4ff74d088d513b4",
+    "mtime": 1787040371.653677,
+    "ast_hash": "6ebea1e0f43f29525847c5f0252318ee",
     "semantic_hash": ""
   },
   "detail_dialog/markdown_edit.py": {
@@ -125,8 +125,8 @@
     "semantic_hash": "18171b8520d1520329fba7ab6645610b"
   },
   "detail_dialog/task_detail_dialog.py": {
-    "mtime": 1787035327.809427,
-    "ast_hash": "2775f20d501d346c4979579328b44590",
+    "mtime": 1787038894.9378839,
+    "ast_hash": "4c62206eb466d67754f43ceb5fae9b20",
     "semantic_hash": ""
   },
   "exporter.py": {
@@ -240,8 +240,8 @@
     "semantic_hash": "3dd3df13194cc9d6f26d3b0329c58312"
   },
   "tests/test_widgets_headless.py": {
-    "mtime": 1787035368.572556,
-    "ast_hash": "c01e7cd92a5f39f26a39a9e93e493f2e",
+    "mtime": 1787040379.3660123,
+    "ast_hash": "cec7edefd5d95508bfccc0310fb20a0f",
     "semantic_hash": ""
   },
   "tests/test_widgets_logic.py": {
@@ -355,8 +355,8 @@
     "semantic_hash": "9df94b2427b6a74deecc1a8c2a1d7c0a"
   },
   "CHANGELOG.md": {
-    "mtime": 1787036940.8042982,
-    "ast_hash": "97587549173233e1d2430b63f0d6a400",
+    "mtime": 1787040799.421408,
+    "ast_hash": "7d6d212e4cc6d403f789291a8a0381f1",
     "semantic_hash": ""
   },
   "README.md": {
@@ -365,8 +365,8 @@
     "semantic_hash": ""
   },
   "backlog.md": {
-    "mtime": 1787036958.7725713,
-    "ast_hash": "bd385d2d7c6011bfd4e4c2bfcbbdb966",
+    "mtime": 1787040807.6689162,
+    "ast_hash": "8f911093a7cc4026fa26c8f7a28d3d71",
     "semantic_hash": ""
   },
   "ekin_icon.png": {

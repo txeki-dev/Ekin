@@ -9,8 +9,7 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 
 - [x] **Task card popup click-outside auto-save and close:** Clicking outside `TaskDetailDialog` within the main window now automatically executes `save_changes()` and closes returning to board view without forcing the user to press "Guardar Cambios".
 - [x] **Window title simplified:** Changed `"main.window_title"` from `"Ekin Kanban - Trello Lite v{version}"` to `"Ekin v{version}"` and updated README title.
-- [x] **Task diary/log text clipping after editing:** Fixed `styles.py` `#LogContent` font-size from invalid fractional `12.5px` to `13px`, removing Qt `setPointSize <= 0 (-1)` font metric calculation error that broke QLabel rich text height calculations.
-- [x] **Task diary/log horizontal card overflow:** Removed QSS margin/padding from `#LogEntryWidget`, added `fit_html_images` to constrain images to chat width, wired `image_width_provider` in edit mode, and set `QSizePolicy.Ignored` on `content_label`. 189/189 tests passing, ruff clean.
+- [x] **Task diary/log horizontal card overflow & scroll position:** Removed QSS margin/padding from `#LogEntryWidget`, added `fit_html_images` to constrain images to chat width, replaced `AlignTop` with `addStretch()` and `QSizePolicy.Preferred` to ensure opening a task lands flush on the latest comment without empty bottom space. 190/190 tests passing, ruff clean.
 
 ---
 

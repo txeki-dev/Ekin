@@ -90,6 +90,7 @@ class TaskDetailDialog(QDialog):
         que al hacer clic fuera se guarden automáticamente los cambios."""
         self.setWindowModality(Qt.NonModal)
         self.show()
+        self.scroll_to_bottom()
         self._click_outside_filter = _ClickOutsideFilter(self)
         QApplication.instance().installEventFilter(self._click_outside_filter)
 
@@ -361,7 +362,6 @@ class TaskDetailDialog(QDialog):
         self.logs_layout = QVBoxLayout(self.logs_container)
         self.logs_layout.setContentsMargins(6, 6, 6, 6)
         self.logs_layout.setSpacing(8)
-        self.logs_layout.setAlignment(Qt.AlignTop)
 
         self.scroll_area.setWidget(self.logs_container)
         right_layout.addWidget(self.scroll_area, 1)  # el historial domina el alto
@@ -861,6 +861,7 @@ class TaskDetailDialog(QDialog):
         for log in logs:
             log_widget = LogEntryWidget(log, self.delete_log_entry, self.edit_log_entry, self)
             self.logs_layout.addWidget(log_widget)
+        self.logs_layout.addStretch()
 
         # Pequeño retardo para dar tiempo a Qt a renderizar antes de bajar el scroll
         self.scroll_to_bottom()

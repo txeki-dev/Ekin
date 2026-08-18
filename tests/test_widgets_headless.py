@@ -737,7 +737,49 @@ def test_log_entry_widget_multiline_text_vertical_sizing(qapp):
     qapp.processEvents()
 
     assert widget.content_label.wordWrap() is True
-    assert widget.content_label.sizePolicy().horizontalPolicy() == widget.content_label.sizePolicy().Policy.Ignored
+    assert widget.content_label.sizePolicy().horizontalPolicy() == widget.content_label.sizePolicy().Policy.Preferred
+
+
+def test_task_detail_dialog_logs_scroll_to_latest(qapp, db_path):
+    """Al abrir TaskDetailDialog con múltiples comentarios, el scroll muestra el último
+    comentario sin espacios vacíos desmesurados debajo."""
+    board_id = database.create_board("Tablero Test", db_path=db_path)
+    col_id = database.create_column(board_id, "Col", db_path=db_path)
+    task_id = database.create_task(col_id, "Tarea con logs", db_path=db_path)
+    for i in range(8):
+        database.create_log(task_id, f"<p>Comentario {i+1} de prueba en el diario</p>", db_path)
+
+    dlg = TaskDetailDialog(task_id, db_path=db_path)
+    dlg.show()
+    qapp.processEvents()
+
+    # Procesar eventos para que el timer de scroll_to_bottom dispare
+    from PySide6.QtCore import QTimer
+    timer = QTimer()
+    timer.setSingleShot(True)
+    timer.timeout.connect(lambda: None)
+    timer.start(100)
+    while timer.isActive():
+        qapp.processEvents()
+
+    sb = dlg.scroll_area.verticalScrollBar()
+    # El scrollbar debe estar en su posición máxima
+    assert sb.value() == sb.maximum()
+
+    # El último comentario debe estar en la región visible del viewport
+    last_widget = None
+    for i in range(dlg.logs_layout.count() - 1, -1, -1):
+        item = dlg.logs_layout.itemAt(i)
+        if item and item.widget():
+            last_widget = item.widget()
+            break
+
+    assert last_widget is not None
+    visible_top = sb.value()
+    visible_bottom = sb.value() + dlg.scroll_area.viewport().height()
+    # El final del último widget está dentro o al borde visible
+    assert visible_top <= last_widget.geometry().bottom() <= visible_bottom + 15
+    dlg.reject()
 
 
 def test_qss_font_sizes_valid_integers():

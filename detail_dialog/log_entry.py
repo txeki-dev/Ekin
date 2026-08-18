@@ -50,7 +50,7 @@ class LogEntryWidget(QFrame):
         return btn
 
     def init_ui(self, log_data):
-        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self.setMinimumWidth(0)
 
         self._layout = QVBoxLayout(self)
@@ -96,7 +96,7 @@ class LogEntryWidget(QFrame):
         self.content_label.setObjectName("LogContent")
         self.content_label.setWordWrap(True)
         self.content_label.setMinimumWidth(0)
-        self.content_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        self.content_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         # TextSelectableByMouse a solas SUSTITUYE el conjunto de flags (no lo amplía),
         # anulando LinksAccessibleByMouse -- sin él, linkActivated nunca se dispara con un
         # clic real aunque el resto del cableado esté bien (bug confirmado: la vista ampliada

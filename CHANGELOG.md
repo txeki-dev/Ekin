@@ -27,12 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   (`font-size: 12.5px;` changed to `13px`) in `styles.py` on `#LogContent`. Qt CSS does not support
   fractional pixel sizes, which previously caused an internal font point size error (-1) that broke
   rich text font metrics in `QLabel` and caused edited comments to collapse vertically in the chat.
-- **Log / Diario horizontal overflow.** Removed `margin: 4px; padding: 8px;` in QSS on `#LogEntryWidget`
-  (relying purely on Qt's layout margins in Python) to prevent box-model expansion beyond `QScrollArea`.
+- **Log / Diario automatic scroll positioning to latest comment.** Fixed an issue where the
+  log container had `setAlignment(Qt.AlignTop)` with `QSizePolicy.Ignored`, which caused Qt's layout
+  to miscalculate child sizes and leave empty space at the bottom of the chat list, scrolling into
+  blank area instead of showing the latest comment. Now uses natural `addStretch()` with `QSizePolicy.Preferred`
+  so the chat list lands flush on the latest entry without empty bottom gaps.
 - **Wide images or tables overflowing behind the chat area.** Added `fit_html_images()` in
   `detail_dialog/log_entry.py` to bound all `<img>` tags to the chat viewport's usable width,
-  configured `image_width_provider` on the inline editor during comment editing, set
-  `QSizePolicy.Ignored` on `content_label`, and enabled `ScrollBarAlwaysOff` horizontally.
+  configured `image_width_provider` on the inline editor during comment editing, and enabled
+  `ScrollBarAlwaysOff` horizontally.
 
 ## [0.9.5] - 2026-08-17
 

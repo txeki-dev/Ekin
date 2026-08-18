@@ -1,23 +1,23 @@
 # Graph Report - Ekin  (2026-08-18)
 
 ## Corpus Check
-- 80 files · ~97,987 words
+- 80 files · ~98,168 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1218 nodes · 2120 edges · 127 communities (84 shown, 43 thin omitted)
+- 1220 nodes · 2124 edges · 121 communities (84 shown, 37 thin omitted)
 - Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 108 edges (avg confidence: 0.69)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `84a406c3`
+- Built from commit: `e5a21303`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - CalendarViewWidget
 - MarkdownTextEdit
-- TaskDetailDialog
+- t
 - test_ics_export.py
 - tasks.py
 - /graphify Pipeline
@@ -25,26 +25,26 @@
 - snapshots.py
 - 2. Implementation Tasks
 - tags.py
-- .init_ui
+- ColumnEditDialog
 - exporter.py
 - ._build_column_widget
 - get_connection
-- t
+- QLabel
 - SidebarWidget
-- main.py
+- SettingsDialog
 - .load_board
 - test_hover_expand.py
 - Part B: Semantic Extraction (Subagents)
 - FlowLayout
 - format_elapsed_time
-- QPushButton
+- ColumnWidget
 - BoardViewWidget
 - MainWindow
 - Release v0.6.0
 - CI Workflow (ruff + pytest)
 - .load_task_data
 - database/__init__.py
-- task_detail_dialog.py
+- styles.py
 - .insertFromMimeData
 - TaskCard
 - backup_database
@@ -56,7 +56,7 @@
 - RichTextToolbar
 - TECHNICAL DESIGN DOCUMENT
 - BoardEditDialog
-- NotificationsPopup
+- sidebar.py
 - test_timer_board_view.py
 - compute_drop_index
 - Release v0.4.0
@@ -68,13 +68,13 @@
 - ImagePreviewDialog
 - ._open_task_detail
 - .reload_boards
-- VerticalLabel
+- TaskListArea
 - CLAUDE.md
 - .reload_logs
 - fixture
 - TECHNICAL DESIGN DOCUMENT
 - TECHNICAL DESIGN DOCUMENT
-- _collapsed_column_widget
+- BoardColumnsArea
 - DraggableColumnTitle
 - Keyboard Shortcuts Wave (Ctrl+Shift+N/1-9/,/Shift+C//)
 - UndoManager
@@ -82,21 +82,19 @@
 - .get_pending_notifications
 - .select_board
 - TECHNICAL DESIGN DOCUMENT
-- TaskListArea
+- BoardSelectionDialog
 - Backlog Step 18: Click-to-Enlarge + Icon Cache/Redesign Wave
 - TECHNICAL DESIGN DOCUMENT
 - settings.py
 - Calendar Drag-to-Reschedule
 - .add_task
-- .handle_task_drop
+- ._build_utility_bar
 - Cross-Repo Graph Merge
-- .render_tags
-- .apply_theme
+- TaskDetailDialog
 - .notify_due_today
 - .delete_board
 - get_subtasks_progress_bulk() Function
 - v0.9.1: Local File Attachments on Task Links
-- _is_local_link
 - extract_release_notes.py
 - CalendarChip Class
 - TaskCard.drag_ended Signal
@@ -112,10 +110,7 @@
 - /graphify explain Command
 - save-result Feedback Loop
 - Step 2: Detect Files
-- .check_for_updates
-- .on_board_changed
 - TECHNICAL DESIGN DOCUMENT
-- .show_shortcuts
 - test_create_log_has_no_intermediate_commit_call
 - test_db_name_is_resolved_at_call_time
 - test_restore_task_returns_none_if_column_was_deleted_in_the_meantime
@@ -137,13 +132,12 @@
 - build_qss
 - fit_html_images
 - ClickableTagPill
-- main
-- .toggle_sidebar
+- main.py
 
 ## God Nodes (most connected - your core abstractions)
 1. `t()` - 116 edges
 2. `get_connection()` - 80 edges
-3. `TaskDetailDialog` - 64 edges
+3. `TaskDetailDialog` - 65 edges
 4. `BoardViewWidget` - 63 edges
 5. `MainWindow` - 39 edges
 6. `SidebarWidget` - 34 edges
@@ -165,8 +159,8 @@
   board_view.py → undo.py
 
 ## Import Cycles
-- 3-file cycle: `database/__init__.py -> database/snapshots.py -> database/boards.py -> database/__init__.py`
 - 3-file cycle: `database/__init__.py -> database/snapshots.py -> database/columns.py -> database/__init__.py`
+- 3-file cycle: `database/__init__.py -> database/snapshots.py -> database/boards.py -> database/__init__.py`
 
 ## Hyperedges (group relationships)
 - **Git-Stash Crash-Fix Verification Method** — _agents_docs_archive_2026_08_07_forensic_fixes_pre_v0_9_0_git_stash_verification_method, _agents_docs_archive_2026_08_07_forensic_fixes_pre_v0_9_0_ctrl_z_fk_crash_fix, _agents_docs_archive_2026_08_07_hover_expand_crash_fix_and_shortcuts_button_load_board_mid_drag_crash_bug [EXTRACTED 0.90]
@@ -176,19 +170,19 @@
 - **Recurring QDialog-Never-Destroyed Leak Pattern** — changelog_v0_9_0_taskdetaildialog_leak_fix, changelog_unreleased_imagepreview_leak_fix, backlog_pre_v0_9_0_forensic_pass_taskdetaildialog_leak_item, backlog_imagepreview_leak_item [EXTRACTED 1.00]
 - **Evolving Keyboard-Shortcuts Discoverability** — _agents_docs_archive_2026_08_01_v0_6_0_keyboard_shortcuts_v1, _agents_docs_archive_2026_08_07_keyboard_shortcuts_and_dialog_keyboard_shortcuts_feature, _agents_docs_archive_2026_08_07_hover_expand_crash_fix_and_shortcuts_button_shortcuts_button_feature [INFERRED 0.75]
 
-## Communities (127 total, 43 thin omitted)
+## Communities (121 total, 37 thin omitted)
 
 ### Community 0 - "CalendarViewWidget"
 Cohesion: 0.05
-Nodes (25): CalendarChip, CalendarSettingsDialog, CalendarViewWidget, DayCell, _group_by_day(), QDialog, QFrame, QWidget (+17 more)
+Nodes (26): CalendarChip, CalendarSettingsDialog, CalendarViewWidget, DayCell, _group_by_day(), QDialog, QFrame, QWidget (+18 more)
 
 ### Community 2 - "MarkdownTextEdit"
 Cohesion: 0.11
 Nodes (14): MarkdownTextEdit, QTextEdit con atajos tipo Markdown para crear listas al vuelo. - `* `, `- `, `+…, Elimina el marcador escrito y convierte la línea actual en una lista., Saca el bloque actual de la lista, dejando un párrafo normal., Elige el símbolo de viñeta según el nivel de anidamiento (las listas numeradas…, Aumenta (Tab) o reduce (Shift+Tab) el nivel de anidamiento de la viñeta actual., QTextEdit, Cuando la imagen original ya es más pequeña que ambos objetivos (inline y… (+6 more)
 
-### Community 3 - "TaskDetailDialog"
-Cohesion: 0.12
-Nodes (10): QDialog, Guarda el título, descripción, etiquetas y fecha de vencimiento., Borra definitivamente la tarea actual de la base de datos., Ancho máximo (px) para imágenes pegadas en el chat: el del histórico (más…, Elimina una entrada de diario tras confirmación., TaskDetailDialog, Al hacer clic fuera de TaskDetailDialog en la ventana principal, se guardan…, Clics dentro de los controles de TaskDetailDialog no deben disparar el… (+2 more)
+### Community 3 - "t"
+Cohesion: 0.11
+Nodes (12): Abre el diálogo de detalle/chat de una tarea., _is_local_link(), True a menos que la cadena empiece por un esquema web reconocido (case-…, Guarda el título, descripción, etiquetas y fecha de vencimiento., Borra definitivamente la tarea actual de la base de datos., Elimina una entrada de diario tras confirmación., Devuelve la cadena asociada a `key`, interpolando **kwargs si se pasan., t() (+4 more)
 
 ### Community 4 - "test_ics_export.py"
 Cohesion: 0.12
@@ -203,8 +197,8 @@ Cohesion: 0.09
 Nodes (24): Backlog Item: restore_task/restore_column FK Crash on Ctrl+Z, Backlog Item: ImagePreviewDialog Never Destroyed, Backlog Step 21: Third Forensic Bug-Hunt Pass Summary, Tech Debt: restore_column/restore_board Not Atomic Across Children, Unreleased Fix: Ctrl+Z FK Crash on Undoing a Deleted Task/Column, Unreleased Fix: ImagePreviewDialog Never Destroyed, /graphify add URL Ingestion, --watch Background Watcher (+16 more)
 
 ### Community 7 - "test_widgets_headless.py"
-Cohesion: 0.10
-Nodes (32): QDialog, SettingsDialog, _card_with_timer(), _make_task(), Pruebas de humo (smoke tests) headless para widgets de Qt: construcción y unas…, Regresión: el texto describía el comportamiento antiguo de Ctrl+N (siempre la…, Regresión de la fuga de memoria: el diálogo real (parentado a MainWindow/…, El nuevo self.finished.connect(self.deleteLater) no debe romper el patrón ya… (+24 more)
+Cohesion: 0.12
+Nodes (31): _card_with_timer(), _collapsed_column_widget(), _drag_enter_event(), _drop_event(), _make_task(), Pruebas de humo (smoke tests) headless para widgets de Qt: construcción y unas…, Regresión de la fuga de memoria: el diálogo real (parentado a MainWindow/…, El nuevo self.finished.connect(self.deleteLater) no debe romper el patrón ya… (+23 more)
 
 ### Community 8 - "snapshots.py"
 Cohesion: 0.15
@@ -218,37 +212,37 @@ Nodes (12): 1. Overview, 2. Implementation Tasks, 3. Acceptance Criteria, `board
 Cohesion: 0.10
 Nodes (19): create_tag_category(), create_tag_value(), delete_tag_category(), delete_tag_value(), get_or_create_tag_value(), get_tag_categories(), get_tag_values(), Crea una etiqueta permanente (categoría). Si ya existe (sin distinguir… (+11 more)
 
-### Community 11 - ".init_ui"
+### Community 11 - "ColumnEditDialog"
 Cohesion: 0.22
-Nodes (3): Devuelve el id de la etiqueta permanente «Prioridad», asegurando que existan…, Rellena el selector rápido de Prioridad con los valores actuales del catálogo…, Ajusta la selección del combo de Prioridad a lo que haya en current_tags, sin…
+Nodes (4): ColumnEditDialog, Abre el diálogo para crear una columna., Abre el diálogo para editar nombre y color de una columna., Diálogo para crear o editar una columna (nombre y color).
 
 ### Community 12 - "exporter.py"
 Cohesion: 0.16
 Nodes (17): boards_to_json(), _gather(), _plain(), Exportación de los tableros de Ekin a JSON, CSV o un informe Markdown.…, Convierte HTML (descripción/nota) en texto plano razonable para exportar., Estructura anidada de todo el contenido: tableros -> columnas -> tareas (+logs)., Volcado completo (tableros, columnas, tareas, etiquetas y diario) como JSON., CSV plano de todas las tareas (una fila por tarea). (+9 more)
 
 ### Community 13 - "._build_column_widget"
-Cohesion: 0.12
-Nodes (8): Registra una acción deshacer/rehacer para un borrado (restaurar desde snapshot)., Construye un ColumnWidget completo (señales conectadas y, si está desplegada,…, Reconstruye el ColumnWidget de UNA sola columna (datos/tareas frescos de la BD)…, Confirma y borra una columna., Expansión temporal (por hover durante un arrastre) de una columna plegada:…, Repliega (BD + widget) la columna actualmente expandida por hover, si la hay.…, Conectado a TaskCard.drag_ended: se ejecuta al terminar cualquier arrastre de…, Abre el diálogo de detalle/chat de una tarea.
+Cohesion: 0.18
+Nodes (5): Construye un ColumnWidget completo (señales conectadas y, si está desplegada,…, Reconstruye el ColumnWidget de UNA sola columna (datos/tareas frescos de la BD)…, Expansión temporal (por hover durante un arrastre) de una columna plegada:…, Repliega (BD + widget) la columna actualmente expandida por hover, si la hay.…, Conectado a TaskCard.drag_ended: se ejecuta al terminar cualquier arrastre de…
 
 ### Community 14 - "get_connection"
 Cohesion: 0.18
 Nodes (16): create_column(), delete_column(), Pliega (collapsed=1) o despliega (0) una columna del tablero., Actualiza las posiciones de múltiples columnas. column_positions debe ser una…, set_column_collapsed(), update_column(), update_column_positions(), get_connection() (+8 more)
 
-### Community 15 - "t"
-Cohesion: 0.06
-Nodes (27): BoardColumnsArea, BoardSelectionDialog, ColumnEditDialog, QDialog, QWidget, Diálogo para seleccionar un tablero de destino para mover o copiar una columna., Contenedor horizontal de columnas que acepta soltar una columna arrastrada para…, Diálogo para crear o editar una columna (nombre y color). (+19 more)
+### Community 15 - "QLabel"
+Cohesion: 0.08
+Nodes (18): QDialog, Gestor del catálogo de etiquetas permanentes. Panel izquierdo: las etiquetas…, TagManagerDialog, QDialog, Selecciona una etiqueta del catálogo para una tarea. - Modo asignar…, Devuelve (tag_value_id | None, is_none). is_none indica que se eligió «Ninguno»., TagPickerDialog, Abre el diálogo de búsqueda global; al elegir un resultado salta a su tarjeta. (+10 more)
 
 ### Community 16 - "SidebarWidget"
 Cohesion: 0.15
 Nodes (14): Menú para exportar todos los tableros a JSON / CSV / informe Markdown., SidebarWidget, La reestructuración en dos filas (reloj arriba, iconos abajo) no debe perder ni…, El reloj debe estar en una fila propia (fila 0 del layout exterior), separada…, Regresión específica contra el bug de captura tardía de variable de bucle: las…, Ctrl+Shift+N ya no está protegido por la visibilidad del botón "+ Añadir…, El fix del guard no debe bloquear el caso normal: con un tablero real…, test_add_column_shortcut_noop_when_no_board_selected() (+6 more)
 
-### Community 17 - "main.py"
-Cohesion: 0.12
-Nodes (14): Vista de calendario mensual para Ekin: muestra las tareas por su fecha de…, Diálogo de búsqueda global de tareas. Filtra por texto (título/descripción),…, Pantalla de Ajustes de la aplicación: tema, notificaciones y persistencia.…, Diálogo "Atajos de teclado" (Ctrl+/): referencia estática de todos los atajos…, color_swatch_css(), hex_to_rgb(), Aplica el tema oscuro estándar (fondo/borde/item/selección) a un QMenu., CSS para un botón de muestra de color (color + borde + esquinas redondeadas).… (+6 more)
+### Community 17 - "SettingsDialog"
+Cohesion: 0.18
+Nodes (8): QDialog, Pantalla de Ajustes de la aplicación: tema, notificaciones y persistencia.…, SettingsDialog, test_settings_dialog_constructs_with_saved_theme(), test_settings_dialog_notification_checkbox_reflects_saved_value(), test_settings_dialog_timer_alert_spin_defaults_to_24(), test_settings_dialog_timer_alert_spin_persists_on_change(), test_settings_dialog_timer_alert_spin_reflects_saved_value()
 
 ### Community 18 - ".load_board"
-Cohesion: 0.12
-Nodes (8): QFrame, Carga las columnas y tareas de un tablero específico. `notify=False` evita…, Limpia todos los widgets del layout de columnas., Abre el diálogo para crear una columna., Abre el diálogo para editar nombre y color de una columna., Pliega o despliega una columna (persiste el estado) y recarga el tablero., Reordena las columnas del tablero actual tras arrastrar una por su título., Crea una copia de la columna en otro tablero seleccionado.
+Cohesion: 0.11
+Nodes (9): QFrame, Registra una acción deshacer/rehacer para un borrado (restaurar desde snapshot)., Carga las columnas y tareas de un tablero específico. `notify=False` evita…, Limpia todos los widgets del layout de columnas., Confirma y borra una columna., Pliega o despliega una columna (persiste el estado) y recarga el tablero., Soltar una tarjeta sobre una columna plegada: la despliega y coloca la tarjeta…, Reordena las columnas del tablero actual tras arrastrar una por su título. (+1 more)
 
 ### Community 19 - "test_hover_expand.py"
 Cohesion: 0.25
@@ -266,17 +260,17 @@ Nodes (3): QLayout, FlowLayout, Layout que distribuye los widgets de izquierda a
 Cohesion: 0.24
 Nodes (14): format_elapsed_time(), Da formato compacto a una duración en segundos: '45m', '3h 20m', '2d 5h'., Pruebas de lógica pura para styles.format_elapsed_time: no requieren Qt., test_accepts_float_seconds(), test_exactly_one_day(), test_exactly_one_hour(), test_exactly_one_minute(), test_hours_and_minutes_under_a_day() (+6 more)
 
-### Community 23 - "QPushButton"
-Cohesion: 0.13
-Nodes (9): QPushButton, ColumnWidget, Se ha mantenido el hover de un drag sobre esta columna PLEGADA lo suficiente:…, Pequeño botón cuadrado con un icono PINTADO (left/right/pencil) a juego con el…, Columna plegada: tira estrecha con botón de desplegar, contador y nombre…, Establece el diseño de la columna (borde y fondo) basado en su color., Muestra el menú contextual de la columna para editarla, moverla, copiarla o…, Elimina todos los widgets de tarea de la columna. (+1 more)
+### Community 23 - "ColumnWidget"
+Cohesion: 0.14
+Nodes (8): ColumnWidget, Se ha mantenido el hover de un drag sobre esta columna PLEGADA lo suficiente:…, Pequeño botón cuadrado con un icono PINTADO (left/right/pencil) a juego con el…, Columna plegada: tira estrecha con botón de desplegar, contador y nombre…, Establece el diseño de la columna (borde y fondo) basado en su color., Muestra el menú contextual de la columna para editarla, moverla, copiarla o…, Elimina todos los widgets de tarea de la columna., Añade una tarjeta de tarea a la columna (no-op si está plegada).
 
 ### Community 24 - "BoardViewWidget"
-Cohesion: 0.31
-Nodes (12): BoardViewWidget, Refresca la insignia de tiempo transcurrido en todas las tarjetas con un…, _make_board(), test_add_task_sets_last_active_column(), test_column_background_click_sets_last_active_column(), test_column_widget_mouse_press_emits_column_activated(), test_quick_add_task_falls_back_to_first_column_when_nothing_active(), test_quick_add_task_falls_back_when_last_active_column_belongs_to_another_board() (+4 more)
+Cohesion: 0.25
+Nodes (13): BoardViewWidget, Refresca la insignia de tiempo transcurrido en todas las tarjetas con un…, Alterna la barra lateral y actualiza el icono: ◀ (plegar) / ▶ (desplegar)., _make_board(), test_add_task_sets_last_active_column(), test_column_background_click_sets_last_active_column(), test_column_widget_mouse_press_emits_column_activated(), test_quick_add_task_falls_back_to_first_column_when_nothing_active() (+5 more)
 
 ### Community 25 - "MainWindow"
-Cohesion: 0.24
-Nodes (3): MainWindow, Reescribe cada feed .ics con auto-sync configurado (el global de todos los…, QMainWindow
+Cohesion: 0.13
+Nodes (7): MainWindow, Manejador si el tablero actual cambió en el sidebar., Abre la ventana de referencia de atajos de teclado (Ctrl+/)., Reescribe cada feed .ics con auto-sync configurado (el global de todos los…, Muestra u oculta la barra lateral., Verifica de forma silenciosa si hay actualizaciones en el repo de GitHub., QMainWindow
 
 ### Community 26 - "Release v0.6.0"
 Cohesion: 0.18
@@ -294,9 +288,9 @@ Nodes (6): Habilita/inhabilita fecha y hora según los checks., Carga los datos 
 Cohesion: 0.19
 Nodes (10): init_db(), Crea las tablas necesarias si no existen., get_scheduled_tasks(), get_task_board_id(), Devuelve el board_id al que pertenece una tarea (o None si no existe)., Devuelve las tareas con fecha de vencimiento (due_date) junto con su tablero.…, Busca tareas en todos los tableros (o en uno) con filtros opcionales. - text:…, search_tasks() (+2 more)
 
-### Community 30 - "task_detail_dialog.py"
-Cohesion: 0.25
-Nodes (6): Alterna la barra lateral y actualiza el icono: ◀ (plegar) / ▶ (desplegar)., color_icon(), Genera un pequeño icono cuadrado del color indicado (para combos y listas)., Cadenas de la interfaz, centralizadas para facilitar una futura traducción.…, make_glyph_icon(), Dibuja un icono (triángulo o lápiz) como QPixmap, sin depender de fuentes. Los…
+### Community 30 - "styles.py"
+Cohesion: 0.16
+Nodes (12): color_icon(), Genera un pequeño icono cuadrado del color indicado (para combos y listas)., Diálogo "Atajos de teclado" (Ctrl+/): referencia estática de todos los atajos…, Cadenas de la interfaz, centralizadas para facilitar una futura traducción.…, color_swatch_css(), Aplica el tema oscuro estándar (fondo/borde/item/selección) a un QMenu., CSS para un botón de muestra de color (color + borde + esquinas redondeadas).…, CSS base para una pastilla de etiqueta coloreada (fondo + esquinas… (+4 more)
 
 ### Community 31 - ".insertFromMimeData"
 Cohesion: 0.20
@@ -304,7 +298,7 @@ Nodes (5): Al pegar: las imágenes se insertan como imagen; una tabla (de Excel/
 
 ### Community 32 - "TaskCard"
 Cohesion: 0.15
-Nodes (8): QFrame, QWidget, Aplica dinámicamente el estilo a la tarjeta basándose en el color de fondo del…, Dibuja (o esconde) la pastilla clicable hacia el tablero enlazado, si lo hay., Umbral (en horas) a partir del cual la insignia del temporizador se resalta en…, Dibuja (o esconde) la insignia de tiempo transcurrido del temporizador, en rojo…, Limpia y dibuja las etiquetas actuales y la fecha de vencimiento., TaskCard
+Nodes (10): hex_to_rgb(), Convierte un color hexadecimal en formato string a una tupla RGB (r, g, b)., QFrame, QWidget, Aplica dinámicamente el estilo a la tarjeta basándose en el color de fondo del…, Dibuja (o esconde) la pastilla clicable hacia el tablero enlazado, si lo hay., Umbral (en horas) a partir del cual la insignia del temporizador se resalta en…, Dibuja (o esconde) la insignia de tiempo transcurrido del temporizador, en rojo… (+2 more)
 
 ### Community 33 - "backup_database"
 Cohesion: 0.24
@@ -315,12 +309,8 @@ Cohesion: 0.20
 Nodes (9): LogEntryWidget, QFrame, Una entrada del diario/chat, con botones (pintados) de editar y eliminar y…, Regresión: setTextInteractionFlags(Qt.TextSelectableByMouse) A SOLAS anulaba…, Verifica que un comentario multilínea tiene tamaño vertical y no se colapsa., test_log_entry_widget_multiline_text_vertical_sizing(), test_log_entry_widget_plain_text_keeps_default_cursor(), test_log_entry_widget_real_click_on_posted_image_opens_preview() (+1 more)
 
 ### Community 35 - ".__init__"
-Cohesion: 0.25
-Nodes (4): app_icon(), Crea el icono de bandeja (habilita toasts nativos de Windows)., Icono de la app. Prefiere el .ico multi-resolución (mejor para la barra de…, Verifica si es la primera vez que se abre la app y crea datos de ejemplo.
-
-### Community 36 - "BoardButton"
-Cohesion: 0.17
-Nodes (4): BoardButton, QFrame, Widget personalizado para representar un botón de tablero en la barra lateral., Barra con reloj (fecha/hora) en su propia fila arriba, y accesos rápidos…
+Cohesion: 0.18
+Nodes (4): Aplica el tema (oscuro/claro) al vuelo. `reload` recarga el tablero para que…, Abre la pantalla de Ajustes (tema, notificaciones)., Crea el icono de bandeja (habilita toasts nativos de Windows)., Verifica si es la primera vez que se abre la app y crea datos de ejemplo.
 
 ### Community 37 - "test_main_window.py"
 Cohesion: 0.26
@@ -340,18 +330,18 @@ Nodes (8): 1. Overview, 2. Implementation Tasks, 3. Acceptance Criteria, Item 1 
 
 ### Community 41 - "BoardEditDialog"
 Cohesion: 0.22
-Nodes (4): BoardEditDialog, Diálogo personalizado para crear o editar un tablero (nombre y color de fondo)., Abre el diálogo para editar el nombre y color del tablero activo., Abre el diálogo para copiar el tablero activo con un nuevo nombre.
+Nodes (4): BoardEditDialog, Diálogo personalizado para crear o editar un tablero (nombre y color de fondo)., Abre el diálogo para crear un nuevo tablero con nombre y color., Abre el diálogo para editar el nombre y color del tablero activo.
 
-### Community 42 - "NotificationsPopup"
-Cohesion: 0.24
-Nodes (7): NotificationsPopup, QDialog, Pequeño icono cuadrado del color indicado (para listar tareas por tablero)., Popup emergente con las tareas atrasadas o que vencen hoy o mañana, agrupadas.…, _swatch_icon(), test_notifications_popup_empty(), test_notifications_popup_with_tasks()
+### Community 42 - "sidebar.py"
+Cohesion: 0.18
+Nodes (9): NotificationsPopup, QDialog, Pequeño icono cuadrado del color indicado (para listar tareas por tablero)., Popup emergente con las tareas atrasadas o que vencen hoy o mañana, agrupadas.…, _swatch_icon(), test_notifications_popup_empty(), test_notifications_popup_with_tasks(), Pila simple de deshacer/rehacer para acciones destructivas (borrar… (+1 more)
 
 ### Community 43 - "test_timer_board_view.py"
 Cohesion: 0.38
 Nodes (9): _card_for(), _make_board_with_task(), Antes del fix, _build_column_widget releía el ajuste una vez POR COLUMNA…, test_build_column_widget_applies_configured_threshold(), test_build_column_widget_defaults_threshold_when_unset(), test_load_board_reads_timer_alert_hours_once_regardless_of_column_count(), test_refresh_timer_badges_noop_on_board_with_no_timers(), test_refresh_timer_badges_noop_on_welcome_screen() (+1 more)
 
 ### Community 44 - "compute_drop_index"
-Cohesion: 0.33
+Cohesion: 0.29
 Nodes (8): Pruebas de lógica pura de la UI que no requieren un bucle de eventos Qt: el…, Arrastrar A (id=1) y soltarla justo debajo de B debe dar el índice 1 en el…, test_dragging_card_excludes_itself_from_count(), test_dragging_first_card_down_is_not_off_by_one(), test_drop_above_first_card_inserts_at_zero(), test_drop_at_end_inserts_after_last(), compute_drop_index(), Índice de inserción para una tarjeta soltada en `drop_y`. `cards_geom` es una…
 
 ### Community 45 - "Release v0.4.0"
@@ -388,15 +378,19 @@ Nodes (4): Abre el diálogo de detalle de una tarea. Devuelve True si el diálog
 
 ### Community 53 - ".reload_boards"
 Cohesion: 0.22
-Nodes (4): Vuelve a cargar la lista de tableros como widgets personalizados desde la base…, Archiva/desarchiva un tablero y recarga la lista., Mueve una columna arrastrada desde el tablero activo hasta el botón de otro…, Abre el diálogo para crear un nuevo tablero con nombre y color.
+Nodes (4): Vuelve a cargar la lista de tableros como widgets personalizados desde la base…, Archiva/desarchiva un tablero y recarga la lista., Mueve una columna arrastrada desde el tablero activo hasta el botón de otro…, Abre el diálogo para copiar el tablero activo con un nuevo nombre.
+
+### Community 54 - "TaskListArea"
+Cohesion: 0.14
+Nodes (3): Etiqueta con el texto girado 90° (nombre de una columna plegada)., TaskListArea, VerticalLabel
 
 ### Community 55 - "CLAUDE.md"
 Cohesion: 0.29
 Nodes (5): 1. Think Before Coding, 2. Simplicity First, 3. Surgical Changes, 4. Goal-Driven Execution, graphify
 
 ### Community 56 - ".reload_logs"
-Cohesion: 0.25
-Nodes (4): Limpia y vuelve a cargar todos los logs/entradas del diario., Guarda la edición de un comentario (o cancela si new_html es None) y recarga., Crea una nueva entrada de diario con el texto del input., Mueve la barra de desplazamiento del diario hasta abajo.
+Cohesion: 0.20
+Nodes (5): Limpia y vuelve a cargar todos los logs/entradas del diario., Guarda la edición de un comentario (o cancela si new_html es None) y recarga., Crea una nueva entrada de diario con el texto del input., Abre el diálogo de forma síncrona sin bloquear la ventana padre, permitiendo…, Mueve la barra de desplazamiento del diario hasta abajo.
 
 ### Community 57 - "fixture"
 Cohesion: 0.32
@@ -410,9 +404,9 @@ Nodes (5): 1. Overview, 2. Implementation Tasks, 3. Acceptance Criteria, QA Repo
 Cohesion: 0.33
 Nodes (5): 1. Overview, 2. Implementation Tasks, 3. Acceptance Criteria, QA Report, TECHNICAL DESIGN DOCUMENT
 
-### Community 60 - "_collapsed_column_widget"
-Cohesion: 0.36
-Nodes (8): _collapsed_column_widget(), _drag_enter_event(), _drop_event(), _task_drag_mime(), test_hover_timeout_emits_signal_only_while_collapsed(), test_hover_timer_starts_on_drag_enter(), test_hover_timer_stops_on_drag_leave(), test_hover_timer_stops_on_drop_before_timeout()
+### Community 60 - "BoardColumnsArea"
+Cohesion: 0.27
+Nodes (3): BoardColumnsArea, QWidget, Contenedor horizontal de columnas que acepta soltar una columna arrastrada para…
 
 ### Community 61 - "DraggableColumnTitle"
 Cohesion: 0.25
@@ -438,6 +432,10 @@ Nodes (3): Cambia el tablero activo, actualiza los estilos visuales de los boton
 Cohesion: 0.33
 Nodes (5): 1. Overview, 2. Implementation Tasks, 3. Acceptance Criteria, QA Report, TECHNICAL DESIGN DOCUMENT
 
+### Community 68 - "BoardSelectionDialog"
+Cohesion: 0.29
+Nodes (4): BoardSelectionDialog, QDialog, Diálogo para seleccionar un tablero de destino para mover o copiar una columna., Crea una copia de la columna en otro tablero seleccionado.
+
 ### Community 69 - "Backlog Step 18: Click-to-Enlarge + Icon Cache/Redesign Wave"
 Cohesion: 0.40
 Nodes (5): Backlog Step 18: Click-to-Enlarge + Icon Cache/Redesign Wave, Backlog Step 19: v0.9.2 Same-Day Fixes, v0.9.2: Click-to-Enlarge Fix on Already-Posted Entries, v0.9.2: App Icon Transparency Retuned, README Feature: Click-to-Enlarge Pasted Images
@@ -458,9 +456,9 @@ Nodes (4): Calendar Drag-to-Reschedule, CalendarViewWidget Class, data_changed S
 Cohesion: 0.50
 Nodes (4): Cross-Repo Graph Merge, Clone Single GitHub Repo, Monorepo Multi-Subfolder Merge, Step 0: GitHub Clone & Multi-Path Merge
 
-### Community 76 - ".render_tags"
-Cohesion: 0.14
-Nodes (7): Dibuja las etiquetas asignadas como pastillas. Clic en la pastilla = editar el…, Asigna (o reemplaza) el valor de una etiqueta permanente, garantizando un único…, Retira una etiqueta de la tarea (localmente) y re-renderiza., Edita el valor de una etiqueta ya asignada: cambiarlo o poner «Ninguno»…, Asigna una etiqueta permanente (categoría) con uno de sus valores a la tarea., Abre el gestor del catálogo de etiquetas y re-sincroniza las etiquetas…, Refresca los datos (valor/color) de las etiquetas asignadas y descarta las que…
+### Community 76 - "TaskDetailDialog"
+Cohesion: 0.08
+Nodes (19): QDialog, Dibuja las etiquetas asignadas como pastillas. Clic en la pastilla = editar el…, Devuelve el id de la etiqueta permanente «Prioridad», asegurando que existan…, Rellena el selector rápido de Prioridad con los valores actuales del catálogo…, Ajusta la selección del combo de Prioridad a lo que haya en current_tags, sin…, Asigna (o reemplaza) el valor de una etiqueta permanente, garantizando un único…, Retira una etiqueta de la tarea (localmente) y re-renderiza., Edita el valor de una etiqueta ya asignada: cambiarlo o poner «Ninguno»… (+11 more)
 
 ### Community 80 - "get_subtasks_progress_bulk() Function"
 Cohesion: 0.67
@@ -469,10 +467,6 @@ Nodes (3): get_subtasks_progress_bulk() Function, get_task_tags_bulk() Function,
 ### Community 81 - "v0.9.1: Local File Attachments on Task Links"
 Cohesion: 0.67
 Nodes (3): Backlog Item: Local File Attachments on Task Links, v0.9.1: Local File Attachments on Task Links, README Feature: Local File Attachments
-
-### Community 82 - "_is_local_link"
-Cohesion: 0.67
-Nodes (3): _is_local_link(), True a menos que la cadena empiece por un esquema web reconocido (case-…, test_is_local_link_classifies_urls_vs_paths()
 
 ### Community 100 - "TECHNICAL DESIGN DOCUMENT"
 Cohesion: 0.33
@@ -483,8 +477,8 @@ Cohesion: 0.33
 Nodes (6): pixmap_from_data_uri(), Decodifica 'data:image/xxx;base64,....' a un QPixmap. Devuelve un QPixmap nulo…, Regresión: antes href y src eran el MISMO data URI (la miniatura ya reducida al…, test_markdown_text_edit_stores_higher_res_copy_for_preview(), test_pixmap_from_data_uri_decodes_valid_png(), test_pixmap_from_data_uri_returns_null_for_garbage()
 
 ### Community 121 - "_ClickOutsideFilter"
-Cohesion: 0.33
-Nodes (4): _ClickOutsideFilter, Filtro de eventos que detecta clics fuera del diálogo dentro de la ventana…, Abre el diálogo de forma síncrona sin bloquear la ventana padre, permitiendo…, QObject
+Cohesion: 0.40
+Nodes (3): _ClickOutsideFilter, Filtro de eventos que detecta clics fuera del diálogo dentro de la ventana…, QObject
 
 ### Community 122 - "build_qss"
 Cohesion: 0.40
@@ -498,23 +492,23 @@ Nodes (4): fit_html_images(), Ajusta o añade el atributo width a las etiquetas 
 Cohesion: 0.50
 Nodes (3): ClickableTagPill, QFrame, Pastilla de etiqueta cuyo cuerpo emite `clicked` (para editar el valor). El…
 
-### Community 125 - "main"
-Cohesion: 0.67
-Nodes (3): apply_win32_icon(), main(), Fuerza los iconos nativos de Win32 (WM_SETICON) directamente en el HWND de…
+### Community 125 - "main.py"
+Cohesion: 0.38
+Nodes (5): app_icon(), apply_win32_icon(), main(), Icono de la app. Prefiere el .ico multi-resolución (mejor para la barra de…, Fuerza los iconos nativos de Win32 (WM_SETICON) directamente en el HWND de…
 
 ## Knowledge Gaps
 - **132 isolated node(s):** `ekin-kanban`, `1. Overview`, `Item 1 — Ctrl+N targets the last-interacted-with column`, `Item 2 — Two-row utility bar`, `Item 3 — Hover-expanded column always re-collapses when the drag ends, even on a drop inside it` (+127 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **43 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **37 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `t()` connect `t` to `CalendarViewWidget`, `TaskDetailDialog`, `test_widgets_headless.py`, `.init_ui`, `._build_column_widget`, `SidebarWidget`, `main.py`, `.load_board`, `QPushButton`, `.load_task_data`, `task_detail_dialog.py`, `TaskCard`, `LogEntryWidget`, `.__init__`, `BoardButton`, `RichTextToolbar`, `BoardEditDialog`, `NotificationsPopup`, `ImagePreviewDialog`, `.reload_boards`, `.add_task`, `.render_tags`, `.notify_due_today`, `.delete_board`, `.check_for_updates`?**
-  _High betweenness centrality (0.113) - this node is a cross-community bridge._
-- **Why does `TaskDetailDialog` connect `TaskDetailDialog` to `LogEntryWidget`, `MarkdownTextEdit`, `RichTextToolbar`, `test_widgets_headless.py`, `.init_ui`, `.render_tags`, `._build_column_widget`, `.load_task_data`, `t`, `main.py`, `._open_task_detail`, `.reload_logs`, `_ClickOutsideFilter`, `ClickableTagPill`, `task_detail_dialog.py`?**
+- **Why does `t()` connect `t` to `CalendarViewWidget`, `test_widgets_headless.py`, `ColumnEditDialog`, `QLabel`, `SidebarWidget`, `SettingsDialog`, `.load_board`, `ColumnWidget`, `MainWindow`, `.load_task_data`, `styles.py`, `TaskCard`, `LogEntryWidget`, `.__init__`, `BoardButton`, `RichTextToolbar`, `BoardEditDialog`, `sidebar.py`, `ImagePreviewDialog`, `.reload_boards`, `BoardColumnsArea`, `BoardSelectionDialog`, `.add_task`, `._build_utility_bar`, `TaskDetailDialog`, `.notify_due_today`, `.delete_board`, `main.py`?**
+  _High betweenness centrality (0.110) - this node is a cross-community bridge._
+- **Why does `TaskDetailDialog` connect `TaskDetailDialog` to `MarkdownTextEdit`, `LogEntryWidget`, `t`, `RichTextToolbar`, `test_widgets_headless.py`, `.load_task_data`, `QLabel`, `._open_task_detail`, `.reload_logs`, `ClickableTagPill`, `main.py`, `styles.py`?**
   _High betweenness centrality (0.066) - this node is a cross-community bridge._
-- **Why does `BoardViewWidget` connect `BoardViewWidget` to `TaskCard`, `.__init__`, `.add_task`, `.handle_task_drop`, `test_timer_board_view.py`, `._build_column_widget`, `t`, `SidebarWidget`, `main.py`, `.load_board`, `test_hover_expand.py`, `QPushButton`, `MainWindow`, `task_detail_dialog.py`?**
+- **Why does `BoardViewWidget` connect `BoardViewWidget` to `TaskCard`, `t`, `BoardSelectionDialog`, `.__init__`, `.add_task`, `sidebar.py`, `ColumnEditDialog`, `test_timer_board_view.py`, `._build_column_widget`, `SidebarWidget`, `.load_board`, `test_hover_expand.py`, `ColumnWidget`, `MainWindow`, `BoardColumnsArea`, `main.py`, `styles.py`?**
   _High betweenness centrality (0.064) - this node is a cross-community bridge._
 - **Are the 6 inferred relationships involving `TaskDetailDialog` (e.g. with `LogEntryWidget` and `MarkdownTextEdit`) actually correct?**
   _`TaskDetailDialog` has 6 INFERRED edges - model-reasoned connections that need verification._
