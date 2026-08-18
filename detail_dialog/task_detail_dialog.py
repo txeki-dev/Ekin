@@ -360,7 +360,7 @@ class TaskDetailDialog(QDialog):
 
         self.logs_container = QWidget()
         self.logs_layout = QVBoxLayout(self.logs_container)
-        self.logs_layout.setContentsMargins(8, 8, 12, 8)
+        self.logs_layout.setContentsMargins(12, 10, 22, 10)
         self.logs_layout.setSpacing(8)
 
         self.scroll_area.setWidget(self.logs_container)
@@ -879,7 +879,7 @@ class TaskDetailDialog(QDialog):
         w = self.scroll_area.viewport().width()
         if w > self.width() * 0.5 or w <= 0:
             w = int(self.width() * 5 / 11) - 40
-        return max(120, min(360, w - 48))
+        return max(120, min(330, w - 64))
 
     def add_log_entry(self):
         """Crea una nueva entrada de diario con el texto del input."""

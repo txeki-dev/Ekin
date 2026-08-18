@@ -14,7 +14,7 @@ def fit_html_images(html, max_width=None):
     if not html:
         return html
     if max_width is None:
-        max_width = 360
+        max_width = 330
     # Ajustar etiquetas <img>
     if "<img" in html.lower():
         def _repl_img(match):

@@ -1,7 +1,7 @@
 # Graph Report - Ekin  (2026-08-18)
 
 ## Corpus Check
-- 80 files · ~98,267 words
+- 80 files · ~98,271 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `a0708b55`
+- Built from commit: `cdb7addf`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -87,7 +87,7 @@
 - TECHNICAL DESIGN DOCUMENT
 - settings.py
 - Calendar Drag-to-Reschedule
-- .add_task
+- .delete_column
 - ._build_utility_bar
 - Cross-Repo Graph Merge
 - .render_tags
@@ -243,7 +243,7 @@ Nodes (8): QDialog, Pantalla de Ajustes de la aplicación: tema, notificaciones 
 
 ### Community 18 - ".load_board"
 Cohesion: 0.11
-Nodes (9): QFrame, Registra una acción deshacer/rehacer para un borrado (restaurar desde snapshot)., Carga las columnas y tareas de un tablero específico. `notify=False` evita…, Limpia todos los widgets del layout de columnas., Confirma y borra una columna., Pliega o despliega una columna (persiste el estado) y recarga el tablero., Soltar una tarjeta sobre una columna plegada: la despliega y coloca la tarjeta…, Reordena las columnas del tablero actual tras arrastrar una por su título. (+1 more)
+Nodes (9): QFrame, Carga las columnas y tareas de un tablero específico. `notify=False` evita…, Limpia todos los widgets del layout de columnas., Pliega o despliega una columna (persiste el estado) y recarga el tablero., Soltar una tarjeta sobre una columna plegada: la despliega y coloca la tarjeta…, Reordena las columnas del tablero actual tras arrastrar una por su título., Atajo Ctrl+N: añade una tarea a la última columna con la que se ha interactuado…, Crea una tarea solicitando el título rápidamente. (+1 more)
 
 ### Community 19 - "test_hover_expand.py"
 Cohesion: 0.25
@@ -501,11 +501,11 @@ Nodes (5): app_icon(), apply_win32_icon(), main(), Icono de la app. Prefiere el 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `t()` connect `t` to `CalendarViewWidget`, `test_widgets_headless.py`, `ColumnEditDialog`, `QLabel`, `SidebarWidget`, `SettingsDialog`, `.load_board`, `ColumnWidget`, `MainWindow`, `.load_task_data`, `styles.py`, `TaskCard`, `LogEntryWidget`, `.__init__`, `BoardButton`, `RichTextToolbar`, `BoardEditDialog`, `sidebar.py`, `ImagePreviewDialog`, `.reload_boards`, `BoardColumnsArea`, `BoardSelectionDialog`, `.add_task`, `._build_utility_bar`, `.render_tags`, `TaskDetailDialog`, `.notify_due_today`, `.delete_board`, `main.py`?**
+- **Why does `t()` connect `t` to `CalendarViewWidget`, `test_widgets_headless.py`, `ColumnEditDialog`, `QLabel`, `SidebarWidget`, `SettingsDialog`, `.load_board`, `ColumnWidget`, `MainWindow`, `.load_task_data`, `styles.py`, `TaskCard`, `LogEntryWidget`, `.__init__`, `BoardButton`, `RichTextToolbar`, `BoardEditDialog`, `sidebar.py`, `ImagePreviewDialog`, `.reload_boards`, `BoardColumnsArea`, `BoardSelectionDialog`, `.delete_column`, `._build_utility_bar`, `.render_tags`, `TaskDetailDialog`, `.notify_due_today`, `.delete_board`, `main.py`?**
   _High betweenness centrality (0.110) - this node is a cross-community bridge._
 - **Why does `TaskDetailDialog` connect `TaskDetailDialog` to `TaskCard`, `MarkdownTextEdit`, `LogEntryWidget`, `t`, `RichTextToolbar`, `test_widgets_headless.py`, `.render_tags`, `QLabel`, `._open_task_detail`, `.reload_logs`, `.load_task_data`, `main.py`, `styles.py`?**
   _High betweenness centrality (0.066) - this node is a cross-community bridge._
-- **Why does `BoardViewWidget` connect `BoardViewWidget` to `TaskCard`, `t`, `BoardSelectionDialog`, `.__init__`, `.add_task`, `sidebar.py`, `ColumnEditDialog`, `test_timer_board_view.py`, `._build_column_widget`, `SidebarWidget`, `.load_board`, `test_hover_expand.py`, `ColumnWidget`, `MainWindow`, `BoardColumnsArea`, `main.py`?**
+- **Why does `BoardViewWidget` connect `BoardViewWidget` to `TaskCard`, `t`, `BoardSelectionDialog`, `.__init__`, `.delete_column`, `sidebar.py`, `ColumnEditDialog`, `test_timer_board_view.py`, `._build_column_widget`, `SidebarWidget`, `.load_board`, `test_hover_expand.py`, `ColumnWidget`, `MainWindow`, `BoardColumnsArea`, `main.py`?**
   _High betweenness centrality (0.064) - this node is a cross-community bridge._
 - **Are the 6 inferred relationships involving `TaskDetailDialog` (e.g. with `LogEntryWidget` and `MarkdownTextEdit`) actually correct?**
   _`TaskDetailDialog` has 6 INFERRED edges - model-reasoned connections that need verification._

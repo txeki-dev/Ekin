@@ -2219,7 +2219,7 @@
       "label": "set_theme()",
       "file_type": "code",
       "source_file": "styles.py",
-      "source_location": "L508",
+      "source_location": "L509",
       "_callable": true,
       "_origin": "ast",
       "id": "styles_set_theme",
@@ -3116,6 +3116,18 @@
       "norm_label": "test_settings_dialog_timer_alert_spin_reflects_saved_value()"
     },
     {
+      "label": ".add_task()",
+      "file_type": "code",
+      "source_file": "board_view.py",
+      "source_location": "L677",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "board_view_boardviewwidget_add_task",
+      "community": 18,
+      "community_name": ".load_board",
+      "norm_label": ".add_task()"
+    },
+    {
       "label": ".clear_columns_layout()",
       "file_type": "code",
       "source_file": "board_view.py",
@@ -3126,18 +3138,6 @@
       "community": 18,
       "community_name": ".load_board",
       "norm_label": ".clear_columns_layout()"
-    },
-    {
-      "label": ".delete_column()",
-      "file_type": "code",
-      "source_file": "board_view.py",
-      "source_location": "L531",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "board_view_boardviewwidget_delete_column",
-      "community": 18,
-      "community_name": ".load_board",
-      "norm_label": ".delete_column()"
     },
     {
       "label": ".handle_collapsed_card_drop()",
@@ -3200,16 +3200,16 @@
       "norm_label": ".load_board()"
     },
     {
-      "label": "._push_delete_undo()",
+      "label": ".quick_add_task()",
       "file_type": "code",
       "source_file": "board_view.py",
-      "source_location": "L224",
+      "source_location": "L655",
       "_callable": true,
       "_origin": "ast",
-      "id": "board_view_boardviewwidget_push_delete_undo",
+      "id": "board_view_boardviewwidget_quick_add_task",
       "community": 18,
       "community_name": ".load_board",
-      "norm_label": "._push_delete_undo()"
+      "norm_label": ".quick_add_task()"
     },
     {
       "label": "._refresh_current()",
@@ -7268,28 +7268,28 @@
       "norm_label": "set_setting()"
     },
     {
-      "label": ".add_task()",
+      "label": ".delete_column()",
       "file_type": "code",
       "source_file": "board_view.py",
-      "source_location": "L677",
+      "source_location": "L531",
       "_callable": true,
       "_origin": "ast",
-      "id": "board_view_boardviewwidget_add_task",
+      "id": "board_view_boardviewwidget_delete_column",
       "community": 73,
-      "community_name": ".add_task",
-      "norm_label": ".add_task()"
+      "community_name": ".delete_column",
+      "norm_label": ".delete_column()"
     },
     {
-      "label": ".quick_add_task()",
+      "label": "._push_delete_undo()",
       "file_type": "code",
       "source_file": "board_view.py",
-      "source_location": "L655",
+      "source_location": "L224",
       "_callable": true,
       "_origin": "ast",
-      "id": "board_view_boardviewwidget_quick_add_task",
+      "id": "board_view_boardviewwidget_push_delete_undo",
       "community": 73,
-      "community_name": ".add_task",
-      "norm_label": ".quick_add_task()"
+      "community_name": ".delete_column",
+      "norm_label": "._push_delete_undo()"
     },
     {
       "label": ".__init__()",
@@ -8538,9 +8538,9 @@
       "label": "Cambia la paleta activa (COLORS) in-place y devuelve el QSS correspondiente.",
       "file_type": "rationale",
       "source_file": "styles.py",
-      "source_location": "L509",
+      "source_location": "L510",
       "_origin": "ast",
-      "id": "styles_rationale_509",
+      "id": "styles_rationale_510",
       "community": 122,
       "community_name": "build_qss",
       "norm_label": "cambia la paleta activa (colors) in-place y devuelve el qss correspondiente."
@@ -9052,17 +9052,6 @@
       "norm_label": "qframe"
     },
     {
-      "label": "Registra una acci\u00f3n deshacer/rehacer para un borrado (restaurar desde snapshot).",
-      "file_type": "rationale",
-      "source_file": "board_view.py",
-      "source_location": "L225",
-      "_origin": "ast",
-      "id": "board_view_rationale_225",
-      "community": 18,
-      "community_name": ".load_board",
-      "norm_label": "registra una accion deshacer/rehacer para un borrado (restaurar desde snapshot)."
-    },
-    {
       "label": "Carga las columnas y tareas de un tablero espec\u00edfico. `notify=False` evita\u2026",
       "file_type": "rationale",
       "source_file": "board_view.py",
@@ -9083,17 +9072,6 @@
       "community": 18,
       "community_name": ".load_board",
       "norm_label": "limpia todos los widgets del layout de columnas."
-    },
-    {
-      "label": "Confirma y borra una columna.",
-      "file_type": "rationale",
-      "source_file": "board_view.py",
-      "source_location": "L532",
-      "_origin": "ast",
-      "id": "board_view_rationale_532",
-      "community": 18,
-      "community_name": ".load_board",
-      "norm_label": "confirma y borra una columna."
     },
     {
       "label": "Pliega o despliega una columna (persiste el estado) y recarga el tablero.",
@@ -9127,6 +9105,28 @@
       "community": 18,
       "community_name": ".load_board",
       "norm_label": "reordena las columnas del tablero actual tras arrastrar una por su titulo."
+    },
+    {
+      "label": "Atajo Ctrl+N: a\u00f1ade una tarea a la \u00faltima columna con la que se ha interactuado\u2026",
+      "file_type": "rationale",
+      "source_file": "board_view.py",
+      "source_location": "L656",
+      "_origin": "ast",
+      "id": "board_view_rationale_656",
+      "community": 18,
+      "community_name": ".load_board",
+      "norm_label": "atajo ctrl+n: anade una tarea a la ultima columna con la que se ha interactuado..."
+    },
+    {
+      "label": "Crea una tarea solicitando el t\u00edtulo r\u00e1pidamente.",
+      "file_type": "rationale",
+      "source_file": "board_view.py",
+      "source_location": "L678",
+      "_origin": "ast",
+      "id": "board_view_rationale_678",
+      "community": 18,
+      "community_name": ".load_board",
+      "norm_label": "crea una tarea solicitando el titulo rapidamente."
     },
     {
       "label": "Maneja la l\u00f3gica de recolocaci\u00f3n de tareas tras arrastrarlas.",
@@ -11923,26 +11923,26 @@
       "norm_label": "devuelve el valor de un ajuste, o `default` si no esta definido."
     },
     {
-      "label": "Atajo Ctrl+N: a\u00f1ade una tarea a la \u00faltima columna con la que se ha interactuado\u2026",
+      "label": "Registra una acci\u00f3n deshacer/rehacer para un borrado (restaurar desde snapshot).",
       "file_type": "rationale",
       "source_file": "board_view.py",
-      "source_location": "L656",
+      "source_location": "L225",
       "_origin": "ast",
-      "id": "board_view_rationale_656",
+      "id": "board_view_rationale_225",
       "community": 73,
-      "community_name": ".add_task",
-      "norm_label": "atajo ctrl+n: anade una tarea a la ultima columna con la que se ha interactuado..."
+      "community_name": ".delete_column",
+      "norm_label": "registra una accion deshacer/rehacer para un borrado (restaurar desde snapshot)."
     },
     {
-      "label": "Crea una tarea solicitando el t\u00edtulo r\u00e1pidamente.",
+      "label": "Confirma y borra una columna.",
       "file_type": "rationale",
       "source_file": "board_view.py",
-      "source_location": "L678",
+      "source_location": "L532",
       "_origin": "ast",
-      "id": "board_view_rationale_678",
+      "id": "board_view_rationale_532",
       "community": 73,
-      "community_name": ".add_task",
-      "norm_label": "crea una tarea solicitando el titulo rapidamente."
+      "community_name": ".delete_column",
+      "norm_label": "confirma y borra una columna."
     },
     {
       "label": "QFrame",
@@ -20198,7 +20198,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "styles.py",
-      "source_location": "L512",
+      "source_location": "L513",
       "weight": 1.0,
       "_origin": "ast",
       "source": "styles_set_theme",
@@ -27541,7 +27541,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "styles.py",
-      "source_location": "L508",
+      "source_location": "L509",
       "weight": 1.0,
       "_origin": "ast",
       "source": "styles",
@@ -35780,10 +35780,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "styles.py",
-      "source_location": "L509",
+      "source_location": "L510",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "styles_rationale_509",
+      "source": "styles_rationale_510",
       "target": "styles_set_theme",
       "confidence_score": 1.0
     },
@@ -39277,5 +39277,5 @@
       "source_file": ".agents/docs/archive/2026-08-07_hover_expand_crash_fix_and_shortcuts_button.md"
     }
   ],
-  "built_at_commit": "a0708b55164fde681fdd788c9bf173acdc9c375b"
+  "built_at_commit": "cdb7addfb09983db9579c89817f0150550325ff7"
 }

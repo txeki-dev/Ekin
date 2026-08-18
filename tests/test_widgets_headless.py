@@ -732,7 +732,7 @@ def test_log_entry_widget_fit_html_images_constrains_width():
 
     # Con max_width=None usa el valor por defecto seguro
     html_def = fit_html_images('<p><img width="800" src="test.png" /></p>', max_width=None)
-    assert 'width="360"' in html_def
+    assert 'width="330"' in html_def
 
 
 def test_log_entry_widget_multiline_text_vertical_sizing(qapp):

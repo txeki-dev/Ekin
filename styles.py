@@ -340,6 +340,7 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
 
 #LogEntryWidget {{
     background-color: {c["bg_card"]};
+    border: 1px solid {c["border"]};
     border-radius: 8px;
 }}
 
