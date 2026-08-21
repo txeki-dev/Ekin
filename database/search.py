@@ -16,7 +16,8 @@ def search_tasks(text="", board_id=None, tag_value_id=None, only_due=False, db_p
     tablero y título. Cada elemento incluye board_id/board_name/board_color para
     poder saltar a la tarjeta desde los resultados."""
     query = [
-        "SELECT DISTINCT t.id, t.title, t.description, t.due_date, t.column_id, t.updated_at,",
+        "SELECT DISTINCT t.id, t.title, t.description, t.due_date, t.due_time, t.recurrence,",
+        "       t.timer_started_at, t.column_id, t.updated_at,",
         "       c.board_id AS board_id, b.name AS board_name, b.color AS board_color,",
         "       c.name AS column_name",
         "FROM tasks t",

@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Advanced Export Modal Dialog (`export_dialog.py`, `exporter.py`):**
+  - Scope selection: export all boards (including archived) or only the active board.
+  - JSON export modes: full export with all tasks, tags, links, logs and timers, or **column structure only (templates)** without tasks.
+  - Comprehensive metadata: exports task links/attachments (`task_links`), timer state (`timer_started_at`), linked boards (`linked_board_id`/`linked_board_name`), tag colors, and logs.
+  - CSV export: includes task count, links count, and single-board filtering.
+  - Markdown report: includes formatted task descriptions, links, and diary logs.
+- **Advanced JSON Import Modal Dialog & Engine (`importer.py`, `export_dialog.py`):**
+  - Pure JSON parser supporting full backups, single-board files, or raw board arrays with structure preview.
+  - Interactive import mode: full restoration or column structure only (importing any file as a clean board template).
+  - Automatic tag category and value resolution in the catalog with persistent colors.
+  - Atomic database transaction with rollback safety, automatic UI selection and reload.
+
+### Fixed & Optimized
+- **Database `get_task()` vs `get_tasks()` Return Shape Parity:** `get_task()` now populates `"links"` via `get_task_links()`.
+- **Atomic Multi-Level Restores:** `restore_board()` and `restore_column()` in `database/snapshots.py` now execute within a shared connection/transaction with immediate rollback on errors.
+- **Calendar Background Efficiency:** `CalendarViewWidget.refresh()` skips heavy SQL queries and layout rebuilds when hidden, refreshing lazily upon becoming visible.
+- **Global Search Due Time Support:** `search_tasks()` now returns `due_time`, `recurrence`, and `timer_started_at`, displaying the time alongside the due date in search result chips.
+- **Deprecated Qt 6 Event Syntaxes:** Resolved all `QMouseEvent` constructor deprecation warnings across test suites.
+- **Test Suite Fortification:** Expanded automated test coverage to 203 passing tests with zero warnings.
+
 ## [0.9.6] - 2026-08-18
 
 ### Added

@@ -26,7 +26,7 @@ Ekin Kanban is a sleek, resource-friendly, and offline-first personal Kanban boa
 - **Attachments / Links**: Attach a web URL, or click **📁** to browse your PC and attach a local file. Local attachments show a **📎** icon (web links keep **🔗**) and turn red with a warning if the file's since moved or been deleted; open or remove either kind from the task detail.
 - **Undo / Redo**: **Ctrl+Z / Ctrl+Y** restores a deleted task, column or board — with all its tags, diary and links.
 - **Keyboard Shortcuts**: Quick actions for new tasks/columns, jumping between boards, opening Settings/Calendar, and more — press **Ctrl+/** anytime to open a reference dialog listing every shortcut in the app.
-- **Board Archiving & Export**: Archive boards to declutter the sidebar; export everything to **JSON / CSV / Markdown**.
+- **Board Archiving & Advanced Export/Import**: Archive boards to declutter the sidebar; export everything or single boards to **JSON / CSV / Markdown** with options for full task backup or **column structure templates** without tasks; import JSON boards and templates directly into Ekin.
 - **Themes & Settings**: A ⚙ settings screen with a **dark/light theme** toggle, notification prefs, a configurable task-timer alert threshold, and a remembered window size.
 - **Automatic Backups**: On every startup Ekin snapshots your database into a `backups/` folder (keeping the most recent few) before applying any changes — a cheap safety net against accidents.
 - **Collapsible Sidebar**: Hide or reveal the sidebar using the toggle (`☰`) button in the board header to maximize work space.
@@ -135,6 +135,7 @@ The database (`ekin_board.db`) is automatically initialized on the first run, an
 * Select a board and click **✏️ Editar** to rename or recolor it, or click **🗑️ Borrar** to remove it.
 * You can clone an entire board (including its columns, tasks, tags, and diaries) by clicking **✏️ Editar** and selecting the Copy/Clone options.
 * Use **Alt+Up / Alt+Down** anywhere to jump to the previous/next board without touching the sidebar.
+* Click **⬇ Exportar...** to export all boards or the active one to JSON, CSV, or Markdown (with support for column-structure-only templates). Click **⬆ Importar...** to import JSON backups or templates into Ekin.
 
 ### 2. Organizing Columns & Tasks
 * Inside a board, click **➕ Nueva Columna** to create stage headers (e.g., "To-Do", "In Progress", "Done").

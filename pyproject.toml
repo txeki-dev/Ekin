@@ -16,7 +16,7 @@ dev = [
 ]
 
 [tool.setuptools]
-py-modules = ["main", "board_view", "sidebar", "styles", "widgets", "version", "calendar_view", "ics_export", "backups", "search_dialog", "exporter", "settings_dialog", "shortcuts_dialog", "undo", "strings"]
+py-modules = ["main", "board_view", "sidebar", "styles", "widgets", "version", "calendar_view", "ics_export", "backups", "search_dialog", "exporter", "importer", "export_dialog", "settings_dialog", "shortcuts_dialog", "undo", "strings"]
 packages = ["database", "detail_dialog"]
 
 [tool.setuptools.dynamic]
@@ -24,6 +24,7 @@ version = { attr = "version.__version__" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 target-version = "py310"

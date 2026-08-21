@@ -127,7 +127,11 @@ class SearchDialog(QDialog):
 
     def _build_result(self, row):
         title = row["title"] or t("search.result_no_title")
-        due = f"   📅 {row['due_date']}" if row.get("due_date") else ""
+        if row.get("due_date"):
+            due_str = row["due_date"] + (f" {row['due_time']}" if row.get("due_time") else "")
+            due = f"   📅 {due_str}"
+        else:
+            due = ""
         btn = QPushButton(f"{title}{due}")
         btn.setObjectName("NotificationItem")
         btn.setCursor(Qt.PointingHandCursor)

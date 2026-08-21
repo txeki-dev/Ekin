@@ -195,9 +195,10 @@ class CalendarViewWidget(QWidget):
         self.anchor = date.today()
         self.cells = []
         self._modes = ["month", "week", "day"]
+        self._dirty = False
         self._build_ui()
         self._rebuild_grid()
-        self.refresh()
+        self.refresh(force=True)
 
     def _build_ui(self):
         self._root = QVBoxLayout(self)
@@ -341,8 +342,17 @@ class CalendarViewWidget(QWidget):
             self.legend.addWidget(lab)
         self.legend.addStretch()
 
-    def refresh(self):
+    def showEvent(self, event):
+        super().showEvent(event)
+        if getattr(self, "_dirty", False):
+            self.refresh(force=True)
+
+    def refresh(self, force=False):
         """Recarga filtro/leyenda y pinta el periodo actual según el modo."""
+        if not force and not self.isVisible():
+            self._dirty = True
+            return
+        self._dirty = False
         self._reload_board_filter()
         self._reload_legend()
         board_id = self.board_combo.currentData()

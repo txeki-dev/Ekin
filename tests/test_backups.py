@@ -43,6 +43,15 @@ def test_backup_returns_none_when_source_missing(tmp_path):
     assert backups.backup_database(missing) is None
 
 
+def test_backup_rotation_zero_or_negative_keep_does_not_prune(db_path, tmp_path):
+    backup_dir = str(tmp_path / "backups")
+    for _ in range(3):
+        backups.backup_database(db_path, keep=0, backup_dir=backup_dir)
+        time.sleep(0.02)
+    remaining = [f for f in os.listdir(backup_dir) if f.endswith(".bak")]
+    assert len(remaining) == 3
+
+
 def test_backup_default_dir_is_sibling_backups_folder(db_path):
     dest = backups.backup_database(db_path, keep=3)
     try:

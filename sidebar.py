@@ -8,7 +8,8 @@ from PySide6.QtGui import QColor, QPixmap, QIcon
 from datetime import date, datetime, timedelta
 import database
 import styles
-import exporter
+import importer
+from export_dialog import ExportDialog, ImportConfirmationDialog
 from styles import hex_to_rgb
 from strings import t
 from undo import UndoAction
@@ -390,7 +391,7 @@ class SidebarWidget(QFrame):
 
         btn_layout.addLayout(action_layout)
 
-        # Fila secundaria: ver archivados + exportar
+        # Fila secundaria: ver archivados + exportar + importar
         extra_layout = QHBoxLayout()
         extra_layout.setSpacing(6)
         self.archived_btn = QPushButton(t("sidebar.archived_btn"))
@@ -403,8 +404,14 @@ class SidebarWidget(QFrame):
         self.export_btn = QPushButton(t("sidebar.export_btn"))
         self.export_btn.setCursor(Qt.PointingHandCursor)
         self.export_btn.setToolTip(t("sidebar.export_tooltip"))
-        self.export_btn.clicked.connect(self.show_export_menu)
+        self.export_btn.clicked.connect(self.show_export_dialog)
         extra_layout.addWidget(self.export_btn)
+
+        self.import_btn = QPushButton(t("sidebar.import_btn"))
+        self.import_btn.setCursor(Qt.PointingHandCursor)
+        self.import_btn.setToolTip(t("sidebar.import_tooltip"))
+        self.import_btn.clicked.connect(self.show_import_dialog)
+        extra_layout.addWidget(self.import_btn)
 
         btn_layout.addLayout(extra_layout)
         layout.addLayout(btn_layout)
@@ -577,32 +584,40 @@ class SidebarWidget(QFrame):
         self.reload_boards()
         self.board_changed.emit()
 
-    def show_export_menu(self):
-        """Menú para exportar todos los tableros a JSON / CSV / informe Markdown."""
-        menu = QMenu(self)
-        styles.style_menu(menu)
-        act_json = menu.addAction(t("sidebar.export_menu.json"))
-        act_csv = menu.addAction(t("sidebar.export_menu.csv"))
-        act_md = menu.addAction(t("sidebar.export_menu.markdown"))
-        chosen = menu.exec(self.export_btn.mapToGlobal(QPoint(0, self.export_btn.height())))
-        if chosen == act_json:
-            self._export_to_file("JSON", "ekin_export.json", "JSON (*.json)", exporter.boards_to_json)
-        elif chosen == act_csv:
-            self._export_to_file("CSV", "ekin_tareas.csv", "CSV (*.csv)", exporter.tasks_to_csv)
-        elif chosen == act_md:
-            self._export_to_file("Markdown", "ekin_informe.md", "Markdown (*.md)", exporter.report_markdown)
+    def show_export_dialog(self):
+        """Abre el diálogo modal de exportación (JSON/CSV/MD, todo o tablero activo)."""
+        dlg = ExportDialog(self.db_path, active_board_id=self.active_board_id, parent=self)
+        dlg.exec()
 
-    def _export_to_file(self, label, default_name, file_filter, build_fn):
-        path, _ = QFileDialog.getSaveFileName(self, t("sidebar.export.dialog_title", label=label), default_name, file_filter)
-        if not path:
+    show_export_menu = show_export_dialog  # Compatibilidad hacia atrás
+
+    def show_import_dialog(self):
+        """Abre el selector de archivo JSON y el diálogo de confirmación de importación."""
+        filepath, _ = QFileDialog.getOpenFileName(
+            self, t("import_dialog.open_title"), "", "JSON (*.json)"
+        )
+        if not filepath:
             return
+
         try:
-            with open(path, "w", encoding="utf-8", newline="") as f:
-                f.write(build_fn(self.db_path))
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
+            boards_data, stats = importer.parse_boards_json(content)
         except Exception as exc:
-            QMessageBox.critical(self, t("sidebar.export.error_title"), t("sidebar.export.error_body", error=exc))
+            QMessageBox.critical(
+                self, t("import_dialog.error_title"),
+                t("import_dialog.error_body", error=exc)
+            )
             return
-        QMessageBox.information(self, t("sidebar.export.done_title"), t("sidebar.export.done_body", label=label, path=path))
+
+        dlg = ImportConfirmationDialog(filepath, boards_data, stats, db_path=self.db_path, parent=self)
+        if dlg.exec() == QDialog.Accepted and dlg.created_board_ids:
+            self.reload_boards(select_board_id=dlg.created_board_ids[0])
+            self.board_changed.emit()
+            QMessageBox.information(
+                self, t("import_dialog.done_title"),
+                t("import_dialog.done_body", count=len(dlg.created_board_ids))
+            )
 
     def handle_column_dropped(self, column_id, target_board_id):
         """Mueve una columna arrastrada desde el tablero activo hasta el botón de otro tablero."""

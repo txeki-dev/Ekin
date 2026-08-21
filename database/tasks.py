@@ -2,7 +2,7 @@ import calendar as _cal
 from datetime import datetime, date, timedelta
 from . import get_connection
 from .tags import get_task_tags, get_task_tags_bulk
-from .links import get_task_links_bulk
+from .links import get_task_links, get_task_links_bulk
 
 __all__ = [
     "create_task", "get_tasks", "get_task", "update_task", "update_task_due_date",
@@ -66,6 +66,7 @@ def get_task(task_id, db_path=None):
         if row:
             t = dict(row)
             t["tags"] = get_task_tags(t["id"], db_path)
+            t["links"] = get_task_links(t["id"], db_path)
             return t
         return None
 

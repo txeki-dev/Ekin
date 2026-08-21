@@ -231,7 +231,7 @@ class MainWindow(QMainWindow):
     # --- Conmutación entre vista de tablero y calendario ---
 
     def show_calendar_view(self):
-        self.calendar_view.refresh()
+        self.calendar_view.refresh(force=True)
         self.center_stack.setCurrentWidget(self.calendar_view)
 
     def show_board_view(self):

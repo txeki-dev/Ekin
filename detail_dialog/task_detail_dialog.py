@@ -97,15 +97,23 @@ class TaskDetailDialog(QDialog):
         self._click_outside_filter = _ClickOutsideFilter(self)
         QApplication.instance().installEventFilter(self._click_outside_filter)
 
-        loop = QEventLoop(self)
-        self.finished.connect(lambda _: loop.quit())
+        loop = QEventLoop()
+        result_code = [TaskDetailDialog.Rejected]
+
+        def _on_finished(res):
+            result_code[0] = res
+            if getattr(self, "_click_outside_filter", None):
+                try:
+                    QApplication.instance().removeEventFilter(self._click_outside_filter)
+                except Exception:
+                    pass
+                self._click_outside_filter = None
+            loop.quit()
+
+        self.finished.connect(_on_finished)
         loop.exec()
 
-        if getattr(self, "_click_outside_filter", None):
-            QApplication.instance().removeEventFilter(self._click_outside_filter)
-            self._click_outside_filter = None
-
-        return self.result()
+        return result_code[0]
 
     def init_ui(self):
         # Layout principal horizontal (Izquierda: Formulario, Derecha: Diario/Log)

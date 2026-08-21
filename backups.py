@@ -51,12 +51,15 @@ def backup_database(db_path, keep=5, backup_dir=None):
 
 def _prune_backups(backup_dir, base, keep):
     """Deja solo las `keep` copias más recientes de `base` en `backup_dir`."""
+    if keep <= 0:
+        return
     pattern = os.path.join(backup_dir, f"{base}.*.bak")
     # El sufijo de marca de tiempo hace que el orden lexicográfico == cronológico.
     backups = sorted(glob.glob(pattern))
-    excess = len(backups) - max(0, keep)
-    for old in backups[:max(0, excess)]:
-        try:
-            os.remove(old)
-        except OSError:
-            pass
+    excess = len(backups) - keep
+    if excess > 0:
+        for old in backups[:excess]:
+            try:
+                os.remove(old)
+            except OSError:
+                pass

@@ -6,7 +6,7 @@ import re
 from datetime import date, datetime, timedelta
 
 import pytest
-from PySide6.QtCore import Qt, QPoint, QMimeData, QEvent
+from PySide6.QtCore import Qt, QPoint, QPointF, QMimeData, QEvent
 from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDropEvent, QImage, QMouseEvent
 from PySide6.QtWidgets import QLabel, QPushButton, QWidget
 
@@ -16,6 +16,7 @@ from calendar_view import CalendarViewWidget
 from sidebar import NotificationsPopup
 from settings_dialog import SettingsDialog
 from shortcuts_dialog import ShortcutsDialog
+from export_dialog import ExportDialog, ImportConfirmationDialog
 from detail_dialog import TaskDetailDialog
 from detail_dialog.log_entry import LogEntryWidget
 import detail_dialog.task_detail_dialog as task_detail_dialog_module
@@ -577,9 +578,9 @@ def test_markdown_text_edit_click_on_image_anchor_opens_preview(qapp, monkeypatc
     calls = []
     monkeypatch.setattr(markdown_edit_module, "show_image_preview", lambda uri, parent=None: calls.append(uri))
 
-    pos = QPoint(10, 10)
-    press = QMouseEvent(QEvent.Type.MouseButtonPress, pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
-    release = QMouseEvent(QEvent.Type.MouseButtonRelease, pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+    pos = QPointF(10, 10)
+    press = QMouseEvent(QEvent.Type.MouseButtonPress, pos, pos, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    release = QMouseEvent(QEvent.Type.MouseButtonRelease, pos, pos, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
     editor.mousePressEvent(press)
     editor.mouseReleaseEvent(release)
 
@@ -596,10 +597,10 @@ def test_markdown_text_edit_drag_does_not_open_preview(qapp, monkeypatch):
     calls = []
     monkeypatch.setattr(markdown_edit_module, "show_image_preview", lambda uri, parent=None: calls.append(uri))
 
-    press_pos = QPoint(10, 10)
-    release_pos = QPoint(50, 60)
-    press = QMouseEvent(QEvent.Type.MouseButtonPress, press_pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
-    release = QMouseEvent(QEvent.Type.MouseButtonRelease, release_pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+    press_pos = QPointF(10, 10)
+    release_pos = QPointF(50, 60)
+    press = QMouseEvent(QEvent.Type.MouseButtonPress, press_pos, press_pos, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    release = QMouseEvent(QEvent.Type.MouseButtonRelease, release_pos, release_pos, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
     editor.mousePressEvent(press)
     editor.mouseReleaseEvent(release)
 
@@ -640,9 +641,9 @@ def test_log_entry_widget_real_click_on_posted_image_opens_preview(qapp, monkeyp
     widget.show()
     qapp.processEvents()
 
-    pos = QPoint(20, 20)
-    press = QMouseEvent(QEvent.Type.MouseButtonPress, pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
-    release = QMouseEvent(QEvent.Type.MouseButtonRelease, pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+    pos = QPointF(20, 20)
+    press = QMouseEvent(QEvent.Type.MouseButtonPress, pos, pos, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    release = QMouseEvent(QEvent.Type.MouseButtonRelease, pos, pos, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
     qapp.sendEvent(widget.content_label, press)
     qapp.sendEvent(widget.content_label, release)
     qapp.processEvents()
@@ -676,8 +677,8 @@ def test_task_detail_dialog_click_outside_auto_saves_and_closes(qapp, db_path):
         # Modificar título
         dlg.title_input.setText("Titulo Modificado")
         # Simular clic en la ventana padre fuera del diálogo
-        pos = QPoint(10, 10)
-        press = QMouseEvent(QEvent.Type.MouseButtonPress, pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+        pos = QPointF(10, 10)
+        press = QMouseEvent(QEvent.Type.MouseButtonPress, pos, pos, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
         qapp.sendEvent(parent_window, press)
 
     from PySide6.QtCore import QTimer
@@ -701,8 +702,8 @@ def test_task_detail_dialog_click_inside_does_not_close(qapp, db_path):
     dlg.show()
     qapp.processEvents()
 
-    pos = QPoint(5, 5)
-    press = QMouseEvent(QEvent.Type.MouseButtonPress, pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+    pos = QPointF(5, 5)
+    press = QMouseEvent(QEvent.Type.MouseButtonPress, pos, pos, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
     qapp.sendEvent(dlg.title_input, press)
     qapp.processEvents()
 
@@ -798,3 +799,119 @@ def test_qss_font_sizes_valid_integers():
     # Buscar patrones como font-size: X.Ypx
     fractional_font_sizes = re.findall(r"font-size:\s*\d+\.\d+px", qss)
     assert fractional_font_sizes == []
+
+
+def test_task_detail_dialog_link_row_rendering_states(qapp, db_path, tmp_path):
+    """Verifica el renderizado de enlaces:
+    1. Archivo local existente: icono 📎, color azul (#60a5fa), tooltip con ruta.
+    2. Archivo local inexistente: icono 📎, color peligro (danger), tooltip de advertencia.
+    3. Enlace web: icono 🔗, color azul (#60a5fa), tooltip con URL.
+    """
+    real_file = tmp_path / "documento.pdf"
+    real_file.write_text("contenido")
+    missing_file = tmp_path / "no_existe.pdf"
+
+    board_id = database.create_board("Tablero Links", db_path=db_path)
+    col_id = database.create_column(board_id, "Col Links", db_path=db_path)
+    task_id = database.create_task(col_id, "Tarea con enlaces", db_path=db_path)
+
+    database.add_task_link(task_id, str(real_file), "Doc Real", db_path=db_path)
+    database.add_task_link(task_id, str(missing_file), "Doc Faltante", db_path=db_path)
+    database.add_task_link(task_id, "https://github.com", "GitHub", db_path=db_path)
+
+    dlg = TaskDetailDialog(task_id, db_path=db_path)
+
+    # 3 enlaces en el links_layout
+    assert dlg.links_layout.count() == 3
+
+    # Fila 1: Archivo local existente
+    row1 = dlg.links_layout.itemAt(0).widget()
+    btn1 = row1.layout().itemAt(0).widget()
+    assert btn1.text() == "📎 Doc Real"
+    assert styles.COLORS["danger"] not in btn1.styleSheet()
+    assert "#60a5fa" in btn1.styleSheet()
+    assert btn1.toolTip() == str(real_file)
+
+    # Fila 2: Archivo local faltante
+    row2 = dlg.links_layout.itemAt(1).widget()
+    btn2 = row2.layout().itemAt(0).widget()
+    assert btn2.text() == "📎 Doc Faltante"
+    assert styles.COLORS["danger"] in btn2.styleSheet()
+    assert t("task_detail.link_missing_tooltip", path=str(missing_file)) in btn2.toolTip()
+
+    # Fila 3: Enlace web
+    row3 = dlg.links_layout.itemAt(2).widget()
+    btn3 = row3.layout().itemAt(0).widget()
+    assert btn3.text() == "🔗 GitHub"
+    assert styles.COLORS["danger"] not in btn3.styleSheet()
+    assert "#60a5fa" in btn3.styleSheet()
+    assert btn3.toolTip() == "https://github.com"
+
+    dlg.reject()
+
+
+def test_calendar_view_refresh_skips_when_hidden(qapp, db_path, monkeypatch):
+    """CalendarViewWidget.refresh() omite consultas costosas cuando el widget está oculto,
+    marcando _dirty=True para refrescarse al volver a ser visible."""
+    cal = CalendarViewWidget(db_path)
+    assert cal.isVisible() is False
+    cal._dirty = False
+
+    called = []
+    original_get_scheduled_tasks = database.get_scheduled_tasks
+
+    def mock_get_scheduled_tasks(*args, **kwargs):
+        called.append(True)
+        return original_get_scheduled_tasks(*args, **kwargs)
+
+    monkeypatch.setattr(database, "get_scheduled_tasks", mock_get_scheduled_tasks)
+
+    # Llamar a refresh() mientras está oculto
+    cal.refresh()
+    assert cal._dirty is True
+    assert len(called) == 0  # No ejecutó la consulta pesada
+
+    # Llamar a refresh(force=True)
+    cal.refresh(force=True)
+    assert cal._dirty is False
+    assert len(called) > 0
+
+
+def test_export_dialog_initial_state_and_toggles(qapp, db_path):
+    board_id = database.create_board("Tablero Export", db_path=db_path)
+    dlg = ExportDialog(db_path=db_path, active_board_id=board_id)
+
+    assert dlg.radio_current.isChecked()
+    assert dlg.radio_json.isChecked()
+    assert dlg.check_json_tasks.isEnabled()
+    assert dlg.check_json_tasks.isChecked()
+
+    # Cambiar a CSV: la opción de tareas en JSON se deshabilita
+    dlg.radio_csv.setChecked(True)
+    assert dlg.check_json_tasks.isEnabled() is False
+
+    # Cambiar a Markdown: se habilita la opción de detalles
+    dlg.radio_md.setChecked(True)
+    assert dlg.check_md_details.isEnabled() is True
+
+    dlg.reject()
+
+
+def test_import_confirmation_dialog_initial_state(qapp, db_path):
+    boards_data = [
+        {
+            "name": "B1",
+            "columns": [
+                {"name": "C1", "tasks": [{"title": "T1"}]}
+            ]
+        }
+    ]
+    stats = {"boards": 1, "columns": 1, "tasks": 1}
+    dlg = ImportConfirmationDialog("test.json", boards_data, stats, db_path=db_path)
+
+    assert dlg.radio_full.isChecked()
+    assert dlg.radio_structure.isChecked() is False
+
+    dlg.reject()
+
+

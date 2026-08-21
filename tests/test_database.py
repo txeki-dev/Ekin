@@ -133,6 +133,25 @@ def test_get_task_includes_tags(db_path):
         {"tag_value_id": tag_value_id, "category_id": estado_cat_id,
          "category": "Estado", "value": "Bug", "color": "#ff0000"}
     ]
+    assert task["links"] == []
+
+
+def test_get_task_and_get_tasks_return_consistent_shape(db_path):
+    board_id = database.create_board("Board", db_path=db_path)
+    col_id = database.create_column(board_id, "Col", db_path=db_path)
+    task_id = database.create_task(col_id, "Tarea", db_path=db_path)
+    tag_value_id = database.get_or_create_tag_value("Estado", "Bug", "#ff0000", db_path=db_path)
+    database.set_task_tags(task_id, [tag_value_id], db_path=db_path)
+    link_id = database.add_task_link(task_id, "https://example.com", "Example", db_path=db_path)
+
+    task_single = database.get_task(task_id, db_path)
+    tasks_list = database.get_tasks(col_id, db_path)
+
+    assert len(tasks_list) == 1
+    assert task_single == tasks_list[0]
+    assert task_single["links"] == [
+        {"id": link_id, "task_id": task_id, "url": "https://example.com", "label": "Example", "position": 0}
+    ]
 
 
 def test_update_task(db_path):
@@ -925,6 +944,25 @@ def test_snapshot_and_restore_board_hierarchy(db_path):
     assert len(cols) == 1 and cols[0]["name"] == "Col"
     titles = [t["title"] for t in database.get_tasks(cols[0]["id"], db_path=db_path)]
     assert titles == ["T1", "T2"]
+
+
+def test_snapshot_and_restore_column_hierarchy(db_path):
+    b = database.create_board("Board", db_path=db_path)
+    c = database.create_column(b, "Col1", color="#abcdef", db_path=db_path)
+    t = database.create_task(c, "Task In Col", db_path=db_path)
+    database.create_log(t, "log in task", db_path=db_path)
+
+    snap = database.snapshot_column(c, db_path=db_path)
+    database.delete_column(c, db_path=db_path)
+    assert database.get_column(c, db_path) is None
+
+    nc = database.restore_column(snap, board_id=b, db_path=db_path)
+    col = database.get_column(nc, db_path=db_path)
+    assert col["name"] == "Col1" and col["color"] == "#abcdef"
+    tasks = database.get_tasks(nc, db_path=db_path)
+    assert len(tasks) == 1
+    assert tasks[0]["title"] == "Task In Col"
+    assert [lg["content"] for lg in database.get_logs(tasks[0]["id"], db_path=db_path)] == ["log in task"]
 
 
 # --- Rutas de sincronización .ics por tablero (database.ics_sync) ---

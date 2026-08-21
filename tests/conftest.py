@@ -33,8 +33,16 @@ def _close_top_level_widgets_after_each_test(qapp):
     todos los demás, y es un no-op para lo que un test ya destruyó por su cuenta."""
     yield
     for widget in qapp.topLevelWidgets():
-        widget.close()
-        widget.deleteLater()
+        if hasattr(widget, "close"):
+            try:
+                widget.close()
+            except Exception:
+                pass
+        if hasattr(widget, "deleteLater"):
+            try:
+                widget.deleteLater()
+            except Exception:
+                pass
     qapp.processEvents()
 
 

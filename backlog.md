@@ -3,6 +3,21 @@
 Living planning doc: forensic findings (tech debt) + ideas for future releases.
 Ordered roughly by value/effort. Checkboxes track what's done.
 
+## ✅ Done (2026-08-21 — Advanced Export/Import: Single/All Boards, Column Structure Templates, Full Metadata)
+
+- [x] **Export modal dialog & enhanced formats (`exporter.py`, `export_dialog.py`):**
+  - **Scope:** Export all boards or current active board.
+  - **JSON:** Export full boards with tasks, or column structure only (board templates without tasks).
+  - **Metadata:** Now exports task links/attachments (`task_links`), timer state (`timer_started_at`), linked boards (`linked_board_id`/`linked_board_name`), tag colors, and logs.
+  - **CSV:** Task counts, links count, and single-board filtering support.
+  - **Markdown:** Formatted project reports with task descriptions, links, and log notes.
+- [x] **JSON Import modal dialog & pure importer engine (`importer.py`, `export_dialog.py`):**
+  - Pure parsing with schema detection (`boards`, `board`, or list) and statistics preview.
+  - Interactive import mode: Full import vs. Column structure only (importing any JSON as a clean template without tasks).
+  - Automatic tag category and value creation/reuse with color assignment.
+  - Atomic database insertion with rollback safety and automatic UI selection/refresh.
+  - 203/203 tests passing, ruff clean.
+
 ---
 
 ## ✅ Fixed (2026-08-18, v0.9.6 — TaskDetailDialog click-outside auto-save, title simplification, log layout fixes)
@@ -225,27 +240,13 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
   `create_log`'s premature commit; the dedicated audit this item asked for happened as a side
   effect of removing ~40 redundant *trailing* commits — none were premature/mid-transaction.
   **(P2 — correctness/atomicity)**
-- [ ] **`get_task()` / `get_tasks()` return shape inconsistency** — flagged during the 2026-08-07
-  forensic pass as out of scope for that wave; the two functions don't expose task fields
-  identically, which is a trap for future code that assumes parity between them. **(P2 — consistency)**
-- [ ] **`backups._prune_backups(keep=0)` edge case** — currently unreachable (no UI path sets `keep`
-  to `0`), but the function doesn't guard against it explicitly. Low priority since it can't be hit
-  today. **(P3)**
+- [x] **`get_task()` / `get_tasks()` return shape inconsistency** *(Done 2026-08-21)* — `get_task()` now populates `links` via `get_task_links()`, matching `get_tasks()` exact dictionary shape. **(P2 — consistency)**
+- [x] **`backups._prune_backups(keep=0)` edge case** *(Done 2026-08-21)* — guarded against `keep <= 0` returning early without unintended pruning of all backups. **(P3)**
 - [x] **`restore_task()` loses `task_links` ordering on Ctrl+Z** *(Done 2026-08-10 — see the
   forensic-pass section above.)* Links are now captured and restored with their real `position`.
-- [ ] **`CalendarViewWidget.refresh()` runs even while the calendar isn't visible** — wasteful but
-  harmless (no wrong output, just an avoidable recompute). **(P3 — efficiency)**
-- [ ] **Missing-file link rendering has no automated regression test** — flagged during QA on the
-  2026-08-10 local-file-attachments wave: `_build_link_row`'s red/tooltip path for a local
-  attachment whose file no longer exists on disk was verified manually (real dialog against a temp
-  DB) but the Architect's own test list for that wave didn't include a dedicated `pytest` case for
-  it. Low risk (simple, already-verified logic) but worth locking in next time this file is
-  touched. **(P3 — test coverage)**
-- [ ] **`restore_column`/`restore_board` aren't atomic across their children** — found during the
-  2026-08-10 forensic pass: each nested `restore_task`/`restore_column` call opens its own
-  connection/transaction, so a failure partway through an undo of a multi-task column/board leaves
-  a partially-restored result instead of all-or-nothing. Low practical impact (would need a
-  mid-restore failure, e.g. disk full) — not acted on this pass. **(P3 — atomicity)**
+- [x] **`CalendarViewWidget.refresh()` runs even while the calendar isn't visible** *(Done 2026-08-21)* — `refresh()` skips heavy queries and widget rebuilding when hidden, setting `_dirty=True` to refresh on `showEvent` / `show_calendar_view()`. **(P3 — efficiency)**
+- [x] **Missing-file link rendering has no automated regression test** *(Done 2026-08-21)* — added comprehensive tests in `test_widgets_headless.py` for missing local files (danger color, missing tooltip), existing files (blue, path tooltip), and web links. **(P3 — test coverage)**
+- [x] **`restore_column`/`restore_board` aren't atomic across their children** *(Done 2026-08-21)* — `restore_board` and `restore_column` run all nested child restorations within a single transaction / connection. **(P3 — atomicity)**
 - [x] **No shared cleanup fixture for widget-constructing tests** *(Done 2026-08-10 — see the
   forensic-pass section above.)* Found during the CI-flakiness investigation: dozens of tests
   construct a `BoardViewWidget`/`TaskDetailDialog` without ever closing/deleting it, relying
