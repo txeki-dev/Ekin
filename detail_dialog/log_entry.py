@@ -50,8 +50,11 @@ def fit_html_images(html, max_width=None):
     if "<table" in html.lower():
         def _repl_tbl(match):
             attrs = match.group(1)
-            w_match = re.search(r'\bwidth\s*=\s*["\']?(\d+)["\']?', attrs, re.IGNORECASE)
+            w_match = re.search(r'\bwidth\s*=\s*["\']?(\d+)(px|%)?["\']?', attrs, re.IGNORECASE)
             if w_match:
+                unit = w_match.group(2)
+                if unit == "%":
+                    return match.group(0)
                 orig_w = int(w_match.group(1))
                 target_w = min(orig_w, max_w_int)
             else:
@@ -62,6 +65,24 @@ def fit_html_images(html, max_width=None):
         html = re.sub(r'<table\s+([^>]*?)>', _repl_tbl, html, flags=re.IGNORECASE)
 
     return html
+
+
+def linkify_urls(html_text):
+    """Convierte URLs en texto plano dentro de html_text en enlaces <a href="...">,
+    respetando los enlaces <a> o etiquetas <img> que ya existan."""
+    if not html_text:
+        return html_text
+    pattern = re.compile(r'(<a\s+[^>]*?>[\s\S]*?</a>|<img\s+[^>]*?>)|(https?://[^\s<>"\'`]+)')
+    def _repl(m):
+        if m.group(1):
+            return m.group(1)
+        url = m.group(2)
+        trailing = ""
+        while url and url[-1] in ".,;:!?)":
+            trailing = url[-1] + trailing
+            url = url[:-1]
+        return f'<a href="{url}">{url}</a>{trailing}'
+    return pattern.sub(_repl, html_text)
 
 
 class LogEntryWidget(QFrame):
@@ -127,12 +148,13 @@ class LogEntryWidget(QFrame):
 
         self._layout.addLayout(top_layout)
 
-        # Contenido de la entrada: ajustar imágenes para que no desborden
+        # Contenido de la entrada: ajustar imágenes para que no desborden y activar enlaces
         parent = self.parent()
         max_w = None
         if parent and hasattr(parent, "_chat_image_width"):
             max_w = parent._chat_image_width()
-        content = fit_html_images(log_data["content"], max_w)
+        content = linkify_urls(log_data["content"])
+        content = fit_html_images(content, max_w)
 
         self.content_label = QLabel(content)
         self.content_label.setObjectName("LogContent")
@@ -148,7 +170,7 @@ class LogEntryWidget(QFrame):
         )
         self.content_label.setOpenExternalLinks(False)
         self.content_label.linkActivated.connect(self._on_content_link_activated)
-        if "<img" in log_data["content"]:
+        if "<img" in log_data["content"] or "<a" in content.lower():
             self.content_label.setCursor(Qt.PointingHandCursor)
         self._layout.addWidget(self.content_label)
 
@@ -163,7 +185,8 @@ class LogEntryWidget(QFrame):
                 max_w = parent._chat_image_width()
             else:
                 max_w = 280
-        content = fit_html_images(self.log_data["content"], max_w)
+        content = linkify_urls(self.log_data["content"])
+        content = fit_html_images(content, max_w)
         self.content_label.setText(content)
 
     def _enter_edit_mode(self):
@@ -201,9 +224,13 @@ class LogEntryWidget(QFrame):
         self._editor.setFocus()
 
     def _on_content_link_activated(self, url):
-        """Maneja los enlaces clicados dentro de una entrada ya enviada. Hoy el único
-        tipo de enlace que insertan los editores es una imagen pegada (data URI); el
-        guard explícito deja la puerta abierta a otros tipos de enlace en el futuro sin
-        que acaben abriéndose por error como si fueran una imagen."""
-        if url.startswith("data:image/"):
+        """Maneja los enlaces clicados dentro de una entrada ya enviada (imágenes, URLs web o borrar código)."""
+        if url == "action:delete_code_block":
+            self._enter_edit_mode()
+            return
+        elif url.startswith("data:image/"):
             show_image_preview(url, self)
+        elif url.startswith(("http://", "https://", "mailto:", "file:", "ftp://")):
+            from PySide6.QtGui import QDesktopServices
+            from PySide6.QtCore import QUrl
+            QDesktopServices.openUrl(QUrl(url))

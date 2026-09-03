@@ -7,26 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Added
-- **Advanced Export Modal Dialog (`export_dialog.py`, `exporter.py`):**
-  - Scope selection: export all boards (including archived) or only the active board.
-  - JSON export modes: full export with all tasks, tags, links, logs and timers, or **column structure only (templates)** without tasks.
-  - Comprehensive metadata: exports task links/attachments (`task_links`), timer state (`timer_started_at`), linked boards (`linked_board_id`/`linked_board_name`), tag colors, and logs.
-  - CSV export: includes task count, links count, and single-board filtering.
-  - Markdown report: includes formatted task descriptions, links, and diary logs.
-- **Advanced JSON Import Modal Dialog & Engine (`importer.py`, `export_dialog.py`):**
-  - Pure JSON parser supporting full backups, single-board files, or raw board arrays with structure preview.
-  - Interactive import mode: full restoration or column structure only (importing any file as a clean board template).
-  - Automatic tag category and value resolution in the catalog with persistent colors.
-  - Atomic database transaction with rollback safety, automatic UI selection and reload.
+## [0.9.7] - 2026-09-03
 
-### Fixed & Optimized
-- **Database `get_task()` vs `get_tasks()` Return Shape Parity:** `get_task()` now populates `"links"` via `get_task_links()`.
-- **Atomic Multi-Level Restores:** `restore_board()` and `restore_column()` in `database/snapshots.py` now execute within a shared connection/transaction with immediate rollback on errors.
-- **Calendar Background Efficiency:** `CalendarViewWidget.refresh()` skips heavy SQL queries and layout rebuilds when hidden, refreshing lazily upon becoming visible.
-- **Global Search Due Time Support:** `search_tasks()` now returns `due_time`, `recurrence`, and `timer_started_at`, displaying the time alongside the due date in search result chips.
-- **Deprecated Qt 6 Event Syntaxes:** Resolved all `QMouseEvent` constructor deprecation warnings across test suites.
-- **Test Suite Fortification:** Expanded automated test coverage to 203 passing tests with zero warnings.
+### Added
+- **Syntax-Highlighted Code Blocks in Task Description & Diary/Chat:**
+  - Integrated `pygments` (Monokai dark theme) rendering syntax-highlighted code inside fluid, self-contained monospace tables.
+  - Added dedicated `CodeBlockDialog` with support for major languages (Python, JavaScript, TypeScript, HTML, CSS, SQL, Bash, JSON, C/C++, C#, Rust, Go, Java, PHP, YAML, Markdown, Plain text).
+  - Added markdown shortcut: typing ```` ``` ```` or ```` ```<lang> ```` on a new line and pressing `Enter` opens the code block dialog directly.
+  - Interactive deletion: added a red `✕ Borrar` action directly on code block headers, a right-click context menu (`🗑️ Eliminar bloque de código`), and `Backspace` handling to delete the entire table structure cleanly.
+- **Horizontal Separator Rules (`---`):**
+  - Typing a third hyphen `-` on an empty line or pressing `Enter` over `---`, `___`, `***` or `—-` converts the line into a fluid full-width `<hr />`.
+  - Added dedicated separator button (`―`) on `RichTextToolbar`.
+- **Text Color Palette Picker:**
+  - Added `A` button with active color underline indicator and a curated palette (Red, Orange, Amber, Green, Cyan, Blue, Purple, Pink, Muted Gray, and Default).
+  - Includes custom color picker (`QColorDialog`) allowing any hex color to be applied to selected text or active typing cursor.
+- **Active Web Hyperlinks Preservation:**
+  - Pasting URLs over selected text automatically creates clickable `<a href="...">` anchors.
+  - Added `LinkDialog` (`🔗`) on toolbar for inserting and editing links.
+  - Automatic linkification of raw URLs in published chat entries (`linkify_urls`).
+  - Native browser dispatch (`QDesktopServices.openUrl`) when clicking web links in the editor or chat.
+- **Advanced Export & Import System (`export_dialog.py`, `exporter.py`, `importer.py`):**
+  - Multi-scope export (all boards or active board) in full data mode or column structure templates without tasks.
+  - Multi-format support (JSON, CSV, Markdown) with complete task metadata, links, timers, tags, and logs.
+  - Pure JSON importer with preview, tag resolution, atomic database transaction with rollback safety.
+
+### Fixed
+- **PySide6 Signal Type Safety in `open_code_dialog`:** Resolved `TypeError: setPlainText(bool)` caused by `QPushButton.clicked` emitting boolean state to optional string argument.
+- **QSS Font Point Size Warning:** Resolved `QFont::setPointSize: Point size <= 0 (-1)` by inheriting parent widget font configurations instead of uninitialized `QFont()` constructors.
+- **Fluid Table & Code Block Sizing in Chat:** Updated `fit_html_images()` in `detail_dialog/log_entry.py` to preserve percentage widths (`width="100%"`) and prevent code block tables from shrinking.
+- **Test Suite Fortification:** Expanded automated test suite to 213 passing tests with 0 failures and 0 warnings.
 
 ## [0.9.6] - 2026-08-18
 

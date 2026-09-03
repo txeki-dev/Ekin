@@ -3,6 +3,16 @@
 Living planning doc: forensic findings (tech debt) + ideas for future releases.
 Ordered roughly by value/effort. Checkboxes track what's done.
 
+## ✅ Shipped (2026-09-03, v0.9.7 — Rich Text Formatting Wave: Syntax-Highlighted Code Blocks, Horizontal Rules, Text Color Palette, Web Links & Deletion)
+
+- [x] **Syntax-highlighted code blocks (`MarkdownTextEdit`, `pygments`):** Monokai dark styling, language selector (`CodeBlockDialog`), markdown shortcut (```` ``` ```` + Enter), fluid 100% responsive tables in description and chat, and 3 deletion mechanisms (button `✕ Borrar`, right-click context menu, and empty cell Backspace).
+- [x] **Horizontal separator rules (`---`):** Typing `---` or pressing Enter on hyphens converts to full-width `<hr />`, with dedicated `―` toolbar button.
+- [x] **Text color palette picker (`RichTextToolbar`):** Palette popup with 9 modern presets, custom color dialog (`QColorDialog`), and active color underline indicator.
+- [x] **Preservation and active dispatch of web links (`🔗`):** Pasting URLs wraps selected text, dedicated link dialog, auto-linkification of plain text URLs in chat comments (`linkify_urls`), and external browser dispatch via `QDesktopServices.openUrl()`.
+- [x] **213/213 automated tests passing, ruff clean. Cut as v0.9.7.**
+
+---
+
 ## ✅ Done (2026-08-21 — Advanced Export/Import: Single/All Boards, Column Structure Templates, Full Metadata)
 
 - [x] **Export modal dialog & enhanced formats (`exporter.py`, `export_dialog.py`):**
@@ -553,6 +563,10 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
    from invalid `12.5px` to `13px` (resolving vertical text collapse on edited comments);
    eliminated horizontal overflow on chat cards with image bounding and margin cleanup.
    189/189 tests passing (6 new), ruff clean. Cut as **v0.9.6**.~~ ✅ 2026-08-18.
+23. ~~**Rich Text Formatting Wave: Syntax-Highlighted Code Blocks, Horizontal Rules, Text Color Palette, Web Links & Deletion** —
+   Pygments code blocks with language dialog, markdown shortcut and 3-way deletion; separator line `---`; text color picker;
+   URL link preservation and browser opening; full regression coverage.
+   213/213 tests passing (10 new), ruff clean. Cut as **v0.9.7**.~~ ✅ 2026-09-03.
 
 ### 🎯 Theme D — Distribution (parked)
 **PyInstaller** standalone build + **update-from-Releases** (replaces the `git pull` auto-updater).

@@ -7,7 +7,10 @@ from datetime import date, datetime, timedelta
 
 import pytest
 from PySide6.QtCore import Qt, QPoint, QPointF, QMimeData, QEvent
-from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDropEvent, QImage, QMouseEvent
+from PySide6.QtGui import (
+    QDragEnterEvent, QDragLeaveEvent, QDropEvent, QImage, QMouseEvent,
+    QTextCursor, QKeyEvent
+)
 from PySide6.QtWidgets import QLabel, QPushButton, QWidget
 
 import database
@@ -605,6 +608,167 @@ def test_markdown_text_edit_drag_does_not_open_preview(qapp, monkeypatch):
     editor.mouseReleaseEvent(release)
 
     assert calls == []
+
+
+def test_markdown_text_edit_insert_horizontal_rule(qapp):
+    """insert_horizontal_rule() inserta una etiqueta <hr /> visible en el HTML."""
+    editor = markdown_edit_module.MarkdownTextEdit()
+    editor.setPlainText("Línea 1\nLínea 2")
+    editor.insert_horizontal_rule()
+    html = editor.toHtml()
+    assert "<hr" in html.lower()
+
+
+def test_markdown_text_edit_three_hyphens_creates_hr(qapp):
+    """Escribir '---' o pulsar Enter sobre '---' inserta automáticamente una línea separadora."""
+    editor = markdown_edit_module.MarkdownTextEdit()
+    editor.setPlainText("--")
+    cursor = editor.textCursor()
+    cursor.movePosition(QTextCursor.End)
+    editor.setTextCursor(cursor)
+
+    # Pulsar el 3er guion '-'
+    ev = QKeyEvent(QEvent.Type.KeyPress, Qt.Key_Minus, Qt.NoModifier, "-")
+    editor.keyPressEvent(ev)
+    assert "<hr" in editor.toHtml().lower()
+
+    # Probar también con Enter sobre "---"
+    editor2 = markdown_edit_module.MarkdownTextEdit()
+    editor2.setPlainText("---")
+    cursor2 = editor2.textCursor()
+    cursor2.movePosition(QTextCursor.End)
+    editor2.setTextCursor(cursor2)
+    ev_enter = QKeyEvent(QEvent.Type.KeyPress, Qt.Key_Return, Qt.NoModifier)
+    editor2.keyPressEvent(ev_enter)
+    assert "<hr" in editor2.toHtml().lower()
+
+
+def test_markdown_text_edit_code_block_formatting(qapp):
+    """format_code_block_html() aplica pygments y insert_code_block() lo embebe en el editor."""
+    code = "def suma(a, b):\n    return a + b"
+    html_block = markdown_edit_module.format_code_block_html(code, "python")
+    assert "<table" in html_block.lower()
+    assert "<pre" in html_block.lower()
+    assert "PYTHON" in html_block
+
+    editor = markdown_edit_module.MarkdownTextEdit()
+    editor.insert_code_block(code, "python")
+    out_html = editor.toHtml()
+    assert "<table" in out_html.lower()
+    assert "suma" in out_html
+
+
+def test_markdown_text_edit_delete_code_block_via_action(qapp, monkeypatch):
+    """Hacer clic en '✕ Borrar' en la cabecera del bloque de código elimina la tabla por completo."""
+    editor = markdown_edit_module.MarkdownTextEdit()
+    editor.insert_code_block("x = 10", "python")
+    assert "<table" in editor.toHtml().lower()
+
+    # Simular clic en el enlace action:delete_code_block
+    monkeypatch.setattr(editor, "anchorAt", lambda pos: "action:delete_code_block")
+    editor._press_pos = QPoint(5, 5)
+    pos = QPointF(5, 5)
+    release = QMouseEvent(QEvent.Type.MouseButtonRelease, pos, pos, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    editor.mouseReleaseEvent(release)
+
+    assert "<table" not in editor.toHtml().lower()
+    assert "x = 10" not in editor.toPlainText()
+
+
+def test_markdown_text_edit_open_code_dialog_bool_safe(qapp, monkeypatch):
+    """open_code_dialog() no falla si se le pasa un booleano desde la señal clicked de un botón."""
+    editor = markdown_edit_module.MarkdownTextEdit()
+    # Simular que QDialog.exec devuelve Rejected para no bloquear el test
+    monkeypatch.setattr(markdown_edit_module.CodeBlockDialog, "exec", lambda self: 0)
+    # No debe levantar TypeError: PySide6.QtWidgets.QPlainTextEdit.setPlainText(bool)
+    editor.open_code_dialog(False)
+    editor.open_code_dialog(True)
+    editor.open_code_dialog(None)
+
+
+def test_markdown_text_edit_text_color_formatting(qapp):
+    """apply_text_color aplica el color especificado al texto seleccionado."""
+    editor = markdown_edit_module.MarkdownTextEdit()
+    toolbar = markdown_edit_module.RichTextToolbar(editor)
+    editor.setPlainText("Texto coloreado")
+    cursor = editor.textCursor()
+    cursor.setPosition(0)
+    cursor.setPosition(5, QTextCursor.KeepAnchor)
+    editor.setTextCursor(cursor)
+
+    toolbar.apply_text_color("#ef4444")
+    html = editor.toHtml()
+    assert "#ef4444" in html.lower()
+
+
+def test_markdown_text_edit_paste_url_wraps_or_inserts_link(qapp):
+    """Pegar una URL envuelve el texto seleccionado en un enlace <a href>, o inserta el enlace directo."""
+    editor = markdown_edit_module.MarkdownTextEdit()
+    editor.setPlainText("visita mi web")
+    cursor = editor.textCursor()
+    cursor.setPosition(10)
+    cursor.setPosition(13, QTextCursor.KeepAnchor)
+    editor.setTextCursor(cursor)
+
+    mime = QMimeData()
+    mime.setText("https://ekin.app")
+    editor.insertFromMimeData(mime)
+
+    html = editor.toHtml()
+    assert '<a href="https://ekin.app"' in html
+    assert "web" in html
+
+
+def test_markdown_text_edit_click_external_link_opens_browser(qapp, monkeypatch):
+    """Hacer clic en un enlace web dentro del editor abre el navegador mediante QDesktopServices."""
+    from PySide6.QtGui import QDesktopServices
+    calls = []
+    monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: calls.append(url.toString()))
+
+    editor = markdown_edit_module.MarkdownTextEdit()
+    monkeypatch.setattr(editor, "anchorAt", lambda pos: "https://github.com/txeki/ekin")
+
+    pos = QPointF(10, 10)
+    press = QMouseEvent(QEvent.Type.MouseButtonPress, pos, pos, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    release = QMouseEvent(QEvent.Type.MouseButtonRelease, pos, pos, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    editor.mousePressEvent(press)
+    editor.mouseReleaseEvent(release)
+
+    assert calls == ["https://github.com/txeki/ekin"]
+
+
+def test_log_entry_linkify_and_external_link_open(qapp, monkeypatch):
+    """LogEntryWidget convierte URLs sin enlace en hipervínculos clicables y los abre con openUrl."""
+    from PySide6.QtGui import QDesktopServices
+    calls = []
+    monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: calls.append(url.toString()))
+
+    log_data = {
+        "id": 1,
+        "content": "Revisa https://github.com/txeki/ekin para novedades.",
+        "created_at": "2026-08-12 10:00:00",
+    }
+    widget = LogEntryWidget(log_data, lambda *a: None, lambda *a: None)
+    assert '<a href="https://github.com/txeki/ekin"' in widget.content_label.text()
+
+    widget._on_content_link_activated("https://github.com/txeki/ekin")
+    assert calls == ["https://github.com/txeki/ekin"]
+
+
+def test_rich_text_toolbar_all_buttons_exist(qapp):
+    """Verifica que la barra de formato contiene todos los botones requeridos."""
+    editor = markdown_edit_module.MarkdownTextEdit()
+    tb = markdown_edit_module.RichTextToolbar(editor)
+    assert hasattr(tb, "bold_btn")
+    assert hasattr(tb, "italic_btn")
+    assert hasattr(tb, "strike_btn")
+    assert hasattr(tb, "color_btn")
+    assert hasattr(tb, "bullet_btn")
+    assert hasattr(tb, "hr_btn")
+    assert hasattr(tb, "table_btn")
+    assert hasattr(tb, "code_btn")
+    assert hasattr(tb, "link_btn")
+    assert hasattr(tb, "arrow_btn")
 
 
 def test_log_entry_widget_routes_image_link_to_preview(qapp, monkeypatch):
