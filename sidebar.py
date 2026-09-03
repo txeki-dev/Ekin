@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QColor, QPixmap, QIcon
 from datetime import date, datetime, timedelta
 import database
+import board_sync
 import styles
 import importer
 from export_dialog import ExportDialog, ImportConfirmationDialog
@@ -109,14 +110,16 @@ class BoardButton(QFrame):
     clicked = Signal(int)  # Emite el board_id cuando se pulsa
     column_dropped = Signal(int, int)  # column_id, target_board_id (al soltar una columna arrastrada)
     archive_toggle_requested = Signal(int, bool)  # board_id, nuevo estado archivado
+    sync_action_requested = Signal(int, str)  # board_id, acción ("sync", "link", "unlink")
 
-    def __init__(self, board_id, name, color, active=False, archived=False, parent=None):
+    def __init__(self, board_id, name, color, active=False, archived=False, sync_path=None, parent=None):
         super().__init__(parent)
         self.board_id = board_id
         self.name = name
         self.color = color
         self.active = active
         self.archived = archived
+        self.sync_path = sync_path
 
         self.setCursor(Qt.PointingHandCursor)
         self.setFixedHeight(40)
@@ -129,11 +132,19 @@ class BoardButton(QFrame):
         layout.setContentsMargins(12, 6, 12, 6)
         layout.setSpacing(6)
 
-        self.label = QLabel(("🗄 " + self.name) if self.archived else self.name)
+        display_name = self.name
+        if self.archived:
+            display_name = "🗄 " + display_name
+        elif self.sync_path:
+            display_name = "☁️ " + display_name
+
+        self.label = QLabel(display_name)
         self.label.setStyleSheet("font-weight: bold; background: transparent; border: none; color: inherit;")
         self.label.setWordWrap(False)
         if self.archived:
             self.setToolTip(t("sidebar.board_button.archived_tooltip"))
+        elif self.sync_path:
+            self.setToolTip(f"{self.name}\nSincronizado con: {self.sync_path}")
         layout.addWidget(self.label)
         layout.addStretch()
 
@@ -142,11 +153,27 @@ class BoardButton(QFrame):
     def contextMenuEvent(self, event):
         menu = QMenu(self)
         styles.style_menu(menu)
-        action = menu.addAction(
+        sync_act = None
+        unlink_act = None
+        link_act = None
+        if self.sync_path:
+            sync_act = menu.addAction(t("sync.menu_sync_now"))
+            unlink_act = menu.addAction(t("sync.menu_unlink"))
+        else:
+            link_act = menu.addAction(t("sync.link_btn"))
+        menu.addSeparator()
+        archive_act = menu.addAction(
             t("sidebar.board_button.menu_unarchive") if self.archived else t("sidebar.board_button.menu_archive")
         )
-        if menu.exec(event.globalPos()) == action:
+        selected = menu.exec(event.globalPos())
+        if selected == archive_act:
             self.archive_toggle_requested.emit(self.board_id, not self.archived)
+        elif sync_act and selected == sync_act:
+            self.sync_action_requested.emit(self.board_id, "sync")
+        elif unlink_act and selected == unlink_act:
+            self.sync_action_requested.emit(self.board_id, "unlink")
+        elif link_act and selected == link_act:
+            self.sync_action_requested.emit(self.board_id, "link")
 
     def update_style(self):
         try:
@@ -560,10 +587,12 @@ class SidebarWidget(QFrame):
             is_active = (board_id == self.active_board_id)
             
             btn = BoardButton(board_id, board["name"], board["color"], active=is_active,
-                              archived=bool(board.get("archived", 0)), parent=self)
+                              archived=bool(board.get("archived", 0)),
+                              sync_path=board.get("sync_path"), parent=self)
             btn.clicked.connect(self.select_board)
             btn.column_dropped.connect(self.handle_column_dropped)
             btn.archive_toggle_requested.connect(self.handle_archive_toggle)
+            btn.sync_action_requested.connect(self.handle_sync_action)
             self.boards_layout.addWidget(btn)
             self.board_buttons[board_id] = btn
 
@@ -583,6 +612,50 @@ class SidebarWidget(QFrame):
             self.active_board_id = None
         self.reload_boards()
         self.board_changed.emit()
+
+    def handle_sync_action(self, board_id, action):
+        """Gestiona las acciones de sincronización solicitadas desde el menú contextual de un tablero."""
+        if action == "sync":
+            res = board_sync.sync_board_with_file(board_id, db_path=self.db_path)
+            if res.status == "error":
+                QMessageBox.warning(self, t("sync.error_title"), res.message)
+            else:
+                self.reload_boards(select_board_id=self.active_board_id)
+                self.board_changed.emit()
+                if res.status == "merged" and res.conflicts_resolved > 0:
+                    QMessageBox.information(
+                        self,
+                        t("sync.success_title"),
+                        t("sync.conflict_merged_toast") + f"\n({res.conflicts_resolved} conflicto(s) archivado(s) en el diario)."
+                    )
+        elif action == "link":
+            board = database.get_board(board_id, self.db_path)
+            board_name = (board["name"] if board else "tablero").strip().replace(" ", "_")
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                t("sync.dialog_title_link"),
+                f"{board_name}.ekboard",
+                t("sync.dialog_filter")
+            )
+            if file_path:
+                res = board_sync.sync_board_with_file(board_id, file_path, self.db_path)
+                if res.status != "error":
+                    self.reload_boards(select_board_id=self.active_board_id)
+                    self.board_changed.emit()
+                else:
+                    QMessageBox.warning(self, t("sync.error_title"), res.message)
+        elif action == "unlink":
+            reply = QMessageBox.question(
+                self,
+                t("sync.unlink_confirm_title"),
+                t("sync.unlink_confirm_body"),
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if reply == QMessageBox.Yes:
+                database.unlink_board_sync(board_id, self.db_path)
+                self.reload_boards(select_board_id=self.active_board_id)
+                self.board_changed.emit()
 
     def show_export_dialog(self):
         """Abre el diálogo modal de exportación (JSON/CSV/MD, todo o tablero activo)."""

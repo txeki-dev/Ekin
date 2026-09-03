@@ -1,10 +1,13 @@
-from PySide6.QtCore import Qt, Signal, QSize, QTimer
+import os
+from PySide6.QtCore import Qt, Signal, QSize, QTimer, QFileSystemWatcher, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QInputDialog, QMessageBox, QDialog, QLineEdit, QColorDialog,
-    QComboBox
+    QComboBox, QFileDialog, QMenu
 )
 import database
+import board_sync
 import styles
 from styles import hex_to_rgb
 from strings import t
@@ -209,6 +212,7 @@ class BoardViewWidget(QFrame):
         # Columna actualmente expandida por HOVER durante un arrastre en curso (o None).
         # Vive aquí (no en ColumnWidget) porque load_board() recrea todos los ColumnWidget.
         self._hover_expanded_column_id = None
+        self.selected_task_ids = set()
         self.setObjectName("BoardViewWidget")
 
         self._timer_badge_refresh_timer = QTimer(self)
@@ -216,6 +220,7 @@ class BoardViewWidget(QFrame):
         self._timer_badge_refresh_timer.start(60_000)  # refresca las insignias cada 60s
 
         self.init_ui()
+        self.data_changed.connect(self._trigger_auto_sync_export)
 
     def _refresh_current(self):
         if self.board_id and self.board_id != -1:
@@ -285,6 +290,12 @@ class BoardViewWidget(QFrame):
         header_layout.addWidget(self.board_title_label)
         header_layout.addStretch()
 
+        # Botón de Sincronización OneDrive / Carpeta compartida
+        self.sync_btn = QPushButton(t("sync.link_btn"))
+        self.sync_btn.setCursor(Qt.PointingHandCursor)
+        self.sync_btn.clicked.connect(self._on_sync_btn_clicked)
+        header_layout.addWidget(self.sync_btn)
+
         self.main_layout.addWidget(self.board_header)
         self.board_header.hide()
 
@@ -325,6 +336,40 @@ class BoardViewWidget(QFrame):
 
         self.board_scroll_area.setWidget(self.board_content)
         self.main_layout.addWidget(self.board_scroll_area)
+
+        # 3. Barra de acción para selección múltiple de tarjetas
+        self.selection_bar = QFrame()
+        self.selection_bar.setObjectName("SelectionBar")
+        self.selection_bar.setFixedHeight(50)
+        self.selection_bar.setStyleSheet(f"""
+            #SelectionBar {{
+                background-color: {styles.COLORS['bg_sidebar']};
+                border-top: 1.5px solid {styles.COLORS['accent_blue']};
+            }}
+        """)
+        sel_layout = QHBoxLayout(self.selection_bar)
+        sel_layout.setContentsMargins(20, 0, 20, 0)
+        sel_layout.setSpacing(12)
+
+        self.selection_bar_label = QLabel(t("ai_spec.selection_count", count=0))
+        self.selection_bar_label.setStyleSheet(f"font-size: 13px; font-weight: bold; color: {styles.COLORS['text_main']};")
+        sel_layout.addWidget(self.selection_bar_label)
+
+        sel_layout.addStretch()
+
+        self.ai_spec_btn = QPushButton(t("ai_spec.generate_spec_btn"))
+        self.ai_spec_btn.setObjectName("PrimaryButton")
+        self.ai_spec_btn.setCursor(Qt.PointingHandCursor)
+        self.ai_spec_btn.clicked.connect(self.open_ai_spec_dialog)
+        sel_layout.addWidget(self.ai_spec_btn)
+
+        self.clear_sel_btn = QPushButton(t("ai_spec.clear_selection_btn"))
+        self.clear_sel_btn.setCursor(Qt.PointingHandCursor)
+        self.clear_sel_btn.clicked.connect(self.clear_task_selection)
+        sel_layout.addWidget(self.clear_sel_btn)
+
+        self.main_layout.addWidget(self.selection_bar)
+        self.selection_bar.hide()
         
         # Por defecto ocultamos la zona del tablero hasta cargar uno
         self.board_scroll_area.hide()
@@ -354,7 +399,10 @@ class BoardViewWidget(QFrame):
                 if board_info:
                     card.set_card_style(board_info["color"])
                 card.set_timer_alert_hours(timer_alert_hours)
+                if card.task_id in self.selected_task_ids:
+                    card.set_selected(True)
                 card.clicked.connect(lambda tid, cid=col_data["id"]: self._handle_task_card_clicked(tid, cid))
+                card.ctrl_clicked.connect(lambda tid, cid=col_data["id"]: self._handle_task_ctrl_clicked(tid, cid))
                 card.board_link_clicked.connect(self.board_link_activated.emit)
                 card.drag_ended.connect(self.finalize_hover_expand)
                 col_widget.add_task_card(card)
@@ -407,12 +455,15 @@ class BoardViewWidget(QFrame):
         """Carga las columnas y tareas de un tablero específico. `notify=False` evita
         emitir data_changed cuando la carga es solo navegación (cambio de tablero,
         recarga de tema, arranque) y no refleja una mutación real de datos."""
+        if self.board_id != board_id:
+            self.selected_task_ids.clear()
         self.board_id = board_id
 
         if board_id == -1:
             # Mostrar pantalla de bienvenida
             self.board_scroll_area.hide()
             self.board_header.hide()
+            self.selection_bar.hide()
             self.welcome_widget.show()
             self.clear_columns_layout()
             self.setStyleSheet("")
@@ -486,8 +537,221 @@ class BoardViewWidget(QFrame):
 
         self.columns_layout.addWidget(self.add_column_card)
 
+        # Actualizar botón de sincronización y file watcher reactivo
+        self._update_sync_ui(board_id)
+
+        # Actualizar visibilidad de selección múltiple
+        self._update_cards_selection_ui()
+
         if notify:
             self.data_changed.emit()
+
+    def _update_sync_ui(self, board_id):
+        """Actualiza el botón y estado de sincronización con OneDrive."""
+        sync_info = database.get_board_sync_info(board_id, self.db_path)
+        self._current_sync_info = sync_info
+        if sync_info and sync_info.get("sync_path"):
+            path = sync_info["sync_path"]
+            self.sync_btn.setText(t("sync.synced_badge"))
+            last_sync = sync_info.get("last_synced_at") or "-"
+            self.sync_btn.setToolTip(f"Sincronizado con:\n{path}\nÚltima sincronización: {last_sync}")
+            self.sync_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(16, 185, 129, 0.15);
+                    border: 1px solid rgba(16, 185, 129, 0.4);
+                    border-radius: 6px;
+                    color: #10b981;
+                    padding: 4px 10px;
+                    font-size: 12px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: rgba(16, 185, 129, 0.25);
+                    border-color: #10b981;
+                }
+            """)
+            self._setup_file_watcher(path)
+        else:
+            self.sync_btn.setText(t("sync.link_btn"))
+            self.sync_btn.setToolTip(t("sync.link_tooltip"))
+            self.sync_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: transparent;
+                    border: 1px solid {styles.COLORS['border']};
+                    border-radius: 6px;
+                    color: {styles.COLORS['text_muted']};
+                    padding: 4px 10px;
+                    font-size: 12px;
+                }}
+                QPushButton:hover {{
+                    background-color: {styles.COLORS['bg_card']};
+                    border-color: {styles.COLORS['accent_blue']};
+                    color: {styles.COLORS['text_main']};
+                }}
+            """)
+            self._setup_file_watcher(None)
+
+    def _setup_file_watcher(self, path):
+        """Configura el watcher para detectar reactivamente cambios externos en el archivo .ekboard."""
+        if not hasattr(self, "_file_watcher"):
+            self._file_watcher = QFileSystemWatcher(self)
+            self._file_watcher.fileChanged.connect(self._on_sync_file_changed)
+            self._sync_debounce_timer = QTimer(self)
+            self._sync_debounce_timer.setSingleShot(True)
+            self._sync_debounce_timer.setInterval(600)
+            self._sync_debounce_timer.timeout.connect(self._on_debounced_file_sync)
+
+        existing = self._file_watcher.files()
+        if existing:
+            self._file_watcher.removePaths(existing)
+        if path and os.path.exists(path):
+            self._file_watcher.addPath(path)
+            self._watched_sync_path = path
+        else:
+            self._watched_sync_path = None
+
+    def _on_sync_file_changed(self, path):
+        """Evento de cambio detectado por el sistema de archivos (OneDrive)."""
+        self._sync_debounce_timer.start()
+
+    def _on_debounced_file_sync(self):
+        """Ejecuta la sincronización en diferido cuando OneDrive termina de escribir."""
+        if not self.board_id or self.board_id == -1:
+            return
+        res = board_sync.sync_board_with_file(self.board_id, db_path=self.db_path)
+        if res.status in ("imported", "merged"):
+            self.load_board(self.board_id, notify=False)
+        # Re-añadir al watcher si OneDrive reemplazó el archivo
+        if hasattr(self, "_watched_sync_path") and self._watched_sync_path:
+            if self._watched_sync_path not in self._file_watcher.files() and os.path.exists(self._watched_sync_path):
+                self._file_watcher.addPath(self._watched_sync_path)
+
+    def _trigger_auto_sync_export(self):
+        """Exporta cambios locales en segundo plano si el tablero está vinculado."""
+        if hasattr(self, "board_id") and self.board_id and self.board_id != -1:
+            sync_info = database.get_board_sync_info(self.board_id, self.db_path)
+            if sync_info and sync_info.get("sync_path"):
+                board_sync.sync_board_with_file(self.board_id, db_path=self.db_path)
+
+    def _on_sync_btn_clicked(self):
+        """Maneja el clic en el botón de sincronización de la cabecera."""
+        if not self.board_id or self.board_id == -1:
+            return
+        sync_info = database.get_board_sync_info(self.board_id, self.db_path)
+        if not sync_info or not sync_info.get("sync_path"):
+            # Diálogo para vincular a OneDrive / carpeta compartida
+            board_name = self.board_title_label.text().strip().replace(" ", "_")
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                t("sync.dialog_title_link"),
+                f"{board_name}.ekboard",
+                t("sync.dialog_filter")
+            )
+            if file_path:
+                res = board_sync.sync_board_with_file(self.board_id, file_path, self.db_path)
+                if res.status != "error":
+                    self.load_board(self.board_id)
+                    parent_win = self.window()
+                    if hasattr(parent_win, "sidebar"):
+                        parent_win.sidebar.reload_boards()
+                else:
+                    QMessageBox.warning(self, t("sync.error_title"), res.message)
+        else:
+            # Menú de opciones del tablero ya vinculado
+            menu = QMenu(self)
+            styles.style_menu(menu)
+            sync_now_act = menu.addAction(t("sync.menu_sync_now"))
+            open_loc_act = menu.addAction(t("sync.menu_open_location"))
+            menu.addSeparator()
+            unlink_act = menu.addAction(t("sync.menu_unlink"))
+
+            chosen = menu.exec(self.sync_btn.mapToGlobal(self.sync_btn.rect().bottomLeft()))
+            if chosen == sync_now_act:
+                self.sync_current_board_now()
+            elif chosen == open_loc_act:
+                folder = os.path.dirname(os.path.abspath(sync_info["sync_path"]))
+                if os.path.exists(folder):
+                    QDesktopServices.openUrl(QUrl.fromLocalFile(folder))
+            elif chosen == unlink_act:
+                reply = QMessageBox.question(
+                    self,
+                    t("sync.unlink_confirm_title"),
+                    t("sync.unlink_confirm_body"),
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No
+                )
+                if reply == QMessageBox.Yes:
+                    database.unlink_board_sync(self.board_id, self.db_path)
+                    self.load_board(self.board_id)
+                    parent_win = self.window()
+                    if hasattr(parent_win, "sidebar"):
+                        parent_win.sidebar.reload_boards()
+
+    def sync_current_board_now(self):
+        """Sincroniza el tablero actual inmediatamente y notifica si hubo fusión."""
+        if not self.board_id or self.board_id == -1:
+            return
+        res = board_sync.sync_board_with_file(self.board_id, db_path=self.db_path)
+        if res.status == "error":
+            QMessageBox.warning(self, t("sync.error_title"), res.message)
+        else:
+            if res.status in ("imported", "merged"):
+                self.load_board(self.board_id, notify=False)
+            if res.status == "merged" and res.conflicts_resolved > 0:
+                QMessageBox.information(
+                    self,
+                    t("sync.success_title"),
+                    t("sync.conflict_merged_toast") + f"\n({res.conflicts_resolved} conflicto(s) archivado(s) en el diario)."
+                )
+
+    # --- SELECCIÓN MÚLTIPLE DE TARJETAS & IA LOCAL ---
+
+    def _handle_task_ctrl_clicked(self, task_id, column_id):
+        """Alterna el estado de selección múltiple de una tarjeta mediante Ctrl+Clic."""
+        self._set_last_active_column(column_id)
+        if task_id in self.selected_task_ids:
+            self.selected_task_ids.remove(task_id)
+        else:
+            self.selected_task_ids.add(task_id)
+        self._update_cards_selection_ui()
+
+    def _update_cards_selection_ui(self):
+        """Actualiza el estado visual de selección en todas las tarjetas y la barra inferior."""
+        for col_widget in self.column_widgets.values():
+            for card in col_widget.findChildren(TaskCard):
+                card.set_selected(card.task_id in self.selected_task_ids)
+
+        count = len(self.selected_task_ids)
+        if count > 0:
+            self.selection_bar.show()
+            self.selection_bar_label.setText(t("ai_spec.selection_count", count=count))
+        else:
+            self.selection_bar.hide()
+
+    def clear_task_selection(self):
+        """Deselecciona todas las tareas activas."""
+        self.selected_task_ids.clear()
+        self._update_cards_selection_ui()
+
+    def open_ai_spec_dialog(self):
+        """Abre el generador modal de especificaciones para agentes de IA."""
+        if not self.selected_task_ids:
+            return
+        from ai_spec_dialog import AiSpecDialog
+        dlg = AiSpecDialog(list(self.selected_task_ids), self.board_id, self.db_path, parent=self)
+        if dlg.exec():
+            # Si el diálogo creó una tarjeta con la SPEC generada, recargar el tablero
+            self.load_board(self.board_id)
+            self.clear_task_selection()
+
+    def keyPressEvent(self, event):
+        """Escape deselecciona tarjetas múltiples."""
+        if event.key() == Qt.Key_Escape and self.selected_task_ids:
+            self.clear_task_selection()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
 
     def clear_columns_layout(self):
         """Limpia todos los widgets del layout de columnas."""

@@ -153,6 +153,8 @@ def compute_drop_index(cards_geom, drop_y, dragged_id):
 class TaskCard(QFrame):
     # Emitido cuando se hace click en la tarjeta (y no se ha arrastrado)
     clicked = Signal(int)  # task_id
+    # Emitido al pulsar Ctrl + Clic para selección múltiple
+    ctrl_clicked = Signal(int)  # task_id
     # Emitido al pulsar la pastilla de tablero enlazado (no abre el detalle de la tarea)
     board_link_clicked = Signal(int)  # linked_board_id
     # Emitido al terminar CUALQUIER arrastre de esta tarjeta (soltada donde sea, o cancelado):
@@ -166,19 +168,36 @@ class TaskCard(QFrame):
         self.drag_start_position = QPoint()
         self.board_color_hex = "#3b82f6"
         self._timer_alert_hours = 24
+        self.is_selected = False
 
         self.setObjectName("TaskCardFrame")
         self.setAttribute(Qt.WA_StyledBackground, True)
         self.init_ui()
 
-    def set_card_style(self, board_color_hex):
-        """Aplica dinámicamente el estilo a la tarjeta basándose en el color de fondo del tablero."""
-        self.board_color_hex = board_color_hex
+    def set_card_style(self, board_color_hex=None):
+        """Aplica dinámicamente el estilo a la tarjeta basándose en el color de fondo del tablero
+        o su estado de selección."""
+        if board_color_hex is not None:
+            self.board_color_hex = board_color_hex
+
+        if getattr(self, "is_selected", False):
+            self.setStyleSheet(f"""
+                #TaskCardFrame {{
+                    background-color: rgba(59, 130, 246, 0.22);
+                    border: 2px solid {styles.COLORS['accent_blue']};
+                    border-radius: 8px;
+                }}
+                #TaskCardFrame:hover {{
+                    background-color: rgba(59, 130, 246, 0.32);
+                    border: 2px solid #60a5fa;
+                }}
+            """)
+            return
 
         # Color base de la ventana, según el tema activo (oscuro o claro)
         base_r, base_g, base_b = hex_to_rgb(styles.COLORS['bg_main'])
         try:
-            r, g, b = hex_to_rgb(board_color_hex)
+            r, g, b = hex_to_rgb(self.board_color_hex)
         except Exception:
             r, g, b = 59, 130, 246
 
@@ -200,16 +219,46 @@ class TaskCard(QFrame):
             }}
         """)
 
+    def set_selected(self, selected: bool):
+        """Activa o desactiva el estado visual de selección múltiple."""
+        self.is_selected = selected
+        if hasattr(self, "selection_badge"):
+            self.selection_badge.setVisible(selected)
+        self.set_card_style()
+
     def init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(6)
 
+        # Cabecera de la tarjeta: Título + Badge de selección
+        title_row = QHBoxLayout()
+        title_row.setContentsMargins(0, 0, 0, 0)
+        title_row.setSpacing(6)
+
         # Título de la tarea
         self.title_label = QLabel(self.task_data["title"])
         self.title_label.setObjectName("TaskCardTitle")
         self.title_label.setWordWrap(True)
-        layout.addWidget(self.title_label)
+        title_row.addWidget(self.title_label, stretch=1)
+
+        # Insignia de selección (visible cuando is_selected=True)
+        self.selection_badge = QLabel("✓")
+        self.selection_badge.setFixedSize(18, 18)
+        self.selection_badge.setAlignment(Qt.AlignCenter)
+        self.selection_badge.setStyleSheet(f"""
+            QLabel {{
+                background-color: {styles.COLORS['accent_blue']};
+                color: #ffffff;
+                font-size: 11px;
+                font-weight: bold;
+                border-radius: 9px;
+            }}
+        """)
+        self.selection_badge.hide()
+        title_row.addWidget(self.selection_badge, alignment=Qt.AlignTop)
+
+        layout.addLayout(title_row)
 
         # Layout vertical para la metadata (Etiquetas y Fecha)
         self.meta_layout = QVBoxLayout()
@@ -452,7 +501,10 @@ class TaskCard(QFrame):
         if event.button() == Qt.LeftButton:
             click_dist = (event.position().toPoint() - self.drag_start_position).manhattanLength()
             if click_dist < QApplication.startDragDistance():
-                self.clicked.emit(self.task_id)
+                if event.modifiers() & Qt.ControlModifier:
+                    self.ctrl_clicked.emit(self.task_id)
+                else:
+                    self.clicked.emit(self.task_id)
         super().mouseReleaseEvent(event)
 
 

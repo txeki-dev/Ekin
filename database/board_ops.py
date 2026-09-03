@@ -1,4 +1,4 @@
-from . import get_connection
+from .connection import get_connection
 
 __all__ = ["move_column_to_board", "copy_column_to_board", "copy_board"]
 

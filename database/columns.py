@@ -1,4 +1,4 @@
-from . import get_connection
+from .connection import get_connection
 
 __all__ = [
     "create_column", "get_columns", "get_column", "update_column", "set_column_collapsed",
@@ -7,17 +7,19 @@ __all__ = [
 
 # --- OPERACIONES DE COLUMNAS (COLUMNS) ---
 
-def create_column(board_id, name, color='#3b82f6', db_path=None):
+def create_column(board_id, name, color='#3b82f6', db_path=None, column_uuid=None):
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
+        import uuid
+        c_uuid = column_uuid or str(uuid.uuid4())
         # Obtener la posición máxima actual para colocar la nueva columna al final
         cursor.execute("SELECT COALESCE(MAX(position), -1) FROM columns WHERE board_id = ?", (board_id,))
         max_pos = cursor.fetchone()[0]
         next_pos = max_pos + 1
 
         cursor.execute(
-            "INSERT INTO columns (board_id, name, color, position) VALUES (?, ?, ?, ?)",
-            (board_id, name, color, next_pos)
+            "INSERT INTO columns (board_id, name, color, position, column_uuid) VALUES (?, ?, ?, ?, ?)",
+            (board_id, name, color, next_pos, c_uuid)
         )
         return cursor.lastrowid
 
@@ -25,7 +27,7 @@ def get_columns(board_id, db_path=None):
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, board_id, name, color, position, collapsed FROM columns WHERE board_id = ? ORDER BY position ASC",
+            "SELECT id, board_id, name, color, position, collapsed, column_uuid FROM columns WHERE board_id = ? ORDER BY position ASC",
             (board_id,)
         )
         return [dict(row) for row in cursor.fetchall()]
@@ -34,7 +36,7 @@ def get_column(column_id, db_path=None):
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, board_id, name, color, position, collapsed FROM columns WHERE id = ?",
+            "SELECT id, board_id, name, color, position, collapsed, column_uuid FROM columns WHERE id = ?",
             (column_id,)
         )
         row = cursor.fetchone()

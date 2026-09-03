@@ -1,4 +1,11 @@
-from . import get_connection
+"""
+Módulo de snapshots y restauración para acciones Deshacer / Rehacer (Undo/Redo).
+Preserva la identidad global (UUIDs) de tareas, columnas y tableros para
+no romper la sincronización con OneDrive (.ekboard).
+"""
+
+import uuid
+from .connection import get_connection
 from .tasks import get_task, get_tasks
 from .logs import get_logs
 from .links import get_task_links
@@ -10,20 +17,26 @@ __all__ = [
     "snapshot_board", "restore_board",
 ]
 
+
 # --- SNAPSHOT / RESTORE (para deshacer borrados) ---
 
 def snapshot_task(task_id, db_path=None):
-    """Captura todo el contenido de una tarea para poder recrearla (deshacer)."""
+    """Captura todo el contenido de una tarea para poder recrearla (deshacer),
+    incluyendo su identidad global (task_uuid) para mantener compatibilidad con sincronización."""
     task = get_task(task_id, db_path)
     if not task:
         return None
     return {
-        "column_id": task["column_id"], "title": task["title"],
-        "description": task["description"], "position": task["position"],
-        "due_date": task.get("due_date"), "due_time": task.get("due_time"),
+        "column_id": task["column_id"],
+        "title": task["title"],
+        "description": task["description"],
+        "position": task["position"],
+        "due_date": task.get("due_date"),
+        "due_time": task.get("due_time"),
         "recurrence": task.get("recurrence", "none"),
         "linked_board_id": task.get("linked_board_id"),
         "timer_started_at": task.get("timer_started_at"),
+        "task_uuid": task.get("task_uuid"),
         "tag_value_ids": [t["tag_value_id"] for t in task.get("tags", [])],
         "logs": [{"content": lg["content"], "created_at": lg["created_at"]}
                  for lg in get_logs(task_id, db_path)],
@@ -58,12 +71,13 @@ def _restore_task_in_conn(snap, column_id, conn):
 
     cur.execute("SELECT COALESCE(MAX(position), -1) FROM tasks WHERE column_id = ?", (column_id,))
     pos = cur.fetchone()[0] + 1
+    t_uuid = snap.get("task_uuid") or str(uuid.uuid4())
     cur.execute(
         "INSERT INTO tasks (column_id, title, description, position, due_date, due_time, "
-        "recurrence, linked_board_id, timer_started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "recurrence, linked_board_id, timer_started_at, task_uuid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (column_id, snap["title"], snap["description"], pos, snap.get("due_date"),
          snap.get("due_time"), snap.get("recurrence", "none"), linked_board_id,
-         snap.get("timer_started_at"))
+         snap.get("timer_started_at"), t_uuid)
     )
     new_id = cur.lastrowid
     for tvid in tag_value_ids:
@@ -91,7 +105,7 @@ def restore_task(snap, column_id=None, db_path=None, conn=None):
 def snapshot_column(column_id, db_path=None):
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT board_id, name, color, position, collapsed FROM columns WHERE id = ?", (column_id,))
+        cursor.execute("SELECT board_id, name, color, position, collapsed, column_uuid FROM columns WHERE id = ?", (column_id,))
         row = cursor.fetchone()
     if not row:
         return None
@@ -108,9 +122,10 @@ def _restore_column_in_conn(snap, board_id, conn):
         return None
     cur.execute("SELECT COALESCE(MAX(position), -1) FROM columns WHERE board_id = ?", (board_id,))
     pos = cur.fetchone()[0] + 1
+    c_uuid = snap.get("column_uuid") or str(uuid.uuid4())
     cur.execute(
-        "INSERT INTO columns (board_id, name, color, position, collapsed) VALUES (?, ?, ?, ?, ?)",
-        (board_id, snap["name"], snap["color"], pos, snap.get("collapsed", 0)))
+        "INSERT INTO columns (board_id, name, color, position, collapsed, column_uuid) VALUES (?, ?, ?, ?, ?, ?)",
+        (board_id, snap["name"], snap["color"], pos, snap.get("collapsed", 0), c_uuid))
     new_col = cur.lastrowid
     for task_snap in snap.get("tasks", []):
         if task_snap:
@@ -131,15 +146,21 @@ def snapshot_board(board_id, db_path=None):
     if not board:
         return None
     return {
-        "name": board["name"], "color": board["color"], "archived": board.get("archived", 0),
+        "name": board["name"],
+        "color": board["color"],
+        "archived": board.get("archived", 0),
+        "board_uuid": board.get("board_uuid"),
+        "sync_path": board.get("sync_path"),
         "columns": [snapshot_column(c["id"], db_path) for c in get_columns(board_id, db_path)],
     }
 
 
 def _restore_board_in_conn(snap, conn):
     cur = conn.cursor()
-    cur.execute("INSERT INTO boards (name, color, archived) VALUES (?, ?, ?)",
-                (snap["name"], snap["color"], 1 if snap.get("archived") else 0))
+    b_uuid = snap.get("board_uuid") or str(uuid.uuid4())
+    sync_path = snap.get("sync_path")
+    cur.execute("INSERT INTO boards (name, color, archived, board_uuid, sync_path) VALUES (?, ?, ?, ?, ?)",
+                (snap["name"], snap["color"], 1 if snap.get("archived") else 0, b_uuid, sync_path))
     new_board = cur.lastrowid
     for col_snap in snap.get("columns", []):
         if col_snap:

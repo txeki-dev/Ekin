@@ -1,4 +1,4 @@
-from . import get_connection
+from .connection import get_connection
 
 __all__ = ["add_task_link", "get_task_links", "delete_task_link", "get_task_links_bulk"]
 

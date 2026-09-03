@@ -3,6 +3,53 @@
 Living planning doc: forensic findings (tech debt) + ideas for future releases.
 Ordered roughly by value/effort. Checkboxes track what's done.
 
+## ✅ Done (2026-09-03 — Forensic Audit Bug Fixes & Refactors)
+
+- [x] **Snapshot UUID Preservation on Undo/Redo (`database/snapshots.py`):** `snapshot_task`, `snapshot_column`, and `snapshot_board` now preserve `task_uuid`, `column_uuid`, and `board_uuid` so restored items never lose synchronization compatibility with OneDrive `.ekboard` files.
+- [x] **Zombie Process Termination (`local_ai.py`, `main.py`):** Registered `atexit.register(stop_managed_runner)` with timeout/kill and connected `QApplication.aboutToQuit` to guarantee `llama-server.exe` exits cleanly.
+- [x] **Remote Task Deletion Sync & No-Resurrection (`board_sync.py`):** If a collaborator deletes a task in OneDrive and the local task was already synced and untouched, the system removes it locally instead of resurrecting it into the shared file.
+- [x] **Transient File Lock Retry on Windows (`board_sync.py`):** `write_sync_file_atomic` implements exponential backoff retry on `os.replace` to prevent `WinError 32` sharing violation errors on OneDrive shares.
+- [x] **Database Layer Decoupling (`database/connection.py`):** Extracted `get_connection` and dynamic `DB_NAME` resolution into `connection.py`, breaking cyclic dependencies across database submodules.
+- [x] **HTML Utilities DRY Centralization (`detail_dialog/html_utils.py`):** Moved `fit_html_images` and `linkify_urls` into a decoupled shared utility module.
+- [x] **236/236 automated tests passing, ruff clean.**
+
+---
+
+## ✅ Done (2026-09-03 — Phase 2: Multi-Card Selection & Autonomous Local AI Spec Generator)
+
+- [x] **Multi-Card Selection with `Ctrl + Click` (`widgets.py`, `board_view.py`):**
+  - Toggle card selection across columns with `Ctrl + Click` without opening detail dialog.
+  - Card visual feedback with accent-blue 2px border, tinted background, and top-right `✓` badge.
+  - Bottom action dock showing selected count, `🤖 Generar SPEC con IA Local` action, and `❌ Deseleccionar` (`Escape` key support).
+- [x] **Autonomous Local AI Module (`local_ai.py` — Vía B):**
+  - Zero-setup architecture for non-technical users: supports Qwen 2.5 Coder 1.5B Instruct (~980 MB) and portable background runner.
+  - Multi-engine auto-detection (Ollama, LM Studio, llama-server on ports 11434, 8080, 1234, 28192).
+  - Deterministic structural fallback synthesizer for instant, 100% offline spec generation.
+  - Real-time OpenAI-compatible streaming tokens worker thread (`SpecGenerationThread`).
+- [x] **AI Spec Generation Modal Dialog (`ai_spec_dialog.py`):**
+  - Supports 3 modes: Code Agent Spec (Antigravity/Claude Code/Cursor), User Stories (Gherkin), and QA Test Plans.
+  - Real-time streaming editor with 1-click Copy, Save to file, and direct board task creation.
+- [x] **234/234 automated tests passing, ruff clean.**
+
+---
+
+## ✅ Done (2026-09-03 — Phase 1: Shared Boards & Asynchronous OneDrive Synchronization)
+
+- [x] **Database schema migrations (`database/__init__.py`, `database/sync.py`):** Added `sync_path`, `last_synced_at`, `sync_hash`, and `board_uuid` to `boards`; `column_uuid` to `columns`; `task_uuid`, `version`, and `synced_version` to `tasks`.
+- [x] **Asynchronous Two-Way Merge & Sync Engine (`board_sync.py`):**
+  - Offline-first differential synchronizer operating on standard JSON `.ekboard` files.
+  - State-based revision tracking (`synced_version`) immune to clock skew and sub-second race conditions.
+  - **No-Data-Loss Conflict Resolution:** superseded conflicting edits are automatically archived into the task's personal diary/chat log.
+  - Automated pre-merge safety snapshots saved to `backups/sync_premerge_board_...`.
+- [x] **Reactive UI Integration (`board_view.py`, `sidebar.py`):**
+  - Header pill button with sync status badge (`☁️ Sincronizado` / `☁️ Vincular con OneDrive`).
+  - Context actions: Sync now, open file location in Explorer, unlink board.
+  - `QFileSystemWatcher` integration with debounced reactive reload when OneDrive writes changes to disk.
+  - Sidebar cloud badges (`☁️ `) for linked boards with dedicated context actions.
+- [x] **225/225 automated tests passing, ruff clean.**
+
+---
+
 ## ✅ Shipped (2026-09-03, v0.9.7 — Rich Text Formatting Wave: Syntax-Highlighted Code Blocks, Horizontal Rules, Text Color Palette, Web Links & Deletion)
 
 - [x] **Syntax-highlighted code blocks (`MarkdownTextEdit`, `pygments`):** Monokai dark styling, language selector (`CodeBlockDialog`), markdown shortcut (```` ``` ```` + Enter), fluid 100% responsive tables in description and chat, and 3 deletion mechanisms (button `✕ Borrar`, right-click context menu, and empty cell Backspace).

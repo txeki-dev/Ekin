@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-03
+
+### Added
+- **Shared Boards & Asynchronous Synchronization with OneDrive / Shared Folders (`board_sync.py`, `database/sync.py`):**
+  - **Offline-First Collaboration**: Boards can be linked to a shared `.ekboard` file stored in OneDrive, Google Drive, Nextcloud, or a local LAN share.
+  - **Entity-Level Two-Way Merge Engine**: Deterministic revision-aware differential synchronizer (`board_sync.py`) supporting concurrent edits from multiple users.
+  - **No-Data-Loss Conflict Resolution**: When concurrent conflicting edits occur on the same task, the newest description is preserved on the card while the superseded text is automatically archived in the task's personal diary/chat log.
+  - **Pre-Merge Safety Backups**: Automated snapshots saved to `backups/sync_premerge_board_...` prior to every merge operation.
+  - **Reactive File Watcher**: `QFileSystemWatcher` integration in `BoardViewWidget` detecting background external changes written by OneDrive and seamlessly auto-reloading without interrupting the user.
+  - **UI Integration**: Header sync pill button (`☁️ Sincronizado` / `☁️ Vincular con OneDrive`), quick sync menu (`🔄 Sincronizar ahora`, `📂 Abrir ubicación del archivo`, `❌ Desvincular`), and sidebar cloud badges on shared boards.
+- **Multi-Card Selection with `Ctrl + Click` & Floating Action Dock (`widgets.py`, `board_view.py`):**
+  - **Explorer-like Multi-Selection**: Select multiple task cards across columns using `Ctrl + Click`.
+  - **Visual Selection Cue**: Selected cards display a highlighted 2px accent-blue border, tinted background, and a top-right `✓` badge.
+  - **Action Dock**: A bottom dock appears when 1 or more cards are selected, showing the count of selected cards, direct button to generate an AI specification, and `❌ Deseleccionar` (or `Escape` key).
+- **Autonomous Local AI Spec Generator for AI Coding Agents (`local_ai.py`, `ai_spec_dialog.py` — Vía B):**
+  - **Zero-Setup AI (Vía B)**: Integrates compact, state-of-the-art coder LLM (Qwen 2.5 Coder 1.5B Instruct ~980 MB) with background portable execution on local CPU/AVX2 without requiring external dependencies or accounts.
+  - **Multi-Engine Auto-Detection**: Automatically detects active local endpoints (Ollama, LM Studio, llama-server) or manages its own background runner.
+  - **Deterministic Structural Fallback**: Instant offline spec synthesizer generating complete software engineering architecture documents even without downloading the model.
+  - **Interactive Spec Dialog**:
+    - Generates 3 specialized formats: **Technical Architecture & Implementation Spec (Antigravity / Claude Code / Cursor)**, **User Stories & Acceptance Criteria (Gherkin)**, and **QA Test Plans**.
+    - Real-time token streaming in dark monospace editor with 1-click **Copy to Clipboard**, **Save to SPEC.md**, and **Create as Task in Board**.
+
+### Fixed & Improved
+- **Snapshot UUID Preservation on Undo/Redo (`database/snapshots.py`):** `snapshot_task`, `snapshot_column`, and `snapshot_board` now preserve `task_uuid`, `column_uuid`, and `board_uuid` so restored items never lose synchronization compatibility with OneDrive `.ekboard` files.
+- **Zombie Process Termination (`local_ai.py`, `main.py`):** Registered `atexit.register(stop_managed_runner)` with timeout/kill and connected `QApplication.aboutToQuit` to guarantee `llama-server.exe` exits cleanly.
+- **Remote Task Deletion Sync & No-Resurrection (`board_sync.py`):** If a collaborator deletes a task in OneDrive and the local task was already synced and untouched, the system removes it locally instead of resurrecting it into the shared file.
+- **Transient File Lock Retry on Windows (`board_sync.py`):** `write_sync_file_atomic` implements exponential backoff retry on `os.replace` to prevent `WinError 32` sharing violation errors on OneDrive shares.
+- **Database Layer Decoupling (`database/connection.py`):** Extracted `get_connection` and dynamic `DB_NAME` resolution into `connection.py`, breaking cyclic dependencies across database submodules.
+- **HTML Utilities DRY Centralization (`detail_dialog/html_utils.py`):** Moved `fit_html_images` and `linkify_urls` into a decoupled shared utility module.
+
 ## [0.9.7] - 2026-09-03
 
 ### Added

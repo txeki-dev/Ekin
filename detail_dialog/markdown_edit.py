@@ -462,7 +462,7 @@ class MarkdownTextEdit(QTextEdit):
         if source.hasHtml():
             html_content = source.html()
             if "<img" in html_content.lower() or "<table" in html_content.lower():
-                from .log_entry import fit_html_images
+                from .html_utils import fit_html_images
                 target_w = self.image_width_provider() if self.image_width_provider else max(100, self.viewport().width() - 24)
                 fitted = fit_html_images(html_content, target_w)
                 self.textCursor().insertHtml(fitted)
@@ -485,7 +485,7 @@ class MarkdownTextEdit(QTextEdit):
                     cursor.insertHtml(f'<a href="{url}">{html.escape(url)}</a>')
                 return
             # Si el texto contiene enlaces web en medio del texto
-            from .log_entry import linkify_urls
+            from .html_utils import linkify_urls
             if re.search(r'https?://[^\s<>"\'`]+', raw_text):
                 escaped = html.escape(raw_text).replace("\r\n", "\n").replace("\r", "\n").replace("\n", "<br/>")
                 linkified = linkify_urls(escaped)

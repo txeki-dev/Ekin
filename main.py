@@ -534,6 +534,9 @@ def main():
     app = QApplication(sys.argv)
     app.setWindowIcon(app_icon())
 
+    import local_ai
+    app.aboutToQuit.connect(local_ai.stop_managed_runner)
+
     window = MainWindow()
     window.show()
     apply_win32_icon(window)

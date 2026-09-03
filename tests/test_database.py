@@ -1006,3 +1006,46 @@ def test_board_ics_sync_path_cascades_on_board_delete(db_path):
     database.set_board_ics_sync_path(b, "/a/b.ics", db_path=db_path)
     database.delete_board(b, db_path=db_path)
     assert database.get_all_board_ics_sync_paths(db_path=db_path) == {}
+
+
+def test_snapshot_and_restore_preserves_uuids(db_path):
+    """Verifica que snapshot y restore preservan intactos los UUIDs de tareas, columnas y tableros (Bug 1)."""
+    b = database.create_board("Board UUID", db_path=db_path)
+    c = database.create_column(b, "Col UUID", db_path=db_path)
+    t = database.create_task(c, "Task UUID", db_path=db_path)
+
+    orig_task = database.get_task(t, db_path)
+    orig_col = database.get_column(c, db_path)
+    orig_board = database.get_board(b, db_path)
+
+    assert orig_task["task_uuid"] is not None
+    assert orig_col["column_uuid"] is not None
+    assert orig_board["board_uuid"] is not None
+
+    # Snapshot task
+    snap_t = database.snapshot_task(t, db_path)
+    assert snap_t["task_uuid"] == orig_task["task_uuid"]
+
+    # Restore task
+    new_t = database.restore_task(snap_t, column_id=c, db_path=db_path)
+    restored_task = database.get_task(new_t, db_path)
+    assert restored_task["task_uuid"] == orig_task["task_uuid"]
+
+    # Snapshot column
+    snap_c = database.snapshot_column(c, db_path)
+    assert snap_c["column_uuid"] == orig_col["column_uuid"]
+
+    # Restore column
+    new_c = database.restore_column(snap_c, board_id=b, db_path=db_path)
+    restored_col = database.get_column(new_c, db_path)
+    assert restored_col["column_uuid"] == orig_col["column_uuid"]
+
+    # Snapshot board
+    snap_b = database.snapshot_board(b, db_path)
+    assert snap_b["board_uuid"] == orig_board["board_uuid"]
+
+    # Restore board
+    new_b = database.restore_board(snap_b, db_path=db_path)
+    restored_board = database.get_board(new_b, db_path)
+    assert restored_board["board_uuid"] == orig_board["board_uuid"]
+

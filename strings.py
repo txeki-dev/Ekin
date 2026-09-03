@@ -519,6 +519,49 @@ STRINGS = {
     "task_detail.delete_link_tooltip": "Eliminar enlace",
     "task_detail.delete_log_title": "Eliminar Entrada",
     "task_detail.delete_log_body": "¿Estás seguro de que deseas borrar esta entrada del diario?",
+
+    # --- board_sync / sincronización con OneDrive / carpeta compartida ---
+    "sync.link_btn": "☁️ Vincular con OneDrive",
+    "sync.link_tooltip": "Vincular este tablero a una carpeta compartida o OneDrive (.ekboard)",
+    "sync.synced_badge": "☁️ Sincronizado",
+    "sync.syncing": "🔄 Sincronizando…",
+    "sync.offline_badge": "Tablero local (sin sincronizar)",
+    "sync.menu_sync_now": "🔄 Sincronizar ahora",
+    "sync.menu_open_location": "📂 Abrir ubicación del archivo…",
+    "sync.menu_unlink": "❌ Desvincular sincronización",
+    "sync.dialog_title_link": "Seleccionar o crear archivo compartido de tablero",
+    "sync.dialog_filter": "Tablero Ekin (*.ekboard);;Todos los archivos (*.*)",
+    "sync.unlink_confirm_title": "Desvincular Sincronización",
+    "sync.unlink_confirm_body": "¿Deseas desvincular este tablero del archivo compartido? El tablero seguirá funcionando localmente sin afectar a otros usuarios.",
+    "sync.success_title": "Sincronización Exitosa",
+    "sync.error_title": "Error de Sincronización",
+    "sync.conflict_merged_toast": "Se han fusionado cambios concurrentes sin pérdida de datos.",
+
+    # --- ai_spec / selección múltiple e IA local ---
+    "ai_spec.selection_count": "✨ {count} tarea(s) seleccionada(s)",
+    "ai_spec.generate_spec_btn": "🤖 Generar SPEC con IA Local",
+    "ai_spec.clear_selection_btn": "❌ Deseleccionar",
+    "ai_spec.dialog_title": "Generador de SPEC para Agentes de IA",
+    "ai_spec.mode_label": "Modo de Especificación:",
+    "ai_spec.mode_coding_agent": "Arquitectura y Plan de Código (Antigravity / Claude Code / Cursor)",
+    "ai_spec.mode_user_stories": "Historias de Usuario & Criterios de Aceptación (Gherkin)",
+    "ai_spec.mode_qa_plan": "Plan de Pruebas & Matriz de QA",
+    "ai_spec.generate_btn": "⚡ Generar SPEC",
+    "ai_spec.copy_btn": "📋 Copiar SPEC",
+    "ai_spec.save_btn": "💾 Guardar Archivo…",
+    "ai_spec.create_task_btn": "➕ Crear como Tarea en el Tablero",
+    "ai_spec.model_status_label": "Motor de IA:",
+    "ai_spec.status_ready": "🟢 Listo para generar",
+    "ai_spec.status_generating": "⏳ Generando especificación con IA local…",
+    "ai_spec.copied_toast": "¡SPEC copiada al portapapeles!",
+    "ai_spec.saved_toast": "Especificación guardada correctamente.",
+    "ai_spec.task_created_toast": "Tarea creada en el tablero con la especificación.",
+    "ai_spec.download_model_title": "Descargar Modelo de IA Local Autónomo",
+    "ai_spec.download_model_prompt": (
+        "Ekin puede ejecutar un modelo de IA local autónomo (Qwen 2.5 Coder 1.5B, ~980 MB) "
+        "sin requerir software adicional ni enviar tus datos a la nube.\n\n"
+        "¿Deseas descargar el modelo ahora?"
+    ),
 }
 
 

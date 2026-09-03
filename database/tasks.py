@@ -1,6 +1,6 @@
 import calendar as _cal
 from datetime import datetime, date, timedelta
-from . import get_connection
+from .connection import get_connection
 from .tags import get_task_tags, get_task_tags_bulk
 from .links import get_task_links, get_task_links_bulk
 
@@ -13,25 +13,27 @@ __all__ = [
 
 # --- OPERACIONES DE TAREAS (TASKS) ---
 
-def create_task(column_id, title, description="", tag_text="", tag_color="#6b7280", due_date=None, db_path=None):
+def create_task(column_id, title, description="", tag_text="", tag_color="#6b7280", due_date=None, db_path=None, task_uuid=None, version=1):
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
+        import uuid
+        t_uuid = task_uuid or str(uuid.uuid4())
         # Obtener la posición máxima actual de tareas en esta columna
         cursor.execute("SELECT COALESCE(MAX(position), -1) FROM tasks WHERE column_id = ?", (column_id,))
         max_pos = cursor.fetchone()[0]
         next_pos = max_pos + 1
 
         cursor.execute(
-            """INSERT INTO tasks (column_id, title, description, tag_text, tag_color, position, due_date)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (column_id, title, description, tag_text, tag_color, next_pos, due_date)
+            """INSERT INTO tasks (column_id, title, description, tag_text, tag_color, position, due_date, task_uuid, version)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (column_id, title, description, tag_text, tag_color, next_pos, due_date, t_uuid, version)
         )
         return cursor.lastrowid
 
 _TASK_SELECT_COLUMNS = """
     t.id, t.column_id, t.title, t.description, t.tag_text, t.tag_color, t.position,
     t.created_at, t.updated_at, t.due_date, t.due_time, t.recurrence, t.linked_board_id,
-    t.timer_started_at,
+    t.timer_started_at, t.task_uuid, t.version, t.synced_version,
     b.name AS linked_board_name, b.color AS linked_board_color
 """
 
@@ -85,7 +87,8 @@ def update_task(task_id, title, description, tag_text, tag_color, due_date, db_p
     with get_connection(db_path) as conn:
         conn.execute(
             """UPDATE tasks
-               SET title = ?, description = ?, tag_text = ?, tag_color = ?, due_date = ?, updated_at = CURRENT_TIMESTAMP
+               SET title = ?, description = ?, tag_text = ?, tag_color = ?, due_date = ?,
+                   version = version + 1, updated_at = CURRENT_TIMESTAMP
                WHERE id = ?""",
             (title, description, tag_text, tag_color, due_date, task_id)
         )

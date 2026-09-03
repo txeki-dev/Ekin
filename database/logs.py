@@ -1,4 +1,4 @@
-from . import get_connection
+from .connection import get_connection
 
 __all__ = ["create_log", "get_logs", "get_logs_bulk", "update_log", "delete_log"]
 

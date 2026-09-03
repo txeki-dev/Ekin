@@ -1,4 +1,4 @@
-from . import get_connection
+from .connection import get_connection
 from .tags import get_task_tags_bulk
 
 __all__ = ["get_scheduled_tasks", "get_task_board_id"]

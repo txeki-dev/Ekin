@@ -1079,3 +1079,135 @@ def test_import_confirmation_dialog_initial_state(qapp, db_path):
     dlg.reject()
 
 
+def test_board_view_sync_btn_states(qapp, db_path, tmp_path):
+    """Verifica que el botón de sincronización de la cabecera muestra el estado correcto (desvinculado y vinculado)."""
+    from board_view import BoardViewWidget
+    import database
+    import board_sync
+
+    board_id = database.create_board("Tablero UI Sync", db_path=db_path)
+    database.create_column(board_id, "Col1", db_path=db_path)
+
+    view = BoardViewWidget(db_path=db_path)
+    view.load_board(board_id)
+
+    # Estado desvinculado
+    assert "Vincular" in view.sync_btn.text()
+
+    # Vincular a archivo compartido
+    sync_file = str(tmp_path / "ui_test.ekboard")
+    board_sync.sync_board_with_file(board_id, sync_file, db_path=db_path)
+
+    # Recargar tablero
+    view.load_board(board_id)
+    assert "Sincronizado" in view.sync_btn.text()
+    assert sync_file in view.sync_btn.toolTip()
+
+
+def test_sidebar_board_button_cloud_badge(qapp):
+    """Verifica que los tableros vinculados muestran el icono ☁️ en la barra lateral."""
+    from sidebar import BoardButton
+
+    btn_local = BoardButton(1, "Local", "#3b82f6", sync_path=None)
+    assert "☁️" not in btn_local.label.text()
+    assert btn_local.label.text() == "Local"
+
+    btn_synced = BoardButton(2, "Compartido", "#3b82f6", sync_path="C:/OneDrive/tablero.ekboard")
+    assert "☁️" in btn_synced.label.text()
+    assert "Compartido" in btn_synced.label.text()
+
+
+def test_task_card_ctrl_click_and_selection_state(qapp):
+    """Verifica que Ctrl+Clic emite ctrl_clicked y set_selected actualiza el aspecto visual."""
+    from widgets import TaskCard
+    from PySide6.QtGui import QMouseEvent
+    from PySide6.QtCore import QEvent, QPointF, Qt
+
+    card = TaskCard({"id": 10, "title": "Test Multi-Select", "column_id": 1})
+    assert card.is_selected is False
+    assert card.selection_badge.isHidden() is True
+
+    card.set_selected(True)
+    assert card.is_selected is True
+    assert card.selection_badge.isHidden() is False
+
+    # Comprobar emisión de ctrl_clicked con modificador Control
+    events_received = []
+    card.ctrl_clicked.connect(lambda tid: events_received.append(("ctrl", tid)))
+    card.clicked.connect(lambda tid: events_received.append(("normal", tid)))
+
+    pos = QPointF(10, 10)
+    press = QMouseEvent(QEvent.Type.MouseButtonPress, pos, pos, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.ControlModifier)
+    release = QMouseEvent(QEvent.Type.MouseButtonRelease, pos, pos, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.ControlModifier)
+    card.mousePressEvent(press)
+    card.mouseReleaseEvent(release)
+
+    assert events_received == [("ctrl", 10)]
+
+
+def test_board_view_multi_selection_bar_and_escape(qapp, db_path):
+    """Verifica que seleccionar tarjetas muestra la barra inferior y Escape las deselecciona."""
+    from board_view import BoardViewWidget
+    from PySide6.QtGui import QKeyEvent
+    from PySide6.QtCore import QEvent, Qt
+    import database
+
+    board_id = database.create_board("Tablero Selección", db_path=db_path)
+    col_id = database.create_column(board_id, "Col", db_path=db_path)
+    t1 = database.create_task(col_id, "Tarea A", db_path=db_path)
+    t2 = database.create_task(col_id, "Tarea B", db_path=db_path)
+
+    view = BoardViewWidget(db_path=db_path)
+    view.load_board(board_id)
+
+    assert view.selection_bar.isHidden() is True
+    assert len(view.selected_task_ids) == 0
+
+    # Simular selección de t1
+    view._handle_task_ctrl_clicked(t1, col_id)
+    assert view.selection_bar.isHidden() is False
+    assert len(view.selected_task_ids) == 1
+    assert "1" in view.selection_bar_label.text()
+
+    # Simular selección de t2
+    view._handle_task_ctrl_clicked(t2, col_id)
+    assert len(view.selected_task_ids) == 2
+    assert "2" in view.selection_bar_label.text()
+
+    # Simular Escape para deseleccionar
+    key_event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier)
+    view.keyPressEvent(key_event)
+
+    assert len(view.selected_task_ids) == 0
+    assert view.selection_bar.isHidden() is True
+
+
+def test_ai_spec_dialog_loads_and_generates(qapp, db_path):
+    """Verifica la carga del diálogo de SPEC y la generación de especificación técnica."""
+    from ai_spec_dialog import AiSpecDialog
+    import database
+
+    board_id = database.create_board("Tablero IA", db_path=db_path)
+    col_id = database.create_column(board_id, "Backlog", db_path=db_path)
+    t1 = database.create_task(col_id, "Autenticación OAuth2", description="Flujo PKCE", db_path=db_path)
+    t2 = database.create_task(col_id, "Tokens en SQLite", description="Almacenar cifrado", db_path=db_path)
+
+    dlg = AiSpecDialog([t1, t2], board_id, db_path)
+    assert len(dlg.tasks_data) == 2
+
+    # Ejecutar generación (usará el generador estructural integrado si no hay LLM externo corriendo)
+    dlg.start_generation()
+    if dlg._gen_thread:
+        dlg._gen_thread.wait(5000)
+    qapp.processEvents()
+
+    spec_text = dlg.spec_edit.toPlainText()
+    assert "# SPEC:" in spec_text
+    assert "Autenticación OAuth2" in spec_text
+    assert "Tokens en SQLite" in spec_text
+
+    dlg.reject()
+
+
+
+

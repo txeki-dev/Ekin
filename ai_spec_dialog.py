@@ -1,0 +1,280 @@
+"""
+Diálogo de interfaz gráfica para la generación de especificaciones (SPEC)
+para agentes de IA a partir de múltiples tarjetas seleccionadas.
+"""
+
+import sys
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QComboBox, QPlainTextEdit, QLineEdit, QMessageBox, QFileDialog,
+    QApplication, QFrame
+)
+from PySide6.QtGui import QFont
+import styles
+import database
+from strings import t
+import local_ai
+
+
+class AiSpecDialog(QDialog):
+    """Diálogo modal interactivo para generar especificaciones técnicas con IA local."""
+
+    def __init__(self, task_ids: list[int], board_id: int, db_path: str, parent=None):
+        super().__init__(parent)
+        self.task_ids = task_ids
+        self.board_id = board_id
+        self.db_path = db_path
+        self.tasks_data = self._load_tasks_data()
+        self._gen_thread = None
+
+        self.setWindowTitle(t("ai_spec.dialog_title"))
+        self.resize(850, 680)
+        self.init_ui()
+
+    def _load_tasks_data(self) -> list[dict]:
+        """Carga la metadata completa de las tareas seleccionadas (incluyendo logs y tags)."""
+        loaded = []
+        for tid in self.task_ids:
+            t_data = database.get_task(tid, self.db_path)
+            if t_data:
+                t_data["tags"] = database.get_task_tags(tid, self.db_path)
+                t_data["logs"] = database.get_logs(tid, self.db_path)
+                col = database.get_column(t_data["column_id"], self.db_path)
+                t_data["column_name"] = col["name"] if col else "Backlog"
+                loaded.append(t_data)
+        return loaded
+
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(14)
+
+        # 1. Cabecera con resumen de tareas seleccionadas
+        header_layout = QVBoxLayout()
+        header_layout.setSpacing(6)
+
+        title_lbl = QLabel(f"🤖 <b>{t('ai_spec.dialog_title')}</b>")
+        title_lbl.setStyleSheet(f"font-size: 16px; color: {styles.COLORS['text_main']};")
+        header_layout.addWidget(title_lbl)
+
+        tasks_summary = ", ".join(f"«{t['title']}»" for t in self.tasks_data[:4])
+        if len(self.tasks_data) > 4:
+            tasks_summary += f" y {len(self.tasks_data) - 4} más"
+
+        desc_lbl = QLabel(f"Tareas seleccionadas ({len(self.tasks_data)}): {tasks_summary}")
+        desc_lbl.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 12px;")
+        desc_lbl.setWordWrap(True)
+        header_layout.addWidget(desc_lbl)
+
+        layout.addLayout(header_layout)
+
+        # 2. Barra de configuración de la SPEC
+        config_frame = QFrame()
+        config_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {styles.COLORS['bg_card']};
+                border: 1px solid {styles.COLORS['border']};
+                border-radius: 8px;
+                padding: 10px;
+            }}
+        """)
+        cfg_layout = QVBoxLayout(config_frame)
+        cfg_layout.setSpacing(10)
+
+        row1 = QHBoxLayout()
+        row1.setSpacing(10)
+
+        row1.addWidget(QLabel(f"<b>{t('ai_spec.mode_label')}</b>"))
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItem(t("ai_spec.mode_coding_agent"), "coding_agent")
+        self.mode_combo.addItem(t("ai_spec.mode_user_stories"), "user_stories")
+        self.mode_combo.addItem(t("ai_spec.mode_qa_plan"), "qa_tests")
+        self.mode_combo.setStyleSheet(f"""
+            QComboBox {{
+                background-color: {styles.COLORS['bg_main']};
+                border: 1px solid {styles.COLORS['border']};
+                border-radius: 6px;
+                padding: 6px 12px;
+                color: {styles.COLORS['text_main']};
+                font-size: 12px;
+            }}
+        """)
+        row1.addWidget(self.mode_combo, stretch=1)
+
+        # Indicador de estado del motor de IA
+        self.engine_status_lbl = QLabel()
+        self._refresh_engine_status()
+        row1.addWidget(self.engine_status_lbl)
+
+        cfg_layout.addLayout(row1)
+
+        # Instrucciones adicionales opcionales
+        row2 = QHBoxLayout()
+        row2.setSpacing(8)
+        self.custom_prompt_input = QLineEdit()
+        self.custom_prompt_input.setPlaceholderText("Instrucciones o enfoque adicional para el agente de IA (opcional)…")
+        self.custom_prompt_input.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {styles.COLORS['bg_main']};
+                border: 1px solid {styles.COLORS['border']};
+                border-radius: 6px;
+                padding: 6px 10px;
+                color: {styles.COLORS['text_main']};
+                font-size: 12px;
+            }}
+        """)
+        row2.addWidget(self.custom_prompt_input, stretch=1)
+
+        self.generate_btn = QPushButton(t("ai_spec.generate_btn"))
+        self.generate_btn.setObjectName("PrimaryButton")
+        self.generate_btn.setCursor(Qt.PointingHandCursor)
+        self.generate_btn.clicked.connect(self.start_generation)
+        row2.addWidget(self.generate_btn)
+
+        cfg_layout.addLayout(row2)
+        layout.addWidget(config_frame)
+
+        # 3. Editor de salida / previsualización en Markdown
+        self.spec_edit = QPlainTextEdit()
+        font = QFont("Consolas" if sys.platform == "win32" else "Monospace", 10)
+        font.setStyleHint(QFont.Monospace)
+        self.spec_edit.setFont(font)
+        self.spec_edit.setPlaceholderText("Pulsa «⚡ Generar SPEC» para crear la especificación técnica con IA…")
+        self.spec_edit.setStyleSheet(f"""
+            QPlainTextEdit {{
+                background-color: #1e1e1e;
+                color: #d4d4d4;
+                border: 1px solid {styles.COLORS['border']};
+                border-radius: 8px;
+                padding: 12px;
+                line-height: 140%;
+            }}
+        """)
+        layout.addWidget(self.spec_edit, stretch=1)
+
+        # 4. Fila de botones de acción inferiores
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
+
+        self.copy_btn = QPushButton(t("ai_spec.copy_btn"))
+        self.copy_btn.setCursor(Qt.PointingHandCursor)
+        self.copy_btn.clicked.connect(self.copy_to_clipboard)
+        btn_row.addWidget(self.copy_btn)
+
+        self.save_btn = QPushButton(t("ai_spec.save_btn"))
+        self.save_btn.setCursor(Qt.PointingHandCursor)
+        self.save_btn.clicked.connect(self.save_to_file)
+        btn_row.addWidget(self.save_btn)
+
+        self.create_task_btn = QPushButton(t("ai_spec.create_task_btn"))
+        self.create_task_btn.setCursor(Qt.PointingHandCursor)
+        self.create_task_btn.clicked.connect(self.create_as_task)
+        btn_row.addWidget(self.create_task_btn)
+
+        btn_row.addStretch()
+
+        self.close_btn = QPushButton("Cerrar")
+        self.close_btn.setCursor(Qt.PointingHandCursor)
+        self.close_btn.clicked.connect(self.accept)
+        btn_row.addWidget(self.close_btn)
+
+        layout.addLayout(btn_row)
+
+    def _refresh_engine_status(self):
+        """Muestra qué motor de IA atenderá la generación."""
+        detect = local_ai.detect_available_llm()
+        name = detect["name"]
+        if detect["status"] == "ready":
+            self.engine_status_lbl.setText(f"🟢 {name}")
+            self.engine_status_lbl.setStyleSheet("color: #10b981; font-weight: bold; font-size: 11px;")
+        elif detect["status"] == "can_start":
+            self.engine_status_lbl.setText("🟡 Modelo local listo para iniciar")
+            self.engine_status_lbl.setStyleSheet("color: #f59e0b; font-weight: bold; font-size: 11px;")
+        else:
+            self.engine_status_lbl.setText("⚡ Modo Estructural (Rápido / Sin descarga)")
+            self.engine_status_lbl.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 11px;")
+
+    def start_generation(self):
+        """Inicia el proceso de generación de SPEC en segundo plano con streaming."""
+        if not self.tasks_data:
+            return
+
+        mode = self.mode_combo.currentData()
+        custom = self.custom_prompt_input.text().strip()
+
+        self.spec_edit.clear()
+        self.generate_btn.setEnabled(False)
+        self.generate_btn.setText(t("ai_spec.status_generating"))
+
+        self._gen_thread = local_ai.SpecGenerationThread(self.tasks_data, mode, custom, parent=self)
+        self._gen_thread.token_received.connect(self._on_token)
+        self._gen_thread.generation_finished.connect(self._on_finished)
+        self._gen_thread.start()
+
+    def _on_token(self, token: str):
+        self.spec_edit.insertPlainText(token)
+        # Auto-scroll hacia el final mientras fluyen los tokens
+        sb = self.spec_edit.verticalScrollBar()
+        sb.setValue(sb.maximum())
+
+    def _on_finished(self, full_text: str):
+        self.generate_btn.setEnabled(True)
+        self.generate_btn.setText(t("ai_spec.generate_btn"))
+        self._refresh_engine_status()
+
+    def copy_to_clipboard(self):
+        """Copia la SPEC generada al portapapeles del sistema."""
+        text = self.spec_edit.toPlainText()
+        if not text.strip():
+            return
+        QApplication.clipboard().setText(text)
+        QMessageBox.information(self, "Copiado", t("ai_spec.copied_toast"))
+
+    def save_to_file(self):
+        """Guarda la especificación en un archivo Markdown."""
+        text = self.spec_edit.toPlainText()
+        if not text.strip():
+            return
+
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Guardar Especificación de IA",
+            "SPEC.md",
+            "Markdown (*.md);;Texto (*.txt);;Todos los archivos (*.*)"
+        )
+        if path:
+            try:
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(text)
+                QMessageBox.information(self, "Guardado", t("ai_spec.saved_toast"))
+            except Exception as e:
+                QMessageBox.warning(self, "Error al guardar", f"No se pudo guardar el archivo:\n{e}")
+
+    def create_as_task(self):
+        """Crea una nueva tarjeta en la primera columna del tablero actual con la SPEC."""
+        text = self.spec_edit.toPlainText()
+        if not text.strip():
+            return
+
+        # Obtener columnas del tablero actual
+        cols = database.get_columns(self.board_id, self.db_path)
+        if not cols:
+            return
+
+        col_id = cols[0]["id"]
+        # Extraer primer título de la SPEC
+        first_line = text.strip().split("\n")[0].replace("#", "").strip()
+        task_title = first_line if first_line else "SPEC: Iniciativa de IA"
+
+        database.create_task(
+            column_id=col_id,
+            title=task_title,
+            description=f"Especificación técnica generada a partir de {len(self.tasks_data)} tareas:\n\n{text}",
+            tag_text="AI:SPEC",
+            tag_color="#8b5cf6",
+            db_path=self.db_path
+        )
+
+        QMessageBox.information(self, "Tarea Creada", t("ai_spec.task_created_toast"))
+        self.accept()

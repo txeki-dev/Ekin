@@ -1,24 +1,5 @@
-import sqlite3
-import contextlib
+from .connection import DB_NAME, get_connection
 
-DB_NAME = "ekin_board.db"
-
-@contextlib.contextmanager
-def get_connection(db_path=None):
-    """Establece una conexión a la base de datos, habilita las claves foráneas y la
-    cierra siempre al salir (commit en éxito, rollback si hay excepción)."""
-    db_path = db_path or DB_NAME
-    conn = sqlite3.connect(db_path)
-    conn.execute("PRAGMA foreign_keys = ON;")
-    conn.row_factory = sqlite3.Row  # Permite acceder a las columnas por nombre
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
 
 def init_db(db_path=None):
     """Crea las tablas necesarias si no existen."""
@@ -44,6 +25,18 @@ def init_db(db_path=None):
             cursor.execute("ALTER TABLE boards ADD COLUMN color TEXT NOT NULL DEFAULT '#3b82f6'")
         if "archived" not in columns_info:
             cursor.execute("ALTER TABLE boards ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
+        if "sync_path" not in columns_info:
+            cursor.execute("ALTER TABLE boards ADD COLUMN sync_path TEXT DEFAULT NULL")
+        if "last_synced_at" not in columns_info:
+            cursor.execute("ALTER TABLE boards ADD COLUMN last_synced_at TEXT DEFAULT NULL")
+        if "sync_hash" not in columns_info:
+            cursor.execute("ALTER TABLE boards ADD COLUMN sync_hash TEXT DEFAULT NULL")
+        if "board_uuid" not in columns_info:
+            cursor.execute("ALTER TABLE boards ADD COLUMN board_uuid TEXT DEFAULT NULL")
+            cursor.execute("SELECT id FROM boards WHERE board_uuid IS NULL")
+            import uuid
+            for r in cursor.fetchall():
+                cursor.execute("UPDATE boards SET board_uuid = ? WHERE id = ?", (str(uuid.uuid4()), r[0]))
 
         # Tabla de columnas (columns)
         cursor.execute("""
@@ -54,15 +47,22 @@ def init_db(db_path=None):
                 color TEXT NOT NULL DEFAULT '#3b82f6',
                 position INTEGER NOT NULL,
                 collapsed INTEGER NOT NULL DEFAULT 0,
+                column_uuid TEXT DEFAULT NULL,
                 FOREIGN KEY(board_id) REFERENCES boards(id) ON DELETE CASCADE
             )
         """)
 
-        # Migración: añadir 'collapsed' (columna plegada) a BD anteriores
+        # Migración: añadir 'collapsed' y 'column_uuid' a BD anteriores
         cursor.execute("PRAGMA table_info(columns)")
         columns_cols = [row[1] for row in cursor.fetchall()]
         if "collapsed" not in columns_cols:
             cursor.execute("ALTER TABLE columns ADD COLUMN collapsed INTEGER NOT NULL DEFAULT 0")
+        if "column_uuid" not in columns_cols:
+            cursor.execute("ALTER TABLE columns ADD COLUMN column_uuid TEXT DEFAULT NULL")
+            cursor.execute("SELECT id FROM columns WHERE column_uuid IS NULL")
+            import uuid
+            for r in cursor.fetchall():
+                cursor.execute("UPDATE columns SET column_uuid = ? WHERE id = ?", (str(uuid.uuid4()), r[0]))
 
         # Tabla de tareas (tasks)
         cursor.execute("""
@@ -76,11 +76,13 @@ def init_db(db_path=None):
                 position INTEGER NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                task_uuid TEXT DEFAULT NULL,
+                version INTEGER NOT NULL DEFAULT 1,
                 FOREIGN KEY(column_id) REFERENCES columns(id) ON DELETE CASCADE
             )
         """)
 
-        # Migración: columnas 'due_date', 'due_time' y 'recurrence' en 'tasks'
+        # Migración: columnas 'due_date', 'due_time', 'recurrence', 'task_uuid' y 'version' en 'tasks'
         cursor.execute("PRAGMA table_info(tasks)")
         tasks_columns = [row[1] for row in cursor.fetchall()]
         if "due_date" not in tasks_columns:
@@ -89,6 +91,16 @@ def init_db(db_path=None):
             cursor.execute("ALTER TABLE tasks ADD COLUMN due_time TEXT")
         if "recurrence" not in tasks_columns:
             cursor.execute("ALTER TABLE tasks ADD COLUMN recurrence TEXT NOT NULL DEFAULT 'none'")
+        if "task_uuid" not in tasks_columns:
+            cursor.execute("ALTER TABLE tasks ADD COLUMN task_uuid TEXT DEFAULT NULL")
+            cursor.execute("SELECT id FROM tasks WHERE task_uuid IS NULL")
+            import uuid
+            for r in cursor.fetchall():
+                cursor.execute("UPDATE tasks SET task_uuid = ? WHERE id = ?", (str(uuid.uuid4()), r[0]))
+        if "version" not in tasks_columns:
+            cursor.execute("ALTER TABLE tasks ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
+        if "synced_version" not in tasks_columns:
+            cursor.execute("ALTER TABLE tasks ADD COLUMN synced_version INTEGER NOT NULL DEFAULT 0")
 
         # Migración: vínculo opcional de una tarea con OTRO tablero (p. ej. una tarea
         # resumen en "Tareas" que enlaza al detalle en el tablero "SW X")
@@ -218,7 +230,6 @@ def init_db(db_path=None):
                 FOREIGN KEY(board_id) REFERENCES boards(id) ON DELETE CASCADE
             )
         """)
-        conn.commit()
 
 
 # Re-exportar el API público de cada módulo de dominio, para que
@@ -235,3 +246,4 @@ from .search import *  # noqa: E402,F401,F403
 from .ics_sync import *  # noqa: E402,F401,F403
 from .board_ops import *  # noqa: E402,F401,F403
 from .snapshots import *  # noqa: E402,F401,F403
+from .sync import *  # noqa: E402,F401,F403
