@@ -29,7 +29,8 @@ class AiSpecDialog(QDialog):
         self._gen_thread = None
 
         self.setWindowTitle(t("ai_spec.dialog_title"))
-        self.resize(850, 680)
+        self.resize(1080, 680)
+        self.setMinimumWidth(980)
         self.init_ui()
 
     def _load_tasks_data(self) -> list[dict]:
@@ -82,10 +83,14 @@ class AiSpecDialog(QDialog):
         cfg_layout = QVBoxLayout(config_frame)
         cfg_layout.setSpacing(10)
 
+        # Fila 1: Modo de Especificación y Estado del Motor de IA
         row1 = QHBoxLayout()
         row1.setSpacing(10)
 
-        row1.addWidget(QLabel(f"<b>{t('ai_spec.mode_label')}</b>"))
+        self.mode_label = QLabel(f"<b>{t('ai_spec.mode_label')}</b>")
+        self.mode_label.setWordWrap(False)
+        row1.addWidget(self.mode_label)
+
         self.mode_combo = QComboBox()
         self.mode_combo.addItem(t("ai_spec.mode_coding_agent"), "coding_agent")
         self.mode_combo.addItem(t("ai_spec.mode_user_stories"), "user_stories")
@@ -95,25 +100,135 @@ class AiSpecDialog(QDialog):
                 background-color: {styles.COLORS['bg_main']};
                 border: 1px solid {styles.COLORS['border']};
                 border-radius: 6px;
-                padding: 6px 12px;
+                padding: 6px 28px 6px 12px;
                 color: {styles.COLORS['text_main']};
                 font-size: 12px;
+            }}
+            QComboBox:focus {{
+                border-color: {styles.COLORS['accent_blue']};
+            }}
+            QComboBox::drop-down {{
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 24px;
+                border-left: 1px solid {styles.COLORS['border']};
+                border-top-right-radius: 6px;
+                border-bottom-right-radius: 6px;
+                background-color: {styles.COLORS['bg_card']};
+            }}
+            QComboBox::down-arrow {{
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 5px solid {styles.COLORS['text_muted']};
+                width: 0;
+                height: 0;
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {styles.COLORS['bg_card']};
+                border: 1px solid {styles.COLORS['border']};
+                selection-background-color: {styles.COLORS['accent_blue']};
+                color: {styles.COLORS['text_main']};
+                padding: 4px;
             }}
         """)
         row1.addWidget(self.mode_combo, stretch=1)
 
         # Indicador de estado del motor de IA
         self.engine_status_lbl = QLabel()
-        self._refresh_engine_status()
+        self.engine_status_lbl.setWordWrap(False)
         row1.addWidget(self.engine_status_lbl)
 
         cfg_layout.addLayout(row1)
 
-        # Instrucciones adicionales opcionales
+        # Fila 2: Selector de Modelo de Ollama, Instrucciones adicionales y Botón Generar
         row2 = QHBoxLayout()
         row2.setSpacing(8)
+
+        self.model_label = QLabel(f"<b>{t('ai_spec.model_label')}</b>")
+        self.model_label.setWordWrap(False)
+        row2.addWidget(self.model_label)
+
+        self.model_combo = QComboBox()
+        self.model_combo.setEditable(True)
+        self.model_combo.setInsertPolicy(QComboBox.NoInsert)
+        self.model_combo.setMinimumWidth(250)
+        self.model_combo.setMaximumWidth(290)
+        self.model_combo.setStyleSheet(f"""
+            QComboBox {{
+                background-color: {styles.COLORS['bg_main']};
+                border: 1px solid {styles.COLORS['border']};
+                border-radius: 6px;
+                padding: 5px 28px 5px 10px;
+                color: {styles.COLORS['text_main']};
+                font-size: 12px;
+            }}
+            QComboBox:focus {{
+                border-color: {styles.COLORS['accent_blue']};
+            }}
+            QComboBox::drop-down {{
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 24px;
+                border-left: 1px solid {styles.COLORS['border']};
+                border-top-right-radius: 6px;
+                border-bottom-right-radius: 6px;
+                background-color: {styles.COLORS['bg_card']};
+            }}
+            QComboBox::down-arrow {{
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 5px solid {styles.COLORS['text_muted']};
+                width: 0;
+                height: 0;
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {styles.COLORS['bg_card']};
+                border: 1px solid {styles.COLORS['border']};
+                selection-background-color: {styles.COLORS['accent_blue']};
+                color: {styles.COLORS['text_main']};
+                padding: 4px;
+            }}
+        """)
+        if self.model_combo.lineEdit():
+            self.model_combo.lineEdit().setPlaceholderText("Ej. qwen2.5-coder:1.5b")
+            self.model_combo.lineEdit().setStyleSheet(f"""
+                QLineEdit {{
+                    background: transparent;
+                    color: {styles.COLORS['text_main']};
+                    border: none;
+                    font-size: 12px;
+                    padding: 0px 4px 0px 0px;
+                }}
+            """)
+            self.model_combo.lineEdit().setCursorPosition(0)
+        self.model_combo.currentIndexChanged.connect(self._reset_model_cursor_pos)
+        self.model_combo.currentTextChanged.connect(self._reset_model_cursor_pos)
+        row2.addWidget(self.model_combo)
+
+        # Botón para refrescar modelos de Ollama activos
+        self.refresh_models_btn = QPushButton("🔄")
+        self.refresh_models_btn.setFixedSize(28, 28)
+        self.refresh_models_btn.setCursor(Qt.PointingHandCursor)
+        self.refresh_models_btn.setToolTip(t("ai_spec.refresh_models_tooltip"))
+        self.refresh_models_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {styles.COLORS['bg_main']};
+                border: 1px solid {styles.COLORS['border']};
+                border-radius: 6px;
+                color: {styles.COLORS['text_main']};
+                font-size: 12px;
+            }}
+            QPushButton:hover {{
+                background-color: {styles.COLORS['bg_card']};
+                border-color: {styles.COLORS['accent_blue']};
+            }}
+        """)
+        self.refresh_models_btn.clicked.connect(lambda: self._refresh_engine_status(manual=True))
+        row2.addWidget(self.refresh_models_btn)
+
+        # Instrucciones adicionales opcionales
         self.custom_prompt_input = QLineEdit()
-        self.custom_prompt_input.setPlaceholderText("Instrucciones o enfoque adicional para el agente de IA (opcional)…")
+        self.custom_prompt_input.setPlaceholderText("Instrucciones adicionales (opcional)…")
         self.custom_prompt_input.setStyleSheet(f"""
             QLineEdit {{
                 background-color: {styles.COLORS['bg_main']};
@@ -134,6 +249,7 @@ class AiSpecDialog(QDialog):
 
         cfg_layout.addLayout(row2)
         layout.addWidget(config_frame)
+        self._refresh_engine_status()
 
         # 3. Editor de salida / previsualización en Markdown
         self.spec_edit = QPlainTextEdit()
@@ -181,19 +297,61 @@ class AiSpecDialog(QDialog):
 
         layout.addLayout(btn_row)
 
-    def _refresh_engine_status(self):
-        """Muestra qué motor de IA atenderá la generación."""
+    def _refresh_engine_status(self, manual: bool = False):
+        """Muestra qué motor de IA atenderá la generación y puebla el selector de modelos de Ollama."""
         detect = local_ai.detect_available_llm()
         name = detect["name"]
-        if detect["status"] == "ready":
-            self.engine_status_lbl.setText(f"🟢 {name}")
+        ollama_models = local_ai.get_ollama_models()
+
+        current_choice = self.model_combo.currentText().strip()
+
+        self.model_combo.blockSignals(True)
+        self.model_combo.clear()
+
+        if ollama_models:
+            for m in ollama_models:
+                self.model_combo.addItem(m)
+            self.engine_status_lbl.setText(f"🟢 Ollama ({len(ollama_models)} mod.)")
             self.engine_status_lbl.setStyleSheet("color: #10b981; font-weight: bold; font-size: 11px;")
-        elif detect["status"] == "can_start":
-            self.engine_status_lbl.setText("🟡 Modelo local listo para iniciar")
-            self.engine_status_lbl.setStyleSheet("color: #f59e0b; font-weight: bold; font-size: 11px;")
+            self.engine_status_lbl.setToolTip("Conectado a Ollama local (localhost:11434)")
         else:
-            self.engine_status_lbl.setText("⚡ Modo Estructural (Rápido / Sin descarga)")
-            self.engine_status_lbl.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 11px;")
+            for m in local_ai.DEFAULT_OLLAMA_MODELS:
+                self.model_combo.addItem(m)
+
+            if detect["type"] == "managed" and detect["status"] == "ready":
+                self.engine_status_lbl.setText(f"🟢 {name}")
+                self.engine_status_lbl.setStyleSheet("color: #10b981; font-weight: bold; font-size: 11px;")
+                self.engine_status_lbl.setToolTip(f"Conectado a {name}")
+            elif detect["status"] == "can_start":
+                self.engine_status_lbl.setText("🟡 Runner local listo")
+                self.engine_status_lbl.setStyleSheet("color: #f59e0b; font-weight: bold; font-size: 11px;")
+                self.engine_status_lbl.setToolTip("El runner local se iniciará al generar la SPEC")
+            else:
+                if manual:
+                    self.engine_status_lbl.setText("⚡ Modo Estructural (Ollama desconectado)")
+                else:
+                    self.engine_status_lbl.setText("⚡ Modo Estructural (Sin descarga)")
+                self.engine_status_lbl.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 11px;")
+                self.engine_status_lbl.setToolTip("Ollama no está en ejecución en localhost:11434. Inicia Ollama y pulsa 🔄 para conectarlo.")
+
+        # Restaurar texto previo si existía, o preseleccionar el mejor modelo de código
+        if current_choice:
+            idx = self.model_combo.findText(current_choice)
+            if idx >= 0:
+                self.model_combo.setCurrentIndex(idx)
+            else:
+                self.model_combo.setEditText(current_choice)
+        else:
+            all_items = [self.model_combo.itemText(i) for i in range(self.model_combo.count())]
+            best_idx = next((i for i, m in enumerate(all_items) if any(k in m.lower() for k in ("coder", "qwen", "deepseek", "code"))), 0)
+            self.model_combo.setCurrentIndex(best_idx)
+
+        self.model_combo.blockSignals(False)
+        self._reset_model_cursor_pos()
+
+    def _reset_model_cursor_pos(self, *args):
+        if hasattr(self, "model_combo") and self.model_combo.lineEdit():
+            self.model_combo.lineEdit().setCursorPosition(0)
 
     def start_generation(self):
         """Inicia el proceso de generación de SPEC en segundo plano con streaming."""
@@ -202,14 +360,18 @@ class AiSpecDialog(QDialog):
 
         mode = self.mode_combo.currentData()
         custom = self.custom_prompt_input.text().strip()
+        selected_model = self.model_combo.currentText().strip() or None
 
         self.spec_edit.clear()
         self.generate_btn.setEnabled(False)
         self.generate_btn.setText(t("ai_spec.status_generating"))
 
-        self._gen_thread = local_ai.SpecGenerationThread(self.tasks_data, mode, custom, parent=self)
+        self._gen_thread = local_ai.SpecGenerationThread(
+            self.tasks_data, mode, custom, model_name=selected_model, parent=self
+        )
         self._gen_thread.token_received.connect(self._on_token)
         self._gen_thread.generation_finished.connect(self._on_finished)
+        self._gen_thread.error_occurred.connect(self._on_error)
         self._gen_thread.start()
 
     def _on_token(self, token: str):
@@ -222,6 +384,30 @@ class AiSpecDialog(QDialog):
         self.generate_btn.setEnabled(True)
         self.generate_btn.setText(t("ai_spec.generate_btn"))
         self._refresh_engine_status()
+
+    def _on_error(self, err_msg: str):
+        self.generate_btn.setEnabled(True)
+        self.generate_btn.setText(t("ai_spec.generate_btn"))
+        self.engine_status_lbl.setText(f"❌ Error: {err_msg[:45]}")
+        self.engine_status_lbl.setStyleSheet("color: #ef4444; font-weight: bold; font-size: 11px;")
+        self.engine_status_lbl.setToolTip(err_msg)
+        if not self.spec_edit.toPlainText().strip():
+            self.spec_edit.setPlainText(
+                f"> ❌ {err_msg}\n\n"
+                f"Comprueba que el modelo esté descargado en Ollama o usa el motor estructural local."
+            )
+
+    def reject(self):
+        if hasattr(self, "_gen_thread") and self._gen_thread and self._gen_thread.isRunning():
+            self._gen_thread.cancel()
+            self._gen_thread.wait(400)
+        super().reject()
+
+    def closeEvent(self, event):
+        if hasattr(self, "_gen_thread") and self._gen_thread and self._gen_thread.isRunning():
+            self._gen_thread.cancel()
+            self._gen_thread.wait(400)
+        super().closeEvent(event)
 
     def copy_to_clipboard(self):
         """Copia la SPEC generada al portapapeles del sistema."""

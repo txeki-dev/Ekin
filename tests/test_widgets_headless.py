@@ -755,6 +755,24 @@ def test_log_entry_linkify_and_external_link_open(qapp, monkeypatch):
     assert calls == ["https://github.com/txeki/ekin"]
 
 
+def test_log_entry_strips_doctype_and_does_not_leak_dtd(qapp):
+    """Regresión: toHtml() genera <!DOCTYPE ... strict.dtd> que antes era transformado
+    erróneamente por linkify_urls en un <a> inválido, haciendo que QLabel mostrase
+    'http://www.w3.org/TR/REC-html40/strict.dtd">' como texto visible al inicio de cada comentario."""
+    raw_html = (
+        '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd">\n'
+        '<html><head><meta name="qrichtext" content="1" /></head><body>'
+        '<p>Comentario normal sin basura de DTD y con enlace https://txek.dev</p>'
+        '</body></html>'
+    )
+    log_data = {"id": 2, "content": raw_html, "created_at": "2026-09-04 10:00:00"}
+    widget = LogEntryWidget(log_data, lambda *a: None, lambda *a: None)
+    rendered = widget.content_label.text()
+    assert "strict.dtd" not in rendered
+    assert "<!DOCTYPE" not in rendered
+    assert '<a href="https://txek.dev">https://txek.dev</a>' in rendered
+
+
 def test_rich_text_toolbar_all_buttons_exist(qapp):
     """Verifica que la barra de formato contiene todos los botones requeridos."""
     editor = markdown_edit_module.MarkdownTextEdit()
@@ -1207,6 +1225,138 @@ def test_ai_spec_dialog_loads_and_generates(qapp, db_path):
     assert "Tokens en SQLite" in spec_text
 
     dlg.reject()
+
+
+def test_cloud_sync_info_dialog_constructs_and_accepts(qapp):
+    """Verifica que CloudSyncInfoDialog se construye con las instrucciones de los proveedores y emite accept."""
+    from cloud_sync_dialog import CloudSyncInfoDialog
+    dlg = CloudSyncInfoDialog("Tablero_Test")
+    assert dlg.windowTitle() == "Vincular Tablero con Cloud"
+    assert hasattr(dlg, "continue_btn")
+    assert hasattr(dlg, "cancel_btn")
+    dlg.continue_btn.click()
+    assert dlg.result() == 1  # Accepted
+
+
+def test_markdown_edit_table_word_style(qapp):
+    """Verifica que insert_table genera tablas estilo Word con celdas centradas."""
+    from detail_dialog.markdown_edit import MarkdownTextEdit
+    edit = MarkdownTextEdit()
+    edit.insert_table(rows=2, cols=3)
+    html = edit.toHtml()
+    assert "<table" in html.lower()
+    # Verifica bordes y alineación centrada
+    assert "border:" in html or "border=" in html
+    assert "center" in html.lower()
+
+
+def test_markdown_edit_text_alignment(qapp):
+    """Verifica alineaciones de texto (izq, centro, der, justificado) y sincronización de toolbar."""
+    from detail_dialog.markdown_edit import MarkdownTextEdit, RichTextToolbar
+    edit = MarkdownTextEdit()
+    toolbar = RichTextToolbar(edit)
+    edit.setPlainText("Texto para probar alineacion")
+
+    edit.align_center()
+    toolbar.sync_buttons()
+    assert bool(edit.alignment() & Qt.AlignHCenter)
+    assert toolbar.align_center_btn.isChecked() is True
+    assert toolbar.align_left_btn.isChecked() is False
+
+    edit.align_right()
+    toolbar.sync_buttons()
+    assert bool(edit.alignment() & Qt.AlignRight)
+    assert toolbar.align_right_btn.isChecked() is True
+
+    edit.align_justify()
+    toolbar.sync_buttons()
+    assert bool(edit.alignment() & Qt.AlignJustify)
+    assert toolbar.align_justify_btn.isChecked() is True
+
+    edit.align_left()
+    toolbar.sync_buttons()
+    assert bool(edit.alignment() & Qt.AlignLeft) or edit.alignment() == Qt.AlignLeft
+    assert toolbar.align_left_btn.isChecked() is True
+
+
+def test_markdown_edit_case_conversions(qapp):
+    """Verifica la conversión a MAYÚSCULAS y minúsculas con selección y palabra bajo cursor."""
+    from PySide6.QtGui import QTextCursor
+    from detail_dialog.markdown_edit import MarkdownTextEdit
+
+    edit = MarkdownTextEdit()
+    edit.setPlainText("hola mundo")
+
+    # Selección completa
+    cursor = edit.textCursor()
+    cursor.select(QTextCursor.Document)
+    edit.setTextCursor(cursor)
+
+    edit.to_uppercase()
+    assert edit.toPlainText() == "HOLA MUNDO"
+
+    edit.to_lowercase()
+    assert edit.toPlainText() == "hola mundo"
+
+    edit.toggle_case()
+    assert edit.toPlainText() == "HOLA MUNDO"
+
+    edit.toggle_case()
+    assert edit.toPlainText() == "hola mundo"
+
+    # Conversión de la palabra bajo el cursor (sin selección)
+    cursor.setPosition(2)
+    edit.setTextCursor(cursor)
+    edit.to_uppercase()
+    assert edit.toPlainText() == "HOLA mundo"
+
+
+def test_shortcuts_dialog_includes_new_editor_shortcuts(qapp):
+    """Verifica que ShortcutsDialog carga y contiene los nuevos atajos de edición."""
+    from shortcuts_dialog import ShortcutsDialog
+    dlg = ShortcutsDialog()
+    assert dlg.windowTitle() != ""
+    labels = [c.text() for c in dlg.findChildren(QLabel)]
+    combined = " ".join(labels)
+    assert "Alinear texto" in combined
+    assert "MAYÚSCULAS" in combined
+
+
+def test_task_detail_dialog_width_and_toolbar_single_line(qapp, db_path):
+    """Verifica que TaskDetailDialog tenga suficiente anchura y que el panel derecho acomode los botones en 1 línea."""
+    import database
+    from detail_dialog import TaskDetailDialog
+
+    board_id = database.create_board("B1", db_path=db_path)
+    col_id = database.create_column(board_id, "C1", db_path=db_path)
+    t_id = database.create_task(col_id, "T1", db_path=db_path)
+
+    dlg = TaskDetailDialog(t_id, db_path=db_path)
+    assert dlg.width() >= 1200
+    assert dlg.right_panel.minimumWidth() >= 480
+    dlg.close()
+
+
+def test_ai_spec_dialog_expanded_widths(qapp, db_path):
+    """Verifica que AiSpecDialog tenga suficiente anchura y que mode_combo y model_combo no se trunquen."""
+    import database
+    from ai_spec_dialog import AiSpecDialog
+
+    board_id = database.create_board("B2", db_path=db_path)
+    col_id = database.create_column(board_id, "C2", db_path=db_path)
+    t_id = database.create_task(col_id, "T2", db_path=db_path)
+
+    dlg = AiSpecDialog([t_id], board_id, db_path=db_path)
+    assert dlg.width() >= 1000
+    assert dlg.minimumWidth() >= 980
+    assert dlg.model_combo.minimumWidth() >= 240
+    if dlg.model_combo.lineEdit():
+        assert dlg.model_combo.lineEdit().cursorPosition() == 0
+    dlg.close()
+
+
+
+
 
 
 

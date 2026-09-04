@@ -14,6 +14,7 @@ from strings import t
 from widgets import ColumnWidget, TaskCard, make_glyph_icon
 from detail_dialog import TaskDetailDialog
 from undo import UndoAction
+from cloud_sync_dialog import CloudSyncInfoDialog
 
 
 class BoardColumnsArea(QWidget):
@@ -614,6 +615,12 @@ class BoardViewWidget(QFrame):
         """Evento de cambio detectado por el sistema de archivos (OneDrive)."""
         self._sync_debounce_timer.start()
 
+    def _ensure_watcher_path_active(self):
+        """Asegura que el archivo sincronizado esté registrado en QFileSystemWatcher tras reemplazo atómico en Windows."""
+        if hasattr(self, "_watched_sync_path") and self._watched_sync_path and hasattr(self, "_file_watcher"):
+            if self._watched_sync_path not in self._file_watcher.files() and os.path.exists(self._watched_sync_path):
+                self._file_watcher.addPath(self._watched_sync_path)
+
     def _on_debounced_file_sync(self):
         """Ejecuta la sincronización en diferido cuando OneDrive termina de escribir."""
         if not self.board_id or self.board_id == -1:
@@ -621,10 +628,7 @@ class BoardViewWidget(QFrame):
         res = board_sync.sync_board_with_file(self.board_id, db_path=self.db_path)
         if res.status in ("imported", "merged"):
             self.load_board(self.board_id, notify=False)
-        # Re-añadir al watcher si OneDrive reemplazó el archivo
-        if hasattr(self, "_watched_sync_path") and self._watched_sync_path:
-            if self._watched_sync_path not in self._file_watcher.files() and os.path.exists(self._watched_sync_path):
-                self._file_watcher.addPath(self._watched_sync_path)
+        self._ensure_watcher_path_active()
 
     def _trigger_auto_sync_export(self):
         """Exporta cambios locales en segundo plano si el tablero está vinculado."""
@@ -632,6 +636,7 @@ class BoardViewWidget(QFrame):
             sync_info = database.get_board_sync_info(self.board_id, self.db_path)
             if sync_info and sync_info.get("sync_path"):
                 board_sync.sync_board_with_file(self.board_id, db_path=self.db_path)
+                self._ensure_watcher_path_active()
 
     def _on_sync_btn_clicked(self):
         """Maneja el clic en el botón de sincronización de la cabecera."""
@@ -639,8 +644,11 @@ class BoardViewWidget(QFrame):
             return
         sync_info = database.get_board_sync_info(self.board_id, self.db_path)
         if not sync_info or not sync_info.get("sync_path"):
-            # Diálogo para vincular a OneDrive / carpeta compartida
             board_name = self.board_title_label.text().strip().replace(" ", "_")
+            info_dlg = CloudSyncInfoDialog(board_name=board_name, parent=self.window())
+            if info_dlg.exec() != QDialog.Accepted:
+                return
+
             file_path, _ = QFileDialog.getSaveFileName(
                 self,
                 t("sync.dialog_title_link"),

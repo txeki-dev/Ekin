@@ -18,6 +18,7 @@ import hashlib
 import tempfile
 import time
 import uuid
+import glob
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 
@@ -197,16 +198,36 @@ def write_sync_file_atomic(file_path: str, data: dict) -> str:
     return calculate_file_hash(file_path)
 
 
+def _prune_premerge_backups(backup_dir: str, board_id: int, keep: int = 10):
+    """Conserva únicamente las `keep` copias de seguridad más recientes de sync para el tablero."""
+    try:
+        pattern = os.path.join(backup_dir, f"sync_premerge_board_{board_id}_*.json")
+        backups = sorted(glob.glob(pattern))
+        excess = len(backups) - keep
+        if excess > 0:
+            for old_path in backups[:excess]:
+                try:
+                    os.remove(old_path)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
 def create_premerge_backup(board_id: int, db_path=None) -> str:
-    """Crea una instantánea local automática del tablero antes de fusionar cambios."""
+    """Crea una instantánea local automática del tablero antes de fusionar cambios,
+    alojándola en el directorio canónico de bases de datos de Ekin (no en el cwd)."""
     try:
         data = export_board_to_sync_dict(board_id, db_path)
-        backup_dir = os.path.join(os.getcwd(), "backups")
+        actual_db = db_path or database.get_db_name()
+        db_dir = os.path.dirname(os.path.abspath(actual_db)) if actual_db else os.path.expanduser("~/.ekin")
+        backup_dir = os.path.join(db_dir, "backups")
         os.makedirs(backup_dir, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_path = os.path.join(backup_dir, f"sync_premerge_board_{board_id}_{timestamp}.json")
         with open(backup_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
+        _prune_premerge_backups(backup_dir, board_id, keep=10)
         return backup_path
     except Exception:
         return ""

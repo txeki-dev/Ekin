@@ -49,6 +49,8 @@ class ShortcutsDialog(QDialog):
             "shortcuts.item_bold",
             "shortcuts.item_italic",
             "shortcuts.item_strike",
+            "shortcuts.item_align",
+            "shortcuts.item_case",
             "shortcuts.item_nest_bullet",
             "shortcuts.item_arrow",
             "shortcuts.item_add_log",

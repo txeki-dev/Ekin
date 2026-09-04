@@ -360,6 +360,8 @@ STRINGS = {
     "shortcuts.item_bold": "Ctrl+B o Ctrl+N — Negrita (dentro del editor)",
     "shortcuts.item_italic": "Ctrl+K o Ctrl+I — Cursiva (dentro del editor)",
     "shortcuts.item_strike": "Ctrl+Shift+X — Tachado (dentro del editor)",
+    "shortcuts.item_align": "Ctrl+L / Ctrl+E / Ctrl+R / Ctrl+J — Alinear texto (izq, centro, der, justificado)",
+    "shortcuts.item_case": "Ctrl+Shift+U / Ctrl+Shift+L / Shift+F3 — Cambiar a MAYÚSCULAS / minúsculas",
     "shortcuts.item_nest_bullet": "Tab (sobre una viñeta) — Anidar la viñeta (dentro del editor)",
     "shortcuts.item_arrow": "Escribir «-->» se convierte en → automáticamente (dentro del editor)",
     "shortcuts.item_add_log": "Ctrl+Enter — Añadir la nota al Diario (detalle de tarea)",
@@ -370,6 +372,14 @@ STRINGS = {
     "markdown_edit.bold_tooltip": "Negrita (Ctrl+B o Ctrl+N)",
     "markdown_edit.italic_tooltip": "Cursiva (Ctrl+K o Ctrl+I)",
     "markdown_edit.strike_tooltip": "Tachado (Ctrl+Shift+X)",
+    "markdown_edit.align_left_tooltip": "Alinear a la izquierda (Ctrl+L)",
+    "markdown_edit.align_center_tooltip": "Centrar texto (Ctrl+E)",
+    "markdown_edit.align_right_tooltip": "Alinear a la derecha (Ctrl+R)",
+    "markdown_edit.align_justify_tooltip": "Justificar texto (Ctrl+J)",
+    "markdown_edit.upper_tooltip": "Convertir a MAYÚSCULAS (Ctrl+Shift+U)",
+    "markdown_edit.lower_tooltip": "Convertir a minúsculas (Ctrl+Shift+L)",
+    "markdown_edit.context_upper": "🔤 Convertir a MAYÚSCULAS",
+    "markdown_edit.context_lower": "🔡 Convertir a minúsculas",
     "markdown_edit.bullet_tooltip": "Lista con viñetas  ·  también con «* », «- » o «+ »",
     "markdown_edit.hr_tooltip": "Línea separadora  ·  también escribiendo «---»",
     "markdown_edit.arrow_tooltip": "Insertar flecha (→)  ·  también escribiendo «-->»",
@@ -520,9 +530,34 @@ STRINGS = {
     "task_detail.delete_log_title": "Eliminar Entrada",
     "task_detail.delete_log_body": "¿Estás seguro de que deseas borrar esta entrada del diario?",
 
-    # --- board_sync / sincronización con OneDrive / carpeta compartida ---
-    "sync.link_btn": "☁️ Vincular con OneDrive",
-    "sync.link_tooltip": "Vincular este tablero a una carpeta compartida o OneDrive (.ekboard)",
+    # --- board_sync / sincronización con Cloud (Google Drive, Dropbox, OneDrive, red) ---
+    "sync.link_btn": "☁️ Vincular con Cloud",
+    "sync.link_tooltip": "Vincular este tablero a Google Drive, Dropbox, OneDrive o carpeta compartida (.ekboard)",
+    "sync.info_dialog_title": "Vincular Tablero con Cloud",
+    "sync.info_header": "☁️ Sincronización en la Nube con Ekin",
+    "sync.info_subtitle": "Colabora en tiempo real con Google Drive, Dropbox, OneDrive o carpetas en red local.",
+    "sync.info_desc": (
+        "Ekin sincroniza este tablero generando un único archivo compartido (.ekboard). "
+        "Cualquier cambio realizado por ti o tu equipo se detecta y fusiona automáticamente "
+        "en segundo plano mediante un motor reactivo sin pérdida de información (No-Data-Loss)."
+    ),
+    "sync.info_providers_title": "Instrucciones por proveedor de nube:",
+    "sync.info_gdrive": (
+        "<b>🟦 Google Drive</b>: Guarda el archivo dentro de tu unidad o carpeta de Google Drive "
+        "sincronizada en este PC (ej. <i>G:\\Mi unidad\\...</i> o <i>C:\\Usuarios\\...\\Google Drive</i>)."
+    ),
+    "sync.info_dropbox": (
+        "<b>📦 Dropbox</b>: Guarda el archivo en tu carpeta de Dropbox sincronizada (ej. <i>C:\\Usuarios\\...\\Dropbox</i>)."
+    ),
+    "sync.info_onedrive": (
+        "<b>☁️ OneDrive</b>: Guarda el archivo en tu carpeta de OneDrive (ej. <i>C:\\Usuarios\\...\\OneDrive</i>)."
+    ),
+    "sync.info_other": (
+        "<b>🌐 Otras Nubes o Red Local</b>: También es compatible con Nextcloud, Syncthing o cualquier "
+        "carpeta compartida de red local (SMB)."
+    ),
+    "sync.info_continue_btn": "Continuar y Seleccionar Carpeta…",
+    "sync.info_cancel_btn": "Cancelar",
     "sync.synced_badge": "☁️ Sincronizado",
     "sync.syncing": "🔄 Sincronizando…",
     "sync.offline_badge": "Tablero local (sin sincronizar)",
@@ -543,6 +578,8 @@ STRINGS = {
     "ai_spec.clear_selection_btn": "❌ Deseleccionar",
     "ai_spec.dialog_title": "Generador de SPEC para Agentes de IA",
     "ai_spec.mode_label": "Modo de Especificación:",
+    "ai_spec.model_label": "Modelo (Ollama):",
+    "ai_spec.refresh_models_tooltip": "Escanear modelos de Ollama activos (localhost:11434)",
     "ai_spec.mode_coding_agent": "Arquitectura y Plan de Código (Antigravity / Claude Code / Cursor)",
     "ai_spec.mode_user_stories": "Historias de Usuario & Criterios de Aceptación (Gherkin)",
     "ai_spec.mode_qa_plan": "Plan de Pruebas & Matriz de QA",

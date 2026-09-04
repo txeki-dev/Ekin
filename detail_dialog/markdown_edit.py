@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt, QBuffer, QIODevice, QUrl
+from PySide6.QtCore import Qt, QBuffer, QIODevice, QUrl, QPointF, QSize
 from PySide6.QtWidgets import (
     QTextEdit, QPushButton, QWidget, QHBoxLayout, QVBoxLayout,
     QInputDialog, QDialog, QLabel, QComboBox, QPlainTextEdit,
@@ -6,13 +6,14 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import (
     QFont, QTextCharFormat, QTextListFormat, QTextCursor, QImage,
-    QTextTableFormat, QTextFrameFormat, QColor, QDesktopServices,
-    QPixmap, QPainter
+    QTextTableFormat, QColor, QDesktopServices,
+    QPixmap, QPainter, QPen, QIcon
 )
 import html
 import re
 import styles
 from strings import t
+from widgets import FlowLayout
 from .image_preview_dialog import show_image_preview
 
 
@@ -71,6 +72,36 @@ def _color_icon(color_hex, size=12):
     painter.drawRoundedRect(0, 0, size - 1, size - 1, 2, 2)
     painter.end()
     return pix
+
+
+def _align_icon(kind, color, size=14):
+    """Dibuja un icono vectorial nítido para alineación de texto (left, center, right, justify)."""
+    pix = QPixmap(size, size)
+    pix.fill(Qt.transparent)
+    p = QPainter(pix)
+    p.setRenderHint(QPainter.Antialiasing)
+    pen = QPen(QColor(color), 1.6)
+    pen.setCapStyle(Qt.RoundCap)
+    p.setPen(pen)
+
+    y_coords = [2.5, 6.0, 9.5, 13.0]
+    s = float(size)
+    for i, y in enumerate(y_coords):
+        if kind == "left":
+            x2 = s - 2.0 if i % 2 == 0 else s - 5.5
+            p.drawLine(QPointF(2.0, y), QPointF(x2, y))
+        elif kind == "center":
+            if i % 2 == 0:
+                p.drawLine(QPointF(2.0, y), QPointF(s - 2.0, y))
+            else:
+                p.drawLine(QPointF(4.0, y), QPointF(s - 4.0, y))
+        elif kind == "right":
+            x1 = 2.0 if i % 2 == 0 else 5.5
+            p.drawLine(QPointF(x1, y), QPointF(s - 2.0, y))
+        elif kind == "justify":
+            p.drawLine(QPointF(2.0, y), QPointF(s - 2.0, y))
+    p.end()
+    return QIcon(pix)
 
 
 class CodeBlockDialog(QDialog):
@@ -291,8 +322,85 @@ class MarkdownTextEdit(QTextEdit):
             del_cursor.endEditBlock()
             self.setTextCursor(del_cursor)
 
+    def align_left(self):
+        """Alinea el bloque de texto actual o selección a la izquierda."""
+        self.setAlignment(Qt.AlignLeft)
+        self.setFocus()
+
+    def align_center(self):
+        """Centra el bloque de texto actual o selección."""
+        self.setAlignment(Qt.AlignHCenter)
+        self.setFocus()
+
+    def align_right(self):
+        """Alinea el bloque de texto actual o selección a la derecha."""
+        self.setAlignment(Qt.AlignRight)
+        self.setFocus()
+
+    def align_justify(self):
+        """Justifica el bloque de texto actual o selección."""
+        self.setAlignment(Qt.AlignJustify)
+        self.setFocus()
+
+    def to_uppercase(self):
+        """Convierte el texto seleccionado (o la palabra bajo el cursor) a MAYÚSCULAS."""
+        cursor = self.textCursor()
+        if not cursor.hasSelection():
+            cursor.select(QTextCursor.WordUnderCursor)
+        if cursor.hasSelection():
+            selected = cursor.selectedText()
+            fmt = cursor.charFormat()
+            new_text = selected.upper()
+            start_pos = cursor.selectionStart()
+            cursor.beginEditBlock()
+            cursor.insertText(new_text, fmt)
+            cursor.endEditBlock()
+            cursor.setPosition(start_pos)
+            cursor.setPosition(start_pos + len(new_text), QTextCursor.KeepAnchor)
+            self.setTextCursor(cursor)
+            self.setFocus()
+
+    def to_lowercase(self):
+        """Convierte el texto seleccionado (o la palabra bajo el cursor) a minúsculas."""
+        cursor = self.textCursor()
+        if not cursor.hasSelection():
+            cursor.select(QTextCursor.WordUnderCursor)
+        if cursor.hasSelection():
+            selected = cursor.selectedText()
+            fmt = cursor.charFormat()
+            new_text = selected.lower()
+            start_pos = cursor.selectionStart()
+            cursor.beginEditBlock()
+            cursor.insertText(new_text, fmt)
+            cursor.endEditBlock()
+            cursor.setPosition(start_pos)
+            cursor.setPosition(start_pos + len(new_text), QTextCursor.KeepAnchor)
+            self.setTextCursor(cursor)
+            self.setFocus()
+
+    def toggle_case(self):
+        """Alterna el caso de la selección o palabra: MAYÚSCULAS <-> minúsculas (Shift+F3)."""
+        cursor = self.textCursor()
+        if not cursor.hasSelection():
+            cursor.select(QTextCursor.WordUnderCursor)
+        if cursor.hasSelection():
+            selected = cursor.selectedText()
+            fmt = cursor.charFormat()
+            if selected.isupper():
+                new_text = selected.lower()
+            else:
+                new_text = selected.upper()
+            start_pos = cursor.selectionStart()
+            cursor.beginEditBlock()
+            cursor.insertText(new_text, fmt)
+            cursor.endEditBlock()
+            cursor.setPosition(start_pos)
+            cursor.setPosition(start_pos + len(new_text), QTextCursor.KeepAnchor)
+            self.setTextCursor(cursor)
+            self.setFocus()
+
     def contextMenuEvent(self, event):
-        """Menú contextual estándar ampliado con opción de borrar bloque de código si el cursor está en uno."""
+        """Menú contextual estándar ampliado con opciones de mayúsculas/minúsculas y borrar código."""
         menu = self.createStandardContextMenu()
         styles.style_menu(menu)
         cursor = self.cursorForPosition(event.pos())
@@ -301,6 +409,15 @@ class MarkdownTextEdit(QTextEdit):
             menu.addSeparator()
             act_del = menu.addAction(f"🗑️ {t('markdown_edit.delete_code_btn_menu')}")
             act_del.triggered.connect(lambda: self._delete_code_block_at(event.pos()))
+
+        text_cur = self.textCursor()
+        if text_cur.hasSelection():
+            menu.addSeparator()
+            act_upper = menu.addAction(t("markdown_edit.context_upper"))
+            act_upper.triggered.connect(self.to_uppercase)
+            act_lower = menu.addAction(t("markdown_edit.context_lower"))
+            act_lower.triggered.connect(self.to_lowercase)
+
         menu.exec(event.globalPos())
 
     def mouseMoveEvent(self, event):
@@ -314,6 +431,7 @@ class MarkdownTextEdit(QTextEdit):
     def keyPressEvent(self, event):
         cursor = self.textCursor()
         ctrl = bool(event.modifiers() & Qt.ControlModifier)
+        shift = bool(event.modifiers() & Qt.ShiftModifier)
 
         # --- Negrita: Ctrl+B o Ctrl+N (Negrita en Word en español) ---
         if ctrl and event.key() in (Qt.Key_B, Qt.Key_N):
@@ -330,10 +448,42 @@ class MarkdownTextEdit(QTextEdit):
             event.accept()
             return
         # --- Tachado: Ctrl+Shift+X ---
-        if ctrl and bool(event.modifiers() & Qt.ShiftModifier) and event.key() == Qt.Key_X:
+        if ctrl and shift and event.key() == Qt.Key_X:
             fmt = QTextCharFormat()
             fmt.setFontStrikeOut(not self.currentCharFormat().fontStrikeOut())
             self.mergeCurrentCharFormat(fmt)
+            event.accept()
+            return
+
+        # --- Alineaciones de texto: Ctrl+L (izq), Ctrl+E (centro), Ctrl+R (der), Ctrl+J (justificado) ---
+        if ctrl and not shift and event.key() == Qt.Key_L:
+            self.align_left()
+            event.accept()
+            return
+        if ctrl and not shift and event.key() == Qt.Key_E:
+            self.align_center()
+            event.accept()
+            return
+        if ctrl and not shift and event.key() == Qt.Key_R:
+            self.align_right()
+            event.accept()
+            return
+        if ctrl and not shift and event.key() == Qt.Key_J:
+            self.align_justify()
+            event.accept()
+            return
+
+        # --- MAYÚSCULAS / minúsculas: Ctrl+Shift+U, Ctrl+Shift+L, Shift+F3 ---
+        if ctrl and shift and event.key() == Qt.Key_U:
+            self.to_uppercase()
+            event.accept()
+            return
+        if ctrl and shift and event.key() == Qt.Key_L:
+            self.to_lowercase()
+            event.accept()
+            return
+        if shift and not ctrl and event.key() == Qt.Key_F3:
+            self.toggle_case()
             event.accept()
             return
 
@@ -508,21 +658,19 @@ class MarkdownTextEdit(QTextEdit):
         return [ln.split("\t") for ln in lines]
 
     def insert_table(self, rows, cols, cell_texts=None):
-        """Inserta una tabla `rows`x`cols` en la posición del cursor, con el estilo del
-        tema activo. Si se pasa `cell_texts` (lista de filas de texto), rellena cada
-        celda con su contenido; si no, la deja vacía (usado por el botón «Insertar tabla»)."""
+        """Inserta una tabla `rows`x`cols` en la posición del cursor con diseño estilo Microsoft Word:
+        bordes estilizados, cabecera resaltada, celdas con padding generoso y texto centrado."""
+        from .html_utils import apply_word_style_to_qt_table
         fmt = QTextTableFormat()
-        fmt.setCellPadding(4)
-        fmt.setCellSpacing(0)
-        fmt.setBorder(1)
-        fmt.setBorderStyle(QTextFrameFormat.BorderStyle_Solid)
-        fmt.setBorderBrush(QColor(styles.COLORS["border"]))
         table = self.textCursor().insertTable(rows, cols, fmt)
-        if cell_texts:
-            for r, row in enumerate(cell_texts):
-                for c, text in enumerate(row):
-                    if r < rows and c < cols:
-                        table.cellAt(r, c).firstCursorPosition().insertText(text)
+        apply_word_style_to_qt_table(
+            table,
+            rows,
+            cols,
+            cell_texts=cell_texts,
+            border_color=styles.COLORS["border"],
+            bg_header=styles.COLORS["bg_card"],
+        )
 
     @staticmethod
     def _image_to_data_uri(image):
@@ -676,22 +824,21 @@ class MarkdownTextEdit(QTextEdit):
 
 
 class RichTextToolbar(QWidget):
-    """Barra de formato (negrita, cursiva, tachado, color, viñetas, línea separadora, tablas, código, enlaces)."""
+    """Barra de formato (negrita, cursiva, tachado, color, alineaciones, mayúsculas/minúsculas,
+    viñetas, línea separadora, tablas, código, enlaces)."""
     def __init__(self, text_edit, parent=None):
         super().__init__(parent)
         self.text_edit = text_edit
         self._current_text_color = styles.COLORS["text_main"]
 
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
+        layout = FlowLayout(self, margin=0, spacing=2)
 
         self.bold_btn = QPushButton("B")
         self.bold_btn.setObjectName("FormatButton")
         self.bold_btn.setToolTip(t("markdown_edit.bold_tooltip"))
         self.bold_btn.setCheckable(True)
         self.bold_btn.setCursor(Qt.PointingHandCursor)
-        self.bold_btn.setFixedSize(28, 26)
+        self.bold_btn.setFixedSize(26, 24)
         bold_font = self.bold_btn.font()
         bold_font.setBold(True)
         self.bold_btn.setFont(bold_font)
@@ -704,7 +851,7 @@ class RichTextToolbar(QWidget):
         self.italic_btn.setToolTip(t("markdown_edit.italic_tooltip"))
         self.italic_btn.setCheckable(True)
         self.italic_btn.setCursor(Qt.PointingHandCursor)
-        self.italic_btn.setFixedSize(28, 26)
+        self.italic_btn.setFixedSize(26, 24)
         italic_font = self.italic_btn.font()
         italic_font.setItalic(True)
         self.italic_btn.setFont(italic_font)
@@ -716,7 +863,7 @@ class RichTextToolbar(QWidget):
         self.strike_btn.setToolTip(t("markdown_edit.strike_tooltip"))
         self.strike_btn.setCheckable(True)
         self.strike_btn.setCursor(Qt.PointingHandCursor)
-        self.strike_btn.setFixedSize(28, 26)
+        self.strike_btn.setFixedSize(26, 24)
         strike_font = self.strike_btn.font()
         strike_font.setStrikeOut(True)
         self.strike_btn.setFont(strike_font)
@@ -727,7 +874,7 @@ class RichTextToolbar(QWidget):
         self.color_btn.setObjectName("FormatButton")
         self.color_btn.setToolTip(t("markdown_edit.color_tooltip"))
         self.color_btn.setCursor(Qt.PointingHandCursor)
-        self.color_btn.setFixedSize(28, 26)
+        self.color_btn.setFixedSize(26, 24)
         color_font = self.color_btn.font()
         color_font.setBold(True)
         self.color_btn.setFont(color_font)
@@ -735,11 +882,82 @@ class RichTextToolbar(QWidget):
         self._update_color_btn_indicator()
         layout.addWidget(self.color_btn)
 
+        # Botones de alineación de texto
+        icon_c = styles.COLORS["text_main"]
+        self.align_left_btn = QPushButton()
+        self.align_left_btn.setObjectName("FormatButton")
+        self.align_left_btn.setToolTip(t("markdown_edit.align_left_tooltip"))
+        self.align_left_btn.setCheckable(True)
+        self.align_left_btn.setCursor(Qt.PointingHandCursor)
+        self.align_left_btn.setFixedSize(26, 24)
+        self.align_left_btn.setIcon(_align_icon("left", icon_c))
+        self.align_left_btn.setIconSize(QSize(14, 14))
+        self.align_left_btn.clicked.connect(self.text_edit.align_left)
+        layout.addWidget(self.align_left_btn)
+
+        self.align_center_btn = QPushButton()
+        self.align_center_btn.setObjectName("FormatButton")
+        self.align_center_btn.setToolTip(t("markdown_edit.align_center_tooltip"))
+        self.align_center_btn.setCheckable(True)
+        self.align_center_btn.setCursor(Qt.PointingHandCursor)
+        self.align_center_btn.setFixedSize(26, 24)
+        self.align_center_btn.setIcon(_align_icon("center", icon_c))
+        self.align_center_btn.setIconSize(QSize(14, 14))
+        self.align_center_btn.clicked.connect(self.text_edit.align_center)
+        layout.addWidget(self.align_center_btn)
+
+        self.align_right_btn = QPushButton()
+        self.align_right_btn.setObjectName("FormatButton")
+        self.align_right_btn.setToolTip(t("markdown_edit.align_right_tooltip"))
+        self.align_right_btn.setCheckable(True)
+        self.align_right_btn.setCursor(Qt.PointingHandCursor)
+        self.align_right_btn.setFixedSize(26, 24)
+        self.align_right_btn.setIcon(_align_icon("right", icon_c))
+        self.align_right_btn.setIconSize(QSize(14, 14))
+        self.align_right_btn.clicked.connect(self.text_edit.align_right)
+        layout.addWidget(self.align_right_btn)
+
+        self.align_justify_btn = QPushButton()
+        self.align_justify_btn.setObjectName("FormatButton")
+        self.align_justify_btn.setToolTip(t("markdown_edit.align_justify_tooltip"))
+        self.align_justify_btn.setCheckable(True)
+        self.align_justify_btn.setCursor(Qt.PointingHandCursor)
+        self.align_justify_btn.setFixedSize(26, 24)
+        self.align_justify_btn.setIcon(_align_icon("justify", icon_c))
+        self.align_justify_btn.setIconSize(QSize(14, 14))
+        self.align_justify_btn.clicked.connect(self.text_edit.align_justify)
+        layout.addWidget(self.align_justify_btn)
+
+        # Botones de MAYÚSCULAS / minúsculas
+        self.upper_btn = QPushButton("AA")
+        self.upper_btn.setObjectName("FormatButton")
+        self.upper_btn.setToolTip(t("markdown_edit.upper_tooltip"))
+        self.upper_btn.setCursor(Qt.PointingHandCursor)
+        self.upper_btn.setFixedSize(26, 24)
+        f_up = self.upper_btn.font()
+        f_up.setBold(True)
+        f_up.setPointSize(9)
+        self.upper_btn.setFont(f_up)
+        self.upper_btn.clicked.connect(self.text_edit.to_uppercase)
+        layout.addWidget(self.upper_btn)
+
+        self.lower_btn = QPushButton("aa")
+        self.lower_btn.setObjectName("FormatButton")
+        self.lower_btn.setToolTip(t("markdown_edit.lower_tooltip"))
+        self.lower_btn.setCursor(Qt.PointingHandCursor)
+        self.lower_btn.setFixedSize(26, 24)
+        f_low = self.lower_btn.font()
+        f_low.setBold(True)
+        f_low.setPointSize(9)
+        self.lower_btn.setFont(f_low)
+        self.lower_btn.clicked.connect(self.text_edit.to_lowercase)
+        layout.addWidget(self.lower_btn)
+
         self.bullet_btn = QPushButton("•")
         self.bullet_btn.setObjectName("FormatButton")
         self.bullet_btn.setToolTip(t("markdown_edit.bullet_tooltip"))
         self.bullet_btn.setCursor(Qt.PointingHandCursor)
-        self.bullet_btn.setFixedSize(28, 26)
+        self.bullet_btn.setFixedSize(26, 24)
         self.bullet_btn.clicked.connect(self.toggle_bullets)
         layout.addWidget(self.bullet_btn)
 
@@ -747,7 +965,7 @@ class RichTextToolbar(QWidget):
         self.hr_btn.setObjectName("FormatButton")
         self.hr_btn.setToolTip(t("markdown_edit.hr_tooltip"))
         self.hr_btn.setCursor(Qt.PointingHandCursor)
-        self.hr_btn.setFixedSize(28, 26)
+        self.hr_btn.setFixedSize(26, 24)
         self.hr_btn.clicked.connect(lambda: self.text_edit.insert_horizontal_rule())
         layout.addWidget(self.hr_btn)
 
@@ -755,7 +973,7 @@ class RichTextToolbar(QWidget):
         self.table_btn.setObjectName("FormatButton")
         self.table_btn.setToolTip(t("markdown_edit.table_tooltip"))
         self.table_btn.setCursor(Qt.PointingHandCursor)
-        self.table_btn.setFixedSize(28, 26)
+        self.table_btn.setFixedSize(26, 24)
         self.table_btn.clicked.connect(self.insert_table_dialog)
         layout.addWidget(self.table_btn)
 
@@ -763,7 +981,7 @@ class RichTextToolbar(QWidget):
         self.code_btn.setObjectName("FormatButton")
         self.code_btn.setToolTip(t("markdown_edit.code_tooltip"))
         self.code_btn.setCursor(Qt.PointingHandCursor)
-        self.code_btn.setFixedSize(28, 26)
+        self.code_btn.setFixedSize(26, 24)
         code_font = self.code_btn.font()
         code_font.setFamily("Consolas")
         code_font.setBold(True)
@@ -775,7 +993,7 @@ class RichTextToolbar(QWidget):
         self.link_btn.setObjectName("FormatButton")
         self.link_btn.setToolTip(t("markdown_edit.link_tooltip"))
         self.link_btn.setCursor(Qt.PointingHandCursor)
-        self.link_btn.setFixedSize(28, 26)
+        self.link_btn.setFixedSize(26, 24)
         self.link_btn.clicked.connect(lambda: self.text_edit.open_link_dialog())
         layout.addWidget(self.link_btn)
 
@@ -783,11 +1001,9 @@ class RichTextToolbar(QWidget):
         self.arrow_btn.setObjectName("FormatButton")
         self.arrow_btn.setToolTip(t("markdown_edit.arrow_tooltip"))
         self.arrow_btn.setCursor(Qt.PointingHandCursor)
-        self.arrow_btn.setFixedSize(28, 26)
+        self.arrow_btn.setFixedSize(26, 24)
         self.arrow_btn.clicked.connect(self.insert_arrow)
         layout.addWidget(self.arrow_btn)
-
-        layout.addStretch()
 
         # Mantener el estado visual de los botones sincronizado con el formato actual,
         # ya sea por movimiento del cursor o por atajos nativos (Ctrl+B / Ctrl+I).
@@ -901,3 +1117,15 @@ class RichTextToolbar(QWidget):
             self._update_color_btn_indicator(fg.name())
         else:
             self._update_color_btn_indicator(styles.COLORS["text_main"])
+
+        align = self.text_edit.alignment()
+        is_center = bool(align & Qt.AlignHCenter)
+        is_right = bool(align & Qt.AlignRight)
+        is_justify = bool(align & Qt.AlignJustify)
+        is_left = bool(align & Qt.AlignLeft) or (not is_center and not is_right and not is_justify)
+
+        self.align_left_btn.setChecked(is_left)
+        self.align_center_btn.setChecked(is_center)
+        self.align_right_btn.setChecked(is_right)
+        self.align_justify_btn.setChecked(is_justify)
+

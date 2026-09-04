@@ -19,7 +19,7 @@ import urllib.request
 import urllib.error
 import atexit
 import subprocess
-from typing import Optional, Generator
+from typing import Optional, Generator, Callable
 from PySide6.QtCore import QThread, Signal
 
 # Rutas estándar de almacenamiento de modelos y binarios de Ekin
@@ -44,6 +44,17 @@ MANAGED_SERVER_PORT = 28192
 
 # Proceso global del runner autónomo gestionado
 _MANAGED_PROCESS: Optional[subprocess.Popen] = None
+
+
+# Modelos populares recomendados para Ollama cuando no está activo o como sugerencia
+DEFAULT_OLLAMA_MODELS = [
+    "qwen2.5-coder:1.5b",
+    "qwen2.5-coder:7b",
+    "deepseek-coder:6.7b",
+    "codellama:7b",
+    "llama3.2:3b",
+    "mistral:7b",
+]
 
 
 def ensure_directories():
@@ -72,6 +83,22 @@ def check_http_endpoint(url: str, timeout: float = 1.0) -> bool:
         return False
 
 
+def get_ollama_models(timeout: float = 1.0) -> list[str]:
+    """Obtiene la lista de nombres de modelos disponibles en Ollama local."""
+    for host in ("127.0.0.1", "localhost"):
+        try:
+            req = urllib.request.Request(f"http://{host}:11434/api/tags", headers={"User-Agent": "Ekin-AI"})
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode("utf-8"))
+                    models = [m["name"] for m in data.get("models", []) if "name" in m]
+                    if models:
+                        return models
+        except Exception:
+            pass
+    return []
+
+
 def detect_available_llm() -> dict:
     """Detecta qué servicio de LLM local está disponible en el equipo."""
     # 1. ¿Runner gestionado por Ekin ya activo en puerto 28192?
@@ -85,11 +112,13 @@ def detect_available_llm() -> dict:
 
     # 2. ¿Ollama activo en puerto 11434?
     if check_http_endpoint("http://127.0.0.1:11434/api/tags", timeout=0.5):
+        models = get_ollama_models(timeout=0.5)
         return {
             "status": "ready",
             "type": "ollama",
             "url": "http://127.0.0.1:11434",
             "name": "Ollama (Local)",
+            "models": models,
         }
 
     # 3. ¿Servidor OpenAI-compatible local activo (LM Studio / llama-server en 8080 o 1234)?
@@ -433,7 +462,9 @@ def stream_openai_chat_completion(
     system_prompt: str,
     user_prompt: str,
     model_name: str = "qwen2.5-coder",
-    timeout: float = 60.0
+    timeout: float = 60.0,
+    cancel_check: Optional[Callable[[], bool]] = None,
+    on_response: Optional[Callable[[object], None]] = None,
 ) -> Generator[str, None, None]:
     """Envía una solicitud en streaming al endpoint OpenAI-compatible y produce tokens sucesivos."""
     url = f"{endpoint.rstrip('/')}/v1/chat/completions"
@@ -455,7 +486,11 @@ def stream_openai_chat_completion(
     )
 
     with urllib.request.urlopen(req, timeout=timeout) as response:
+        if on_response is not None:
+            on_response(response)
         for line in response:
+            if cancel_check is not None and cancel_check():
+                break
             line_str = line.decode("utf-8", errors="replace").strip()
             if not line_str.startswith("data:"):
                 continue
@@ -553,15 +588,22 @@ class SpecGenerationThread(QThread):
     generation_finished = Signal(str)
     error_occurred = Signal(str)
 
-    def __init__(self, tasks: list[dict], mode: str, custom_instructions: str = "", parent=None):
+    def __init__(self, tasks: list[dict], mode: str, custom_instructions: str = "", model_name: Optional[str] = None, parent=None):
         super().__init__(parent)
         self.tasks = tasks
         self.mode = mode
         self.custom_instructions = custom_instructions
+        self.model_name = model_name
         self._is_cancelled = False
+        self._active_response = None
 
     def cancel(self):
         self._is_cancelled = True
+        if self._active_response is not None:
+            try:
+                self._active_response.close()
+            except Exception:
+                pass
 
     def run(self):
         system_prompt, user_prompt = build_spec_prompts(self.tasks, self.mode, self.custom_instructions)
@@ -572,11 +614,26 @@ class SpecGenerationThread(QThread):
             start_managed_runner()
             detection = detect_available_llm()
 
+        fallback_warning = ""
+
         if detection["status"] == "ready":
             endpoint = detection["url"]
+            target_model = self.model_name
+            if not target_model:
+                target_model = "qwen2.5-coder"
             accumulated = []
             try:
-                for token in stream_openai_chat_completion(endpoint, system_prompt, user_prompt):
+                def _store_resp(resp):
+                    self._active_response = resp
+
+                for token in stream_openai_chat_completion(
+                    endpoint,
+                    system_prompt,
+                    user_prompt,
+                    model_name=target_model,
+                    cancel_check=lambda: self._is_cancelled,
+                    on_response=_store_resp,
+                ):
                     if self._is_cancelled:
                         return
                     accumulated.append(token)
@@ -586,18 +643,34 @@ class SpecGenerationThread(QThread):
                 if full_text.strip():
                     self.generation_finished.emit(full_text)
                     return
-            except Exception:
-                # Si falla la llamada HTTP a la IA, recurrir al generador estructural transparente
-                pass
+            except Exception as exc:
+                if self._is_cancelled:
+                    return
+                # Si ya se emitieron tokens a la interfaz, emitir error_occurred en lugar de
+                # concatenar el fallback estructural sobre una respuesta a medias.
+                if accumulated:
+                    self.error_occurred.emit(f"Error durante la inferencia con '{target_model}': {exc}")
+                    return
+                # Si falló antes de emitir ningún token, preparamos un aviso informativo visible
+                fallback_warning = (
+                    f"> ⚠️ **Aviso**: No se pudo generar con el modelo '{target_model}' ({exc}). "
+                    f"Se ha recurrido al sintetizador estructural local.\n\n"
+                )
+            finally:
+                self._active_response = None
+
+        if self._is_cancelled:
+            return
 
         # Fallback estructural rápido: garantizado 100% fiable y sin dependencias
         structural_spec = generate_structural_spec(self.tasks, self.mode, self.custom_instructions)
-        # Emitir tokens en pequeños fragmentos para dar respuesta fluida
-        lines = structural_spec.split("\n")
+        full_spec = fallback_warning + structural_spec if fallback_warning else structural_spec
+
+        lines = full_spec.split("\n")
         for line in lines:
             if self._is_cancelled:
                 return
             self.token_received.emit(line + "\n")
             time.sleep(0.01)
 
-        self.generation_finished.emit(structural_spec)
+        self.generation_finished.emit(full_spec)

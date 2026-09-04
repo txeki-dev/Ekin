@@ -11,6 +11,7 @@ import board_sync
 import styles
 import importer
 from export_dialog import ExportDialog, ImportConfirmationDialog
+from cloud_sync_dialog import CloudSyncInfoDialog
 from styles import hex_to_rgb
 from strings import t
 from undo import UndoAction
@@ -631,6 +632,10 @@ class SidebarWidget(QFrame):
         elif action == "link":
             board = database.get_board(board_id, self.db_path)
             board_name = (board["name"] if board else "tablero").strip().replace(" ", "_")
+            info_dlg = CloudSyncInfoDialog(board_name=board_name, parent=self.window())
+            if info_dlg.exec() != QDialog.Accepted:
+                return
+
             file_path, _ = QFileDialog.getSaveFileName(
                 self,
                 t("sync.dialog_title_link"),

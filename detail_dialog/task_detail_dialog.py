@@ -71,8 +71,8 @@ class TaskDetailDialog(QDialog):
         self._click_outside_filter = None
 
         self.setWindowTitle(t("task_detail.window_title"))
-        self.resize(1120, 720)
-        self.setMinimumSize(940, 580)
+        self.resize(1260, 740)
+        self.setMinimumSize(1120, 600)
 
         self.init_ui()
         self.load_task_data()
@@ -344,7 +344,7 @@ class TaskDetailDialog(QDialog):
         action_layout.addWidget(self.close_btn)
 
         left_layout.addLayout(action_layout)
-        main_layout.addWidget(left_panel, 4)
+        main_layout.addWidget(left_panel, 5)
 
         # Separador visual
         separator = QFrame()
@@ -356,8 +356,9 @@ class TaskDetailDialog(QDialog):
         # ==========================================
         # PANEL DERECHO: DIARIO / HISTORIAL (LOGS)
         # ==========================================
-        right_panel = QWidget()
-        right_layout = QVBoxLayout(right_panel)
+        self.right_panel = QWidget()
+        self.right_panel.setMinimumWidth(485)
+        right_layout = QVBoxLayout(self.right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(10)
 
@@ -404,7 +405,7 @@ class TaskDetailDialog(QDialog):
         input_layout.addLayout(log_btn_layout)
         right_layout.addWidget(input_container)
 
-        main_layout.addWidget(right_panel, 5)
+        main_layout.addWidget(self.right_panel, 5)
 
         # Atajo teclado Ctrl+Enter para añadir entrada al diario
         shortcut = QShortcut(QKeySequence("Ctrl+Return"), self)

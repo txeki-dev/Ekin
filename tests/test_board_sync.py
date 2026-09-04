@@ -1,5 +1,6 @@
 import os
 import json
+from datetime import datetime, timedelta
 import pytest
 
 import database
@@ -166,7 +167,7 @@ def test_sync_collision_no_data_loss_preserves_in_journal(sync_test_db):
         if t["title"] == "Tarea 1":
             t["description"] = "Versión remota del compañero en OneDrive"
             t["version"] = 5
-            t["updated_at"] = "2026-09-03 19:30:00"  # Más reciente
+            t["updated_at"] = (datetime.now() + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")  # Más reciente
 
     with open(sync_file, "w", encoding="utf-8") as f:
         json.dump(file_data, f, indent=2)
@@ -275,10 +276,25 @@ def test_premerge_backup_created_on_merge(sync_test_db):
     res = board_sync.sync_board_with_file(board_id, sync_file, db_path)
     assert res.status == "imported"
 
-    backup_dir = os.path.join(os.getcwd(), "backups")
+    backup_dir = os.path.join(os.path.dirname(os.path.abspath(db_path)), "backups")
     assert os.path.exists(backup_dir)
     backups = [f for f in os.listdir(backup_dir) if f.startswith(f"sync_premerge_board_{board_id}")]
     assert len(backups) >= 1
+
+
+def test_create_premerge_backup_and_pruning(sync_test_db):
+    """Verifica que create_premerge_backup usa el directorio canónico de la BD y poda copias antiguas."""
+    db_path = sync_test_db["db_path"]
+    board_id = sync_test_db["board_id"]
+    backup_dir = os.path.join(os.path.dirname(os.path.abspath(db_path)), "backups")
+
+    for _ in range(12):
+        p = board_sync.create_premerge_backup(board_id, db_path)
+        assert p != ""
+        assert os.path.exists(p)
+
+    backups = [f for f in os.listdir(backup_dir) if f.startswith(f"sync_premerge_board_{board_id}")]
+    assert len(backups) <= 10
 
 
 def test_sync_remote_deletion_does_not_resurrect(sync_test_db):
