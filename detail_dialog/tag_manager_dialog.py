@@ -24,7 +24,7 @@ class TagManagerDialog(QDialog):
         self.resize(600, 440)
         self.setMinimumSize(520, 380)
 
-        self.new_value_color = "#3b82f6"
+        self.new_value_color = "#c67139"
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(15, 15, 15, 15)

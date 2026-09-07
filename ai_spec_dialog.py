@@ -4,7 +4,7 @@ para agentes de IA a partir de múltiples tarjetas seleccionadas.
 """
 
 import sys
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSize
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QComboBox, QPlainTextEdit, QLineEdit, QMessageBox, QFileDialog,
@@ -15,6 +15,7 @@ import styles
 import database
 from strings import t
 import local_ai
+from icons import lucide_icon
 
 
 class AiSpecDialog(QDialog):
@@ -55,15 +56,17 @@ class AiSpecDialog(QDialog):
         header_layout = QVBoxLayout()
         header_layout.setSpacing(6)
 
-        title_lbl = QLabel(f"🤖 <b>{t('ai_spec.dialog_title')}</b>")
-        title_lbl.setStyleSheet(f"font-size: 16px; color: {styles.COLORS['text_main']};")
+        title_lbl = QLabel(t('ai_spec.dialog_title'))
+        title_lbl.setStyleSheet(
+            f"font-family: 'Caprasimo', 'Segoe UI', serif; font-size: 20px; color: {styles.COLORS['text_main']};"
+        )
         header_layout.addWidget(title_lbl)
 
         tasks_summary = ", ".join(f"«{t['title']}»" for t in self.tasks_data[:4])
         if len(self.tasks_data) > 4:
-            tasks_summary += f" y {len(self.tasks_data) - 4} más"
+            tasks_summary += f" and {len(self.tasks_data) - 4} more"
 
-        desc_lbl = QLabel(f"Tareas seleccionadas ({len(self.tasks_data)}): {tasks_summary}")
+        desc_lbl = QLabel(f"Selected tasks ({len(self.tasks_data)}): {tasks_summary}")
         desc_lbl.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 12px;")
         desc_lbl.setWordWrap(True)
         header_layout.addWidget(desc_lbl)
@@ -190,7 +193,7 @@ class AiSpecDialog(QDialog):
             }}
         """)
         if self.model_combo.lineEdit():
-            self.model_combo.lineEdit().setPlaceholderText("Ej. qwen2.5-coder:1.5b")
+            self.model_combo.lineEdit().setPlaceholderText("e.g. qwen2.5-coder:1.5b")
             self.model_combo.lineEdit().setStyleSheet(f"""
                 QLineEdit {{
                     background: transparent;
@@ -206,21 +209,20 @@ class AiSpecDialog(QDialog):
         row2.addWidget(self.model_combo)
 
         # Botón para refrescar modelos de Ollama activos
-        self.refresh_models_btn = QPushButton("🔄")
+        self.refresh_models_btn = QPushButton()
         self.refresh_models_btn.setFixedSize(28, 28)
         self.refresh_models_btn.setCursor(Qt.PointingHandCursor)
         self.refresh_models_btn.setToolTip(t("ai_spec.refresh_models_tooltip"))
+        self.refresh_models_btn.setIcon(lucide_icon("rotate-ccw", styles.COLORS['text_soft'], 15))
+        self.refresh_models_btn.setIconSize(QSize(15, 15))
         self.refresh_models_btn.setStyleSheet(f"""
             QPushButton {{
-                background-color: {styles.COLORS['bg_main']};
+                background-color: {styles.COLORS['bg_card']};
                 border: 1px solid {styles.COLORS['border']};
-                border-radius: 6px;
-                color: {styles.COLORS['text_main']};
-                font-size: 12px;
+                border-radius: 14px;
             }}
             QPushButton:hover {{
-                background-color: {styles.COLORS['bg_card']};
-                border-color: {styles.COLORS['accent_blue']};
+                background-color: {styles.COLORS['bg_hover']};
             }}
         """)
         self.refresh_models_btn.clicked.connect(lambda: self._refresh_engine_status(manual=True))
@@ -228,7 +230,7 @@ class AiSpecDialog(QDialog):
 
         # Instrucciones adicionales opcionales
         self.custom_prompt_input = QLineEdit()
-        self.custom_prompt_input.setPlaceholderText("Instrucciones adicionales (opcional)…")
+        self.custom_prompt_input.setPlaceholderText("Extra instructions (optional)…")
         self.custom_prompt_input.setStyleSheet(f"""
             QLineEdit {{
                 background-color: {styles.COLORS['bg_main']};
@@ -256,12 +258,12 @@ class AiSpecDialog(QDialog):
         font = QFont("Consolas" if sys.platform == "win32" else "Monospace", 10)
         font.setStyleHint(QFont.Monospace)
         self.spec_edit.setFont(font)
-        self.spec_edit.setPlaceholderText("Pulsa «⚡ Generar SPEC» para crear la especificación técnica con IA…")
+        self.spec_edit.setPlaceholderText("Press «Generate SPEC» to create the technical spec with local AI…")
         self.spec_edit.setStyleSheet(f"""
             QPlainTextEdit {{
-                background-color: #1e1e1e;
-                color: #d4d4d4;
-                border: 1px solid {styles.COLORS['border']};
+                background-color: {styles.COLORS['bg_dark']};
+                color: {styles.COLORS['bg_hover']};
+                border: none;
                 border-radius: 8px;
                 padding: 12px;
                 line-height: 140%;
@@ -290,7 +292,7 @@ class AiSpecDialog(QDialog):
 
         btn_row.addStretch()
 
-        self.close_btn = QPushButton("Cerrar")
+        self.close_btn = QPushButton("Close")
         self.close_btn.setCursor(Qt.PointingHandCursor)
         self.close_btn.clicked.connect(self.accept)
         btn_row.addWidget(self.close_btn)
@@ -311,28 +313,28 @@ class AiSpecDialog(QDialog):
         if ollama_models:
             for m in ollama_models:
                 self.model_combo.addItem(m)
-            self.engine_status_lbl.setText(f"🟢 Ollama ({len(ollama_models)} mod.)")
-            self.engine_status_lbl.setStyleSheet("color: #10b981; font-weight: bold; font-size: 11px;")
-            self.engine_status_lbl.setToolTip("Conectado a Ollama local (localhost:11434)")
+            self.engine_status_lbl.setText(f"Ollama ({len(ollama_models)} models)")
+            self.engine_status_lbl.setStyleSheet(f"color: {styles.COLORS['accent_2']}; font-weight: bold; font-size: 11px;")
+            self.engine_status_lbl.setToolTip("Connected to local Ollama (localhost:11434)")
         else:
             for m in local_ai.DEFAULT_OLLAMA_MODELS:
                 self.model_combo.addItem(m)
 
             if detect["type"] == "managed" and detect["status"] == "ready":
-                self.engine_status_lbl.setText(f"🟢 {name}")
-                self.engine_status_lbl.setStyleSheet("color: #10b981; font-weight: bold; font-size: 11px;")
-                self.engine_status_lbl.setToolTip(f"Conectado a {name}")
+                self.engine_status_lbl.setText(name)
+                self.engine_status_lbl.setStyleSheet(f"color: {styles.COLORS['accent_2']}; font-weight: bold; font-size: 11px;")
+                self.engine_status_lbl.setToolTip(f"Connected to {name}")
             elif detect["status"] == "can_start":
-                self.engine_status_lbl.setText("🟡 Runner local listo")
-                self.engine_status_lbl.setStyleSheet("color: #f59e0b; font-weight: bold; font-size: 11px;")
-                self.engine_status_lbl.setToolTip("El runner local se iniciará al generar la SPEC")
+                self.engine_status_lbl.setText("Local runner ready")
+                self.engine_status_lbl.setStyleSheet(f"color: {styles.COLORS['accent']}; font-weight: bold; font-size: 11px;")
+                self.engine_status_lbl.setToolTip("The local runner will start when you generate the SPEC")
             else:
                 if manual:
-                    self.engine_status_lbl.setText("⚡ Modo Estructural (Ollama desconectado)")
+                    self.engine_status_lbl.setText("Structural mode (Ollama offline)")
                 else:
-                    self.engine_status_lbl.setText("⚡ Modo Estructural (Sin descarga)")
+                    self.engine_status_lbl.setText("Structural mode (no download)")
                 self.engine_status_lbl.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 11px;")
-                self.engine_status_lbl.setToolTip("Ollama no está en ejecución en localhost:11434. Inicia Ollama y pulsa 🔄 para conectarlo.")
+                self.engine_status_lbl.setToolTip("Ollama isn't running on localhost:11434. Start Ollama and click refresh to connect it.")
 
         # Restaurar texto previo si existía, o preseleccionar el mejor modelo de código
         if current_choice:
@@ -388,13 +390,13 @@ class AiSpecDialog(QDialog):
     def _on_error(self, err_msg: str):
         self.generate_btn.setEnabled(True)
         self.generate_btn.setText(t("ai_spec.generate_btn"))
-        self.engine_status_lbl.setText(f"❌ Error: {err_msg[:45]}")
-        self.engine_status_lbl.setStyleSheet("color: #ef4444; font-weight: bold; font-size: 11px;")
+        self.engine_status_lbl.setText(f"Error: {err_msg[:45]}")
+        self.engine_status_lbl.setStyleSheet(f"color: {styles.COLORS['danger']}; font-weight: bold; font-size: 11px;")
         self.engine_status_lbl.setToolTip(err_msg)
         if not self.spec_edit.toPlainText().strip():
             self.spec_edit.setPlainText(
-                f"> ❌ {err_msg}\n\n"
-                f"Comprueba que el modelo esté descargado en Ollama o usa el motor estructural local."
+                f"> {err_msg}\n\n"
+                f"Check that the model is downloaded in Ollama, or use the local structural engine."
             )
 
     def reject(self):
@@ -415,7 +417,7 @@ class AiSpecDialog(QDialog):
         if not text.strip():
             return
         QApplication.clipboard().setText(text)
-        QMessageBox.information(self, "Copiado", t("ai_spec.copied_toast"))
+        QMessageBox.information(self, "Copied", t("ai_spec.copied_toast"))
 
     def save_to_file(self):
         """Guarda la especificación en un archivo Markdown."""
@@ -425,17 +427,17 @@ class AiSpecDialog(QDialog):
 
         path, _ = QFileDialog.getSaveFileName(
             self,
-            "Guardar Especificación de IA",
+            "Save AI spec",
             "SPEC.md",
-            "Markdown (*.md);;Texto (*.txt);;Todos los archivos (*.*)"
+            "Markdown (*.md);;Text (*.txt);;All files (*.*)"
         )
         if path:
             try:
                 with open(path, "w", encoding="utf-8") as f:
                     f.write(text)
-                QMessageBox.information(self, "Guardado", t("ai_spec.saved_toast"))
+                QMessageBox.information(self, "Saved", t("ai_spec.saved_toast"))
             except Exception as e:
-                QMessageBox.warning(self, "Error al guardar", f"No se pudo guardar el archivo:\n{e}")
+                QMessageBox.warning(self, "Save error", f"Could not save the file:\n{e}")
 
     def create_as_task(self):
         """Crea una nueva tarjeta en la primera columna del tablero actual con la SPEC."""
@@ -451,16 +453,16 @@ class AiSpecDialog(QDialog):
         col_id = cols[0]["id"]
         # Extraer primer título de la SPEC
         first_line = text.strip().split("\n")[0].replace("#", "").strip()
-        task_title = first_line if first_line else "SPEC: Iniciativa de IA"
+        task_title = first_line if first_line else "SPEC: AI initiative"
 
         database.create_task(
             column_id=col_id,
             title=task_title,
-            description=f"Especificación técnica generada a partir de {len(self.tasks_data)} tareas:\n\n{text}",
+            description=f"Technical spec generated from {len(self.tasks_data)} tasks:\n\n{text}",
             tag_text="AI:SPEC",
             tag_color="#8b5cf6",
             db_path=self.db_path
         )
 
-        QMessageBox.information(self, "Tarea Creada", t("ai_spec.task_created_toast"))
+        QMessageBox.information(self, "Task created", t("ai_spec.task_created_toast"))
         self.accept()

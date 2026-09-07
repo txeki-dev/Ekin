@@ -11,7 +11,7 @@ from PySide6.QtGui import QKeySequence, QShortcut, QDesktopServices
 import database
 import styles
 from strings import t
-from widgets import make_glyph_icon
+from icons import lucide_icon
 from .markdown_edit import MarkdownTextEdit, RichTextToolbar
 from .log_entry import LogEntryWidget
 from .tag_pill import ClickableTagPill, color_icon
@@ -116,96 +116,96 @@ class TaskDetailDialog(QDialog):
         return result_code[0]
 
     def init_ui(self):
-        # Layout principal horizontal (Izquierda: Formulario, Derecha: Diario/Log)
-        main_layout = QHBoxLayout(self)
-        main_layout.setContentsMargins(15, 15, 15, 15)
-        main_layout.setSpacing(15)
+        # Estructura del handoff: Cabecera (kicker + título) → tarjeta de metadatos →
+        # cuerpo de dos paneles (Notes | Journal) → barra de acciones.
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
 
-        # ==========================================
-        # PANEL IZQUIERDO: DETALLES DE LA TAREA
-        # ==========================================
-        left_panel = QWidget()
-        left_layout = QVBoxLayout(left_panel)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(12)
+        # ========== CABECERA ==========
+        header = QWidget()
+        header_l = QHBoxLayout(header)
+        header_l.setContentsMargins(30, 26, 24, 14)
+        header_l.setSpacing(12)
 
-        # 1. Título
-        left_layout.addWidget(QLabel(t("task_detail.title_label")))
+        header_left = QVBoxLayout()
+        header_left.setSpacing(3)
+        self.kicker_label = QLabel("")
+        self.kicker_label.setObjectName("TaskDetailKicker")
+        header_left.addWidget(self.kicker_label)
+        # Título editable en sitio (sin caja de input visible): estilo grande tipo Caprasimo
         self.title_input = QLineEdit()
+        self.title_input.setObjectName("TaskDetailTitle")
         self.title_input.setPlaceholderText(t("task_detail.title_placeholder"))
-        left_layout.addWidget(self.title_input)
+        header_left.addWidget(self.title_input)
+        header_l.addLayout(header_left, 1)
 
-        # 2. Descripción
-        left_layout.addWidget(QLabel(t("task_detail.description_label")))
-        self.desc_input = MarkdownTextEdit()
-        # Mismo ancho por defecto para imágenes pegadas que en el chat (self._chat_image_width,
-        # asignado también a log_input más abajo) -- evita que una imagen pegada aquí desborde
-        # si el diálogo se redimensiona más estrecho después de pegarla.
-        self.desc_input.image_width_provider = self._chat_image_width
-        self.desc_input.setPlaceholderText(t("task_detail.description_placeholder"))
-        left_layout.addWidget(RichTextToolbar(self.desc_input))
-        left_layout.addWidget(self.desc_input)
+        self.close_circle = QPushButton()
+        self.close_circle.setFixedSize(34, 34)
+        self.close_circle.setCursor(Qt.PointingHandCursor)
+        self.close_circle.setIcon(lucide_icon("x", styles.COLORS['text_soft'], 16))
+        self.close_circle.setIconSize(QSize(16, 16))
+        self.close_circle.setStyleSheet(
+            f"QPushButton {{ background: transparent; border: 1px solid {styles.COLORS['border']}; border-radius: 17px; }}"
+            f"QPushButton:hover {{ background-color: {styles.COLORS['bg_hover']}; }}"
+        )
+        self.close_circle.clicked.connect(self.reject)
+        header_l.addWidget(self.close_circle, 0, Qt.AlignTop)
+        root.addWidget(header)
 
-        # 2.5 Temporizador
-        timer_section = QWidget()
-        timer_section_layout = QHBoxLayout(timer_section)
-        timer_section_layout.setContentsMargins(0, 0, 0, 0)
-        timer_section_layout.setSpacing(10)
+        # ========== TARJETA DE METADATOS ==========
+        meta = QFrame()
+        meta.setObjectName("TaskMetaCard")
+        meta.setAttribute(Qt.WA_StyledBackground, True)
+        meta.setStyleSheet(
+            f"#TaskMetaCard {{ background-color: {styles.COLORS['bg_card']}; border-radius: 16px; }}"
+        )
+        meta_l = QVBoxLayout(meta)
+        meta_l.setContentsMargins(16, 12, 16, 12)
+        meta_l.setSpacing(10)
 
-        timer_section_layout.addWidget(QLabel(t("task_detail.timer_label")))
-
+        # Fila A: temporizador + vencimiento + recurrencia
+        row_a = QHBoxLayout()
+        row_a.setSpacing(10)
+        row_a.addWidget(QLabel(t("task_detail.timer_label")))
         self.timer_toggle_btn = QPushButton(t("task_detail.timer_start_btn"))
         self.timer_toggle_btn.setCursor(Qt.PointingHandCursor)
         self.timer_toggle_btn.clicked.connect(self._on_timer_toggle_clicked)
-        timer_section_layout.addWidget(self.timer_toggle_btn)
-
+        row_a.addWidget(self.timer_toggle_btn)
         self.timer_clear_btn = QPushButton(t("task_detail.timer_clear_btn"))
         self.timer_clear_btn.setCursor(Qt.PointingHandCursor)
         self.timer_clear_btn.setToolTip(t("task_detail.timer_clear_tooltip"))
         self.timer_clear_btn.clicked.connect(self._on_timer_clear_clicked)
-        timer_section_layout.addWidget(self.timer_clear_btn)
-
+        row_a.addWidget(self.timer_clear_btn)
         self.timer_elapsed_label = QLabel("")
         self.timer_elapsed_label.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 11px;")
-        timer_section_layout.addWidget(self.timer_elapsed_label)
-        timer_section_layout.addStretch()
+        row_a.addWidget(self.timer_elapsed_label)
+        row_a.addSpacing(18)
 
-        left_layout.addWidget(timer_section)
-
-        # 3. Fecha de Vencimiento
-        due_section = QWidget()
-        due_layout = QHBoxLayout(due_section)
-        due_layout.setContentsMargins(0, 0, 0, 0)
-        due_layout.setSpacing(10)
-
-        due_layout.addWidget(QLabel(t("task_detail.due_label")))
-
+        row_a.addWidget(QLabel(t("task_detail.due_label")))
         self.due_enable_chk = QCheckBox(t("task_detail.due_enable_checkbox"))
         self.due_enable_chk.setCursor(Qt.PointingHandCursor)
         self.due_enable_chk.stateChanged.connect(self._sync_due_enabled)
-        due_layout.addWidget(self.due_enable_chk)
-
+        row_a.addWidget(self.due_enable_chk)
         self.due_date_edit = QDateEdit()
         self.due_date_edit.setCalendarPopup(True)
         self.due_date_edit.setDate(QDate.currentDate())
         self.due_date_edit.setDisplayFormat("yyyy-MM-dd")
         self.due_date_edit.setEnabled(False)
-        due_layout.addWidget(self.due_date_edit)
-
-        # Hora de vencimiento opcional (activa un aviso en el .ics)
+        row_a.addWidget(self.due_date_edit)
         self.due_time_chk = QCheckBox(t("task_detail.due_time_checkbox"))
         self.due_time_chk.setCursor(Qt.PointingHandCursor)
         self.due_time_chk.setToolTip(t("task_detail.due_time_tooltip"))
         self.due_time_chk.stateChanged.connect(self._sync_due_enabled)
-        due_layout.addWidget(self.due_time_chk)
+        row_a.addWidget(self.due_time_chk)
         self.due_time_edit = QTimeEdit()
         self.due_time_edit.setDisplayFormat("HH:mm")
         self.due_time_edit.setTime(QTime(9, 0))
         self.due_time_edit.setEnabled(False)
-        due_layout.addWidget(self.due_time_edit)
-
-        # Recurrencia (repetir la tarea)
-        due_layout.addWidget(QLabel("🔁"))
+        row_a.addWidget(self.due_time_edit)
+        self.recurrence_icon = QLabel()
+        self.recurrence_icon.setPixmap(lucide_icon("repeat", styles.COLORS['text_muted'], 14).pixmap(14, 14))
+        row_a.addWidget(self.recurrence_icon)
         self._recurrence_values = ["none", "daily", "weekly", "monthly"]
         self.recurrence_combo = QComboBox()
         for label in (
@@ -214,92 +214,88 @@ class TaskDetailDialog(QDialog):
         ):
             self.recurrence_combo.addItem(label)
         self.recurrence_combo.setToolTip(t("task_detail.recurrence_tooltip"))
-        due_layout.addWidget(self.recurrence_combo)
-        due_layout.addStretch()
+        row_a.addWidget(self.recurrence_combo)
+        row_a.addStretch()
+        meta_l.addLayout(row_a)
 
-        left_layout.addWidget(due_section)
-
-        # 4. Sección de Etiquetas Múltiples
-        tags_section = QWidget()
-        tags_layout = QVBoxLayout(tags_section)
-        tags_layout.setContentsMargins(0, 0, 0, 0)
-        tags_layout.setSpacing(4)
-
-        tags_layout.addWidget(QLabel(t("task_detail.tags_label")))
-
+        # Fila B: etiquetas + prioridad + tablero vinculado
+        row_b = QHBoxLayout()
+        row_b.setSpacing(10)
+        row_b.addWidget(QLabel(t("task_detail.tags_label")))
         self.tags_container_widget = QWidget()
         self.tags_container_layout = QHBoxLayout(self.tags_container_widget)
         self.tags_container_layout.setContentsMargins(0, 0, 0, 0)
         self.tags_container_layout.setSpacing(6)
         self.tags_container_layout.setAlignment(Qt.AlignLeft)
-        tags_layout.addWidget(self.tags_container_widget)
-
-        tag_btns_row = QHBoxLayout()
-        tag_btns_row.setSpacing(6)
+        row_b.addWidget(self.tags_container_widget)
         self.add_tag_btn = QPushButton(t("task_detail.assign_tag_btn"))
         self.add_tag_btn.setCursor(Qt.PointingHandCursor)
         self.add_tag_btn.clicked.connect(self.assign_tag_dialog)
-        tag_btns_row.addWidget(self.add_tag_btn)
-
+        row_b.addWidget(self.add_tag_btn)
         self.manage_tags_btn = QPushButton(t("task_detail.manage_tags_btn"))
         self.manage_tags_btn.setToolTip(t("task_detail.manage_tags_tooltip"))
         self.manage_tags_btn.setCursor(Qt.PointingHandCursor)
         self.manage_tags_btn.clicked.connect(self.open_tag_manager)
-        tag_btns_row.addWidget(self.manage_tags_btn)
-        tag_btns_row.addStretch()
-        tags_layout.addLayout(tag_btns_row)
-
-        # Selector rápido de Prioridad, a la derecha de Etiquetas
-        priority_section = QWidget()
-        priority_layout = QVBoxLayout(priority_section)
-        priority_layout.setContentsMargins(0, 0, 0, 0)
-        priority_layout.setSpacing(4)
-        priority_layout.addWidget(QLabel(t("task_detail.priority_label")))
+        row_b.addWidget(self.manage_tags_btn)
+        row_b.addStretch()
+        row_b.addWidget(QLabel(t("task_detail.priority_label")))
         self.priority_combo = QComboBox()
         self.priority_combo.setToolTip(t("task_detail.priority_tooltip"))
         self.priority_combo.setCursor(Qt.PointingHandCursor)
         self._refresh_priority_combo()
         self.priority_combo.currentIndexChanged.connect(self._on_priority_changed)
-        priority_layout.addWidget(self.priority_combo)
-        priority_layout.addStretch()
-
-        # Selector rápido de Tablero vinculado, junto a Etiquetas y Prioridad
-        board_link_section = QWidget()
-        board_link_layout = QVBoxLayout(board_link_section)
-        board_link_layout.setContentsMargins(0, 0, 0, 0)
-        board_link_layout.setSpacing(4)
-        board_link_layout.addWidget(QLabel(t("task_detail.linked_board_label")))
+        row_b.addWidget(self.priority_combo)
+        row_b.addWidget(QLabel(t("task_detail.linked_board_label")))
         self.linked_board_combo = QComboBox()
         self.linked_board_combo.setToolTip(t("task_detail.linked_board_tooltip"))
         self.linked_board_combo.setCursor(Qt.PointingHandCursor)
-        board_link_layout.addWidget(self.linked_board_combo)
-        board_link_layout.addStretch()
+        row_b.addWidget(self.linked_board_combo)
+        meta_l.addLayout(row_b)
 
-        tags_priority_row = QHBoxLayout()
-        tags_priority_row.setSpacing(12)
-        tags_priority_row.addWidget(tags_section, 2)
-        tags_priority_row.addWidget(priority_section, 1)
-        tags_priority_row.addWidget(board_link_section, 1)
-        left_layout.addLayout(tags_priority_row)
+        meta_wrap = QWidget()
+        meta_wrap_l = QHBoxLayout(meta_wrap)
+        meta_wrap_l.setContentsMargins(30, 0, 30, 0)
+        meta_wrap_l.addWidget(meta)
+        root.addWidget(meta_wrap)
 
-        # 5. Enlaces / adjuntos
-        links_section = QWidget()
-        links_outer = QVBoxLayout(links_section)
-        links_outer.setContentsMargins(0, 0, 0, 0)
-        links_outer.setSpacing(4)
-        links_outer.addWidget(QLabel(t("task_detail.links_label")))
+        # ========== CUERPO: NOTES | JOURNAL ==========
+        body = QWidget()
+        body_l = QHBoxLayout(body)
+        body_l.setContentsMargins(30, 14, 30, 0)
+        body_l.setSpacing(18)
 
+        # --- Panel izquierdo: Notes ---
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(8)
+
+        notes_kicker = QLabel(t("task_detail.notes_kicker"))
+        notes_kicker.setObjectName("TaskDetailKicker")
+        left_layout.addWidget(notes_kicker)
+
+        self.desc_input = MarkdownTextEdit()
+        self.desc_input.image_width_provider = self._chat_image_width
+        self.desc_input.setPlaceholderText(t("task_detail.description_placeholder"))
+        left_layout.addWidget(RichTextToolbar(self.desc_input))
+        left_layout.addWidget(self.desc_input, 1)
+
+        # Adjuntos
+        links_kicker = QLabel(t("task_detail.links_label"))
+        left_layout.addWidget(links_kicker)
         self.links_container = QWidget()
         self.links_layout = QVBoxLayout(self.links_container)
         self.links_layout.setContentsMargins(0, 0, 0, 0)
         self.links_layout.setSpacing(2)
-        links_outer.addWidget(self.links_container)
+        left_layout.addWidget(self.links_container)
 
         add_link_row = QHBoxLayout()
         add_link_row.setSpacing(6)
-        self.browse_link_btn = QPushButton("📁")
-        self.browse_link_btn.setFixedWidth(30)
+        self.browse_link_btn = QPushButton()
+        self.browse_link_btn.setFixedWidth(34)
         self.browse_link_btn.setCursor(Qt.PointingHandCursor)
+        self.browse_link_btn.setIcon(lucide_icon("paperclip", styles.COLORS['text_soft'], 15))
+        self.browse_link_btn.setIconSize(QSize(15, 15))
         self.browse_link_btn.setToolTip(t("task_detail.browse_file_tooltip"))
         self.browse_link_btn.clicked.connect(self.browse_local_file)
         add_link_row.addWidget(self.browse_link_btn)
@@ -310,90 +306,57 @@ class TaskDetailDialog(QDialog):
         self.link_label_input = QLineEdit()
         self.link_label_input.setPlaceholderText(t("task_detail.link_label_placeholder"))
         add_link_row.addWidget(self.link_label_input, 1)
-        add_link_btn = QPushButton("➕")
-        add_link_btn.setFixedWidth(30)
+        add_link_btn = QPushButton()
+        add_link_btn.setFixedWidth(34)
         add_link_btn.setCursor(Qt.PointingHandCursor)
+        add_link_btn.setIcon(lucide_icon("plus", styles.COLORS['text_soft'], 15))
+        add_link_btn.setIconSize(QSize(15, 15))
         add_link_btn.setToolTip(t("task_detail.add_link_tooltip"))
         add_link_btn.clicked.connect(self.add_link)
         add_link_row.addWidget(add_link_btn)
-        links_outer.addLayout(add_link_row)
+        left_layout.addLayout(add_link_row)
 
-        left_layout.addWidget(links_section)
-        left_layout.addStretch()
+        body_l.addWidget(left_panel, 5)
 
-        # Botones de Acción de la Tarea (Guardar, Eliminar, Cerrar)
-        action_layout = QHBoxLayout()
-
-        self.delete_task_btn = QPushButton(t("task_detail.delete_task_btn"))
-        self.delete_task_btn.setObjectName("DangerButton")
-        self.delete_task_btn.setCursor(Qt.PointingHandCursor)
-        self.delete_task_btn.clicked.connect(self.delete_task)
-        action_layout.addWidget(self.delete_task_btn)
-
-        action_layout.addStretch()
-
-        self.save_btn = QPushButton(t("task_detail.save_btn"))
-        self.save_btn.setObjectName("PrimaryButton")
-        self.save_btn.setCursor(Qt.PointingHandCursor)
-        self.save_btn.clicked.connect(self.save_changes)
-        action_layout.addWidget(self.save_btn)
-
-        self.close_btn = QPushButton(t("task_detail.close_btn"))
-        self.close_btn.setCursor(Qt.PointingHandCursor)
-        self.close_btn.clicked.connect(self.reject)
-        action_layout.addWidget(self.close_btn)
-
-        left_layout.addLayout(action_layout)
-        main_layout.addWidget(left_panel, 5)
-
-        # Separador visual
-        separator = QFrame()
-        separator.setFrameShape(QFrame.VLine)
-        separator.setFrameShadow(QFrame.Sunken)
-        separator.setStyleSheet(f"background-color: {styles.COLORS['border']};")
-        main_layout.addWidget(separator)
-
-        # ==========================================
-        # PANEL DERECHO: DIARIO / HISTORIAL (LOGS)
-        # ==========================================
+        # --- Panel derecho: Journal ---
         self.right_panel = QWidget()
         self.right_panel.setMinimumWidth(485)
         right_layout = QVBoxLayout(self.right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(10)
 
-        right_layout.addWidget(QLabel(t("task_detail.log_header")))
+        journal_head = QHBoxLayout()
+        journal_title = QLabel(t("task_detail.log_header"))
+        journal_title.setObjectName("JournalHeader")
+        journal_head.addWidget(journal_title)
+        journal_head.addStretch()
+        self.entries_count_label = QLabel("")
+        self.entries_count_label.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 12px;")
+        journal_head.addWidget(self.entries_count_label)
+        right_layout.addLayout(journal_head)
 
-        # Área de Scroll para ver el historial
         self.scroll_area = QScrollArea()
         self.scroll_area.setObjectName("ChatScrollArea")
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-
         self.logs_container = QWidget()
         self.logs_layout = QVBoxLayout(self.logs_container)
         self.logs_layout.setContentsMargins(12, 10, 22, 10)
         self.logs_layout.setSpacing(8)
-
         self.scroll_area.setWidget(self.logs_container)
-        right_layout.addWidget(self.scroll_area, 1)  # el historial domina el alto
+        right_layout.addWidget(self.scroll_area, 1)
 
-        # Caja de entrada para nuevos logs
         input_container = QWidget()
         input_layout = QVBoxLayout(input_container)
         input_layout.setContentsMargins(0, 0, 0, 0)
         input_layout.setSpacing(6)
-
         self.log_input = MarkdownTextEdit()
         self.log_input.setPlaceholderText(t("task_detail.log_input_placeholder"))
-        # Caja cómoda que crece con el texto (sin límite de caracteres; solo tope visual)
         self.log_input.setMinimumHeight(110)
         self.log_input.setMaximumHeight(260)
-        # Las imágenes pegadas en el chat se ajustan al ancho del histórico (más estrecho)
         self.log_input.image_width_provider = self._chat_image_width
         input_layout.addWidget(RichTextToolbar(self.log_input))
         input_layout.addWidget(self.log_input)
-
         log_btn_layout = QHBoxLayout()
         log_btn_layout.addStretch()
         self.add_log_btn = QPushButton(t("task_detail.add_log_btn"))
@@ -401,17 +364,42 @@ class TaskDetailDialog(QDialog):
         self.add_log_btn.setCursor(Qt.PointingHandCursor)
         self.add_log_btn.clicked.connect(self.add_log_entry)
         log_btn_layout.addWidget(self.add_log_btn)
-
         input_layout.addLayout(log_btn_layout)
         right_layout.addWidget(input_container)
 
-        main_layout.addWidget(self.right_panel, 5)
+        body_l.addWidget(self.right_panel, 5)
+        root.addWidget(body, 1)
+
+        # ========== BARRA DE ACCIONES ==========
+        action_bar = QWidget()
+        action_layout = QHBoxLayout(action_bar)
+        action_layout.setContentsMargins(30, 16, 30, 20)
+        action_layout.setSpacing(10)
+        self.delete_task_btn = QPushButton(t("task_detail.delete_task_btn"))
+        self.delete_task_btn.setObjectName("DangerButton")
+        self.delete_task_btn.setCursor(Qt.PointingHandCursor)
+        self.delete_task_btn.setIcon(lucide_icon("trash-2", styles.COLORS['on_accent'], 15))
+        self.delete_task_btn.setIconSize(QSize(15, 15))
+        self.delete_task_btn.clicked.connect(self.delete_task)
+        action_layout.addWidget(self.delete_task_btn)
+        action_layout.addStretch()
+        saves_hint = QLabel(t("task_detail.saves_hint"))
+        saves_hint.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 12px;")
+        action_layout.addWidget(saves_hint)
+        self.close_btn = QPushButton(t("task_detail.close_btn"))
+        self.close_btn.setCursor(Qt.PointingHandCursor)
+        self.close_btn.clicked.connect(self.reject)
+        action_layout.addWidget(self.close_btn)
+        self.save_btn = QPushButton(t("task_detail.save_btn"))
+        self.save_btn.setObjectName("PrimaryButton")
+        self.save_btn.setCursor(Qt.PointingHandCursor)
+        self.save_btn.clicked.connect(self.save_changes)
+        action_layout.addWidget(self.save_btn)
+        root.addWidget(action_bar)
 
         # Atajo teclado Ctrl+Enter para añadir entrada al diario
         shortcut = QShortcut(QKeySequence("Ctrl+Return"), self)
         shortcut.activated.connect(self.add_log_entry)
-
-        # También mapear Ctrl+Enter del teclado numérico
         shortcut_num = QShortcut(QKeySequence("Ctrl+Enter"), self)
         shortcut_num.activated.connect(self.add_log_entry)
 
@@ -432,6 +420,14 @@ class TaskDetailDialog(QDialog):
 
         self.title_input.setText(task["title"])
         self.desc_input.setHtml(task["description"] or "")
+
+        # Kicker de cabecera: TABLERO · COLUMNA (en mayúsculas)
+        col = database.get_column(task["column_id"], self.db_path)
+        board = database.get_board(col["board_id"], self.db_path) if col else None
+        if board and col:
+            self.kicker_label.setText(
+                t("task_detail.kicker", board=board["name"], column=col["name"]).upper()
+            )
 
         # Cargar temporizador
         self._timer_started_at = task.get("timer_started_at")
@@ -502,27 +498,27 @@ class TaskDetailDialog(QDialog):
             pill_layout.setContentsMargins(6, 2, 6, 2)
             pill_layout.setSpacing(4)
 
-            lbl = QLabel(f"{tag['category']}: {tag['value']}".upper())
-            lbl.setStyleSheet("color: #ffffff; font-size: 9px; font-weight: bold; background: transparent; border: none;")
+            txt = styles.contrast_text(tag['color'])
+            lbl = QLabel(f"{tag['category']} · {tag['value']}")
+            lbl.setStyleSheet(f"color: {txt}; font-size: 10px; font-weight: 600; background: transparent; border: none;")
             pill_layout.addWidget(lbl)
 
             del_btn = QPushButton("×")
             del_btn.setFixedSize(14, 14)
             del_btn.setCursor(Qt.PointingHandCursor)
             del_btn.setToolTip(t("task_detail.tag_pill_remove_tooltip"))
-            del_btn.setStyleSheet("""
-                QPushButton {
+            del_btn.setStyleSheet(f"""
+                QPushButton {{
                     background: transparent;
                     border: none;
-                    color: #ffffff;
+                    color: {txt};
                     font-weight: bold;
                     font-size: 10px;
-                }
-                QPushButton:hover {
-                    color: #ef4444;
+                }}
+                QPushButton:hover {{
                     background-color: rgba(255, 255, 255, 0.2);
                     border-radius: 2px;
-                }
+                }}
             """)
             # Usar captura de índice en lambda
             del_btn.clicked.connect(lambda checked=False, idx=index: self.delete_tag_at(idx))
@@ -538,9 +534,9 @@ class TaskDetailDialog(QDialog):
         etiqueta de ejemplo «Prioridad: Alta» del onboarding)."""
         cat_id = database.create_tag_category(t("task_detail.priority_category_name"), self.db_path)
         defaults = (
-            (t("task_detail.priority_low"), "#10b981"),
-            (t("task_detail.priority_medium"), "#f59e0b"),
-            (t("task_detail.priority_high"), "#ef4444"),
+            (t("task_detail.priority_low"), styles.COLORS["accent_2"]),
+            (t("task_detail.priority_medium"), styles.COLORS["text_muted"]),
+            (t("task_detail.priority_high"), styles.COLORS["accent_pressed"]),
         )
         for value, color in defaults:
             if not database.value_exists_in_category(cat_id, value, db_path=self.db_path):
@@ -801,14 +797,16 @@ class TaskDetailDialog(QDialog):
 
         is_local = _is_local_link(link["url"])
         missing = is_local and not os.path.exists(link["url"])
-        icon = "📎" if is_local else "🔗"
+        text_color = styles.COLORS["danger"] if missing else styles.COLORS["accent"]
+        icon_name = "paperclip" if is_local else "link-2"
 
-        open_btn = QPushButton(icon + " " + (link["label"] or link["url"]))
+        open_btn = QPushButton(" " + (link["label"] or link["url"]))
+        open_btn.setIcon(lucide_icon(icon_name, text_color, 13))
+        open_btn.setIconSize(QSize(13, 13))
         open_btn.setCursor(Qt.PointingHandCursor)
         open_btn.setToolTip(
             t("task_detail.link_missing_tooltip", path=link["url"]) if missing else link["url"]
         )
-        text_color = styles.COLORS["danger"] if missing else "#60a5fa"
         open_btn.setStyleSheet(
             f"QPushButton {{ background: transparent; border: none; color: {text_color}; text-align: left; }}"
             "QPushButton:hover { text-decoration: underline; }"
@@ -819,7 +817,7 @@ class TaskDetailDialog(QDialog):
         del_btn.setFixedSize(18, 18)
         del_btn.setCursor(Qt.PointingHandCursor)
         del_btn.setToolTip(t("task_detail.delete_link_tooltip"))
-        del_btn.setIcon(make_glyph_icon("cross", "#ef4444", 12))
+        del_btn.setIcon(lucide_icon("x", styles.COLORS['danger'], 12))
         del_btn.setIconSize(QSize(12, 12))
         del_btn.setStyleSheet("QPushButton { background: transparent; border: none; }")
         del_btn.clicked.connect(lambda _=False, lid=link["id"]: self.remove_link(lid))
@@ -874,6 +872,9 @@ class TaskDetailDialog(QDialog):
             log_widget = LogEntryWidget(log, self.delete_log_entry, self.edit_log_entry, self)
             self.logs_layout.addWidget(log_widget)
         self.logs_layout.addStretch()
+
+        if hasattr(self, "entries_count_label"):
+            self.entries_count_label.setText(t("task_detail.entries_count", count=len(logs)))
 
         # Pequeño retardo para dar tiempo a Qt a renderizar antes de bajar el scroll
         self.scroll_to_bottom()

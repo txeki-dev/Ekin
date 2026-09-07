@@ -3,7 +3,7 @@ from PySide6.QtCore import Qt, Signal, QSize, QTimer, QFileSystemWatcher, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QInputDialog, QMessageBox, QDialog, QLineEdit, QColorDialog,
+    QScrollArea, QInputDialog, QMessageBox, QDialog, QLineEdit,
     QComboBox, QFileDialog, QMenu
 )
 import database
@@ -11,10 +11,12 @@ import board_sync
 import styles
 from styles import hex_to_rgb
 from strings import t
-from widgets import ColumnWidget, TaskCard, make_glyph_icon
+from widgets import ColumnWidget, TaskCard
+from icons import lucide_icon, lucide_pixmap
 from detail_dialog import TaskDetailDialog
 from undo import UndoAction
 from cloud_sync_dialog import CloudSyncInfoDialog
+from color_picker import ColorCirclesPicker
 
 
 class BoardColumnsArea(QWidget):
@@ -67,7 +69,7 @@ class ColumnEditDialog(QDialog):
     def __init__(self, title="Editar Columna", name="", color="#3b82f6", parent=None):
         super().__init__(parent)
         self.setWindowTitle(title)
-        self.setFixedSize(300, 180)
+        self.setMinimumWidth(440)
         self.color = color
 
         layout = QVBoxLayout(self)
@@ -80,19 +82,11 @@ class ColumnEditDialog(QDialog):
         self.name_input.setPlaceholderText(t("board_view.column_edit.name_placeholder"))
         layout.addWidget(self.name_input)
 
-        # Color de la columna
-        color_layout = QHBoxLayout()
-        color_layout.addWidget(QLabel(t("board_view.column_edit.color_label")))
-        
-        self.color_btn = QPushButton()
-        self.color_btn.setFixedSize(40, 24)
-        self.color_btn.setCursor(Qt.PointingHandCursor)
-        self.color_btn.clicked.connect(self.choose_color)
-        self.update_color_btn_style()
-        color_layout.addWidget(self.color_btn)
-        color_layout.addStretch()
-        
-        layout.addLayout(color_layout)
+        # Color de la columna: círculos preseleccionados
+        layout.addWidget(QLabel(t("board_view.column_edit.color_label")))
+        self.color_picker = ColorCirclesPicker(self.color)
+        self.color_picker.color_changed.connect(self._on_color_picked)
+        layout.addWidget(self.color_picker)
         layout.addStretch()
 
         # Botones OK / Cancelar
@@ -110,14 +104,8 @@ class ColumnEditDialog(QDialog):
 
         layout.addLayout(btn_layout)
 
-    def choose_color(self):
-        color = QColorDialog.getColor(self.color, self, t("board_view.column_edit.color_dialog_title"))
-        if color.isValid():
-            self.color = color.name()
-            self.update_color_btn_style()
-
-    def update_color_btn_style(self):
-        self.color_btn.setStyleSheet(styles.color_swatch_css(self.color, hover=True))
+    def _on_color_picked(self, color):
+        self.color = color
 
     def validate_and_accept(self):
         if not self.name_input.text().strip():
@@ -269,26 +257,31 @@ class BoardViewWidget(QFrame):
         self.toggle_sidebar_btn.setFixedSize(32, 32)
         self.toggle_sidebar_btn.setCursor(Qt.PointingHandCursor)
         self.toggle_sidebar_btn.setToolTip(t("board_view.header.toggle_sidebar_tooltip"))
-        self.toggle_sidebar_btn.setIcon(make_glyph_icon("left", styles.COLORS['text_main'], 16))
+        self.toggle_sidebar_btn.setIcon(lucide_icon("chevron-left", styles.COLORS['text_soft'], 16))
         self.toggle_sidebar_btn.setIconSize(QSize(16, 16))
         self.toggle_sidebar_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: transparent;
                 border: 1px solid {styles.COLORS['border']};
-                border-radius: 6px;
+                border-radius: 16px;
             }}
             QPushButton:hover {{
-                background-color: {styles.COLORS['bg_card']};
-                border-color: {styles.COLORS['accent_blue']};
+                background-color: {styles.COLORS['bg_hover']};
             }}
         """)
         self.toggle_sidebar_btn.clicked.connect(self._on_toggle_sidebar)
         header_layout.addWidget(self.toggle_sidebar_btn)
 
-        # Título del Tablero
+        # Título del Tablero (estilado por objectName en la QSS global, reactivo al tema)
         self.board_title_label = QLabel(t("board_view.header.default_title"))
-        self.board_title_label.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {styles.COLORS['text_main']};")
+        self.board_title_label.setObjectName("BoardHeaderTitle")
         header_layout.addWidget(self.board_title_label)
+
+        # Chip neutro con el recuento de tareas y vencimientos de esta semana
+        self.board_counts_chip = QLabel("")
+        self.board_counts_chip.setObjectName("BoardCountsChip")
+        header_layout.addWidget(self.board_counts_chip, 0, Qt.AlignVCenter)
+
         header_layout.addStretch()
 
         # Botón de Sincronización OneDrive / Carpeta compartida
@@ -327,12 +320,13 @@ class BoardViewWidget(QFrame):
         
         self.board_content = BoardColumnsArea()
         self.board_content.setObjectName("BoardViewContent")
-        self.board_content.setStyleSheet("background-color: transparent;")
+        self.board_content.setAttribute(Qt.WA_StyledBackground, True)
+        # El fondo del carril lo pinta la QSS global (#BoardViewContent), reactiva al tema.
         self.board_content.column_reordered.connect(self.handle_column_drop)
 
         self.columns_layout = QHBoxLayout(self.board_content)
-        self.columns_layout.setContentsMargins(15, 15, 15, 15)
-        self.columns_layout.setSpacing(15)
+        self.columns_layout.setContentsMargins(24, 8, 24, 24)
+        self.columns_layout.setSpacing(16)
         self.columns_layout.setAlignment(Qt.AlignLeft)
 
         self.board_scroll_area.setWidget(self.board_content)
@@ -341,19 +335,29 @@ class BoardViewWidget(QFrame):
         # 3. Barra de acción para selección múltiple de tarjetas
         self.selection_bar = QFrame()
         self.selection_bar.setObjectName("SelectionBar")
-        self.selection_bar.setFixedHeight(50)
+        self.selection_bar.setFixedHeight(74)
         self.selection_bar.setStyleSheet(f"""
             #SelectionBar {{
-                background-color: {styles.COLORS['bg_sidebar']};
-                border-top: 1.5px solid {styles.COLORS['accent_blue']};
+                background-color: {styles.COLORS['bg_dark']};
+                border: none;
             }}
         """)
         sel_layout = QHBoxLayout(self.selection_bar)
-        sel_layout.setContentsMargins(20, 0, 20, 0)
-        sel_layout.setSpacing(12)
+        sel_layout.setContentsMargins(24, 0, 24, 0)
+        sel_layout.setSpacing(14)
+
+        # Círculo de acento con check
+        check_dot = QLabel()
+        check_dot.setFixedSize(32, 32)
+        check_dot.setAlignment(Qt.AlignCenter)
+        check_dot.setPixmap(lucide_pixmap("check", styles.COLORS['on_accent'], 18))
+        check_dot.setStyleSheet(f"background-color: {styles.COLORS['accent']}; border-radius: 16px;")
+        sel_layout.addWidget(check_dot)
 
         self.selection_bar_label = QLabel(t("ai_spec.selection_count", count=0))
-        self.selection_bar_label.setStyleSheet(f"font-size: 13px; font-weight: bold; color: {styles.COLORS['text_main']};")
+        self.selection_bar_label.setStyleSheet(
+            f"font-family: 'Caprasimo', 'Segoe UI', serif; font-size: 18px; color: {styles.COLORS['on_accent']};"
+        )
         sel_layout.addWidget(self.selection_bar_label)
 
         sel_layout.addStretch()
@@ -361,11 +365,23 @@ class BoardViewWidget(QFrame):
         self.ai_spec_btn = QPushButton(t("ai_spec.generate_spec_btn"))
         self.ai_spec_btn.setObjectName("PrimaryButton")
         self.ai_spec_btn.setCursor(Qt.PointingHandCursor)
+        self.ai_spec_btn.setIcon(lucide_icon("sparkles", styles.COLORS['on_accent'], 16))
+        self.ai_spec_btn.setIconSize(QSize(16, 16))
         self.ai_spec_btn.clicked.connect(self.open_ai_spec_dialog)
         sel_layout.addWidget(self.ai_spec_btn)
 
         self.clear_sel_btn = QPushButton(t("ai_spec.clear_selection_btn"))
         self.clear_sel_btn.setCursor(Qt.PointingHandCursor)
+        self.clear_sel_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                border: 1px solid rgba(245, 234, 216, 0.4);
+                border-radius: 999px;
+                color: {styles.COLORS['on_accent']};
+                padding: 7px 14px;
+            }}
+            QPushButton:hover {{ background-color: rgba(245, 234, 216, 0.12); }}
+        """)
         self.clear_sel_btn.clicked.connect(self.clear_task_selection)
         sel_layout.addWidget(self.clear_sel_btn)
 
@@ -476,7 +492,18 @@ class BoardViewWidget(QFrame):
         self.welcome_widget.hide()
         self.board_header.show()
         self.board_scroll_area.show()
-        
+
+        # Fondo del carril y de la barra de cabecera: se fijan aquí (no en init_ui) para que
+        # el conmutador de tema los repinte — apply_theme() llama a load_board() al cambiar de
+        # tema. Qt no pinta el fondo de estos contenedores vía QSS global, así que van inline.
+        self.board_content.setStyleSheet(f"background-color: {styles.COLORS['bg_board']};")
+        self.board_header.setStyleSheet(f"""
+            #BoardHeaderBar {{
+                background-color: {styles.COLORS['bg_sidebar']};
+                border-bottom: 1.5px solid {styles.COLORS['border']};
+            }}
+        """)
+
         self.clear_columns_layout()
 
         # Obtener información del tablero (incluyendo el color)
@@ -502,28 +529,47 @@ class BoardViewWidget(QFrame):
         columns = database.get_columns(board_id, self.db_path)
         timer_alert_hours = int(database.get_setting("timer_alert_hours", "24", self.db_path))
 
+        total_tasks = 0
+        due_this_week = 0
+        from datetime import date, timedelta
+        week_end = date.today() + timedelta(days=7)
+
         for col_data in columns:
             # Cargar las tareas primero: hace falta el contador para la vista plegada.
             tasks = database.get_tasks(col_data["id"], self.db_path)
             col_data["task_count"] = len(tasks)
+            total_tasks += len(tasks)
+            for tk in tasks:
+                due = tk.get("due_date")
+                if due:
+                    try:
+                        if date.today() <= date.fromisoformat(due) <= week_end:
+                            due_this_week += 1
+                    except (ValueError, TypeError):
+                        pass
 
             col_widget = self._build_column_widget(col_data, tasks, board_info, timer_alert_hours)
 
             self.columns_layout.addWidget(col_widget)
             self.column_widgets[col_data["id"]] = col_widget
 
+        self.board_counts_chip.setText(
+            t("board_view.header.counts", tasks=total_tasks, due=due_this_week)
+        )
+
         # Añadir el botón "+ Añadir Columna" al final
         self.add_column_card = QFrame()
-        self.add_column_card.setFixedWidth(280)
+        self.add_column_card.setFixedWidth(288)
         self.add_column_card.setObjectName("ColumnContainer")
         self.add_column_card.setStyleSheet(f"""
             #ColumnContainer {{
                 background-color: transparent;
-                border: 2px dashed {styles.COLORS['border']};
-                border-radius: 10px;
+                border: 2px dashed {styles.COLORS['border_dashed']};
+                border-radius: 28px;
             }}
             #ColumnContainer:hover {{
-                border-color: {styles.COLORS['accent_blue']};
+                background-color: {styles.COLORS['accent_tint']};
+                border-color: {styles.COLORS['accent']};
             }}
         """)
         
@@ -555,38 +601,38 @@ class BoardViewWidget(QFrame):
             path = sync_info["sync_path"]
             self.sync_btn.setText(t("sync.synced_badge"))
             last_sync = sync_info.get("last_synced_at") or "-"
-            self.sync_btn.setToolTip(f"Sincronizado con:\n{path}\nÚltima sincronización: {last_sync}")
-            self.sync_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: rgba(16, 185, 129, 0.15);
-                    border: 1px solid rgba(16, 185, 129, 0.4);
-                    border-radius: 6px;
-                    color: #10b981;
-                    padding: 4px 10px;
+            self.sync_btn.setToolTip(f"Synced with:\n{path}\nLast sync: {last_sync}")
+            self.sync_btn.setIcon(lucide_icon("cloud", styles.COLORS['accent_2'], 15))
+            self.sync_btn.setIconSize(QSize(15, 15))
+            self.sync_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {styles.COLORS['accent_2_tint']};
+                    border: none;
+                    border-radius: 999px;
+                    color: {styles.COLORS['accent_2_ink']};
+                    padding: 6px 14px;
                     font-size: 12px;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background-color: rgba(16, 185, 129, 0.25);
-                    border-color: #10b981;
-                }
+                    font-weight: 600;
+                }}
+                QPushButton:hover {{ background-color: {styles.COLORS['bg_hover']}; }}
             """)
             self._setup_file_watcher(path)
         else:
             self.sync_btn.setText(t("sync.link_btn"))
             self.sync_btn.setToolTip(t("sync.link_tooltip"))
+            self.sync_btn.setIcon(lucide_icon("cloud", styles.COLORS['text_muted'], 15))
+            self.sync_btn.setIconSize(QSize(15, 15))
             self.sync_btn.setStyleSheet(f"""
                 QPushButton {{
                     background-color: transparent;
                     border: 1px solid {styles.COLORS['border']};
-                    border-radius: 6px;
+                    border-radius: 999px;
                     color: {styles.COLORS['text_muted']};
-                    padding: 4px 10px;
+                    padding: 6px 14px;
                     font-size: 12px;
                 }}
                 QPushButton:hover {{
-                    background-color: {styles.COLORS['bg_card']};
-                    border-color: {styles.COLORS['accent_blue']};
+                    background-color: {styles.COLORS['bg_hover']};
                     color: {styles.COLORS['text_main']};
                 }}
             """)
@@ -827,8 +873,8 @@ class BoardViewWidget(QFrame):
     def _on_toggle_sidebar(self):
         """Alterna la barra lateral y actualiza el icono: ◀ (plegar) / ▶ (desplegar)."""
         self._sidebar_visible = not self._sidebar_visible
-        kind = "left" if self._sidebar_visible else "right"
-        self.toggle_sidebar_btn.setIcon(make_glyph_icon(kind, styles.COLORS['text_main'], 16))
+        icon_name = "chevron-left" if self._sidebar_visible else "chevron-right"
+        self.toggle_sidebar_btn.setIcon(lucide_icon(icon_name, styles.COLORS['text_soft'], 16))
         self.toggle_sidebar_requested.emit()
 
     def handle_column_collapse(self, column_id):

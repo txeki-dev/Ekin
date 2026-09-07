@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QStackedWidget, QSystemTrayIcon, QMenu
 )
 from PySide6.QtCore import Qt, QTimer, QByteArray
-from PySide6.QtGui import QIcon, QShortcut, QKeySequence
+from PySide6.QtGui import QIcon, QShortcut, QKeySequence, QFontDatabase
 import database
 import backups
 import styles
@@ -48,13 +48,23 @@ def app_icon():
     return QIcon(os.path.join(_APP_DIR, "ekin_icon.png"))
 
 
+def register_fonts():
+    """Registra las tipografías empaquetadas (Caprasimo display + Figtree body) para que
+    los títulos salgan en Caprasimo aunque la fuente no esté instalada en el sistema."""
+    fonts_dir = os.path.join(_APP_DIR, "assets", "fonts")
+    for name in ("Caprasimo-Regular.ttf", "Figtree-VariableFont_wght.ttf"):
+        path = os.path.join(fonts_dir, name)
+        if os.path.exists(path):
+            QFontDatabase.addApplicationFont(path)
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(t("main.window_title", version=__version__))
         self.setWindowIcon(app_icon())
-        self.resize(1100, 700)
-        self.setMinimumSize(850, 500)
+        self.resize(1280, 800)
+        self.setMinimumSize(1024, 640)
         
         # Copia de seguridad automática ANTES de inicializar (así se guarda una
         # instantánea previa a cualquier migración de esquema). No-op en el primer
@@ -82,8 +92,8 @@ class MainWindow(QMainWindow):
 
         # Tema guardado: se aplica ANTES de construir la UI, para que los widgets que
         # fijan su estilo una sola vez en construcción (p. ej. el título del tablero)
-        # nazcan ya con la paleta correcta en vez de con el valor por defecto (oscuro).
-        self.apply_theme(database.get_setting("theme", "dark"), reload=False)
+        # nazcan ya con la paleta correcta en vez de con el valor por defecto.
+        self.apply_theme(database.get_setting("theme", "light"), reload=False)
 
         self.init_ui()
         self.board_view.undo_manager = self.undo_manager
@@ -247,8 +257,12 @@ class MainWindow(QMainWindow):
         """Aplica el tema (oscuro/claro) al vuelo. `reload` recarga el tablero para que
         las tarjetas/columnas se reconstruyan con la nueva paleta."""
         QApplication.instance().setStyleSheet(styles.set_theme(theme))
-        if reload and self.sidebar.active_board_id:
-            self.board_view.load_board(self.sidebar.active_board_id, notify=False)
+        if reload:
+            # La barra lateral fija colores/iconos al construirse; hay que refrescarla para
+            # que no queden con la paleta del tema anterior al conmutar en caliente.
+            self.sidebar.refresh_theme()
+            if self.sidebar.active_board_id:
+                self.board_view.load_board(self.sidebar.active_board_id, notify=False)
 
     def show_settings(self):
         """Abre la pantalla de Ajustes (tema, notificaciones)."""
@@ -532,6 +546,7 @@ def apply_win32_icon(window):
 
 def main():
     app = QApplication(sys.argv)
+    register_fonts()
     app.setWindowIcon(app_icon())
 
     import local_ai

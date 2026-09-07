@@ -200,8 +200,8 @@ def test_shortcuts_item_new_task_describes_last_active_column_behavior():
     """Regresión: el texto describía el comportamiento antiguo de Ctrl+N (siempre la
     primera columna) después de que quick_add_task ya usara la última columna activa."""
     text = t("shortcuts.item_new_task")
-    assert "última columna" in text
-    assert "primera columna del tablero activo" not in text
+    assert "last column" in text
+    assert "interacted with" in text
 
 
 # --- TaskCard.update_timer_badge / set_timer_alert_hours (v0.9.0) ---
@@ -223,7 +223,7 @@ def test_timer_badge_shown_muted_under_threshold(qapp):
     card = _card_with_timer(started_at=started, alert_hours=24)
 
     assert not card.timer_container.isHidden()
-    assert "⏱" in card.timer_badge_label.text()
+    assert card.timer_badge_label.text().endswith("m")
     assert styles.COLORS['danger'] not in card.timer_badge_label.styleSheet()
     assert styles.COLORS['text_muted'] in card.timer_badge_label.styleSheet()
 
@@ -392,7 +392,7 @@ def test_add_link_with_local_path_renders_with_attachment_icon(qapp, db_path, tm
     dlg.add_link()
 
     buttons = dlg.links_container.findChildren(QPushButton)
-    assert any(b.text().startswith("📎") for b in buttons)
+    assert any((not b.icon().isNull()) and str(file_path) in b.text() for b in buttons)
 
 
 def test_add_link_with_web_url_renders_with_link_icon(qapp, db_path):
@@ -403,7 +403,7 @@ def test_add_link_with_web_url_renders_with_link_icon(qapp, db_path):
     dlg.add_link()
 
     buttons = dlg.links_container.findChildren(QPushButton)
-    assert any(b.text().startswith("🔗") for b in buttons)
+    assert any((not b.icon().isNull()) and "example.com" in b.text() for b in buttons)
 
 
 def test_open_link_warns_when_target_cannot_be_opened(qapp, db_path, monkeypatch):
@@ -1009,24 +1009,26 @@ def test_task_detail_dialog_link_row_rendering_states(qapp, db_path, tmp_path):
     # Fila 1: Archivo local existente
     row1 = dlg.links_layout.itemAt(0).widget()
     btn1 = row1.layout().itemAt(0).widget()
-    assert btn1.text() == "📎 Doc Real"
+    assert "Doc Real" in btn1.text()
+    assert not btn1.icon().isNull()
     assert styles.COLORS["danger"] not in btn1.styleSheet()
-    assert "#60a5fa" in btn1.styleSheet()
+    assert styles.COLORS["accent"] in btn1.styleSheet()
     assert btn1.toolTip() == str(real_file)
 
     # Fila 2: Archivo local faltante
     row2 = dlg.links_layout.itemAt(1).widget()
     btn2 = row2.layout().itemAt(0).widget()
-    assert btn2.text() == "📎 Doc Faltante"
+    assert "Doc Faltante" in btn2.text()
     assert styles.COLORS["danger"] in btn2.styleSheet()
     assert t("task_detail.link_missing_tooltip", path=str(missing_file)) in btn2.toolTip()
 
     # Fila 3: Enlace web
     row3 = dlg.links_layout.itemAt(2).widget()
     btn3 = row3.layout().itemAt(0).widget()
-    assert btn3.text() == "🔗 GitHub"
+    assert "GitHub" in btn3.text()
+    assert not btn3.icon().isNull()
     assert styles.COLORS["danger"] not in btn3.styleSheet()
-    assert "#60a5fa" in btn3.styleSheet()
+    assert styles.COLORS["accent"] in btn3.styleSheet()
     assert btn3.toolTip() == "https://github.com"
 
     dlg.reject()
@@ -1110,7 +1112,7 @@ def test_board_view_sync_btn_states(qapp, db_path, tmp_path):
     view.load_board(board_id)
 
     # Estado desvinculado
-    assert "Vincular" in view.sync_btn.text()
+    assert "Link" in view.sync_btn.text()
 
     # Vincular a archivo compartido
     sync_file = str(tmp_path / "ui_test.ekboard")
@@ -1118,7 +1120,7 @@ def test_board_view_sync_btn_states(qapp, db_path, tmp_path):
 
     # Recargar tablero
     view.load_board(board_id)
-    assert "Sincronizado" in view.sync_btn.text()
+    assert "Synced" in view.sync_btn.text()
     assert sync_file in view.sync_btn.toolTip()
 
 
@@ -1131,7 +1133,7 @@ def test_sidebar_board_button_cloud_badge(qapp):
     assert btn_local.label.text() == "Local"
 
     btn_synced = BoardButton(2, "Compartido", "#3b82f6", sync_path="C:/OneDrive/tablero.ekboard")
-    assert "☁️" in btn_synced.label.text()
+    assert not btn_synced.badge_icon.pixmap().isNull()
     assert "Compartido" in btn_synced.label.text()
 
 
@@ -1231,7 +1233,7 @@ def test_cloud_sync_info_dialog_constructs_and_accepts(qapp):
     """Verifica que CloudSyncInfoDialog se construye con las instrucciones de los proveedores y emite accept."""
     from cloud_sync_dialog import CloudSyncInfoDialog
     dlg = CloudSyncInfoDialog("Tablero_Test")
-    assert dlg.windowTitle() == "Vincular Tablero con Cloud"
+    assert dlg.windowTitle() == "Link board to Cloud"
     assert hasattr(dlg, "continue_btn")
     assert hasattr(dlg, "cancel_btn")
     dlg.continue_btn.click()
@@ -1318,8 +1320,8 @@ def test_shortcuts_dialog_includes_new_editor_shortcuts(qapp):
     assert dlg.windowTitle() != ""
     labels = [c.text() for c in dlg.findChildren(QLabel)]
     combined = " ".join(labels)
-    assert "Alinear texto" in combined
-    assert "MAYÚSCULAS" in combined
+    assert "Align text" in combined
+    assert "UPPERCASE" in combined
 
 
 def test_task_detail_dialog_width_and_toolbar_single_line(qapp, db_path):

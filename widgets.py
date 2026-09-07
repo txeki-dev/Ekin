@@ -1,13 +1,13 @@
 from PySide6.QtCore import Qt, QMimeData, QPoint, Signal, QRect, QSize, QTimer
 from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QWidget, QMenu, QApplication, QLayout
+    QScrollArea, QWidget, QMenu, QApplication, QLayout, QGraphicsDropShadowEffect
 )
 from PySide6.QtGui import QDrag, QPixmap, QCursor, QPainter, QColor, QIcon, QPolygon, QPen
 from datetime import datetime
 import styles
-from styles import hex_to_rgb
 from strings import t
+from icons import lucide_icon
 
 
 class FlowLayout(QLayout):
@@ -174,50 +174,55 @@ class TaskCard(QFrame):
         self.setAttribute(Qt.WA_StyledBackground, True)
         self.init_ui()
 
+        # Sombra de elevación: la tarjeta no lleva borde; la profundidad la da la sombra
+        # (sm en reposo, md en hover), tal como pide el diseño.
+        self._shadow = QGraphicsDropShadowEffect(self)
+        self._apply_shadow(hovered=False)
+        self.setGraphicsEffect(self._shadow)
+
+    def _apply_shadow(self, hovered):
+        self._shadow.setBlurRadius(20 if hovered else 10)
+        self._shadow.setXOffset(0)
+        self._shadow.setYOffset(6 if hovered else 2)
+        self._shadow.setColor(QColor(46, 43, 37, 60 if hovered else 40))
+
+    def enterEvent(self, event):
+        self._apply_shadow(hovered=True)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._apply_shadow(hovered=False)
+        super().leaveEvent(event)
+
     def set_card_style(self, board_color_hex=None):
-        """Aplica dinámicamente el estilo a la tarjeta basándose en el color de fondo del tablero
-        o su estado de selección."""
+        """Aplica el estilo de la tarjeta: crema plana sin borde (la profundidad la da la
+        sombra) o, si está seleccionada, relleno tenue de acento con anillo de 2 px."""
         if board_color_hex is not None:
             self.board_color_hex = board_color_hex
 
+        # Estilo inline (Qt solo pinta el fondo de estos QFrame vía stylesheet propio; la
+        # QSS global por objectName no lo pinta). Se re-aplica en cada load_board, así que el
+        # conmutador de tema lo reconstruye con la paleta nueva.
+        card_bg = styles.COLORS['accent_tint'] if getattr(self, "is_selected", False) else styles.COLORS['bg_card']
         if getattr(self, "is_selected", False):
             self.setStyleSheet(f"""
                 #TaskCardFrame {{
-                    background-color: rgba(59, 130, 246, 0.22);
-                    border: 2px solid {styles.COLORS['accent_blue']};
-                    border-radius: 8px;
-                }}
-                #TaskCardFrame:hover {{
-                    background-color: rgba(59, 130, 246, 0.32);
-                    border: 2px solid #60a5fa;
+                    background-color: {card_bg};
+                    border: 2px solid {styles.COLORS['accent']};
+                    border-radius: 16px;
                 }}
             """)
-            return
-
-        # Color base de la ventana, según el tema activo (oscuro o claro)
-        base_r, base_g, base_b = hex_to_rgb(styles.COLORS['bg_main'])
-        try:
-            r, g, b = hex_to_rgb(self.board_color_hex)
-        except Exception:
-            r, g, b = 59, 130, 246
-
-        alpha = 0.06
-        blend_r = int(base_r * (1 - alpha) + r * alpha)
-        blend_g = int(base_g * (1 - alpha) + g * alpha)
-        blend_b = int(base_b * (1 - alpha) + b * alpha)
-
-        # Marco sólido y fondo idéntico al fondo del tablero
-        self.setStyleSheet(f"""
-            #TaskCardFrame {{
-                background-color: rgb({blend_r}, {blend_g}, {blend_b});
-                border: 1.5px solid {styles.COLORS['border']};
-                border-radius: 8px;
-            }}
-            #TaskCardFrame:hover {{
-                border: 1.5px solid {styles.COLORS['accent_blue']};
-                background-color: rgb({min(255, blend_r + 12)}, {min(255, blend_g + 12)}, {min(255, blend_b + 16)});
-            }}
-        """)
+        else:
+            self.setStyleSheet(f"""
+                #TaskCardFrame {{
+                    background-color: {card_bg};
+                    border: none;
+                    border-radius: 16px;
+                }}
+            """)
+        # El título (QLabel) sobre un padre con fondo estilado pinta el color de la ventana;
+        # se fija su fondo al de la tarjeta para que integre (sin caja oscura).
+        self.title_label.setStyleSheet(f"background-color: {card_bg};")
 
     def set_selected(self, selected: bool):
         """Activa o desactiva el estado visual de selección múltiple."""
@@ -228,8 +233,8 @@ class TaskCard(QFrame):
 
     def init_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(6)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(8)
 
         # Cabecera de la tarjeta: Título + Badge de selección
         title_row = QHBoxLayout()
@@ -248,8 +253,8 @@ class TaskCard(QFrame):
         self.selection_badge.setAlignment(Qt.AlignCenter)
         self.selection_badge.setStyleSheet(f"""
             QLabel {{
-                background-color: {styles.COLORS['accent_blue']};
-                color: #ffffff;
+                background-color: {styles.COLORS['accent']};
+                color: {styles.COLORS['on_accent']};
                 font-size: 11px;
                 font-weight: bold;
                 border-radius: 9px;
@@ -260,47 +265,48 @@ class TaskCard(QFrame):
 
         layout.addLayout(title_row)
 
-        # Layout vertical para la metadata (Etiquetas y Fecha)
+        # Metadata en 3 filas por orden de lectura (como el handoff):
+        #   Fila 1 → etiquetas (categoría·valor, sin la de Prioridad), con salto de línea
+        #   Fila 2 → Prioridad (su propia fila)
+        #   Fila 3 → vencimiento + temporizador + tablero enlazado, en línea
         self.meta_layout = QVBoxLayout()
         self.meta_layout.setContentsMargins(0, 4, 0, 0)
         self.meta_layout.setSpacing(6)
 
-        # Contenedor para múltiples etiquetas (Fila 1)
+        # --- Fila 1: etiquetas (excluye Prioridad) ---
         self.tags_container = QWidget()
         self.tags_container.setStyleSheet("background: transparent; border: none;")
         self.tags_layout = FlowLayout(self.tags_container, margin=0, spacing=4)
         self.meta_layout.addWidget(self.tags_container)
 
-        # Contenedor para fecha de vencimiento (Fila 2)
+        # --- Fila 2: Prioridad ---
+        self.priority_container = QWidget()
+        self.priority_container.setStyleSheet("background: transparent; border: none;")
+        priority_layout = QHBoxLayout(self.priority_container)
+        priority_layout.setContentsMargins(0, 0, 0, 0)
+        priority_layout.setSpacing(6)
+        self.priority_label = QLabel()
+        priority_layout.addWidget(self.priority_label)
+        priority_layout.addStretch()
+        self.meta_layout.addWidget(self.priority_container)
+
+        # --- Fila 3: vencimiento + temporizador + tablero enlazado ---
+        row3 = QWidget()
+        row3.setStyleSheet("background: transparent; border: none;")
+        row3_layout = QHBoxLayout(row3)
+        row3_layout.setContentsMargins(0, 0, 0, 0)
+        row3_layout.setSpacing(6)
+
         self.due_container = QWidget()
         self.due_container.setStyleSheet("background: transparent; border: none;")
         self.due_layout = QHBoxLayout(self.due_container)
         self.due_layout.setContentsMargins(0, 0, 0, 0)
         self.due_layout.setSpacing(6)
-
-        # La fecha se estiliza en línea (según esté vencida o no), así que no lleva
-        # objectName: no existe regla QSS para #TaskCardDueDate.
+        # La fecha se estiliza en línea (según esté vencida o no), así que no lleva objectName.
         self.due_label = QLabel()
         self.due_layout.addWidget(self.due_label)
-        self.due_layout.addStretch()  # Empuja la fecha a la izquierda
-        self.meta_layout.addWidget(self.due_container)
+        row3_layout.addWidget(self.due_container)
 
-        # Contenedor para la pastilla de tablero enlazado (Fila 3, opcional)
-        self.board_link_container = QWidget()
-        self.board_link_container.setStyleSheet("background: transparent; border: none;")
-        board_link_layout = QHBoxLayout(self.board_link_container)
-        board_link_layout.setContentsMargins(0, 0, 0, 0)
-        board_link_layout.setSpacing(6)
-
-        self.board_link_btn = QPushButton()
-        self.board_link_btn.setCursor(Qt.PointingHandCursor)
-        self.board_link_btn.setToolTip(t("widgets.card.board_link_tooltip"))
-        self.board_link_btn.clicked.connect(self._emit_board_link_clicked)
-        board_link_layout.addWidget(self.board_link_btn)
-        board_link_layout.addStretch()
-        self.meta_layout.addWidget(self.board_link_container)
-
-        # Contenedor para la insignia del temporizador (Fila 4, opcional)
         self.timer_container = QWidget()
         self.timer_container.setStyleSheet("background: transparent; border: none;")
         timer_row_layout = QHBoxLayout(self.timer_container)
@@ -308,8 +314,21 @@ class TaskCard(QFrame):
         timer_row_layout.setSpacing(6)
         self.timer_badge_label = QLabel()
         timer_row_layout.addWidget(self.timer_badge_label)
-        timer_row_layout.addStretch()
-        self.meta_layout.addWidget(self.timer_container)
+        row3_layout.addWidget(self.timer_container)
+
+        self.board_link_container = QWidget()
+        self.board_link_container.setStyleSheet("background: transparent; border: none;")
+        board_link_layout = QHBoxLayout(self.board_link_container)
+        board_link_layout.setContentsMargins(0, 0, 0, 0)
+        board_link_layout.setSpacing(6)
+        self.board_link_btn = QPushButton()
+        self.board_link_btn.setCursor(Qt.PointingHandCursor)
+        self.board_link_btn.setToolTip(t("widgets.card.board_link_tooltip"))
+        self.board_link_btn.clicked.connect(self._emit_board_link_clicked)
+        board_link_layout.addWidget(self.board_link_btn)
+        row3_layout.addWidget(self.board_link_container)
+        row3_layout.addStretch()
+        self.meta_layout.addWidget(row3)
 
         layout.addLayout(self.meta_layout)
 
@@ -332,25 +351,25 @@ class TaskCard(QFrame):
 
         name = self.task_data.get("linked_board_name") or "?"
         color = self.task_data.get("linked_board_color") or "#3b82f6"
-        try:
-            r, g, b = hex_to_rgb(color)
-        except Exception:
-            r, g, b = 59, 130, 246
 
-        self.board_link_btn.setText(f"🔗 {name}")
+        # Píldora neutra legible en ambos temas: fondo hover neutro, texto principal, y el
+        # color del tablero solo en el icono de enlace (no como fondo/texto de bajo contraste).
+        self.board_link_btn.setText(f" {name}")
+        self.board_link_btn.setIcon(lucide_icon("link-2", color, 13))
+        self.board_link_btn.setIconSize(QSize(13, 13))
         self.board_link_btn.setStyleSheet(f"""
             QPushButton {{
-                background-color: rgba({r}, {g}, {b}, 0.15);
-                border: 1px solid rgba({r}, {g}, {b}, 0.5);
-                border-radius: 4px;
-                color: {color};
-                font-size: 10px;
-                font-weight: bold;
-                padding: 2px 6px;
+                background-color: {styles.COLORS['bg_hover']};
+                border: none;
+                border-radius: 9px;
+                color: {styles.COLORS['text_soft']};
+                font-size: 11px;
+                font-weight: 600;
+                padding: 3px 9px;
                 text-align: left;
             }}
             QPushButton:hover {{
-                background-color: rgba({r}, {g}, {b}, 0.3);
+                background-color: {styles.COLORS['bg_column']};
             }}
         """)
         self.board_link_container.show()
@@ -380,18 +399,16 @@ class TaskCard(QFrame):
         elapsed_hours = elapsed.total_seconds() / 3600
         is_stale = elapsed_hours >= self._timer_alert_hours
 
-        self.timer_badge_label.setText(f"⏱ {styles.format_elapsed_time(elapsed.total_seconds())}")
+        self.timer_badge_label.setText(styles.format_elapsed_time(elapsed.total_seconds()))
         if is_stale:
-            dr, dg, db = hex_to_rgb(styles.COLORS['danger'])
             self.timer_badge_label.setStyleSheet(
-                f"color: {styles.COLORS['danger']}; font-weight: bold; font-size: 10px; "
-                f"background-color: rgba({dr}, {dg}, {db}, 0.15); border-radius: 4px; padding: 2px 4px;"
+                f"color: {styles.COLORS['danger']}; font-weight: bold; font-size: 11px; "
+                f"background-color: {styles.COLORS['accent_tint_2']}; border-radius: 9px; padding: 3px 9px;"
             )
         else:
-            mr, mg, mb = hex_to_rgb(styles.COLORS['text_muted'])
             self.timer_badge_label.setStyleSheet(
-                f"color: {styles.COLORS['text_muted']}; font-size: 10px; "
-                f"background-color: rgba({mr}, {mg}, {mb}, 0.15); border-radius: 4px; padding: 2px 4px;"
+                f"color: {styles.COLORS['text_muted']}; font-size: 11px; "
+                f"background-color: {styles.COLORS['bg_hover']}; border-radius: 9px; padding: 3px 9px;"
             )
         self.timer_container.show()
 
@@ -404,17 +421,36 @@ class TaskCard(QFrame):
             if w:
                 w.deleteLater()
 
-        # Añadir las nuevas etiquetas, con formato "Categoría: Valor"
-        if tags:
-            for tag in tags:
-                lbl = QLabel(f"{tag['category']}: {tag['value']}".upper())
+        # Separar la etiqueta de Prioridad (va en su propia fila) del resto de etiquetas.
+        priority_names = {"priority", "prioridad"}
+        regular_tags = [tg for tg in tags if tg["category"].lower() not in priority_names]
+        priority_tag = next((tg for tg in tags if tg["category"].lower() in priority_names), None)
+
+        # Fila 1: etiquetas normales (formato "Categoría · Valor")
+        if regular_tags:
+            for tag in regular_tags:
+                lbl = QLabel(f"{tag['category']} · {tag['value']}")
+                txt = styles.contrast_text(tag['color'])
                 lbl.setStyleSheet(
-                    f"{styles.tag_pill_css(tag['color'])} color: #ffffff; font-size: 9px; font-weight: bold; padding: 2px 5px;"
+                    f"{styles.tag_pill_css(tag['color'])} border-radius: 9px; color: {txt}; "
+                    f"font-size: 10px; font-weight: 600; padding: 3px 9px;"
                 )
                 self.tags_layout.addWidget(lbl)
             self.tags_container.show()
         else:
             self.tags_container.hide()
+
+        # Fila 2: Prioridad como píldora propia (icono de banderín + valor)
+        if priority_tag:
+            ptxt = styles.contrast_text(priority_tag['color'])
+            self.priority_label.setText(f"{priority_tag['category']} · {priority_tag['value']}")
+            self.priority_label.setStyleSheet(
+                f"{styles.tag_pill_css(priority_tag['color'])} border-radius: 9px; color: {ptxt}; "
+                f"font-size: 10px; font-weight: 600; padding: 3px 9px;"
+            )
+            self.priority_container.show()
+        else:
+            self.priority_container.hide()
 
         # Mostrar/Ocultar fecha de vencimiento
         if due_date:
@@ -428,23 +464,23 @@ class TaskCard(QFrame):
                 recurring = self.task_data.get("recurrence", "none") not in (None, "", "none")
                 time_txt = f" {self.task_data['due_time']}" if self.task_data.get("due_time") else ""
                 n_links = len(self.task_data.get("links", []))
-                extra = ("  🔁" if recurring else "") + (f"  🔗{n_links}" if n_links else "")
-                self.due_label.setText(f"📅 {formatted}{time_txt}{extra}")
+                rec_word = {"daily": "Daily", "weekly": "Weekly", "monthly": "Monthly"}.get(
+                    str(self.task_data.get("recurrence", "")).lower(), ""
+                )
+                extra = (f" · {rec_word}" if recurring and rec_word else "") + (f" · {n_links} link(s)" if n_links else "")
+                self.due_label.setText(f"{formatted}{time_txt}{extra}")
                 if is_overdue:
-                    dr, dg, db = hex_to_rgb(styles.COLORS['danger'])
                     self.due_label.setStyleSheet(
-                        f"color: {styles.COLORS['danger']}; font-weight: bold; font-size: 10px; "
-                        f"background-color: rgba({dr}, {dg}, {db}, 0.15); border-radius: 4px; padding: 2px 4px;"
+                        f"color: {styles.COLORS['accent_ink']}; font-weight: 600; font-size: 11px; "
+                        f"background-color: {styles.COLORS['accent_tint_2']}; border-radius: 9px; padding: 3px 9px;"
                     )
                 else:
-                    mr, mg, mb = hex_to_rgb(styles.COLORS['text_muted'])
                     self.due_label.setStyleSheet(
-                        f"color: {styles.COLORS['text_muted']}; font-size: 10px; "
-                        f"background-color: rgba({mr}, {mg}, {mb}, 0.15); border-radius: 4px; padding: 2px 4px;"
+                        f"color: {styles.COLORS['text_muted']}; font-size: 11px; padding: 3px 0px;"
                     )
             except Exception:
-                self.due_label.setText(f"📅 {due_date}")
-                self.due_label.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 10px;")
+                self.due_label.setText(f"{due_date}")
+                self.due_label.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 11px;")
             self.due_container.show()
         else:
             self.due_container.hide()
@@ -647,8 +683,8 @@ class ColumnWidget(QFrame):
     hover_expand_requested = Signal(int)     # column_id (hover sostenido sobre columna plegada)
     column_activated = Signal(int)           # column_id (clic en cualquier parte "en blanco" de la columna)
 
-    COLLAPSED_WIDTH = 46
-    EXPANDED_WIDTH = 280
+    COLLAPSED_WIDTH = 56
+    EXPANDED_WIDTH = 288
     HOVER_EXPAND_MS = 650
 
     def __init__(self, column_data, parent=None):
@@ -682,34 +718,24 @@ class ColumnWidget(QFrame):
         super().mousePressEvent(event)
 
     def _column_icon_button(self, kind, tooltip):
-        """Pequeño botón cuadrado con un icono PINTADO (left/right/pencil) a juego con
-        el color de la columna. Se pinta a mano para no depender de glifos de fuente."""
+        """Botón circular sin marco con un icono Lucide (chevron para plegar/desplegar,
+        más-vertical para el menú) a juego con el color de la columna."""
         btn = QPushButton()
-        btn.setFixedSize(24, 24)
+        btn.setFixedSize(26, 26)
         btn.setCursor(Qt.PointingHandCursor)
         btn.setToolTip(tooltip)
-        try:
-            r, g, b = hex_to_rgb(self.column_data["color"])
-        except Exception:
-            r, g, b = 59, 130, 246
         color = self.column_data["color"]
-        btn.setIcon(make_glyph_icon(kind, color, 16))
+        icon_name = {"left": "chevron-left", "right": "chevron-right", "pencil": "more-vertical"}.get(kind, "chevron-right")
+        btn.setIcon(lucide_icon(icon_name, color, 16))
         btn.setIconSize(QSize(16, 16))
         btn.setStyleSheet(f"""
             QPushButton {{
-                background-color: rgba({r}, {g}, {b}, 0.1);
-                border: 1.2px solid rgba({r}, {g}, {b}, 0.45);
-                border-radius: 4px;
-                color: {color};
-                font-size: 14px;
-                font-weight: bold;
+                background-color: transparent;
+                border: none;
+                border-radius: 13px;
             }}
-            QPushButton:hover {{
-                background-color: rgba({r}, {g}, {b}, 0.25);
-                border-color: {color};
-                color: #ffffff;
-            }}
-            QPushButton:pressed {{ background-color: rgba({r}, {g}, {b}, 0.4); }}
+            QPushButton:hover {{ background-color: {styles.COLORS['bg_hover']}; }}
+            QPushButton:pressed {{ background-color: {styles.COLORS['bg_hover']}; }}
         """)
         return btn
 
@@ -758,19 +784,33 @@ class ColumnWidget(QFrame):
         # 1. Cabecera de la columna
         header_widget = QWidget()
         header_widget.setObjectName("ColumnHeaderBar")
-        # Aplicamos el color de borde superior correspondiente al color de la columna
+        # El interior de la columna (cabecera, área de tareas) se pinta explícitamente con
+        # bg_column: una QScrollArea con hijos no deja ver el fondo del contenedor de forma
+        # fiable, así que cada zona lleva su propio fondo para que TODA la columna sea del
+        # mismo color que su marco. Se reconstruye en cada load_board (reactivo al tema).
+        header_widget.setAttribute(Qt.WA_StyledBackground, True)
         header_widget.setStyleSheet(
-            f"#ColumnHeaderBar {{ border-bottom: 3px solid {self.column_data['color']}; padding-bottom: 4px; }}"
+            f"#ColumnHeaderBar {{ background-color: {styles.COLORS['bg_column']}; "
+            f"border-top-left-radius: 16px; border-top-right-radius: 16px; }}"
         )
 
         header_layout = QHBoxLayout(header_widget)
         header_layout.setContentsMargins(6, 4, 6, 4)
-        header_layout.setSpacing(4)
+        header_layout.setSpacing(8)
+
+        # Punto de 8 px del color de la etapa (sustituye al subrayado de color)
+        dot = QLabel()
+        dot.setFixedSize(8, 8)
+        dot.setStyleSheet(f"background-color: {self.column_data['color']}; border-radius: 4px;")
+        header_layout.addWidget(dot, 0, Qt.AlignVCenter)
 
         # Nombre de la columna (arrastrable para reordenar o mover a otro tablero)
         self.title_label = DraggableColumnTitle(self.column_data["name"], self)
         self.title_label.setObjectName("ColumnTitle")
         self.title_label.setToolTip(t("widgets.column.title_drag_tooltip"))
+        # Fondo explícito: un QLabel sobre un padre con fondo estilado pinta el color de la
+        # ventana (caja oscura) si no se le fija; se iguala al de la columna.
+        self.title_label.setStyleSheet(f"background-color: {styles.COLORS['bg_column']};")
         header_layout.addWidget(self.title_label)
         header_layout.addStretch()
 
@@ -791,9 +831,13 @@ class ColumnWidget(QFrame):
         scroll_area.setObjectName("TaskListArea")
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setStyleSheet(f"#TaskListArea {{ background-color: {styles.COLORS['bg_column']}; border: none; }}")
+        scroll_area.viewport().setStyleSheet(f"background-color: {styles.COLORS['bg_column']};")
 
         # El contenedor interno que acepta drops
         self.list_area = TaskListArea(self.column_id)
+        self.list_area.setAttribute(Qt.WA_StyledBackground, True)
+        self.list_area.setStyleSheet(f"background-color: {styles.COLORS['bg_column']};")
         self.list_area.task_dropped.connect(self.task_dropped.emit)
 
         # Aplicar el estilo dinámico inicial a la columna
@@ -806,10 +850,28 @@ class ColumnWidget(QFrame):
         scroll_area.setWidget(self.list_area)
         main_layout.addWidget(scroll_area)
 
-        # 3. Botón para añadir una nueva tarea
+        # 3. Botón para añadir una nueva tarea. Fondo bg_column explícito (inline) para que
+        # coincida con el interior de la columna: la QSS global por objectName no pinta el
+        # fondo de este botón de forma fiable (quedaría transparente sobre el carril).
         self.add_task_btn = QPushButton(t("widgets.column.add_task_btn"))
         self.add_task_btn.setObjectName("AddTaskButton")
         self.add_task_btn.setCursor(Qt.PointingHandCursor)
+        self.add_task_btn.setIcon(lucide_icon("plus", styles.COLORS['text_muted'], 16))
+        self.add_task_btn.setIconSize(QSize(16, 16))
+        self.add_task_btn.setStyleSheet(f"""
+            #AddTaskButton {{
+                background-color: {styles.COLORS['bg_column']};
+                border: none;
+                color: {styles.COLORS['text_muted']};
+                border-radius: 19px;
+                padding: 8px;
+                font-weight: 600;
+            }}
+            #AddTaskButton:hover {{
+                background-color: {styles.COLORS['accent_tint']};
+                color: {styles.COLORS['accent_pressed']};
+            }}
+        """)
         self.add_task_btn.clicked.connect(lambda: self.add_task_requested.emit(self.column_id))
         main_layout.addWidget(self.add_task_btn)
 
@@ -846,26 +908,23 @@ class ColumnWidget(QFrame):
             event.ignore()
 
     def set_column_style(self, dragging=False):
-        """Establece el diseño de la columna (borde y fondo) basado en su color."""
-        try:
-            r, g, b = hex_to_rgb(self.column_data["color"])
-        except Exception:
-            r, g, b = 59, 130, 246  # Azul por defecto
-            
+        """La columna es una tarjeta crema plana (estilo inline: Qt solo pinta el fondo de
+        estos QFrame vía stylesheet propio); al arrastrar una tarjeta encima muestra un anillo
+        de acento. Se re-aplica en cada load_board, reactivo al conmutador de tema."""
         if dragging:
-            # Fondo más iluminado y borde discontinuo más grueso
             self.setStyleSheet(f"""
                 #ColumnContainer {{
-                    background-color: rgba({r}, {g}, {b}, 0.12);
-                    border: 2px dashed rgba({r}, {g}, {b}, 0.8);
+                    background-color: {styles.COLORS['bg_column']};
+                    border: 2px solid {styles.COLORS['accent']};
+                    border-radius: 28px;
                 }}
             """)
         else:
-            # Fondo muy sutil y borde semi-transparente que enmarca la columna
             self.setStyleSheet(f"""
                 #ColumnContainer {{
-                    background-color: rgba({r}, {g}, {b}, 0.04);
-                    border: 1.5px solid rgba({r}, {g}, {b}, 0.3);
+                    background-color: {styles.COLORS['bg_column']};
+                    border: none;
+                    border-radius: 28px;
                 }}
             """)
 

@@ -1,7 +1,8 @@
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QSizePolicy
 from datetime import datetime
-from widgets import make_glyph_icon
+import styles
+from icons import lucide_icon
 from strings import t
 from .markdown_edit import MarkdownTextEdit, RichTextToolbar
 from .image_preview_dialog import show_image_preview
@@ -24,16 +25,16 @@ class LogEntryWidget(QFrame):
         self.setObjectName("LogEntryWidget")
         self.init_ui(log_data)
 
-    def _icon_button(self, kind, color, tooltip, hover_rgba):
+    def _icon_button(self, kind, color, tooltip, hover_bg):
         btn = QPushButton()
-        btn.setFixedSize(20, 20)
+        btn.setFixedSize(22, 22)
         btn.setCursor(Qt.PointingHandCursor)
         btn.setToolTip(tooltip)
-        btn.setIcon(make_glyph_icon(kind, color, 13))
+        btn.setIcon(lucide_icon(kind, color, 13))
         btn.setIconSize(QSize(13, 13))
         btn.setStyleSheet(
             "QPushButton { background: transparent; border: none; }"
-            f"QPushButton:hover {{ background-color: {hover_rgba}; border-radius: 3px; }}"
+            f"QPushButton:hover {{ background-color: {hover_bg}; border-radius: 11px; }}"
         )
         return btn
 
@@ -62,12 +63,12 @@ class LogEntryWidget(QFrame):
         top_layout.addStretch()
 
         self.edit_btn = self._icon_button(
-            "pencil", "#94a3b8", t("log_entry.edit_tooltip"), "rgba(148, 163, 184, 0.20)")
+            "pencil", styles.COLORS['text_muted'], t("log_entry.edit_tooltip"), styles.COLORS['bg_hover'])
         self.edit_btn.clicked.connect(self._enter_edit_mode)
         top_layout.addWidget(self.edit_btn)
 
         self.delete_btn = self._icon_button(
-            "cross", "#ef4444", t("log_entry.delete_tooltip"), "rgba(239, 68, 68, 0.15)")
+            "x", styles.COLORS['danger'], t("log_entry.delete_tooltip"), styles.COLORS['accent_tint'])
         self.delete_btn.clicked.connect(lambda: self.delete_callback(self.log_id, self))
         top_layout.addWidget(self.delete_btn)
 

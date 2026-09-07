@@ -3,7 +3,7 @@ y permite exportar a iCalendar (.ics) desde su diálogo de Ajustes."""
 import calendar as _cal
 from datetime import date, timedelta
 
-from PySide6.QtCore import Qt, Signal, QMimeData, QPoint, QUrl
+from PySide6.QtCore import Qt, Signal, QMimeData, QPoint, QUrl, QSize
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
     QFrame, QDialog, QFileDialog, QMessageBox, QSizePolicy, QApplication, QLineEdit,
@@ -14,6 +14,7 @@ from PySide6.QtGui import QColor, QPixmap, QIcon, QDrag, QDesktopServices
 import database
 import styles
 import ics_export
+from icons import lucide_icon
 from strings import t
 
 _WEEKDAYS = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"]
@@ -102,22 +103,24 @@ class DayCell(QFrame):
         if day_number is None:
             self.day_label.setText("")
             self._apply_style(
-                "#DayCell { background-color: transparent; border: 1px solid transparent; border-radius: 8px; }"
+                "#DayCell { background-color: transparent; border: none; border-radius: 16px; }"
             )
             return
 
         self.day_label.setText(str(day_number))
         if is_today:
             self._apply_style(
-                f"#DayCell {{ background-color: rgba(59,130,246,0.18);"
-                f" border: 1.5px solid {styles.COLORS['accent_blue']}; border-radius: 8px; }}"
-                f"#DayNumber {{ color: {styles.COLORS['accent_blue']}; font-weight: bold; }}"
+                f"#DayCell {{ background-color: {styles.COLORS['bg_main']};"
+                f" border: 2px solid {styles.COLORS['accent']}; border-radius: 16px; }}"
+                f"#DayNumber {{ color: {styles.COLORS['accent']}; font-weight: bold;"
+                f" background-color: {styles.COLORS['bg_main']}; }}"
             )
         else:
             self._apply_style(
-                f"#DayCell {{ background-color: {styles.COLORS['bg_column']};"
-                f" border: 1px solid {styles.COLORS['border']}; border-radius: 8px; }}"
-                f"#DayNumber {{ color: {styles.COLORS['text_muted']}; font-weight: bold; }}"
+                f"#DayCell {{ background-color: {styles.COLORS['bg_card']};"
+                f" border: none; border-radius: 16px; }}"
+                f"#DayNumber {{ color: {styles.COLORS['text_muted']}; font-weight: bold;"
+                f" background-color: {styles.COLORS['bg_card']}; }}"
             )
 
         for task in tasks[:max_show]:
@@ -146,9 +149,9 @@ class DayCell(QFrame):
         if self.cell_date is not None and event.mimeData().hasFormat(_CAL_TASK_MIME):
             event.acceptProposedAction()
             self.setStyleSheet(
-                f"#DayCell {{ background-color: rgba(59,130,246,0.30);"
-                f" border: 1.5px dashed {styles.COLORS['accent_blue']}; border-radius: 8px; }}"
-                f"#DayNumber {{ color: {styles.COLORS['accent_blue']}; font-weight: bold; }}"
+                f"#DayCell {{ background-color: {styles.COLORS['accent_tint']};"
+                f" border: 2px solid {styles.COLORS['accent']}; border-radius: 16px; }}"
+                f"#DayNumber {{ color: {styles.COLORS['accent']}; font-weight: bold; }}"
             )
         else:
             event.ignore()
@@ -208,15 +211,19 @@ class CalendarViewWidget(QWidget):
         header = QHBoxLayout()
         header.setSpacing(6)
 
-        prev_btn = QPushButton("‹")
+        prev_btn = QPushButton()
         prev_btn.setObjectName("CalNavButton")
-        prev_btn.setFixedSize(30, 28)
+        prev_btn.setFixedSize(34, 34)
+        prev_btn.setIcon(lucide_icon("chevron-left", styles.COLORS['text_soft'], 16))
+        prev_btn.setIconSize(QSize(16, 16))
         prev_btn.setCursor(Qt.PointingHandCursor)
         prev_btn.clicked.connect(self.go_prev)
 
-        next_btn = QPushButton("›")
+        next_btn = QPushButton()
         next_btn.setObjectName("CalNavButton")
-        next_btn.setFixedSize(30, 28)
+        next_btn.setFixedSize(34, 34)
+        next_btn.setIcon(lucide_icon("chevron-right", styles.COLORS['text_soft'], 16))
+        next_btn.setIconSize(QSize(16, 16))
         next_btn.setCursor(Qt.PointingHandCursor)
         next_btn.clicked.connect(self.go_next)
 
@@ -252,6 +259,8 @@ class CalendarViewWidget(QWidget):
         settings_btn = QPushButton(t("calendar.settings_btn"))
         settings_btn.setCursor(Qt.PointingHandCursor)
         settings_btn.setToolTip(t("calendar.settings_tooltip"))
+        settings_btn.setIcon(lucide_icon("sliders-horizontal", styles.COLORS['text_soft'], 15))
+        settings_btn.setIconSize(QSize(15, 15))
         settings_btn.clicked.connect(self.open_settings)
 
         close_btn = QPushButton(t("calendar.close_btn"))

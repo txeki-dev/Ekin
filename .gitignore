@@ -3,6 +3,9 @@ context.md
 diary.md
 diary_archive.md
 
+# Design handoff bundle (local-only source from Claude Design)
+Refactor UI para EKIN-handoff.zip
+
 # graphify - machine-specific interpreter path + regenerable build cache
 graphify-out/.graphify_python
 graphify-out/cache/

@@ -3,6 +3,157 @@
 Living planning doc: forensic findings (tech debt) + ideas for future releases.
 Ordered roughly by value/effort. Checkboxes track what's done.
 
+## 🚧 In progress (2026-09-05 — UI Refactor: "Warm Shell" from Claude Design handoff)
+
+Full presentation refactor per the `Refactor UI para EKIN-handoff.zip` spec (design system
+"Organic": cream ground `#f5ead8`, single terracotta accent `#c67139`, sage second voice,
+Caprasimo display + Figtree body, Lucide icons). No data-model/schema changes. Landed in
+verified chunks (ruff clean, 248/248 pytest green after each). Light "Warm shell" is now the
+default theme; the native window frame is kept.
+
+- [x] **Palette + `build_qss()` overhaul (`styles.py`):** 12-key palette expanded to the full
+  Organic ramp (~24 keys); `accent_blue` kept as a transitional alias for `accent`. Light
+  default (`main.py`, `settings_dialog.py`). Dark stays Slate provisionally (the "Night lanes"
+  retune is pending).
+- [x] **Fonts vendored + registered (`assets/fonts/`, `main.py`):** Caprasimo + Figtree (OFL)
+  loaded via `QFontDatabase` so titles render without a system install.
+- [x] **Lucide icons + tint helper (`assets/icons/lucide/`, `icons.py`):** 30 SVGs (ISC),
+  recolored per state, replacing every emoji glyph.
+- [x] **UI copy flipped to English, emoji stripped (`strings.py`).**
+- [x] **Board screen (`widgets.py`, `board_view.py`):** flat cream task cards with drop
+  shadows (no borders), radius-28 columns with an 8px stage dot (the color underline removed),
+  56px collapsed strip, warm due/timer/tag pills, `bg_board` carril, Caprasimo board title,
+  Lucide chevrons/menu/plus/cloud.
+- [x] **Sidebar (`sidebar.py`):** board rows as 42px/radius-16 with a color dot + accent
+  selection, Lucide utility bar (bell/search/calendar/settings/shortcuts), cloud/archive board
+  badges, version chip + `offline · everything on this machine` tagline.
+- [x] **Calendar** (`calendar_view.py`): month in Caprasimo 32, day cells radius-16 borderless,
+  today = `bg_main` + 2px accent ring + accent number, Lucide chevron nav, warm drag highlight.
+- [x] **Task detail** (`task_detail_dialog.py`, `markdown_edit.py`, `log_entry.py`): warm styling
+  inherited from QSS + emoji→Lucide (add-link, link/attachment rows, tag pills, journal edit/delete),
+  warm priority colors, code blocks on `bg_dark` with `#eee7db` text, English color-picker names.
+  (Kept the delicate two-panel restructure of the detail dialog for the refine pass.)
+- [x] **AI spec + Selection dock** (`ai_spec_dialog.py`, `board_view.py`): 74px dark dock with
+  accent check circle + Caprasimo count + `sparkles` generate + outline Clear; ai_spec dialog
+  fully de-Spanished, `rotate-ccw` refresh, warm engine-status colors, `bg_dark` code editor.
+- [x] **Small dialogs** (`settings_dialog.py`, `shortcuts_dialog.py`, `search_dialog.py`,
+  `tag_manager_dialog.py`): warm via inherited QSS + token fixes (warm default tag color).
+- [x] **`main.py`:** min window 1024×640 (resize 1280×800).
+- [x] **Dark "Night lanes" palette** (`styles.py`): warm-espresso `DARK` mirroring the Warm-Shell
+  level hierarchy; both palettes build clean and keys match.
+
+**Deferred to the test-&-refine pass** (nice-to-haves, not blockers): two-panel task-detail
+restructure; 6-circle preset color picker (New board / Edit column); settings segmented/toggle/
+stepper controls; global `QComboBox`/`QCheckBox`/`QSpinBox` warm styling; full keyboard focus-ring
+system; sub-1180 sidebar auto-collapse (manual toggle already exists); per-token pygments palette
+in code blocks.
+
+### Refine round 1 (2026-09-06 — from live dark-theme testing)
+
+- [x] **Fixed the "dark box" integration bug** (`widgets.py`, `styles.py`, `calendar_view.py`):
+  Qt paints an object-name-styled `QLabel` sitting on a styled-background parent with the
+  *window* color, not the parent's — leaving a mismatched box. Only an explicit matching
+  background clears it (verified by rendering). Fixed card titles (`set_card_style`), "+ Add
+  task" (`bg_column`), journal timestamp/content (`bg_card`), and calendar day numbers.
+- [x] **Removed the `...` from Import/Export labels** (`strings.py`).
+- [x] **"Background color" → "Board color"** (`strings.py`): the board color is *not* unused —
+  it now drives the sidebar color dot and the calendar legend/chips — so the control is kept
+  and the label renamed to match its new role (an accent dot, not a background).
+- [x] **Board options modal** (`sidebar.py`): new `BoardConfigDialog` (Edit / Copy / Archive /
+  Import / Export / Delete) opened by a config button on the active board row; the sidebar
+  bottom now shows only **New board** + **Archived boards**.
+- [x] **`on_accent` token** (`styles.py` + call sites): a cream foreground for text/icons on the
+  accent (and on dark surfaces) so dark theme no longer renders dark-on-terracotta. Light theme
+  unchanged (its `bg_main` was already cream).
+- [x] **Light theme broke on theme-toggle** (`board_view.py`, `widgets.py`, `styles.py`): the
+  board's carril/columns/cards had theme colors **baked into inline stylesheets at build time**,
+  so toggling dark→light left the whole board area dark. Root-caused by rendering: Qt does **not**
+  paint these custom `QFrame`/`QWidget` backgrounds from app-level QSS (only an inline stylesheet
+  paints them). Fix: the carril bg is re-applied in `load_board()` (which runs on every theme
+  toggle), columns/cards are already rebuilt there, and the board title moved to an object-name
+  QSS rule (labels *do* take app-QSS color). Verified by rendering a dark→light toggle.
+
+### Refine round 2 (2026-09-07 — closing the structural gaps vs the handoff)
+
+- [x] **Task detail restructured to the handoff shape** (`task_detail_dialog.py`, `styles.py`,
+  `strings.py`): header with kicker (`BOARD · COLUMN`) + big Caprasimo in-place title + close
+  circle → metadata card → two panels **Notes | Journal** (Caprasimo "Journal" header + "N
+  entries") → action bar (Delete ghost · "Changes save as you type" · Close · Save changes). All
+  public widgets/methods preserved (timer, links, scroll, `right_panel` ≥480) so the 248 stay green.
+- [x] **Global form-control theming** (`styles.py`): `QComboBox` / `QAbstractSpinBox` (date/time/
+  spin) / `QCheckBox` now themed by app QSS. **This was the real dark-theme bug** — those controls
+  rendered Qt's default white palette in dark mode across Task detail, Settings, Calendar & AI spec.
+- [x] **Settings → segmented / toggle / stepper** (`settings_dialog.py`): segmented Light/Dark, an
+  accent `ToggleSwitch` (paintEvent knob), and a −/+ stepper with a Caprasimo value. Backing
+  `theme_combo`/`notif_chk`/`timer_alert_spin` kept hidden as the state + persistence path (tests green).
+- [x] **Board header counts chip** (`board_view.py`): `{tasks} tasks · {due} due this week`,
+  computed in `load_board`.
+- [x] **6-circle preset color picker** (`color_picker.py`, wired into `BoardEditDialog` &
+  `ColumnEditDialog`): six design-system circles with a double-ring selection + a dashed "+" for a
+  custom color; `get_data()`/`self.color` contract preserved.
+
+Verified by rendering every screen in both light and dark. Remaining minor niceties (not blockers):
+card metadata is stacked rather than a single reading-order row; the QCalendar date popup and
+pygments per-token palette aren't warm-themed yet.
+
+### Refine round 3 (2026-09-07 — dark-theme overhaul + legibility + icon)
+
+- [x] **Dark palette redesigned for real elevation** (`styles.py`): carril `#201d19` (darkest) <
+  columns/sidebar `#2f2b25` < task cards `#3c362e` (lightest). Before, `bg_column ≈ bg_board ≈
+  bg_main`, so columns looked transparent and the header/`+Add task` blended into the window.
+- [x] **`contrast_text()` for legible pills** (`styles.py`, `widgets.py`, `task_detail_dialog.py`):
+  tag/priority pills now pick dark ink on light colors (yellow) and cream on dark colors (red),
+  by perceptual luminance — fixes the illegible white-on-yellow tags in both themes.
+- [x] **Linked-board pill made theme-safe** (`widgets.py`): neutral `bg_hover` pill with the board
+  color only on the link icon, instead of low-contrast colored text on a faint tint.
+- [x] **Segmented Light/Dark toggle fixed** (`settings_dialog.py`): fully-pill (999) buttons inside
+  a stadium container, so the active segment no longer pokes square corners past the border.
+- [x] **New app icon** (`ekin_icon.png` 512², `ekin_icon.ico` 16–256): terracotta squircle with the
+  brand's Caprasimo "e" in cream + a sage accent dot — organic/modern, matched to the light theme.
+
+### Refine round 4 (2026-09-07 — column fill + segmented pill, follow-ups)
+
+- [x] **Column interior now uniformly `bg_column`** (`widgets.py`): a `QScrollArea` with children
+  does NOT reliably show the container's fill behind it, so the empty task area rendered as the
+  darker carril ("transparent columns"). Fixed by painting `bg_column` explicitly on the header,
+  the scroll viewport and the inner `TaskListArea`, plus an explicit bg on the column title label
+  (the QLabel-on-styled-parent dark-box bug). The whole column is now the same color as its card.
+- [x] **Segmented Light/Dark pill actually rounds** (`settings_dialog.py`): Qt ignores
+  `border-radius` on a `QPushButton` when `border: none` (it fills a square). Added a
+  `1px solid transparent` border so the active segment renders as a clean stadium pill.
+
+### Refine round 5 (2026-09-07 — add-task fill, 3-row card, dark header title)
+
+- [x] **"+ Add task" fill fixed** (`widgets.py`): it rendered transparent (showed the carril)
+  because the app-QSS `#AddTaskButton` background didn't paint — same class of Qt quirk as the
+  columns. Set its background/border/hover explicitly inline (bg_column), matching the column.
+- [x] **Task card metadata in exactly 3 rows** (`widgets.py`): Row 1 tags (category·value +
+  priority, wraps), Row 2 due + timer inline, Row 3 linked board. `timer_container` kept as an
+  attribute (tests) but moved into the shared row 2.
+- [x] **Dark board header + title** (`board_view.py`, `styles.py`): the header bar background was
+  set inline at construction (light `bg_sidebar`) and never refreshed on theme toggle, so in dark
+  it stayed light and the cream title vanished. Now the header bar bg is re-applied in
+  `load_board()` (reactive), and `#BoardHeaderTitle` is recolored to the accent (terracotta) —
+  visible and on-brand in both themes.
+
+### Refine round 6 (2026-09-07 — add-task border, title/icon theming, real 3-row card)
+
+- [x] **"+ Add task" border removed** (`widgets.py`): no dashed frame — just the solid `bg_column`
+  fill with an accent-tint hover.
+- [x] **Board title white in dark, terracotta in light** (`styles.py`): added a `header_title`
+  palette key (`#c67139` light, `#f5ead8` dark) so `#BoardHeaderTitle` is high-contrast in both.
+- [x] **Sidebar theme refresh on toggle** (`sidebar.py`, `main.py`): the utility icons
+  (bell/search/calendar/settings/shortcuts), the New-board/Archived icons, the version chip and
+  tagline all bake their color at construction and went invisible after a hot theme switch. Added
+  `SidebarWidget.refresh_theme()` (re-colors those + reloads the board list), called from
+  `MainWindow.apply_theme()`.
+- [x] **Task card metadata is now really 3 rows** (`widgets.py`): the previous layout collapsed to
+  2 rows for a card without a linked board. Split the **Priority** tag onto its own row so the
+  reading order is Row 1 tags · Row 2 priority · Row 3 due + timer + linked board — matching the
+  handoff. Priority detected by category name (`priority`/`prioridad`, covers legacy Spanish data).
+
+---
+
 ## ✅ Done (2026-09-03 — Forensic Audit Bug Fixes & Refactors)
 
 - [x] **Snapshot UUID Preservation on Undo/Redo (`database/snapshots.py`):** `snapshot_task`, `snapshot_column`, and `snapshot_board` now preserve `task_uuid`, `column_uuid`, and `board_uuid` so restored items never lose synchronization compatibility with OneDrive `.ekboard` files.

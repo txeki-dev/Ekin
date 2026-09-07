@@ -14,6 +14,7 @@ import re
 import styles
 from strings import t
 from widgets import FlowLayout
+from icons import lucide_icon
 from .image_preview_dialog import show_image_preview
 
 
@@ -42,22 +43,22 @@ def format_code_block_html(code: str, language: str = "python") -> str:
     else:
         highlighted = html.escape(code_clean)
 
-    bg = "#1e1e2e"
-    border = "#3b4252"
-    lang_display = html.escape(lang_name.upper()) if (lang_name and lang_name.lower() not in ("text", "plain", "texto plano", "ninguno")) else "CÓDIGO"
+    bg = styles.COLORS['bg_dark']
+    border = "#402310"
+    lang_display = html.escape(lang_name.upper()) if (lang_name and lang_name.lower() not in ("text", "plain", "texto plano", "ninguno")) else "CODE"
     header_html = (
         f'<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 4px;">'
         f'<tr>'
-        f'<td align="left" style="color: #94a3b8; font-size: 10px; font-weight: bold; font-family: sans-serif; text-transform: uppercase;">{lang_display}</td>'
-        f'<td align="right"><a href="action:delete_code_block" style="color: #ef4444; font-size: 11px; font-weight: bold; text-decoration: none;" title="{t("markdown_edit.delete_code_tooltip")}">✕ {t("markdown_edit.delete_code_btn")}</a></td>'
+        f'<td align="left" style="color: #a19786; font-size: 10px; font-weight: bold; font-family: sans-serif; text-transform: uppercase;">{lang_display}</td>'
+        f'<td align="right"><a href="action:delete_code_block" style="color: #ffc6a5; font-size: 11px; font-weight: bold; text-decoration: none;" title="{t("markdown_edit.delete_code_tooltip")}">✕ {t("markdown_edit.delete_code_btn")}</a></td>'
         f'</tr></table>'
     )
 
     return (
         f'<table width="100%" cellpadding="8" cellspacing="0" '
-        f'style="background-color: {bg}; border: 1px solid {border}; border-radius: 4px; margin: 6px 0px;">'
+        f'style="background-color: {bg}; border: 1px solid {border}; border-radius: 8px; margin: 6px 0px;">'
         f'<tr><td>{header_html}'
-        f'<pre style="margin: 0; font-family: Consolas, \'Courier New\', monospace; font-size: 11px; line-height: 1.4; color: #f8f8f2; white-space: pre-wrap;">'
+        f'<pre style="margin: 0; font-family: Consolas, \'Courier New\', monospace; font-size: 11px; line-height: 1.4; color: #eee7db; white-space: pre-wrap;">'
         f'{highlighted}</pre></td></tr></table>'
     )
 
@@ -989,9 +990,11 @@ class RichTextToolbar(QWidget):
         self.code_btn.clicked.connect(lambda: self.text_edit.open_code_dialog())
         layout.addWidget(self.code_btn)
 
-        self.link_btn = QPushButton("🔗")
+        self.link_btn = QPushButton()
         self.link_btn.setObjectName("FormatButton")
         self.link_btn.setToolTip(t("markdown_edit.link_tooltip"))
+        self.link_btn.setIcon(lucide_icon("link-2", styles.COLORS['text_soft'], 15))
+        self.link_btn.setIconSize(QSize(15, 15))
         self.link_btn.setCursor(Qt.PointingHandCursor)
         self.link_btn.setFixedSize(26, 24)
         self.link_btn.clicked.connect(lambda: self.text_edit.open_link_dialog())
@@ -1067,15 +1070,15 @@ class RichTextToolbar(QWidget):
         menu.addSeparator()
 
         palette = [
-            ("Rojo", "#ef4444"),
-            ("Naranja", "#f97316"),
-            ("Amarillo", "#eab308"),
-            ("Verde", "#10b981"),
-            ("Cian", "#06b6d4"),
-            ("Azul", "#3b82f6"),
-            ("Morado", "#8b5cf6"),
-            ("Rosa", "#ec4899"),
-            ("Gris", "#94a3b8"),
+            ("Red", "#ef4444"),
+            ("Orange", "#f97316"),
+            ("Yellow", "#eab308"),
+            ("Green", "#10b981"),
+            ("Cyan", "#06b6d4"),
+            ("Blue", "#3b82f6"),
+            ("Purple", "#8b5cf6"),
+            ("Pink", "#ec4899"),
+            ("Gray", "#94a3b8"),
         ]
         for name, hex_code in palette:
             act = menu.addAction(name)

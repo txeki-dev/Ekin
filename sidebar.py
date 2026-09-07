@@ -1,7 +1,7 @@
-from PySide6.QtCore import Qt, Signal, QTimer, QPoint
+from PySide6.QtCore import Qt, Signal, QTimer, QPoint, QSize
 from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QWidget, QMessageBox, QDialog, QLineEdit, QColorDialog,
+    QScrollArea, QWidget, QMessageBox, QDialog, QLineEdit,
     QMenu, QFileDialog
 )
 from PySide6.QtGui import QColor, QPixmap, QIcon
@@ -12,8 +12,10 @@ import styles
 import importer
 from export_dialog import ExportDialog, ImportConfirmationDialog
 from cloud_sync_dialog import CloudSyncInfoDialog
-from styles import hex_to_rgb
+from icons import lucide_icon, lucide_pixmap
+from color_picker import ColorCirclesPicker
 from strings import t
+from version import __version__
 from undo import UndoAction
 
 # Nombres cortos en español para el reloj (evita depender de la locale del sistema)
@@ -112,6 +114,7 @@ class BoardButton(QFrame):
     column_dropped = Signal(int, int)  # column_id, target_board_id (al soltar una columna arrastrada)
     archive_toggle_requested = Signal(int, bool)  # board_id, nuevo estado archivado
     sync_action_requested = Signal(int, str)  # board_id, acción ("sync", "link", "unlink")
+    config_requested = Signal(int)  # board_id (abrir el modal de opciones del tablero)
 
     def __init__(self, board_id, name, color, active=False, archived=False, sync_path=None, parent=None):
         super().__init__(parent)
@@ -123,31 +126,53 @@ class BoardButton(QFrame):
         self.sync_path = sync_path
 
         self.setCursor(Qt.PointingHandCursor)
-        self.setFixedHeight(40)
+        self.setFixedHeight(42)
         self.setAcceptDrops(True)
 
         self.init_ui()
 
     def init_ui(self):
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 6, 12, 6)
-        layout.setSpacing(6)
+        layout.setContentsMargins(14, 0, 14, 0)
+        layout.setSpacing(10)
 
-        display_name = self.name
-        if self.archived:
-            display_name = "🗄 " + display_name
-        elif self.sync_path:
-            display_name = "☁️ " + display_name
+        # El color del tablero se reduce a un punto de 9 px junto al nombre
+        self.dot = QLabel()
+        self.dot.setFixedSize(9, 9)
+        layout.addWidget(self.dot, 0, Qt.AlignVCenter)
 
-        self.label = QLabel(display_name)
-        self.label.setStyleSheet("font-weight: bold; background: transparent; border: none; color: inherit;")
+        self.label = QLabel(self.name)
         self.label.setWordWrap(False)
-        if self.archived:
-            self.setToolTip(t("sidebar.board_button.archived_tooltip"))
-        elif self.sync_path:
-            self.setToolTip(f"{self.name}\nSincronizado con: {self.sync_path}")
         layout.addWidget(self.label)
         layout.addStretch()
+
+        # Botón de opciones del tablero: solo visible en el tablero activo (abre el modal)
+        self.config_btn = QPushButton()
+        self.config_btn.setFixedSize(24, 24)
+        self.config_btn.setCursor(Qt.PointingHandCursor)
+        self.config_btn.setToolTip(t("sidebar.board_config_tooltip"))
+        self.config_btn.setIcon(lucide_icon("sliders-horizontal", styles.COLORS['on_accent'], 15))
+        self.config_btn.setIconSize(QSize(15, 15))
+        self.config_btn.setStyleSheet(
+            "QPushButton { background: transparent; border: none; border-radius: 12px; }"
+        )
+        self.config_btn.clicked.connect(lambda: self.config_requested.emit(self.board_id))
+        self.config_btn.setVisible(self.active)
+        layout.addWidget(self.config_btn, 0, Qt.AlignVCenter)
+
+        # Insignia de estado: nube si está sincronizado, archivador si está archivado
+        self.badge_icon = QLabel()
+        self.badge_icon.setFixedSize(16, 16)
+        self.badge_icon.setStyleSheet("background: transparent; border: none;")
+        if self.archived:
+            self.badge_icon.setPixmap(lucide_pixmap("archive", styles.COLORS['text_muted'], 15))
+            self.setToolTip(t("sidebar.board_button.archived_tooltip"))
+        elif self.sync_path:
+            self.badge_icon.setPixmap(lucide_pixmap("cloud", styles.COLORS['text_muted'], 15))
+            self.setToolTip(f"{self.name}\nSynced with: {self.sync_path}")
+        else:
+            self.badge_icon.hide()
+        layout.addWidget(self.badge_icon, 0, Qt.AlignVCenter)
 
         self.update_style()
 
@@ -177,37 +202,37 @@ class BoardButton(QFrame):
             self.sync_action_requested.emit(self.board_id, "link")
 
     def update_style(self):
-        try:
-            r, g, b = hex_to_rgb(self.color)
-        except Exception:
-            r, g, b = 59, 130, 246  # Azul por defecto si falla el parseo
-            
         if self.active:
-            # Color original vibrante y texto blanco
+            # Seleccionado: fondo acento, texto crema, punto crema
             self.setStyleSheet(f"""
                 QFrame {{
-                    background-color: rgb({r}, {g}, {b});
-                    border: 1.5px solid rgb({r}, {g}, {b});
-                    border-radius: 6px;
-                    color: #ffffff;
+                    background-color: {styles.COLORS['accent']};
+                    border: none;
+                    border-radius: 16px;
                 }}
             """)
+            self.label.setStyleSheet(
+                f"background: transparent; border: none; font-weight: 600; color: {styles.COLORS['on_accent']};"
+            )
+            self.dot.setStyleSheet(f"background-color: {styles.COLORS['on_accent']}; border-radius: 5px;")
         else:
-            # Estado "Grey Out" con el color original como un tinte suave (12% opacidad)
-            # y un borde coloreado al 40% de opacidad. El texto está desaturado.
+            # Reposo: sin fondo; hover neutro
             self.setStyleSheet(f"""
                 QFrame {{
-                    background-color: rgba({r}, {g}, {b}, 0.12);
-                    border: 1.5px solid rgba({r}, {g}, {b}, 0.4);
-                    border-radius: 6px;
-                    color: #94a3b8;
+                    background-color: transparent;
+                    border: none;
+                    border-radius: 16px;
                 }}
                 QFrame:hover {{
-                    background-color: rgba({r}, {g}, {b}, 0.25);
-                    border-color: rgba({r}, {g}, {b}, 0.7);
-                    color: #f8fafc;
+                    background-color: {styles.COLORS['bg_hover']};
                 }}
             """)
+            self.label.setStyleSheet(
+                f"background: transparent; border: none; font-weight: 500; color: {styles.COLORS['text_main']};"
+            )
+            self.dot.setStyleSheet(f"background-color: {self.color}; border-radius: 5px;")
+        if hasattr(self, "config_btn"):
+            self.config_btn.setVisible(self.active)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -219,10 +244,9 @@ class BoardButton(QFrame):
             event.acceptProposedAction()
             self.setStyleSheet(f"""
                 QFrame {{
-                    background-color: rgba(59, 130, 246, 0.25);
-                    border: 2px dashed {styles.COLORS['accent_blue']};
-                    border-radius: 6px;
-                    color: #f8fafc;
+                    background-color: {styles.COLORS['accent_tint']};
+                    border: 2px dashed {styles.COLORS['accent']};
+                    border-radius: 16px;
                 }}
             """)
         else:
@@ -248,7 +272,7 @@ class BoardEditDialog(QDialog):
     def __init__(self, title="Editar Tablero", name="", color="#3b82f6", parent=None):
         super().__init__(parent)
         self.setWindowTitle(title)
-        self.setFixedSize(300, 180)
+        self.setMinimumWidth(440)
         self.color = color
 
         layout = QVBoxLayout(self)
@@ -261,19 +285,11 @@ class BoardEditDialog(QDialog):
         self.name_input.setPlaceholderText(t("sidebar.board_edit.name_placeholder"))
         layout.addWidget(self.name_input)
 
-        # Color del Tablero
-        color_layout = QHBoxLayout()
-        color_layout.addWidget(QLabel(t("sidebar.board_edit.color_label")))
-        
-        self.color_btn = QPushButton()
-        self.color_btn.setFixedSize(40, 24)
-        self.color_btn.setCursor(Qt.PointingHandCursor)
-        self.color_btn.clicked.connect(self.choose_color)
-        self.update_color_btn_style()
-        color_layout.addWidget(self.color_btn)
-        color_layout.addStretch()
-        
-        layout.addLayout(color_layout)
+        # Color del Tablero: círculos preseleccionados
+        layout.addWidget(QLabel(t("sidebar.board_edit.color_label")))
+        self.color_picker = ColorCirclesPicker(self.color)
+        self.color_picker.color_changed.connect(self._on_color_picked)
+        layout.addWidget(self.color_picker)
         layout.addStretch()
 
         # Botones Guardar / Cancelar
@@ -291,14 +307,8 @@ class BoardEditDialog(QDialog):
 
         layout.addLayout(btn_layout)
 
-    def choose_color(self):
-        color = QColorDialog.getColor(QColor(self.color), self, t("sidebar.board_edit.color_dialog_title"))
-        if color.isValid():
-            self.color = color.name()
-            self.update_color_btn_style()
-
-    def update_color_btn_style(self):
-        self.color_btn.setStyleSheet(styles.color_swatch_css(self.color, hover=True))
+    def _on_color_picked(self, color):
+        self.color = color
 
     def validate_and_accept(self):
         if not self.name_input.text().strip():
@@ -308,6 +318,56 @@ class BoardEditDialog(QDialog):
 
     def get_data(self):
         return self.name_input.text().strip(), self.color
+
+
+class BoardConfigDialog(QDialog):
+    """Modal de opciones del tablero activo: Edit, Copy, Archive, Import, Export, Delete.
+    Cada botón fija una acción y cierra; el llamador la ejecuta al volver de exec_action()."""
+    def __init__(self, archived=False, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(t("sidebar.board_config.title"))
+        self.setMinimumWidth(320)
+        self._action = None
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(8)
+
+        title = QLabel(t("sidebar.board_config.title"))
+        title.setStyleSheet(
+            f"font-family: 'Caprasimo', 'Segoe UI', serif; font-size: 20px; "
+            f"color: {styles.COLORS['text_main']}; background: transparent;"
+        )
+        layout.addWidget(title)
+
+        rows = [
+            ("edit", "pencil", t("sidebar.edit_board_btn"), False),
+            ("copy", "copy", t("sidebar.copy_board_btn"), False),
+            ("archive", "archive",
+             t("sidebar.board_button.menu_unarchive") if archived else t("sidebar.board_button.menu_archive"), False),
+            ("import", "upload", t("sidebar.import_btn"), False),
+            ("export", "download", t("sidebar.export_btn"), False),
+            ("delete", "trash-2", t("sidebar.delete_board_btn"), True),
+        ]
+        for action, icon, text, danger in rows:
+            b = QPushButton("  " + text)
+            if danger:
+                b.setObjectName("DangerButton")
+            b.setCursor(Qt.PointingHandCursor)
+            icon_color = styles.COLORS['on_accent'] if danger else styles.COLORS['text_soft']
+            b.setIcon(lucide_icon(icon, icon_color, 16))
+            b.setIconSize(QSize(16, 16))
+            b.setStyleSheet("QPushButton { text-align: left; padding-left: 16px; }")
+            b.clicked.connect(lambda _=False, a=action: self._choose(a))
+            layout.addWidget(b)
+
+    def _choose(self, action):
+        self._action = action
+        self.accept()
+
+    def exec_action(self):
+        self.exec()
+        return self._action
 
 
 class SidebarWidget(QFrame):
@@ -361,8 +421,20 @@ class SidebarWidget(QFrame):
         title_label.setObjectName("SidebarTitle")
         title_layout.addWidget(title_label)
 
+        # Chip de versión (lee version.__version__, no un literal)
+        self.version_chip = QLabel(__version__)
+        self.version_chip.setStyleSheet(
+            f"background-color: {styles.COLORS['bg_hover']}; color: {styles.COLORS['text_muted']}; "
+            f"font-size: 11px; border-radius: 8px; padding: 1px 7px;"
+        )
+        title_layout.addWidget(self.version_chip, 0, Qt.AlignVCenter)
+
         title_layout.addStretch()
         layout.addWidget(title_container)
+
+        self.tagline = QLabel("offline · everything on this machine")
+        self.tagline.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 12px; margin-left: 8px;")
+        layout.addWidget(self.tagline)
 
         # --- Barra de utilidades: reloj + campana de vencimientos + calendario ---
         layout.addWidget(self._build_utility_bar())
@@ -394,54 +466,23 @@ class SidebarWidget(QFrame):
         self.add_btn = QPushButton(t("sidebar.add_board_btn"))
         self.add_btn.setObjectName("PrimaryButton")
         self.add_btn.setCursor(Qt.PointingHandCursor)
+        self.add_btn.setIcon(lucide_icon("plus", styles.COLORS['on_accent'], 16))
+        self.add_btn.setIconSize(QSize(16, 16))
         self.add_btn.clicked.connect(self.add_board)
         btn_layout.addWidget(self.add_btn)
 
-        # Fila de acciones (Editar, Copiar y Borrar)
-        action_layout = QHBoxLayout()
-        action_layout.setSpacing(6)
-
-        self.edit_btn = QPushButton(t("sidebar.edit_board_btn"))
-        self.edit_btn.setCursor(Qt.PointingHandCursor)
-        self.edit_btn.clicked.connect(self.edit_board)
-        action_layout.addWidget(self.edit_btn)
-
-        self.copy_btn = QPushButton(t("sidebar.copy_board_btn"))
-        self.copy_btn.setCursor(Qt.PointingHandCursor)
-        self.copy_btn.clicked.connect(self.copy_board)
-        action_layout.addWidget(self.copy_btn)
-
-        self.delete_btn = QPushButton(t("sidebar.delete_board_btn"))
-        self.delete_btn.setObjectName("DangerButton")
-        self.delete_btn.setCursor(Qt.PointingHandCursor)
-        self.delete_btn.clicked.connect(self.delete_board)
-        action_layout.addWidget(self.delete_btn)
-
-        btn_layout.addLayout(action_layout)
-
-        # Fila secundaria: ver archivados + exportar + importar
-        extra_layout = QHBoxLayout()
-        extra_layout.setSpacing(6)
+        # Solo "Archived boards" queda en la vista principal; el resto de acciones por
+        # tablero (Edit / Copy / Delete / Archive / Import / Export) viven en el modal de
+        # opciones que abre el botón de configuración del tablero activo.
         self.archived_btn = QPushButton(t("sidebar.archived_btn"))
         self.archived_btn.setCheckable(True)
         self.archived_btn.setCursor(Qt.PointingHandCursor)
         self.archived_btn.setToolTip(t("sidebar.archived_tooltip"))
+        self.archived_btn.setIcon(lucide_icon("archive", styles.COLORS['text_soft'], 15))
+        self.archived_btn.setIconSize(QSize(15, 15))
         self.archived_btn.toggled.connect(self.toggle_show_archived)
-        extra_layout.addWidget(self.archived_btn)
+        btn_layout.addWidget(self.archived_btn)
 
-        self.export_btn = QPushButton(t("sidebar.export_btn"))
-        self.export_btn.setCursor(Qt.PointingHandCursor)
-        self.export_btn.setToolTip(t("sidebar.export_tooltip"))
-        self.export_btn.clicked.connect(self.show_export_dialog)
-        extra_layout.addWidget(self.export_btn)
-
-        self.import_btn = QPushButton(t("sidebar.import_btn"))
-        self.import_btn.setCursor(Qt.PointingHandCursor)
-        self.import_btn.setToolTip(t("sidebar.import_tooltip"))
-        self.import_btn.clicked.connect(self.show_import_dialog)
-        extra_layout.addWidget(self.import_btn)
-
-        btn_layout.addLayout(extra_layout)
         layout.addLayout(btn_layout)
 
     def _build_utility_bar(self):
@@ -467,8 +508,10 @@ class SidebarWidget(QFrame):
         # Campana con badge de conteo superpuesto
         bell_container = QWidget()
         bell_container.setFixedSize(34, 28)
-        self.bell_btn = QPushButton("🔔", bell_container)
+        self.bell_btn = QPushButton(bell_container)
         self.bell_btn.setObjectName("UtilityIconButton")
+        self.bell_btn.setIcon(lucide_icon("bell", styles.COLORS['text_soft'], 17))
+        self.bell_btn.setIconSize(QSize(17, 17))
         self.bell_btn.setGeometry(0, 0, 34, 28)
         self.bell_btn.setCursor(Qt.PointingHandCursor)
         self.bell_btn.setToolTip(t("sidebar.bell_tooltip"))
@@ -482,32 +525,40 @@ class SidebarWidget(QFrame):
         self.bell_badge.hide()
         icons_row.addWidget(bell_container)
 
-        self.search_btn = QPushButton("🔍")
+        self.search_btn = QPushButton()
         self.search_btn.setObjectName("UtilityIconButton")
+        self.search_btn.setIcon(lucide_icon("search", styles.COLORS['text_soft'], 17))
+        self.search_btn.setIconSize(QSize(17, 17))
         self.search_btn.setFixedSize(34, 28)
         self.search_btn.setCursor(Qt.PointingHandCursor)
         self.search_btn.setToolTip(t("sidebar.search_tooltip"))
         self.search_btn.clicked.connect(self.open_search_requested.emit)
         icons_row.addWidget(self.search_btn)
 
-        self.calendar_btn = QPushButton("📅")
+        self.calendar_btn = QPushButton()
         self.calendar_btn.setObjectName("UtilityIconButton")
+        self.calendar_btn.setIcon(lucide_icon("calendar", styles.COLORS['text_soft'], 17))
+        self.calendar_btn.setIconSize(QSize(17, 17))
         self.calendar_btn.setFixedSize(34, 28)
         self.calendar_btn.setCursor(Qt.PointingHandCursor)
         self.calendar_btn.setToolTip(t("sidebar.calendar_tooltip"))
         self.calendar_btn.clicked.connect(self.open_calendar_requested.emit)
         icons_row.addWidget(self.calendar_btn)
 
-        self.settings_btn = QPushButton("⚙")
+        self.settings_btn = QPushButton()
         self.settings_btn.setObjectName("UtilityIconButton")
+        self.settings_btn.setIcon(lucide_icon("sliders-horizontal", styles.COLORS['text_soft'], 17))
+        self.settings_btn.setIconSize(QSize(17, 17))
         self.settings_btn.setFixedSize(34, 28)
         self.settings_btn.setCursor(Qt.PointingHandCursor)
         self.settings_btn.setToolTip(t("sidebar.settings_tooltip"))
         self.settings_btn.clicked.connect(self.open_settings_requested.emit)
         icons_row.addWidget(self.settings_btn)
 
-        self.shortcuts_btn = QPushButton("❔")
+        self.shortcuts_btn = QPushButton()
         self.shortcuts_btn.setObjectName("UtilityIconButton")
+        self.shortcuts_btn.setIcon(lucide_icon("command", styles.COLORS['text_soft'], 17))
+        self.shortcuts_btn.setIconSize(QSize(17, 17))
         self.shortcuts_btn.setFixedSize(34, 28)
         self.shortcuts_btn.setCursor(Qt.PointingHandCursor)
         self.shortcuts_btn.setToolTip(t("sidebar.shortcuts_tooltip"))
@@ -554,6 +605,27 @@ class SidebarWidget(QFrame):
     def _on_notification_task(self, task_id, board_id):
         self.open_task_requested.emit(task_id, board_id)
 
+    def refresh_theme(self):
+        """Re-aplica los colores dependientes del tema en los widgets de la barra lateral que
+        fijan su color al construirse (iconos de la barra de utilidades, botones inferiores,
+        chip de versión, tagline). Sin esto, al conmutar de tema estos iconos/colores quedan
+        con la paleta anterior (p. ej. iconos oscuros e invisibles sobre el sidebar oscuro)."""
+        soft = styles.COLORS["text_soft"]
+        self.bell_btn.setIcon(lucide_icon("bell", soft, 17))
+        self.search_btn.setIcon(lucide_icon("search", soft, 17))
+        self.calendar_btn.setIcon(lucide_icon("calendar", soft, 17))
+        self.settings_btn.setIcon(lucide_icon("sliders-horizontal", soft, 17))
+        self.shortcuts_btn.setIcon(lucide_icon("command", soft, 17))
+        self.add_btn.setIcon(lucide_icon("plus", styles.COLORS["on_accent"], 16))
+        self.archived_btn.setIcon(lucide_icon("archive", soft, 15))
+        self.version_chip.setStyleSheet(
+            f"background-color: {styles.COLORS['bg_hover']}; color: {styles.COLORS['text_muted']}; "
+            f"font-size: 11px; border-radius: 8px; padding: 1px 7px;"
+        )
+        self.tagline.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 12px; margin-left: 8px;")
+        # Recargar la lista para que los botones de tablero (colores/estilos) se reconstruyan.
+        self.reload_boards(select_board_id=self.active_board_id)
+
     def reload_boards(self, select_board_id=None):
         """Vuelve a cargar la lista de tableros como widgets personalizados desde la base de datos."""
         # Limpiar contenedor anterior
@@ -594,6 +666,7 @@ class SidebarWidget(QFrame):
             btn.column_dropped.connect(self.handle_column_dropped)
             btn.archive_toggle_requested.connect(self.handle_archive_toggle)
             btn.sync_action_requested.connect(self.handle_sync_action)
+            btn.config_requested.connect(self.open_board_config)
             self.boards_layout.addWidget(btn)
             self.board_buttons[board_id] = btn
 
@@ -613,6 +686,24 @@ class SidebarWidget(QFrame):
             self.active_board_id = None
         self.reload_boards()
         self.board_changed.emit()
+
+    def open_board_config(self, board_id):
+        """Abre el modal de opciones del tablero activo y ejecuta la acción elegida."""
+        btn = self.board_buttons.get(board_id)
+        archived = btn.archived if btn else False
+        action = BoardConfigDialog(archived, parent=self).exec_action()
+        if action == "edit":
+            self.edit_board()
+        elif action == "copy":
+            self.copy_board()
+        elif action == "delete":
+            self.delete_board()
+        elif action == "archive":
+            self.handle_archive_toggle(board_id, not archived)
+        elif action == "import":
+            self.show_import_dialog()
+        elif action == "export":
+            self.show_export_dialog()
 
     def handle_sync_action(self, board_id, action):
         """Gestiona las acciones de sincronización solicitadas desde el menú contextual de un tablero."""
