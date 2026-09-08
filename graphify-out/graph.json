@@ -108,19 +108,6 @@
       "norm_label": "calendarviewwidget"
     },
     {
-      "label": "DayCell",
-      "file_type": "code",
-      "source_file": "calendar_view.py",
-      "source_location": "L67",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "id": "calendar_view_daycell",
-      "community": 101,
-      "community_name": "DayCell",
-      "norm_label": "daycell"
-    },
-    {
       "label": "ModelDownloadThread",
       "file_type": "code",
       "source_file": "local_ai.py",
@@ -145,6 +132,45 @@
       "community": 11,
       "community_name": "SpecGenerationThread",
       "norm_label": "specgenerationthread"
+    },
+    {
+      "label": "UndoManager",
+      "file_type": "code",
+      "source_file": "undo.py",
+      "source_location": "L14",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "undo_undomanager",
+      "community": 121,
+      "community_name": "UndoManager",
+      "norm_label": "undomanager"
+    },
+    {
+      "label": "BoardSelectionDialog",
+      "file_type": "code",
+      "source_file": "board_view.py",
+      "source_location": "L122",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "board_view_boardselectiondialog",
+      "community": 123,
+      "community_name": "CloudSyncInfoDialog",
+      "norm_label": "boardselectiondialog"
+    },
+    {
+      "label": "ColumnEditDialog",
+      "file_type": "code",
+      "source_file": "board_view.py",
+      "source_location": "L67",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "board_view_columneditdialog",
+      "community": 123,
+      "community_name": "CloudSyncInfoDialog",
+      "norm_label": "columneditdialog"
     },
     {
       "label": "CloudSyncInfoDialog",
@@ -173,17 +199,17 @@
       "norm_label": "toggleswitch"
     },
     {
-      "label": "UndoManager",
+      "label": "ShortcutsDialog",
       "file_type": "code",
-      "source_file": "undo.py",
-      "source_location": "L14",
+      "source_file": "shortcuts_dialog.py",
+      "source_location": "L12",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
-      "id": "undo_undomanager",
+      "id": "shortcuts_dialog_shortcutsdialog",
       "community": 129,
-      "community_name": "UndoManager",
-      "norm_label": "undomanager"
+      "community_name": "ShortcutsDialog",
+      "norm_label": "shortcutsdialog"
     },
     {
       "label": "SearchDialog",
@@ -197,19 +223,6 @@
       "community": 130,
       "community_name": "SearchDialog",
       "norm_label": "searchdialog"
-    },
-    {
-      "label": "ShortcutsDialog",
-      "file_type": "code",
-      "source_file": "shortcuts_dialog.py",
-      "source_location": "L12",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "id": "shortcuts_dialog_shortcutsdialog",
-      "community": 132,
-      "community_name": "ShortcutsDialog",
-      "norm_label": "shortcutsdialog"
     },
     {
       "label": "DraggableColumnTitle",
@@ -394,17 +407,17 @@
       "norm_label": "calendarsettingsdialog"
     },
     {
-      "label": "CalendarChip",
+      "label": "BoardColumnsArea",
       "file_type": "code",
-      "source_file": "calendar_view.py",
-      "source_location": "L34",
+      "source_file": "board_view.py",
+      "source_location": "L22",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
-      "id": "calendar_view_calendarchip",
+      "id": "board_view_boardcolumnsarea",
       "community": 32,
-      "community_name": ".__init__",
-      "norm_label": "calendarchip"
+      "community_name": "BoardColumnsArea",
+      "norm_label": "boardcolumnsarea"
     },
     {
       "label": "BoardButton",
@@ -550,30 +563,17 @@
       "norm_label": "notificationspopup"
     },
     {
-      "label": "BoardSelectionDialog",
+      "label": "CalendarChip",
       "file_type": "code",
-      "source_file": "board_view.py",
-      "source_location": "L122",
+      "source_file": "calendar_view.py",
+      "source_location": "L34",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
-      "id": "board_view_boardselectiondialog",
-      "community": 60,
-      "community_name": "board_view.py",
-      "norm_label": "boardselectiondialog"
-    },
-    {
-      "label": "ColumnEditDialog",
-      "file_type": "code",
-      "source_file": "board_view.py",
-      "source_location": "L67",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "id": "board_view_columneditdialog",
-      "community": 60,
-      "community_name": "board_view.py",
-      "norm_label": "columneditdialog"
+      "id": "calendar_view_calendarchip",
+      "community": 56,
+      "community_name": ".__init__",
+      "norm_label": "calendarchip"
     },
     {
       "label": "UndoAction",
@@ -641,19 +641,6 @@
       "norm_label": "logentrywidget"
     },
     {
-      "label": "BoardColumnsArea",
-      "file_type": "code",
-      "source_file": "board_view.py",
-      "source_location": "L22",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "id": "board_view_boardcolumnsarea",
-      "community": 73,
-      "community_name": "BoardColumnsArea",
-      "norm_label": "boardcolumnsarea"
-    },
-    {
       "label": "TaskListArea",
       "file_type": "code",
       "source_file": "widgets.py",
@@ -704,6 +691,19 @@
       "community": 82,
       "community_name": "SettingsDialog",
       "norm_label": "settingsdialog"
+    },
+    {
+      "label": "DayCell",
+      "file_type": "code",
+      "source_file": "calendar_view.py",
+      "source_location": "L67",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "calendar_view_daycell",
+      "community": 99,
+      "community_name": "DayCell",
+      "norm_label": "daycell"
     },
     {
       "label": ".go_next()",
@@ -1834,88 +1834,64 @@
       "norm_label": "value_exists_in_category()"
     },
     {
-      "label": "._apply_style()",
+      "label": ".on_board_link_activated()",
       "file_type": "code",
-      "source_file": "calendar_view.py",
-      "source_location": "L89",
+      "source_file": "main.py",
+      "source_location": "L323",
       "_callable": true,
       "_origin": "ast",
-      "id": "calendar_view_daycell_apply_style",
+      "id": "main_mainwindow_on_board_link_activated",
       "community": 101,
-      "community_name": "DayCell",
-      "norm_label": "._apply_style()"
+      "community_name": "._open_task_detail",
+      "norm_label": ".on_board_link_activated()"
     },
     {
-      "label": ".dragEnterEvent()",
+      "label": ".on_calendar_task()",
       "file_type": "code",
-      "source_file": "calendar_view.py",
-      "source_location": "L148",
+      "source_file": "main.py",
+      "source_location": "L329",
       "_callable": true,
       "_origin": "ast",
-      "id": "calendar_view_daycell_dragenterevent",
+      "id": "main_mainwindow_on_calendar_task",
       "community": 101,
-      "community_name": "DayCell",
-      "norm_label": ".dragenterevent()"
+      "community_name": "._open_task_detail",
+      "norm_label": ".on_calendar_task()"
     },
     {
-      "label": ".dragLeaveEvent()",
+      "label": ".on_notification_task()",
       "file_type": "code",
-      "source_file": "calendar_view.py",
-      "source_location": "L165",
+      "source_file": "main.py",
+      "source_location": "L311",
       "_callable": true,
       "_origin": "ast",
-      "id": "calendar_view_daycell_dragleaveevent",
+      "id": "main_mainwindow_on_notification_task",
       "community": 101,
-      "community_name": "DayCell",
-      "norm_label": ".dragleaveevent()"
+      "community_name": "._open_task_detail",
+      "norm_label": ".on_notification_task()"
     },
     {
-      "label": ".dragMoveEvent()",
+      "label": "._open_task_detail()",
       "file_type": "code",
-      "source_file": "calendar_view.py",
-      "source_location": "L159",
+      "source_file": "main.py",
+      "source_location": "L304",
       "_callable": true,
       "_origin": "ast",
-      "id": "calendar_view_daycell_dragmoveevent",
+      "id": "main_mainwindow_open_task_detail",
       "community": 101,
-      "community_name": "DayCell",
-      "norm_label": ".dragmoveevent()"
+      "community_name": "._open_task_detail",
+      "norm_label": "._open_task_detail()"
     },
     {
-      "label": ".dropEvent()",
+      "label": ".show_board_view()",
       "file_type": "code",
-      "source_file": "calendar_view.py",
-      "source_location": "L169",
+      "source_file": "main.py",
+      "source_location": "L247",
       "_callable": true,
       "_origin": "ast",
-      "id": "calendar_view_daycell_dropevent",
+      "id": "main_mainwindow_show_board_view",
       "community": 101,
-      "community_name": "DayCell",
-      "norm_label": ".dropevent()"
-    },
-    {
-      "label": ".set_day()",
-      "file_type": "code",
-      "source_file": "calendar_view.py",
-      "source_location": "L93",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "calendar_view_daycell_set_day",
-      "community": 101,
-      "community_name": "DayCell",
-      "norm_label": ".set_day()"
-    },
-    {
-      "label": "_swatch_icon()",
-      "file_type": "code",
-      "source_file": "calendar_view.py",
-      "source_location": "L25",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "calendar_view_swatch_icon",
-      "community": 101,
-      "community_name": "DayCell",
-      "norm_label": "_swatch_icon()"
+      "community_name": "._open_task_detail",
+      "norm_label": ".show_board_view()"
     },
     {
       "label": "test_create_log_has_no_intermediate_commit_call()",
@@ -2314,64 +2290,76 @@
       "norm_label": "test_parse_boards_json_valid_structures()"
     },
     {
-      "label": ".on_board_link_activated()",
+      "label": ".can_redo()",
       "file_type": "code",
-      "source_file": "main.py",
-      "source_location": "L323",
+      "source_file": "undo.py",
+      "source_location": "L29",
       "_callable": true,
       "_origin": "ast",
-      "id": "main_mainwindow_on_board_link_activated",
+      "id": "undo_undomanager_can_redo",
       "community": 121,
-      "community_name": "._open_task_detail",
-      "norm_label": ".on_board_link_activated()"
+      "community_name": "UndoManager",
+      "norm_label": ".can_redo()"
     },
     {
-      "label": ".on_calendar_task()",
+      "label": ".can_undo()",
       "file_type": "code",
-      "source_file": "main.py",
-      "source_location": "L329",
+      "source_file": "undo.py",
+      "source_location": "L26",
       "_callable": true,
       "_origin": "ast",
-      "id": "main_mainwindow_on_calendar_task",
+      "id": "undo_undomanager_can_undo",
       "community": 121,
-      "community_name": "._open_task_detail",
-      "norm_label": ".on_calendar_task()"
+      "community_name": "UndoManager",
+      "norm_label": ".can_undo()"
     },
     {
-      "label": ".on_notification_task()",
+      "label": ".__init__()",
       "file_type": "code",
-      "source_file": "main.py",
-      "source_location": "L311",
+      "source_file": "undo.py",
+      "source_location": "L15",
       "_callable": true,
       "_origin": "ast",
-      "id": "main_mainwindow_on_notification_task",
+      "id": "undo_undomanager_init",
       "community": 121,
-      "community_name": "._open_task_detail",
-      "norm_label": ".on_notification_task()"
+      "community_name": "UndoManager",
+      "norm_label": ".__init__()"
     },
     {
-      "label": "._open_task_detail()",
+      "label": ".push()",
       "file_type": "code",
-      "source_file": "main.py",
-      "source_location": "L304",
+      "source_file": "undo.py",
+      "source_location": "L20",
       "_callable": true,
       "_origin": "ast",
-      "id": "main_mainwindow_open_task_detail",
+      "id": "undo_undomanager_push",
       "community": 121,
-      "community_name": "._open_task_detail",
-      "norm_label": "._open_task_detail()"
+      "community_name": "UndoManager",
+      "norm_label": ".push()"
     },
     {
-      "label": ".show_board_view()",
+      "label": ".redo()",
       "file_type": "code",
-      "source_file": "main.py",
-      "source_location": "L247",
+      "source_file": "undo.py",
+      "source_location": "L40",
       "_callable": true,
       "_origin": "ast",
-      "id": "main_mainwindow_show_board_view",
+      "id": "undo_undomanager_redo",
       "community": 121,
-      "community_name": "._open_task_detail",
-      "norm_label": ".show_board_view()"
+      "community_name": "UndoManager",
+      "norm_label": ".redo()"
+    },
+    {
+      "label": ".undo()",
+      "file_type": "code",
+      "source_file": "undo.py",
+      "source_location": "L32",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "undo_undomanager_undo",
+      "community": 121,
+      "community_name": "UndoManager",
+      "norm_label": ".undo()"
     },
     {
       "label": "._collapse_hover_expanded_column()",
@@ -2420,6 +2408,54 @@
       "community": 122,
       "community_name": "._collapse_hover_expanded_column",
       "norm_label": "._rebuild_single_column()"
+    },
+    {
+      "label": ".accept_selection()",
+      "file_type": "code",
+      "source_file": "board_view.py",
+      "source_location": "L175",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "board_view_boardselectiondialog_accept_selection",
+      "community": 123,
+      "community_name": "CloudSyncInfoDialog",
+      "norm_label": ".accept_selection()"
+    },
+    {
+      "label": ".get_data()",
+      "file_type": "code",
+      "source_file": "board_view.py",
+      "source_location": "L118",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "board_view_columneditdialog_get_data",
+      "community": 123,
+      "community_name": "CloudSyncInfoDialog",
+      "norm_label": ".get_data()"
+    },
+    {
+      "label": "._on_color_picked()",
+      "file_type": "code",
+      "source_file": "board_view.py",
+      "source_location": "L107",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "board_view_columneditdialog_on_color_picked",
+      "community": 123,
+      "community_name": "CloudSyncInfoDialog",
+      "norm_label": "._on_color_picked()"
+    },
+    {
+      "label": ".validate_and_accept()",
+      "file_type": "code",
+      "source_file": "board_view.py",
+      "source_location": "L110",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "board_view_columneditdialog_validate_and_accept",
+      "community": 123,
+      "community_name": "CloudSyncInfoDialog",
+      "norm_label": ".validate_and_accept()"
     },
     {
       "label": ".handle_sync_action()",
@@ -2722,76 +2758,52 @@
       "norm_label": "._trigger_auto_sync_export()"
     },
     {
-      "label": ".can_redo()",
-      "file_type": "code",
-      "source_file": "undo.py",
-      "source_location": "L29",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "undo_undomanager_can_redo",
-      "community": 129,
-      "community_name": "UndoManager",
-      "norm_label": ".can_redo()"
-    },
-    {
-      "label": ".can_undo()",
-      "file_type": "code",
-      "source_file": "undo.py",
-      "source_location": "L26",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "undo_undomanager_can_undo",
-      "community": 129,
-      "community_name": "UndoManager",
-      "norm_label": ".can_undo()"
-    },
-    {
       "label": ".__init__()",
       "file_type": "code",
-      "source_file": "undo.py",
-      "source_location": "L15",
+      "source_file": "shortcuts_dialog.py",
+      "source_location": "L13",
       "_callable": true,
       "_origin": "ast",
-      "id": "undo_undomanager_init",
+      "id": "shortcuts_dialog_shortcutsdialog_init",
       "community": 129,
-      "community_name": "UndoManager",
+      "community_name": "ShortcutsDialog",
       "norm_label": ".__init__()"
     },
     {
-      "label": ".push()",
+      "label": "._item_label()",
       "file_type": "code",
-      "source_file": "undo.py",
-      "source_location": "L20",
+      "source_file": "shortcuts_dialog.py",
+      "source_location": "L95",
       "_callable": true,
       "_origin": "ast",
-      "id": "undo_undomanager_push",
+      "id": "shortcuts_dialog_shortcutsdialog_item_label",
       "community": 129,
-      "community_name": "UndoManager",
-      "norm_label": ".push()"
+      "community_name": "ShortcutsDialog",
+      "norm_label": "._item_label()"
     },
     {
-      "label": ".redo()",
+      "label": "._section_label()",
       "file_type": "code",
-      "source_file": "undo.py",
-      "source_location": "L40",
+      "source_file": "shortcuts_dialog.py",
+      "source_location": "L90",
       "_callable": true,
       "_origin": "ast",
-      "id": "undo_undomanager_redo",
+      "id": "shortcuts_dialog_shortcutsdialog_section_label",
       "community": 129,
-      "community_name": "UndoManager",
-      "norm_label": ".redo()"
+      "community_name": "ShortcutsDialog",
+      "norm_label": "._section_label()"
     },
     {
-      "label": ".undo()",
+      "label": "test_shortcuts_dialog_constructs_with_both_sections()",
       "file_type": "code",
-      "source_file": "undo.py",
-      "source_location": "L32",
+      "source_file": "tests/test_widgets_headless.py",
+      "source_location": "L186",
       "_callable": true,
       "_origin": "ast",
-      "id": "undo_undomanager_undo",
+      "id": "tests_test_widgets_headless_test_shortcuts_dialog_constructs_with_both_sections",
       "community": 129,
-      "community_name": "UndoManager",
-      "norm_label": ".undo()"
+      "community_name": "ShortcutsDialog",
+      "norm_label": "test_shortcuts_dialog_constructs_with_both_sections()"
     },
     {
       "label": "._build_column_widget()",
@@ -2986,52 +2998,28 @@
       "norm_label": "test_pixmap_from_data_uri_returns_null_for_garbage()"
     },
     {
-      "label": ".__init__()",
+      "label": "._maybe_notify_new_day()",
       "file_type": "code",
-      "source_file": "shortcuts_dialog.py",
-      "source_location": "L13",
+      "source_file": "main.py",
+      "source_location": "L426",
       "_callable": true,
       "_origin": "ast",
-      "id": "shortcuts_dialog_shortcutsdialog_init",
+      "id": "main_mainwindow_maybe_notify_new_day",
       "community": 132,
-      "community_name": "ShortcutsDialog",
-      "norm_label": ".__init__()"
+      "community_name": ".notify_due_today",
+      "norm_label": "._maybe_notify_new_day()"
     },
     {
-      "label": "._item_label()",
+      "label": ".notify_due_today()",
       "file_type": "code",
-      "source_file": "shortcuts_dialog.py",
-      "source_location": "L95",
+      "source_file": "main.py",
+      "source_location": "L399",
       "_callable": true,
       "_origin": "ast",
-      "id": "shortcuts_dialog_shortcutsdialog_item_label",
+      "id": "main_mainwindow_notify_due_today",
       "community": 132,
-      "community_name": "ShortcutsDialog",
-      "norm_label": "._item_label()"
-    },
-    {
-      "label": "._section_label()",
-      "file_type": "code",
-      "source_file": "shortcuts_dialog.py",
-      "source_location": "L90",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "shortcuts_dialog_shortcutsdialog_section_label",
-      "community": 132,
-      "community_name": "ShortcutsDialog",
-      "norm_label": "._section_label()"
-    },
-    {
-      "label": "test_shortcuts_dialog_constructs_with_both_sections()",
-      "file_type": "code",
-      "source_file": "tests/test_widgets_headless.py",
-      "source_location": "L186",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "tests_test_widgets_headless_test_shortcuts_dialog_constructs_with_both_sections",
-      "community": 132,
-      "community_name": "ShortcutsDialog",
-      "norm_label": "test_shortcuts_dialog_constructs_with_both_sections()"
+      "community_name": ".notify_due_today",
+      "norm_label": ".notify_due_today()"
     },
     {
       "label": "._change_list_indent()",
@@ -3517,7 +3505,7 @@
       "label": "t()",
       "file_type": "code",
       "source_file": "strings.py",
-      "source_location": "L608",
+      "source_location": "L619",
       "_callable": true,
       "_origin": "ast",
       "id": "strings_t",
@@ -3646,16 +3634,28 @@
       "norm_label": "test_is_local_link_classifies_urls_vs_paths()"
     },
     {
-      "label": "test_calendar_view_refresh_skips_when_hidden()",
+      "label": "._do_export()",
       "file_type": "code",
-      "source_file": "tests/test_widgets_headless.py",
-      "source_location": "L1037",
+      "source_file": "export_dialog.py",
+      "source_location": "L160",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_widgets_headless_test_calendar_view_refresh_skips_when_hidden",
+      "id": "export_dialog_exportdialog_do_export",
       "community": 139,
-      "community_name": "test_calendar_view_refresh_skips_when_hidden",
-      "norm_label": "test_calendar_view_refresh_skips_when_hidden()"
+      "community_name": "._do_export",
+      "norm_label": "._do_export()"
+    },
+    {
+      "label": "_slugify()",
+      "file_type": "code",
+      "source_file": "export_dialog.py",
+      "source_location": "L25",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "export_dialog_slugify",
+      "community": 139,
+      "community_name": "._do_export",
+      "norm_label": "_slugify()"
     },
     {
       "label": "create_column()",
@@ -3802,28 +3802,16 @@
       "norm_label": "update_log()"
     },
     {
-      "label": "._maybe_notify_new_day()",
+      "label": "test_calendar_view_refresh_skips_when_hidden()",
       "file_type": "code",
-      "source_file": "main.py",
-      "source_location": "L426",
+      "source_file": "tests/test_widgets_headless.py",
+      "source_location": "L1037",
       "_callable": true,
       "_origin": "ast",
-      "id": "main_mainwindow_maybe_notify_new_day",
+      "id": "tests_test_widgets_headless_test_calendar_view_refresh_skips_when_hidden",
       "community": 140,
-      "community_name": ".notify_due_today",
-      "norm_label": "._maybe_notify_new_day()"
-    },
-    {
-      "label": ".notify_due_today()",
-      "file_type": "code",
-      "source_file": "main.py",
-      "source_location": "L399",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "main_mainwindow_notify_due_today",
-      "community": 140,
-      "community_name": ".notify_due_today",
-      "norm_label": ".notify_due_today()"
+      "community_name": "test_calendar_view_refresh_skips_when_hidden",
+      "norm_label": "test_calendar_view_refresh_skips_when_hidden()"
     },
     {
       "label": "test_markdown_text_edit_insert_horizontal_rule()",
@@ -4990,18 +4978,6 @@
       "norm_label": ".open_board_config()"
     },
     {
-      "label": "._push_board_undo()",
-      "file_type": "code",
-      "source_file": "sidebar.py",
-      "source_location": "L905",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "sidebar_sidebarwidget_push_board_undo",
-      "community": 22,
-      "community_name": "BoardEditDialog",
-      "norm_label": "._push_board_undo()"
-    },
-    {
       "label": ".refresh_theme()",
       "file_type": "code",
       "source_file": "sidebar.py",
@@ -5024,18 +5000,6 @@
       "community": 22,
       "community_name": "BoardEditDialog",
       "norm_label": ".reload_boards()"
-    },
-    {
-      "label": ".show_export_dialog()",
-      "file_type": "code",
-      "source_file": "sidebar.py",
-      "source_location": "L756",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "sidebar_sidebarwidget_show_export_dialog",
-      "community": 22,
-      "community_name": "BoardEditDialog",
-      "norm_label": ".show_export_dialog()"
     },
     {
       "label": ".show_import_dialog()",
@@ -5962,76 +5926,88 @@
       "norm_label": "test_generate_structural_spec_offline()"
     },
     {
-      "label": ".__init__()",
+      "label": ".dragEnterEvent()",
       "file_type": "code",
-      "source_file": "calendar_view.py",
-      "source_location": "L37",
+      "source_file": "board_view.py",
+      "source_location": "L30",
       "_callable": true,
       "_origin": "ast",
-      "id": "calendar_view_calendarchip_init",
+      "id": "board_view_boardcolumnsarea_dragenterevent",
       "community": 32,
-      "community_name": ".__init__",
-      "norm_label": ".__init__()"
+      "community_name": "BoardColumnsArea",
+      "norm_label": ".dragenterevent()"
     },
     {
-      "label": ".mouseMoveEvent()",
+      "label": ".dragMoveEvent()",
       "file_type": "code",
-      "source_file": "calendar_view.py",
-      "source_location": "L47",
+      "source_file": "board_view.py",
+      "source_location": "L36",
       "_callable": true,
       "_origin": "ast",
-      "id": "calendar_view_calendarchip_mousemoveevent",
+      "id": "board_view_boardcolumnsarea_dragmoveevent",
       "community": 32,
-      "community_name": ".__init__",
-      "norm_label": ".mousemoveevent()"
+      "community_name": "BoardColumnsArea",
+      "norm_label": ".dragmoveevent()"
     },
     {
-      "label": ".mousePressEvent()",
+      "label": ".dropEvent()",
       "file_type": "code",
-      "source_file": "calendar_view.py",
+      "source_file": "board_view.py",
       "source_location": "L42",
       "_callable": true,
       "_origin": "ast",
-      "id": "calendar_view_calendarchip_mousepressevent",
+      "id": "board_view_boardcolumnsarea_dropevent",
       "community": 32,
-      "community_name": ".__init__",
-      "norm_label": ".mousepressevent()"
+      "community_name": "BoardColumnsArea",
+      "norm_label": ".dropevent()"
     },
     {
       "label": ".__init__()",
       "file_type": "code",
-      "source_file": "calendar_view.py",
-      "source_location": "L452",
+      "source_file": "board_view.py",
+      "source_location": "L26",
       "_callable": true,
       "_origin": "ast",
-      "id": "calendar_view_calendarsettingsdialog_init",
+      "id": "board_view_boardcolumnsarea_init",
       "community": 32,
-      "community_name": ".__init__",
+      "community_name": "BoardColumnsArea",
       "norm_label": ".__init__()"
-    },
-    {
-      "label": "._provider_guide_html()",
-      "file_type": "code",
-      "source_file": "calendar_view.py",
-      "source_location": "L713",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "calendar_view_calendarsettingsdialog_provider_guide_html",
-      "community": 32,
-      "community_name": ".__init__",
-      "norm_label": "._provider_guide_html()"
     },
     {
       "label": ".__init__()",
       "file_type": "code",
-      "source_file": "calendar_view.py",
-      "source_location": "L73",
+      "source_file": "board_view.py",
+      "source_location": "L124",
       "_callable": true,
       "_origin": "ast",
-      "id": "calendar_view_daycell_init",
+      "id": "board_view_boardselectiondialog_init",
       "community": 32,
-      "community_name": ".__init__",
+      "community_name": "BoardColumnsArea",
       "norm_label": ".__init__()"
+    },
+    {
+      "label": ".__init__()",
+      "file_type": "code",
+      "source_file": "board_view.py",
+      "source_location": "L189",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "board_view_boardviewwidget_init",
+      "community": 32,
+      "community_name": "BoardColumnsArea",
+      "norm_label": ".__init__()"
+    },
+    {
+      "label": ".init_ui()",
+      "file_type": "code",
+      "source_file": "board_view.py",
+      "source_location": "L235",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "board_view_boardviewwidget_init_ui",
+      "community": 32,
+      "community_name": "BoardColumnsArea",
+      "norm_label": ".init_ui()"
     },
     {
       "label": "backup_database()",
@@ -6133,7 +6109,7 @@
       "label": "apply_win32_icon()",
       "file_type": "code",
       "source_file": "main.py",
-      "source_location": "L524",
+      "source_location": "L544",
       "_callable": true,
       "_origin": "ast",
       "id": "main_apply_win32_icon",
@@ -6145,7 +6121,7 @@
       "label": "main()",
       "file_type": "code",
       "source_file": "main.py",
-      "source_location": "L547",
+      "source_location": "L567",
       "_callable": true,
       "_origin": "ast",
       "id": "main_main",
@@ -8302,6 +8278,18 @@
       "norm_label": "._activate()"
     },
     {
+      "label": ".show_export_dialog()",
+      "file_type": "code",
+      "source_file": "sidebar.py",
+      "source_location": "L756",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "sidebar_sidebarwidget_show_export_dialog",
+      "community": 54,
+      "community_name": "ExportDialog",
+      "norm_label": ".show_export_dialog()"
+    },
+    {
       "label": "test_export_dialog_initial_state_and_toggles()",
       "file_type": "code",
       "source_file": "tests/test_widgets_headless.py",
@@ -8350,28 +8338,76 @@
       "norm_label": "test_notifications_popup_with_tasks()"
     },
     {
-      "label": "._do_export()",
+      "label": ".__init__()",
       "file_type": "code",
-      "source_file": "export_dialog.py",
-      "source_location": "L160",
+      "source_file": "calendar_view.py",
+      "source_location": "L37",
       "_callable": true,
       "_origin": "ast",
-      "id": "export_dialog_exportdialog_do_export",
+      "id": "calendar_view_calendarchip_init",
       "community": 56,
-      "community_name": "._do_export",
-      "norm_label": "._do_export()"
+      "community_name": ".__init__",
+      "norm_label": ".__init__()"
     },
     {
-      "label": "_slugify()",
+      "label": ".mouseMoveEvent()",
       "file_type": "code",
-      "source_file": "export_dialog.py",
-      "source_location": "L25",
+      "source_file": "calendar_view.py",
+      "source_location": "L47",
       "_callable": true,
       "_origin": "ast",
-      "id": "export_dialog_slugify",
+      "id": "calendar_view_calendarchip_mousemoveevent",
       "community": 56,
-      "community_name": "._do_export",
-      "norm_label": "_slugify()"
+      "community_name": ".__init__",
+      "norm_label": ".mousemoveevent()"
+    },
+    {
+      "label": ".mousePressEvent()",
+      "file_type": "code",
+      "source_file": "calendar_view.py",
+      "source_location": "L42",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "calendar_view_calendarchip_mousepressevent",
+      "community": 56,
+      "community_name": ".__init__",
+      "norm_label": ".mousepressevent()"
+    },
+    {
+      "label": ".__init__()",
+      "file_type": "code",
+      "source_file": "calendar_view.py",
+      "source_location": "L452",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "calendar_view_calendarsettingsdialog_init",
+      "community": 56,
+      "community_name": ".__init__",
+      "norm_label": ".__init__()"
+    },
+    {
+      "label": "._provider_guide_html()",
+      "file_type": "code",
+      "source_file": "calendar_view.py",
+      "source_location": "L713",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "calendar_view_calendarsettingsdialog_provider_guide_html",
+      "community": 56,
+      "community_name": ".__init__",
+      "norm_label": "._provider_guide_html()"
+    },
+    {
+      "label": ".__init__()",
+      "file_type": "code",
+      "source_file": "calendar_view.py",
+      "source_location": "L73",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "calendar_view_daycell_init",
+      "community": 56,
+      "community_name": ".__init__",
+      "norm_label": ".__init__()"
     },
     {
       "label": "_close_top_level_widgets_after_each_test()",
@@ -8422,54 +8458,6 @@
       "norm_label": "calculate_content_hash()"
     },
     {
-      "label": ".accept_selection()",
-      "file_type": "code",
-      "source_file": "board_view.py",
-      "source_location": "L175",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "board_view_boardselectiondialog_accept_selection",
-      "community": 60,
-      "community_name": "board_view.py",
-      "norm_label": ".accept_selection()"
-    },
-    {
-      "label": ".get_data()",
-      "file_type": "code",
-      "source_file": "board_view.py",
-      "source_location": "L118",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "board_view_columneditdialog_get_data",
-      "community": 60,
-      "community_name": "board_view.py",
-      "norm_label": ".get_data()"
-    },
-    {
-      "label": "._on_color_picked()",
-      "file_type": "code",
-      "source_file": "board_view.py",
-      "source_location": "L107",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "board_view_columneditdialog_on_color_picked",
-      "community": 60,
-      "community_name": "board_view.py",
-      "norm_label": "._on_color_picked()"
-    },
-    {
-      "label": ".validate_and_accept()",
-      "file_type": "code",
-      "source_file": "board_view.py",
-      "source_location": "L110",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "board_view_columneditdialog_validate_and_accept",
-      "community": 60,
-      "community_name": "board_view.py",
-      "norm_label": ".validate_and_accept()"
-    },
-    {
       "label": "lucide_pixmap()",
       "file_type": "code",
       "source_file": "icons.py",
@@ -8492,6 +8480,18 @@
       "community": 60,
       "community_name": "board_view.py",
       "norm_label": "_svg_data()"
+    },
+    {
+      "label": "._push_board_undo()",
+      "file_type": "code",
+      "source_file": "sidebar.py",
+      "source_location": "L905",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "sidebar_sidebarwidget_push_board_undo",
+      "community": 60,
+      "community_name": "board_view.py",
+      "norm_label": "._push_board_undo()"
     },
     {
       "label": "_swatch_icon()",
@@ -9610,88 +9610,88 @@
       "norm_label": "test_show_image_preview_opens_dialog_for_valid_image()"
     },
     {
-      "label": ".dragEnterEvent()",
+      "label": ".apply_theme()",
       "file_type": "code",
-      "source_file": "board_view.py",
-      "source_location": "L30",
+      "source_file": "main.py",
+      "source_location": "L256",
       "_callable": true,
       "_origin": "ast",
-      "id": "board_view_boardcolumnsarea_dragenterevent",
+      "id": "main_mainwindow_apply_theme",
       "community": 73,
-      "community_name": "BoardColumnsArea",
-      "norm_label": ".dragenterevent()"
+      "community_name": ".__init__",
+      "norm_label": ".apply_theme()"
     },
     {
-      "label": ".dragMoveEvent()",
+      "label": ".check_onboarding()",
       "file_type": "code",
-      "source_file": "board_view.py",
-      "source_location": "L36",
+      "source_file": "main.py",
+      "source_location": "L515",
       "_callable": true,
       "_origin": "ast",
-      "id": "board_view_boardcolumnsarea_dragmoveevent",
+      "id": "main_mainwindow_check_onboarding",
       "community": 73,
-      "community_name": "BoardColumnsArea",
-      "norm_label": ".dragmoveevent()"
-    },
-    {
-      "label": ".dropEvent()",
-      "file_type": "code",
-      "source_file": "board_view.py",
-      "source_location": "L42",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "board_view_boardcolumnsarea_dropevent",
-      "community": 73,
-      "community_name": "BoardColumnsArea",
-      "norm_label": ".dropevent()"
+      "community_name": ".__init__",
+      "norm_label": ".check_onboarding()"
     },
     {
       "label": ".__init__()",
       "file_type": "code",
-      "source_file": "board_view.py",
-      "source_location": "L26",
+      "source_file": "main.py",
+      "source_location": "L62",
       "_callable": true,
       "_origin": "ast",
-      "id": "board_view_boardcolumnsarea_init",
+      "id": "main_mainwindow_init",
       "community": 73,
-      "community_name": "BoardColumnsArea",
-      "norm_label": ".__init__()"
-    },
-    {
-      "label": ".__init__()",
-      "file_type": "code",
-      "source_file": "board_view.py",
-      "source_location": "L124",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "board_view_boardselectiondialog_init",
-      "community": 73,
-      "community_name": "BoardColumnsArea",
-      "norm_label": ".__init__()"
-    },
-    {
-      "label": ".__init__()",
-      "file_type": "code",
-      "source_file": "board_view.py",
-      "source_location": "L189",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "board_view_boardviewwidget_init",
-      "community": 73,
-      "community_name": "BoardColumnsArea",
+      "community_name": ".__init__",
       "norm_label": ".__init__()"
     },
     {
       "label": ".init_ui()",
       "file_type": "code",
-      "source_file": "board_view.py",
-      "source_location": "L235",
+      "source_file": "main.py",
+      "source_location": "L160",
       "_callable": true,
       "_origin": "ast",
-      "id": "board_view_boardviewwidget_init_ui",
+      "id": "main_mainwindow_init_ui",
       "community": 73,
-      "community_name": "BoardColumnsArea",
+      "community_name": ".__init__",
       "norm_label": ".init_ui()"
+    },
+    {
+      "label": "._restore_geometry()",
+      "file_type": "code",
+      "source_file": "main.py",
+      "source_location": "L287",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "main_mainwindow_restore_geometry",
+      "community": 73,
+      "community_name": ".__init__",
+      "norm_label": "._restore_geometry()"
+    },
+    {
+      "label": ".setup_tray()",
+      "file_type": "code",
+      "source_file": "main.py",
+      "source_location": "L367",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "main_mainwindow_setup_tray",
+      "community": 73,
+      "community_name": ".__init__",
+      "norm_label": ".setup_tray()"
+    },
+    {
+      "label": ".show_settings()",
+      "file_type": "code",
+      "source_file": "main.py",
+      "source_location": "L267",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "main_mainwindow_show_settings",
+      "community": 73,
+      "community_name": ".__init__",
+      "norm_label": ".show_settings()"
     },
     {
       "label": ".dragEnterEvent()",
@@ -10438,88 +10438,88 @@
       "norm_label": ".reload_logs()"
     },
     {
-      "label": ".apply_theme()",
+      "label": "._apply_style()",
       "file_type": "code",
-      "source_file": "main.py",
-      "source_location": "L256",
+      "source_file": "calendar_view.py",
+      "source_location": "L89",
       "_callable": true,
       "_origin": "ast",
-      "id": "main_mainwindow_apply_theme",
+      "id": "calendar_view_daycell_apply_style",
       "community": 99,
-      "community_name": ".__init__",
-      "norm_label": ".apply_theme()"
+      "community_name": "DayCell",
+      "norm_label": "._apply_style()"
     },
     {
-      "label": ".check_onboarding()",
+      "label": ".dragEnterEvent()",
       "file_type": "code",
-      "source_file": "main.py",
-      "source_location": "L495",
+      "source_file": "calendar_view.py",
+      "source_location": "L148",
       "_callable": true,
       "_origin": "ast",
-      "id": "main_mainwindow_check_onboarding",
+      "id": "calendar_view_daycell_dragenterevent",
       "community": 99,
-      "community_name": ".__init__",
-      "norm_label": ".check_onboarding()"
+      "community_name": "DayCell",
+      "norm_label": ".dragenterevent()"
     },
     {
-      "label": ".__init__()",
+      "label": ".dragLeaveEvent()",
       "file_type": "code",
-      "source_file": "main.py",
-      "source_location": "L62",
+      "source_file": "calendar_view.py",
+      "source_location": "L165",
       "_callable": true,
       "_origin": "ast",
-      "id": "main_mainwindow_init",
+      "id": "calendar_view_daycell_dragleaveevent",
       "community": 99,
-      "community_name": ".__init__",
-      "norm_label": ".__init__()"
+      "community_name": "DayCell",
+      "norm_label": ".dragleaveevent()"
     },
     {
-      "label": ".init_ui()",
+      "label": ".dragMoveEvent()",
       "file_type": "code",
-      "source_file": "main.py",
-      "source_location": "L160",
+      "source_file": "calendar_view.py",
+      "source_location": "L159",
       "_callable": true,
       "_origin": "ast",
-      "id": "main_mainwindow_init_ui",
+      "id": "calendar_view_daycell_dragmoveevent",
       "community": 99,
-      "community_name": ".__init__",
-      "norm_label": ".init_ui()"
+      "community_name": "DayCell",
+      "norm_label": ".dragmoveevent()"
     },
     {
-      "label": "._restore_geometry()",
+      "label": ".dropEvent()",
       "file_type": "code",
-      "source_file": "main.py",
-      "source_location": "L287",
+      "source_file": "calendar_view.py",
+      "source_location": "L169",
       "_callable": true,
       "_origin": "ast",
-      "id": "main_mainwindow_restore_geometry",
+      "id": "calendar_view_daycell_dropevent",
       "community": 99,
-      "community_name": ".__init__",
-      "norm_label": "._restore_geometry()"
+      "community_name": "DayCell",
+      "norm_label": ".dropevent()"
     },
     {
-      "label": ".setup_tray()",
+      "label": ".set_day()",
       "file_type": "code",
-      "source_file": "main.py",
-      "source_location": "L367",
+      "source_file": "calendar_view.py",
+      "source_location": "L93",
       "_callable": true,
       "_origin": "ast",
-      "id": "main_mainwindow_setup_tray",
+      "id": "calendar_view_daycell_set_day",
       "community": 99,
-      "community_name": ".__init__",
-      "norm_label": ".setup_tray()"
+      "community_name": "DayCell",
+      "norm_label": ".set_day()"
     },
     {
-      "label": ".show_settings()",
+      "label": "_swatch_icon()",
       "file_type": "code",
-      "source_file": "main.py",
-      "source_location": "L267",
+      "source_file": "calendar_view.py",
+      "source_location": "L25",
       "_callable": true,
       "_origin": "ast",
-      "id": "main_mainwindow_show_settings",
+      "id": "calendar_view_swatch_icon",
       "community": 99,
-      "community_name": ".__init__",
-      "norm_label": ".show_settings()"
+      "community_name": "DayCell",
+      "norm_label": "_swatch_icon()"
     },
     {
       "label": "Vista de calendario (mes / semana / d\u00eda) con filtro por tablero y leyenda.",
@@ -10742,15 +10742,48 @@
       "norm_label": "technical design document"
     },
     {
-      "label": "Celda de un d\u00eda del calendario: n\u00famero + chips de tareas que vencen ese d\u00eda.\u2026",
+      "label": "Abre el di\u00e1logo de detalle de una tarea. Devuelve True si el di\u00e1logo modific\u00f3 o\u2026",
       "file_type": "rationale",
-      "source_file": "calendar_view.py",
-      "source_location": "L68",
+      "source_file": "main.py",
+      "source_location": "L305",
       "_origin": "ast",
-      "id": "calendar_view_rationale_68",
+      "id": "main_rationale_305",
       "community": 101,
-      "community_name": "DayCell",
-      "norm_label": "celda de un dia del calendario: numero + chips de tareas que vencen ese dia...."
+      "community_name": "._open_task_detail",
+      "norm_label": "abre el dialogo de detalle de una tarea. devuelve true si el dialogo modifico o..."
+    },
+    {
+      "label": "Desde la campana: ir al tablero de la tarea, mostrarlo y abrir su detalle.",
+      "file_type": "rationale",
+      "source_file": "main.py",
+      "source_location": "L312",
+      "_origin": "ast",
+      "id": "main_rationale_312",
+      "community": 101,
+      "community_name": "._open_task_detail",
+      "norm_label": "desde la campana: ir al tablero de la tarea, mostrarlo y abrir su detalle."
+    },
+    {
+      "label": "Desde la pastilla de tablero enlazado de una tarjeta: saltar a ese tablero.",
+      "file_type": "rationale",
+      "source_file": "main.py",
+      "source_location": "L324",
+      "_origin": "ast",
+      "id": "main_rationale_324",
+      "community": 101,
+      "community_name": "._open_task_detail",
+      "norm_label": "desde la pastilla de tablero enlazado de una tarjeta: saltar a ese tablero."
+    },
+    {
+      "label": "Desde el calendario: abrir el detalle y quedarnos en el calendario.",
+      "file_type": "rationale",
+      "source_file": "main.py",
+      "source_location": "L330",
+      "_origin": "ast",
+      "id": "main_rationale_330",
+      "community": 101,
+      "community_name": "._open_task_detail",
+      "norm_label": "desde el calendario: abrir el detalle y quedarnos en el calendario."
     },
     {
       "label": "Antes del fix, create_log() ten\u00eda un commit() intermedio entre el INSERT del\u2026",
@@ -11063,50 +11096,6 @@
       "norm_label": "pruebas del importador de tableros desde json."
     },
     {
-      "label": "Abre el di\u00e1logo de detalle de una tarea. Devuelve True si el di\u00e1logo modific\u00f3 o\u2026",
-      "file_type": "rationale",
-      "source_file": "main.py",
-      "source_location": "L305",
-      "_origin": "ast",
-      "id": "main_rationale_305",
-      "community": 121,
-      "community_name": "._open_task_detail",
-      "norm_label": "abre el dialogo de detalle de una tarea. devuelve true si el dialogo modifico o..."
-    },
-    {
-      "label": "Desde la campana: ir al tablero de la tarea, mostrarlo y abrir su detalle.",
-      "file_type": "rationale",
-      "source_file": "main.py",
-      "source_location": "L312",
-      "_origin": "ast",
-      "id": "main_rationale_312",
-      "community": 121,
-      "community_name": "._open_task_detail",
-      "norm_label": "desde la campana: ir al tablero de la tarea, mostrarlo y abrir su detalle."
-    },
-    {
-      "label": "Desde la pastilla de tablero enlazado de una tarjeta: saltar a ese tablero.",
-      "file_type": "rationale",
-      "source_file": "main.py",
-      "source_location": "L324",
-      "_origin": "ast",
-      "id": "main_rationale_324",
-      "community": 121,
-      "community_name": "._open_task_detail",
-      "norm_label": "desde la pastilla de tablero enlazado de una tarjeta: saltar a ese tablero."
-    },
-    {
-      "label": "Desde el calendario: abrir el detalle y quedarnos en el calendario.",
-      "file_type": "rationale",
-      "source_file": "main.py",
-      "source_location": "L330",
-      "_origin": "ast",
-      "id": "main_rationale_330",
-      "community": 121,
-      "community_name": "._open_task_detail",
-      "norm_label": "desde el calendario: abrir el detalle y quedarnos en el calendario."
-    },
-    {
       "label": "Reconstruye el ColumnWidget de UNA sola columna (datos/tareas frescos de la BD)\u2026",
       "file_type": "rationale",
       "source_file": "board_view.py",
@@ -11156,10 +11145,43 @@
       "source_file": "",
       "source_location": "",
       "_origin": "ast",
+      "id": "board_view_py_qdialog",
+      "community": 123,
+      "community_name": "CloudSyncInfoDialog",
+      "norm_label": "qdialog"
+    },
+    {
+      "label": "QDialog",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
       "id": "cloud_sync_dialog_py_qdialog",
       "community": 123,
       "community_name": "CloudSyncInfoDialog",
       "norm_label": "qdialog"
+    },
+    {
+      "label": "Di\u00e1logo para seleccionar un tablero de destino para mover o copiar una columna.",
+      "file_type": "rationale",
+      "source_file": "board_view.py",
+      "source_location": "L123",
+      "_origin": "ast",
+      "id": "board_view_rationale_123",
+      "community": 123,
+      "community_name": "CloudSyncInfoDialog",
+      "norm_label": "dialogo para seleccionar un tablero de destino para mover o copiar una columna."
+    },
+    {
+      "label": "Di\u00e1logo para crear o editar una columna (nombre y color).",
+      "file_type": "rationale",
+      "source_file": "board_view.py",
+      "source_location": "L68",
+      "_origin": "ast",
+      "id": "board_view_rationale_68",
+      "community": 123,
+      "community_name": "CloudSyncInfoDialog",
+      "norm_label": "dialogo para crear o editar una columna (nombre y color)."
     },
     {
       "label": "Di\u00e1logo modal explicativo previo a seleccionar la ruta de sincronizaci\u00f3n en la\u2026",
@@ -11426,6 +11448,17 @@
       "norm_label": "exporta cambios locales en segundo plano si el tablero esta vinculado."
     },
     {
+      "label": "QDialog",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "id": "shortcuts_dialog_py_qdialog",
+      "community": 129,
+      "community_name": "ShortcutsDialog",
+      "norm_label": "qdialog"
+    },
+    {
       "label": "Abre el di\u00e1logo de detalle/chat de una tarea.",
       "file_type": "rationale",
       "source_file": "board_view.py",
@@ -11558,15 +11591,26 @@
       "norm_label": "regresion: antes href y src eran el mismo data uri (la miniatura ya reducida al..."
     },
     {
-      "label": "QDialog",
-      "file_type": "code",
-      "source_file": "",
-      "source_location": "",
+      "label": "Muestra un toast con las tareas que vencen hoy (si las hay). Portabilidad:\u2026",
+      "file_type": "rationale",
+      "source_file": "main.py",
+      "source_location": "L400",
       "_origin": "ast",
-      "id": "shortcuts_dialog_py_qdialog",
+      "id": "main_rationale_400",
       "community": 132,
-      "community_name": "ShortcutsDialog",
-      "norm_label": "qdialog"
+      "community_name": ".notify_due_today",
+      "norm_label": "muestra un toast con las tareas que vencen hoy (si las hay). portabilidad:..."
+    },
+    {
+      "label": "Con la revisi\u00f3n horaria, notifica de nuevo si ha cambiado el d\u00eda.",
+      "file_type": "rationale",
+      "source_file": "main.py",
+      "source_location": "L427",
+      "_origin": "ast",
+      "id": "main_rationale_427",
+      "community": 132,
+      "community_name": ".notify_due_today",
+      "norm_label": "con la revision horaria, notifica de nuevo si ha cambiado el dia."
     },
     {
       "label": "Elige el s\u00edmbolo de vi\u00f1eta seg\u00fan el nivel de anidamiento (las listas numeradas\u2026",
@@ -11759,9 +11803,9 @@
       "label": "Devuelve la cadena asociada a `key`, interpolando **kwargs si se pasan.",
       "file_type": "rationale",
       "source_file": "strings.py",
-      "source_location": "L609",
+      "source_location": "L620",
       "_origin": "ast",
-      "id": "strings_rationale_609",
+      "id": "strings_rationale_620",
       "community": 135,
       "community_name": "t",
       "norm_label": "devuelve la cadena asociada a `key`, interpolando **kwargs si se pasan."
@@ -11833,15 +11877,15 @@
       "norm_label": "true a menos que la cadena empiece por un esquema web reconocido (case-..."
     },
     {
-      "label": "CalendarViewWidget.refresh() omite consultas costosas cuando el widget est\u00e1\u2026",
+      "label": "Genera una cadena amigable para nombres de archivo.",
       "file_type": "rationale",
-      "source_file": "tests/test_widgets_headless.py",
-      "source_location": "L1038",
+      "source_file": "export_dialog.py",
+      "source_location": "L26",
       "_origin": "ast",
-      "id": "tests_test_widgets_headless_rationale_1038",
+      "id": "export_dialog_rationale_26",
       "community": 139,
-      "community_name": "test_calendar_view_refresh_skips_when_hidden",
-      "norm_label": "calendarviewwidget.refresh() omite consultas costosas cuando el widget esta..."
+      "community_name": "._do_export",
+      "norm_label": "genera una cadena amigable para nombres de archivo."
     },
     {
       "label": "columns.py",
@@ -11921,26 +11965,15 @@
       "norm_label": "edita el contenido (html) de una entrada del diario y refresca el updated_at de..."
     },
     {
-      "label": "Muestra un toast con las tareas que vencen hoy (si las hay). Portabilidad:\u2026",
+      "label": "CalendarViewWidget.refresh() omite consultas costosas cuando el widget est\u00e1\u2026",
       "file_type": "rationale",
-      "source_file": "main.py",
-      "source_location": "L400",
+      "source_file": "tests/test_widgets_headless.py",
+      "source_location": "L1038",
       "_origin": "ast",
-      "id": "main_rationale_400",
+      "id": "tests_test_widgets_headless_rationale_1038",
       "community": 140,
-      "community_name": ".notify_due_today",
-      "norm_label": "muestra un toast con las tareas que vencen hoy (si las hay). portabilidad:..."
-    },
-    {
-      "label": "Con la revisi\u00f3n horaria, notifica de nuevo si ha cambiado el d\u00eda.",
-      "file_type": "rationale",
-      "source_file": "main.py",
-      "source_location": "L427",
-      "_origin": "ast",
-      "id": "main_rationale_427",
-      "community": 140,
-      "community_name": ".notify_due_today",
-      "norm_label": "con la revision horaria, notifica de nuevo si ha cambiado el dia."
+      "community_name": "test_calendar_view_refresh_skips_when_hidden",
+      "norm_label": "calendarviewwidget.refresh() omite consultas costosas cuando el widget esta..."
     },
     {
       "label": "insert_horizontal_rule() inserta una etiqueta <hr /> visible en el HTML.",
@@ -12658,17 +12691,6 @@
       "norm_label": "abre el modal de opciones del tablero activo y ejecuta la accion elegida."
     },
     {
-      "label": "Abre el di\u00e1logo modal de exportaci\u00f3n (JSON/CSV/MD, todo o tablero activo).",
-      "file_type": "rationale",
-      "source_file": "sidebar.py",
-      "source_location": "L757",
-      "_origin": "ast",
-      "id": "sidebar_rationale_757",
-      "community": 22,
-      "community_name": "BoardEditDialog",
-      "norm_label": "abre el dialogo modal de exportacion (json/csv/md, todo o tablero activo)."
-    },
-    {
       "label": "Abre el selector de archivo JSON y el di\u00e1logo de confirmaci\u00f3n de importaci\u00f3n.",
       "file_type": "rationale",
       "source_file": "sidebar.py",
@@ -12733,17 +12755,6 @@
       "community": 22,
       "community_name": "BoardEditDialog",
       "norm_label": "confirma y elimina el tablero activo."
-    },
-    {
-      "label": "Registra deshacer/rehacer del borrado de un tablero (restaurar desde snapshot).",
-      "file_type": "rationale",
-      "source_file": "sidebar.py",
-      "source_location": "L906",
-      "_origin": "ast",
-      "id": "sidebar_rationale_906",
-      "community": 22,
-      "community_name": "BoardEditDialog",
-      "norm_label": "registra deshacer/rehacer del borrado de un tablero (restaurar desde snapshot)."
     },
     {
       "label": "QFrame",
@@ -12955,7 +12966,7 @@
       "norm_label": "muestra u oculta la barra lateral."
     },
     {
-      "label": "Verifica de forma silenciosa si hay actualizaciones en el repo de GitHub.",
+      "label": "Verifica de forma silenciosa si hay actualizaciones en el repo de GitHub.\u2026",
       "file_type": "rationale",
       "source_file": "main.py",
       "source_location": "L436",
@@ -12963,7 +12974,7 @@
       "id": "main_rationale_436",
       "community": 25,
       "community_name": "MainWindow",
-      "norm_label": "verifica de forma silenciosa si hay actualizaciones en el repo de github."
+      "norm_label": "verifica de forma silenciosa si hay actualizaciones en el repo de github...."
     },
     {
       "label": "Atajo Ctrl+N: a\u00f1ade una tarea a la \u00faltima columna con la que se ha interactuado\u2026",
@@ -13268,9 +13279,9 @@
       "source_file": "",
       "source_location": "",
       "_origin": "ast",
-      "id": "calendar_view_py_qframe",
+      "id": "board_view_py_qframe",
       "community": 32,
-      "community_name": ".__init__",
+      "community_name": "BoardColumnsArea",
       "norm_label": "qframe"
     },
     {
@@ -13279,32 +13290,21 @@
       "source_file": "",
       "source_location": "",
       "_origin": "ast",
-      "id": "calendar_view_py_qwidget",
+      "id": "board_view_py_qwidget",
       "community": 32,
-      "community_name": ".__init__",
+      "community_name": "BoardColumnsArea",
       "norm_label": "qwidget"
     },
     {
-      "label": "Chip de tarea en el calendario. Se puede pulsar (abrir) o arrastrar a otro d\u00eda\u2026",
+      "label": "Contenedor horizontal de columnas que acepta soltar una columna arrastrada para\u2026",
       "file_type": "rationale",
-      "source_file": "calendar_view.py",
-      "source_location": "L35",
+      "source_file": "board_view.py",
+      "source_location": "L23",
       "_origin": "ast",
-      "id": "calendar_view_rationale_35",
+      "id": "board_view_rationale_23",
       "community": 32,
-      "community_name": ".__init__",
-      "norm_label": "chip de tarea en el calendario. se puede pulsar (abrir) o arrastrar a otro dia..."
-    },
-    {
-      "label": "Gu\u00eda detallada de suscripci\u00f3n por proveedor (texto del di\u00e1logo de Ajustes).",
-      "file_type": "rationale",
-      "source_file": "calendar_view.py",
-      "source_location": "L714",
-      "_origin": "ast",
-      "id": "calendar_view_rationale_714",
-      "community": 32,
-      "community_name": ".__init__",
-      "norm_label": "guia detallada de suscripcion por proveedor (texto del dialogo de ajustes)."
+      "community_name": "BoardColumnsArea",
+      "norm_label": "contenedor horizontal de columnas que acepta soltar una columna arrastrada para..."
     },
     {
       "label": "backups.py",
@@ -13420,9 +13420,9 @@
       "label": "Fuerza los iconos nativos de Win32 (WM_SETICON) directamente en el HWND de\u2026",
       "file_type": "rationale",
       "source_file": "main.py",
-      "source_location": "L525",
+      "source_location": "L545",
       "_origin": "ast",
-      "id": "main_rationale_525",
+      "id": "main_rationale_545",
       "community": 34,
       "community_name": "main.py",
       "norm_label": "fuerza los iconos nativos de win32 (wm_seticon) directamente en el hwnd de..."
@@ -15056,6 +15056,17 @@
       "norm_label": "popup emergente con las tareas atrasadas o que vencen hoy o manana, agrupadas...."
     },
     {
+      "label": "Abre el di\u00e1logo modal de exportaci\u00f3n (JSON/CSV/MD, todo o tablero activo).",
+      "file_type": "rationale",
+      "source_file": "sidebar.py",
+      "source_location": "L757",
+      "_origin": "ast",
+      "id": "sidebar_rationale_757",
+      "community": 54,
+      "community_name": "ExportDialog",
+      "norm_label": "abre el dialogo modal de exportacion (json/csv/md, todo o tablero activo)."
+    },
+    {
       "label": "CLAUDE.md",
       "file_type": "document",
       "source_file": ".claude/CLAUDE.md",
@@ -15133,15 +15144,48 @@
       "norm_label": "graphify"
     },
     {
-      "label": "Genera una cadena amigable para nombres de archivo.",
-      "file_type": "rationale",
-      "source_file": "export_dialog.py",
-      "source_location": "L26",
+      "label": "QFrame",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
       "_origin": "ast",
-      "id": "export_dialog_rationale_26",
+      "id": "calendar_view_py_qframe",
       "community": 56,
-      "community_name": "._do_export",
-      "norm_label": "genera una cadena amigable para nombres de archivo."
+      "community_name": ".__init__",
+      "norm_label": "qframe"
+    },
+    {
+      "label": "QWidget",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "id": "calendar_view_py_qwidget",
+      "community": 56,
+      "community_name": ".__init__",
+      "norm_label": "qwidget"
+    },
+    {
+      "label": "Chip de tarea en el calendario. Se puede pulsar (abrir) o arrastrar a otro d\u00eda\u2026",
+      "file_type": "rationale",
+      "source_file": "calendar_view.py",
+      "source_location": "L35",
+      "_origin": "ast",
+      "id": "calendar_view_rationale_35",
+      "community": 56,
+      "community_name": ".__init__",
+      "norm_label": "chip de tarea en el calendario. se puede pulsar (abrir) o arrastrar a otro dia..."
+    },
+    {
+      "label": "Gu\u00eda detallada de suscripci\u00f3n por proveedor (texto del di\u00e1logo de Ajustes).",
+      "file_type": "rationale",
+      "source_file": "calendar_view.py",
+      "source_location": "L714",
+      "_origin": "ast",
+      "id": "calendar_view_rationale_714",
+      "community": 56,
+      "community_name": ".__init__",
+      "norm_label": "guia detallada de suscripcion por proveedor (texto del dialogo de ajustes)."
     },
     {
       "label": "conftest.py",
@@ -15353,17 +15397,6 @@
       "norm_label": "board_view.py"
     },
     {
-      "label": "QDialog",
-      "file_type": "code",
-      "source_file": "",
-      "source_location": "",
-      "_origin": "ast",
-      "id": "board_view_py_qdialog",
-      "community": 60,
-      "community_name": "board_view.py",
-      "norm_label": "qdialog"
-    },
-    {
       "label": "sidebar.py",
       "file_type": "code",
       "source_file": "sidebar.py",
@@ -15408,28 +15441,6 @@
       "norm_label": "calcula el hash sha-256 de una cadena de texto o diccionario json."
     },
     {
-      "label": "Di\u00e1logo para seleccionar un tablero de destino para mover o copiar una columna.",
-      "file_type": "rationale",
-      "source_file": "board_view.py",
-      "source_location": "L123",
-      "_origin": "ast",
-      "id": "board_view_rationale_123",
-      "community": 60,
-      "community_name": "board_view.py",
-      "norm_label": "dialogo para seleccionar un tablero de destino para mover o copiar una columna."
-    },
-    {
-      "label": "Di\u00e1logo para crear o editar una columna (nombre y color).",
-      "file_type": "rationale",
-      "source_file": "board_view.py",
-      "source_location": "L68",
-      "_origin": "ast",
-      "id": "board_view_rationale_68",
-      "community": 60,
-      "community_name": "board_view.py",
-      "norm_label": "dialogo para crear o editar una columna (nombre y color)."
-    },
-    {
       "label": "QPixmap cuadrado (size x size) del icono Lucide `name`, trazado en `color`.",
       "file_type": "rationale",
       "source_file": "icons.py",
@@ -15450,6 +15461,17 @@
       "community": 60,
       "community_name": "board_view.py",
       "norm_label": "pequeno icono cuadrado del color indicado (para listar tareas por tablero)."
+    },
+    {
+      "label": "Registra deshacer/rehacer del borrado de un tablero (restaurar desde snapshot).",
+      "file_type": "rationale",
+      "source_file": "sidebar.py",
+      "source_location": "L906",
+      "_origin": "ast",
+      "id": "sidebar_rationale_906",
+      "community": 60,
+      "community_name": "board_view.py",
+      "norm_label": "registra deshacer/rehacer del borrado de un tablero (restaurar desde snapshot)."
     },
     {
       "label": "Pila simple de deshacer/rehacer para acciones destructivas (borrar\u2026",
@@ -16376,37 +16398,48 @@
       "norm_label": "verifica que un comentario multilinea tiene tamano vertical y no se colapsa."
     },
     {
-      "label": "QFrame",
-      "file_type": "code",
-      "source_file": "",
-      "source_location": "",
-      "_origin": "ast",
-      "id": "board_view_py_qframe",
-      "community": 73,
-      "community_name": "BoardColumnsArea",
-      "norm_label": "qframe"
-    },
-    {
-      "label": "QWidget",
-      "file_type": "code",
-      "source_file": "",
-      "source_location": "",
-      "_origin": "ast",
-      "id": "board_view_py_qwidget",
-      "community": 73,
-      "community_name": "BoardColumnsArea",
-      "norm_label": "qwidget"
-    },
-    {
-      "label": "Contenedor horizontal de columnas que acepta soltar una columna arrastrada para\u2026",
+      "label": "Aplica el tema (oscuro/claro) al vuelo. `reload` recarga el tablero para que\u2026",
       "file_type": "rationale",
-      "source_file": "board_view.py",
-      "source_location": "L23",
+      "source_file": "main.py",
+      "source_location": "L257",
       "_origin": "ast",
-      "id": "board_view_rationale_23",
+      "id": "main_rationale_257",
       "community": 73,
-      "community_name": "BoardColumnsArea",
-      "norm_label": "contenedor horizontal de columnas que acepta soltar una columna arrastrada para..."
+      "community_name": ".__init__",
+      "norm_label": "aplica el tema (oscuro/claro) al vuelo. `reload` recarga el tablero para que..."
+    },
+    {
+      "label": "Abre la pantalla de Ajustes (tema, notificaciones).",
+      "file_type": "rationale",
+      "source_file": "main.py",
+      "source_location": "L268",
+      "_origin": "ast",
+      "id": "main_rationale_268",
+      "community": 73,
+      "community_name": ".__init__",
+      "norm_label": "abre la pantalla de ajustes (tema, notificaciones)."
+    },
+    {
+      "label": "Crea el icono de bandeja (habilita toasts nativos de Windows).",
+      "file_type": "rationale",
+      "source_file": "main.py",
+      "source_location": "L368",
+      "_origin": "ast",
+      "id": "main_rationale_368",
+      "community": 73,
+      "community_name": ".__init__",
+      "norm_label": "crea el icono de bandeja (habilita toasts nativos de windows)."
+    },
+    {
+      "label": "Verifica si es la primera vez que se abre la app y crea datos de ejemplo.",
+      "file_type": "rationale",
+      "source_file": "main.py",
+      "source_location": "L516",
+      "_origin": "ast",
+      "id": "main_rationale_516",
+      "community": 73,
+      "community_name": ".__init__",
+      "norm_label": "verifica si es la primera vez que se abre la app y crea datos de ejemplo."
     },
     {
       "label": "sync.py",
@@ -16882,48 +16915,15 @@
       "norm_label": "limpia y vuelve a cargar todos los logs/entradas del diario."
     },
     {
-      "label": "Aplica el tema (oscuro/claro) al vuelo. `reload` recarga el tablero para que\u2026",
+      "label": "Celda de un d\u00eda del calendario: n\u00famero + chips de tareas que vencen ese d\u00eda.\u2026",
       "file_type": "rationale",
-      "source_file": "main.py",
-      "source_location": "L257",
+      "source_file": "calendar_view.py",
+      "source_location": "L68",
       "_origin": "ast",
-      "id": "main_rationale_257",
+      "id": "calendar_view_rationale_68",
       "community": 99,
-      "community_name": ".__init__",
-      "norm_label": "aplica el tema (oscuro/claro) al vuelo. `reload` recarga el tablero para que..."
-    },
-    {
-      "label": "Abre la pantalla de Ajustes (tema, notificaciones).",
-      "file_type": "rationale",
-      "source_file": "main.py",
-      "source_location": "L268",
-      "_origin": "ast",
-      "id": "main_rationale_268",
-      "community": 99,
-      "community_name": ".__init__",
-      "norm_label": "abre la pantalla de ajustes (tema, notificaciones)."
-    },
-    {
-      "label": "Crea el icono de bandeja (habilita toasts nativos de Windows).",
-      "file_type": "rationale",
-      "source_file": "main.py",
-      "source_location": "L368",
-      "_origin": "ast",
-      "id": "main_rationale_368",
-      "community": 99,
-      "community_name": ".__init__",
-      "norm_label": "crea el icono de bandeja (habilita toasts nativos de windows)."
-    },
-    {
-      "label": "Verifica si es la primera vez que se abre la app y crea datos de ejemplo.",
-      "file_type": "rationale",
-      "source_file": "main.py",
-      "source_location": "L496",
-      "_origin": "ast",
-      "id": "main_rationale_496",
-      "community": 99,
-      "community_name": ".__init__",
-      "norm_label": "verifica si es la primera vez que se abre la app y crea datos de ejemplo."
+      "community_name": "DayCell",
+      "norm_label": "celda de un dia del calendario: numero + chips de tareas que vencen ese dia...."
     },
     {
       "label": "create_log() Atomicity Fix (Fix 6)",
@@ -25314,7 +25314,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "main.py",
-      "source_location": "L549",
+      "source_location": "L569",
       "weight": 1.0,
       "_origin": "ast",
       "source": "main_main",
@@ -25326,7 +25326,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "main.py",
-      "source_location": "L550",
+      "source_location": "L570",
       "weight": 1.0,
       "_origin": "ast",
       "source": "main_main",
@@ -25338,7 +25338,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "main.py",
-      "source_location": "L555",
+      "source_location": "L575",
       "weight": 1.0,
       "_origin": "ast",
       "source": "main_main",
@@ -25350,7 +25350,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "main.py",
-      "source_location": "L557",
+      "source_location": "L577",
       "weight": 1.0,
       "_origin": "ast",
       "source": "main_main",
@@ -25363,7 +25363,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "main.py",
-      "source_location": "L466",
+      "source_location": "L478",
       "weight": 1.0,
       "_origin": "ast",
       "source": "main_mainwindow_check_for_updates",
@@ -25375,7 +25375,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "main.py",
-      "source_location": "L500",
+      "source_location": "L520",
       "weight": 1.0,
       "_origin": "ast",
       "source": "main_mainwindow_check_onboarding",
@@ -36453,7 +36453,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "main.py",
-      "source_location": "L524",
+      "source_location": "L544",
       "weight": 1.0,
       "_origin": "ast",
       "source": "main",
@@ -36464,7 +36464,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "main.py",
-      "source_location": "L547",
+      "source_location": "L567",
       "weight": 1.0,
       "_origin": "ast",
       "source": "main",
@@ -36607,7 +36607,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "strings.py",
-      "source_location": "L608",
+      "source_location": "L619",
       "weight": 1.0,
       "_origin": "ast",
       "source": "strings",
@@ -43185,7 +43185,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "main.py",
-      "source_location": "L495",
+      "source_location": "L515",
       "weight": 1.0,
       "_origin": "ast",
       "source": "main_mainwindow",
@@ -47464,10 +47464,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "main.py",
-      "source_location": "L496",
+      "source_location": "L516",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "main_rationale_496",
+      "source": "main_rationale_516",
       "target": "main_mainwindow_check_onboarding",
       "confidence_score": 1.0
     },
@@ -47486,10 +47486,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "main.py",
-      "source_location": "L525",
+      "source_location": "L545",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "main_rationale_525",
+      "source": "main_rationale_545",
       "target": "main_apply_win32_icon",
       "confidence_score": 1.0
     },
@@ -47882,10 +47882,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "strings.py",
-      "source_location": "L609",
+      "source_location": "L620",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "strings_rationale_609",
+      "source": "strings_rationale_620",
       "target": "strings_t",
       "confidence_score": 1.0
     },
@@ -52601,5 +52601,5 @@
       "source_file": ".agents/docs/archive/2026-08-07_hover_expand_crash_fix_and_shortcuts_button.md"
     }
   ],
-  "built_at_commit": "fbb858364478b9d69663198e48cbe8b6930bbf10"
+  "built_at_commit": "c27b3fe34ac4032c8795c2582a69dda8d4b8a45a"
 }

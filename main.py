@@ -433,61 +433,81 @@ class MainWindow(QMainWindow):
         self.sidebar.setVisible(not self.sidebar.isVisible())
 
     def check_for_updates(self):
-        """Verifica de forma silenciosa si hay actualizaciones en el repo de GitHub."""
+        """Verifica de forma silenciosa si hay actualizaciones en el repo de GitHub.
+
+        Endurecido: solo actúa sobre un checkout de git real, nunca hace pull sobre un
+        árbol de trabajo sucio (el directorio de ejecución contiene la base de datos y
+        las copias de seguridad del usuario) y solo reinicia si el pull tuvo éxito.
+        """
         try:
             startupinfo = None
             if os.name == 'nt':
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 startupinfo.wShowWindow = 0  # Ocultar ventana de comandos de cmd
-                
-            # 1. Ejecutar git fetch para actualizar referencias de forma silenciosa
-            subprocess.run(
-                ["git", "fetch", "origin"],
-                startupinfo=startupinfo,
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            
-            # 2. Ejecutar git status -uno para ver el estado local vs remoto
-            result = subprocess.run(
-                ["git", "status", "-uno"],
-                startupinfo=startupinfo,
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            
-            # Si la salida contiene "behind", significa que estamos desactualizados
-            if "behind" in result.stdout:
-                confirm = QMessageBox.question(
-                    self,
-                    t("main.update.available_title"),
-                    t("main.update.available_body"),
-                    QMessageBox.Yes | QMessageBox.No,
-                    QMessageBox.Yes
+
+            def _git(args, timeout):
+                return subprocess.run(
+                    ["git", *args],
+                    startupinfo=startupinfo,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
                 )
-                
-                if confirm == QMessageBox.Yes:
-                    # Ejecutar git pull origin main para descargar cambios
-                    subprocess.run(
-                        ["git", "pull", "origin", "main"],
-                        startupinfo=startupinfo,
-                        capture_output=True,
-                        text=True,
-                        timeout=15
-                    )
-                    
-                    QMessageBox.information(
-                        self,
-                        t("main.update.done_title"),
-                        t("main.update.done_body")
-                    )
-                    
-                    # Reiniciar el script actual de python (execv solo retorna si falla,
-                    # lo que cae al except de abajo; en éxito reemplaza el proceso entero)
-                    os.execv(sys.executable, [sys.executable] + sys.argv)
+
+            # 0. Actuar solo si esto es realmente un checkout de git (no un ejecutable empaquetado).
+            inside = _git(["rev-parse", "--is-inside-work-tree"], 5)
+            if inside.returncode != 0 or inside.stdout.strip() != "true":
+                return
+
+            # 1. Actualizar referencias remotas de forma silenciosa.
+            if _git(["fetch", "origin"], 5).returncode != 0:
+                return
+
+            # 2. Comprobar si el checkout local está por detrás del remoto.
+            status = _git(["status", "-uno"], 5)
+            if status.returncode != 0 or "behind" not in status.stdout:
+                return
+
+            # 3. Nunca hacer pull sobre un árbol de trabajo sucio: git pull abortaría y el
+            #    directorio de ejecución es también la BD/backups del usuario. Avisar y salir.
+            dirty = _git(["status", "--porcelain"], 5)
+            if dirty.returncode != 0 or dirty.stdout.strip():
+                QMessageBox.information(
+                    self,
+                    t("main.update.dirty_title"),
+                    t("main.update.dirty_body"),
+                )
+                return
+
+            confirm = QMessageBox.question(
+                self,
+                t("main.update.available_title"),
+                t("main.update.available_body"),
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            if confirm != QMessageBox.Yes:
+                return
+
+            # 4. Solo fast-forward: falla limpiamente si no se puede avanzar sin fusionar.
+            pull = _git(["pull", "--ff-only", "origin", "main"], 15)
+            if pull.returncode != 0:
+                QMessageBox.warning(
+                    self,
+                    t("main.update.failed_title"),
+                    t("main.update.failed_body"),
+                )
+                return
+
+            QMessageBox.information(
+                self,
+                t("main.update.done_title"),
+                t("main.update.done_body")
+            )
+
+            # Reiniciar solo tras un pull exitoso (execv reemplaza el proceso entero).
+            os.execv(sys.executable, [sys.executable] + sys.argv)
         except Exception as e:
             # Fallar en silencio si no hay conexión o no es una instalación Git
             print(f"Error al comprobar actualizaciones: {e}")

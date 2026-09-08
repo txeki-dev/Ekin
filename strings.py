@@ -23,6 +23,17 @@ STRINGS = {
     ),
     "main.update.done_title": "Updated",
     "main.update.done_body": "The app updated successfully. It will restart now.",
+    "main.update.dirty_title": "Update available",
+    "main.update.dirty_body": (
+        "A new version is available, but there are uncommitted local changes in the "
+        "app folder. The automatic update was skipped to protect your data — please "
+        "update manually with 'git pull'."
+    ),
+    "main.update.failed_title": "Update failed",
+    "main.update.failed_body": (
+        "The update could not be applied automatically. Your data is untouched — "
+        "please update manually with 'git pull'."
+    ),
     "main.onboarding.board_name": "My First Board",
     "main.onboarding.col_todo": "To do",
     "main.onboarding.col_doing": "In progress",
