@@ -1,7 +1,7 @@
 {
   ".claude/settings.local.json": {
     "mtime": 1785338761.0323222,
-    "ast_hash": "",
+    "ast_hash": "6e617c27d42818e94811485c0ad4d667",
     "semantic_hash": ""
   },
   ".github/scripts/extract_release_notes.py": {
