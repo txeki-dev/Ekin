@@ -1743,10 +1743,51 @@ def test_warm_syntax_highlighting_style():
     assert "#2e2b25" in html_code
 
 
+def test_sidebar_anchors_logo_path(qapp, db_path):
+    """Verifica que SidebarWidget localiza el logo de la aplicación anclado a _APP_DIR."""
+    import os
+    from sidebar import SidebarWidget, _APP_DIR
+    sb = SidebarWidget(db_path=db_path)
+    assert os.path.exists(os.path.join(_APP_DIR, "ekin_icon.png"))
+    labels = sb.findChildren(QLabel)
+    logo_labels = [lbl for lbl in labels if lbl.pixmap() is not None and not lbl.pixmap().isNull()]
+    assert len(logo_labels) >= 1
 
 
+def test_secondary_dialogs_schedule_delete_later_on_finished(qapp, db_path):
+    """Verifica que los diálogos secundarios conectan deleteLater al emitir finished para no fugar memoria."""
+    from PySide6.QtCore import QEvent
+    from settings_dialog import SettingsDialog
+    from bulk_add_dialog import BulkAddTaskDialog
+    from shortcuts_dialog import ShortcutsDialog
+    from cloud_sync_dialog import CloudSyncInfoDialog
+    import database
 
+    parent = QWidget()
 
+    b_id = database.create_board("Test Board", db_path=db_path)
+    database.create_column(b_id, "Col", db_path=db_path)
 
+    dlg_settings = SettingsDialog(db_path, parent=parent)
+    assert dlg_settings in parent.children()
+    dlg_settings.accept()
+    qapp.sendPostedEvents(None, QEvent.DeferredDelete)
+    assert dlg_settings not in parent.children()
 
+    dlg_bulk = BulkAddTaskDialog(b_id, db_path=db_path, parent=parent)
+    assert dlg_bulk in parent.children()
+    dlg_bulk.reject()
+    qapp.sendPostedEvents(None, QEvent.DeferredDelete)
+    assert dlg_bulk not in parent.children()
 
+    dlg_shortcuts = ShortcutsDialog(parent=parent)
+    assert dlg_shortcuts in parent.children()
+    dlg_shortcuts.accept()
+    qapp.sendPostedEvents(None, QEvent.DeferredDelete)
+    assert dlg_shortcuts not in parent.children()
+
+    dlg_sync = CloudSyncInfoDialog(parent=parent)
+    assert dlg_sync in parent.children()
+    dlg_sync.reject()
+    qapp.sendPostedEvents(None, QEvent.DeferredDelete)
+    assert dlg_sync not in parent.children()

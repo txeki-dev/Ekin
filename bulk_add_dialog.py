@@ -19,6 +19,8 @@ class BulkAddTaskDialog(QDialog):
     """Diálogo modal con tabla para crear múltiples tareas simultáneamente."""
     def __init__(self, board_id: int, db_path=database.DB_NAME, initial_column_id=None, parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.finished.connect(self.deleteLater)
         self.board_id = board_id
         self.db_path = db_path
         self.initial_column_id = initial_column_id

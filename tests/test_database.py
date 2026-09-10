@@ -1107,3 +1107,113 @@ def test_create_tasks_batch(db_path):
     assert tasks_c2_after[1]["due_date"] == "2026-10-01"
 
 
+def test_copy_operations_generate_uuids(db_path):
+    """Verifica que duplicar/copiar columnas y tableros genera UUIDs válidos y distintos."""
+    b1 = database.create_board("Board 1", db_path=db_path)
+    c1 = database.create_column(b1, "Col 1", db_path=db_path)
+    t1 = database.create_task(c1, "Task 1", db_path=db_path)
+
+    orig_board = database.get_board(b1, db_path)
+    orig_col = database.get_column(c1, db_path)
+    orig_task = database.get_task(t1, db_path)
+
+    # 1. Copiar columna a otro tablero
+    b2 = database.create_board("Board 2", db_path=db_path)
+    copied_col_id = database.copy_column_to_board(c1, b2, db_path=db_path)
+    copied_col = database.get_column(copied_col_id, db_path)
+
+    assert copied_col["column_uuid"] is not None
+    assert len(copied_col["column_uuid"]) == 36
+    assert copied_col["column_uuid"] != orig_col["column_uuid"]
+
+    copied_tasks = database.get_tasks(copied_col_id, db_path=db_path)
+    assert len(copied_tasks) == 1
+    assert copied_tasks[0]["task_uuid"] is not None
+    assert len(copied_tasks[0]["task_uuid"]) == 36
+    assert copied_tasks[0]["task_uuid"] != orig_task["task_uuid"]
+
+    # 2. Copiar tablero completo
+    copied_b_id = database.copy_board(b1, "Board 1 Copy", "#10b981", db_path=db_path)
+    copied_board = database.get_board(copied_b_id, db_path)
+
+    assert copied_board["board_uuid"] is not None
+    assert len(copied_board["board_uuid"]) == 36
+    assert copied_board["board_uuid"] != orig_board["board_uuid"]
+
+    copied_b_cols = database.get_columns(copied_b_id, db_path)
+    assert len(copied_b_cols) == 1
+    assert copied_b_cols[0]["column_uuid"] is not None
+    assert copied_b_cols[0]["column_uuid"] != orig_col["column_uuid"]
+
+    copied_b_tasks = database.get_tasks(copied_b_cols[0]["id"], db_path)
+    assert len(copied_b_tasks) == 1
+    assert copied_b_tasks[0]["task_uuid"] is not None
+    assert copied_b_tasks[0]["task_uuid"] != orig_task["task_uuid"]
+
+
+def test_save_task_full_atomic_update(db_path):
+    """Verifica que save_task_full actualiza todos los atributos atómicamente e incrementa la versión una sola vez."""
+    b_id = database.create_board("Board Primary", db_path=db_path)
+    b_linked = database.create_board("Linked Board", db_path=db_path)
+    c_id = database.create_column(b_id, "Column", db_path=db_path)
+    t_id = database.create_task(c_id, "Initial Title", description="Initial Desc", db_path=db_path)
+
+    t_initial = database.get_task(t_id, db_path)
+    assert t_initial["version"] == 1
+
+    tag1 = database.get_or_create_tag_value("Status", "In Review", "#3b82f6", db_path)
+    tag2 = database.get_or_create_tag_value("Priority", "Urgent", "#ef4444", db_path)
+
+    database.save_task_full(
+        t_id,
+        title="Updated Title",
+        description="Updated Desc",
+        due_date="2026-10-15",
+        due_time="14:30",
+        tag_value_ids=[tag1, tag2],
+        recurrence="weekly",
+        linked_board_id=b_linked,
+        db_path=db_path,
+    )
+
+    t_saved = database.get_task(t_id, db_path)
+    assert t_saved["title"] == "Updated Title"
+    assert t_saved["description"] == "Updated Desc"
+    assert t_saved["due_date"] == "2026-10-15"
+    assert t_saved["due_time"] == "14:30"
+    assert t_saved["recurrence"] == "weekly"
+    assert t_saved["linked_board_id"] == b_linked
+    assert t_saved["version"] == 2  # Exactly 1 increment, not 5!
+
+    tags = database.get_task_tags(t_id, db_path)
+    tag_ids = {t["tag_value_id"] for t in tags}
+    assert tag_ids == {tag1, tag2}
+
+
+def test_snapshot_and_restore_board_single_connection(db_path):
+    """Verifica que snapshot_board y restore_board funcionan correctamente con una conexión reutilizada (evitando N+1 conexiones)."""
+    b_id = database.create_board("Board to Snapshot", db_path=db_path)
+    c1 = database.create_column(b_id, "Col 1", db_path=db_path)
+    c2 = database.create_column(b_id, "Col 2", db_path=db_path)
+    t1 = database.create_task(c1, "Task 1", db_path=db_path)
+    t2 = database.create_task(c2, "Task 2", db_path=db_path)
+    database.create_log(t1, "Log 1", db_path=db_path)
+    database.add_task_link(t2, "https://example.com", "Example", db_path=db_path)
+
+    with database.get_connection(db_path) as conn:
+        snap = database.snapshot_board(b_id, conn=conn)
+        assert snap is not None
+        assert snap["name"] == "Board to Snapshot"
+        assert len(snap["columns"]) == 2
+        assert len(snap["columns"][0]["tasks"]) == 1
+        assert len(snap["columns"][1]["tasks"]) == 1
+
+        restored_b_id = database.restore_board(snap, conn=conn)
+        assert restored_b_id is not None
+        assert restored_b_id != b_id
+
+    restored_cols = database.get_columns(restored_b_id, db_path=db_path)
+    assert len(restored_cols) == 2
+    restored_tasks_c1 = database.get_tasks(restored_cols[0]["id"], db_path=db_path)
+    assert len(restored_tasks_c1) == 1
+    assert restored_tasks_c1[0]["title"] == "Task 1"

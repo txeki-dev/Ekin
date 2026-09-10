@@ -12,6 +12,8 @@ from strings import t
 class ShortcutsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.finished.connect(self.deleteLater)
         self.setWindowTitle(t("shortcuts.window_title"))
         self.setMinimumWidth(460)
         self.resize(460, 520)

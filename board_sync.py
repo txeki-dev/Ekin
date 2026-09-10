@@ -66,13 +66,39 @@ def calculate_content_hash(data_or_text) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def calculate_file_hash(file_path: str) -> str:
-    """Calcula el hash SHA-256 de un archivo en disco."""
+def calculate_file_hash(file_path: str, max_attempts: int = 4) -> str:
+    """Calcula el hash SHA-256 de un archivo en disco con reintentos para mitigar bloqueos temporales."""
     hasher = hashlib.sha256()
-    with open(file_path, "rb") as f:
-        while chunk := f.read(65536):
-            hasher.update(chunk)
-    return hasher.hexdigest()
+    last_err = None
+    for attempt in range(max_attempts):
+        try:
+            with open(file_path, "rb") as f:
+                while chunk := f.read(65536):
+                    hasher.update(chunk)
+            return hasher.hexdigest()
+        except (PermissionError, OSError) as pe:
+            last_err = pe
+            hasher = hashlib.sha256()
+            time.sleep(0.05 * (2 ** attempt))
+    if last_err is not None:
+        raise last_err
+    return ""
+
+
+def read_sync_file_with_retry(file_path: str, max_attempts: int = 4) -> dict:
+    """Lee y deserializa un archivo .ekboard con reintentos para mitigar bloqueos temporales
+    de OneDrive o antivirus en Windows."""
+    last_err = None
+    for attempt in range(max_attempts):
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (PermissionError, OSError) as pe:
+            last_err = pe
+            time.sleep(0.05 * (2 ** attempt))
+    if last_err is not None:
+        raise last_err
+    return {}
 
 
 def now_utc_iso() -> str:
@@ -125,11 +151,14 @@ def export_board_to_sync_dict(board_id: int, db_path=None) -> dict:
             # Extraer etiquetas formateadas
             tags_list = []
             for tag in t.get("tags", []):
-                tags_list.append({
-                    "category": tag.get("category_name", "General"),
-                    "value": tag.get("text", ""),
-                    "color": tag.get("color", "#6b7280"),
-                })
+                cat = (tag.get("category") or tag.get("category_name") or "General").strip()
+                val = (tag.get("value") or tag.get("text") or "").strip()
+                if val:
+                    tags_list.append({
+                        "category": cat,
+                        "value": val,
+                        "color": tag.get("color", "#6b7280") or "#6b7280",
+                    })
 
             # Extraer enlaces
             links_list = []
@@ -297,18 +326,23 @@ def sync_board_with_file(board_id: int, file_path: str = None, db_path=None) -> 
         )
 
     # --- CASO B: El archivo compartido existe -> Comprobar hash y diferencias ---
-    current_file_hash = calculate_file_hash(target_path)
-
-    with open(target_path, "r", encoding="utf-8") as f:
-        try:
-            remote_data = json.load(f)
-        except Exception as e:
-            return SyncResult(
-                status="error",
-                board_id=board_id,
-                file_path=target_path,
-                message=f"El archivo compartido está dañado o no es un JSON válido: {e}",
-            )
+    try:
+        current_file_hash = calculate_file_hash(target_path)
+        remote_data = read_sync_file_with_retry(target_path)
+    except (PermissionError, OSError) as pe:
+        return SyncResult(
+            status="error",
+            board_id=board_id,
+            file_path=target_path,
+            message=f"No se pudo acceder al archivo compartido (bloqueado por otro proceso): {pe}",
+        )
+    except Exception as e:
+        return SyncResult(
+            status="error",
+            board_id=board_id,
+            file_path=target_path,
+            message=f"El archivo compartido está dañado o no es un JSON válido: {e}",
+        )
 
     remote_uuid = remote_data.get("board_uuid")
     if board_uuid and remote_uuid and board_uuid != remote_uuid:
@@ -740,6 +774,68 @@ def _merge_task_sub_entities(cursor, task_id: int, r_task: dict):
             )
             existing_links.add(url)
 
+    # 3. Tags: asociar las etiquetas remotas que no existan en la tarea local
+    cursor.execute(
+        """SELECT LOWER(tc.name), LOWER(tv.value)
+           FROM task_tags tt
+           JOIN tag_values tv ON tt.tag_value_id = tv.id
+           JOIN tag_categories tc ON tv.category_id = tc.id
+           WHERE tt.task_id = ?""",
+        (task_id,)
+    )
+    existing_tags = {(row[0], row[1]) for row in cursor.fetchall()}
+
+    remote_tags = r_task.get("tags", [])
+    if not remote_tags and r_task.get("tag_text"):
+        remote_tags = [{
+            "category": "General",
+            "value": r_task["tag_text"],
+            "color": r_task.get("tag_color", "#6b7280"),
+        }]
+
+    for tag_item in remote_tags:
+        cat_name = (tag_item.get("category") or tag_item.get("category_name") or "General").strip()
+        val_text = (tag_item.get("value") or tag_item.get("text") or "").strip()
+        color = (tag_item.get("color") or "#6b7280").strip()
+
+        if not val_text:
+            continue
+
+        tag_key = (cat_name.lower(), val_text.lower())
+        if tag_key in existing_tags:
+            continue
+
+        # Obtener o crear la categoría
+        cursor.execute("SELECT id FROM tag_categories WHERE LOWER(name) = LOWER(?)", (cat_name,))
+        cat_row = cursor.fetchone()
+        if cat_row:
+            cat_id = cat_row[0]
+        else:
+            cursor.execute("INSERT INTO tag_categories (name) VALUES (?)", (cat_name,))
+            cat_id = cursor.lastrowid
+
+        # Obtener o crear el valor de la etiqueta
+        cursor.execute(
+            "SELECT id FROM tag_values WHERE category_id = ? AND LOWER(value) = LOWER(?)",
+            (cat_id, val_text)
+        )
+        val_row = cursor.fetchone()
+        if val_row:
+            tag_val_id = val_row[0]
+        else:
+            cursor.execute(
+                "INSERT INTO tag_values (category_id, value, color) VALUES (?, ?, ?)",
+                (cat_id, val_text, color)
+            )
+            tag_val_id = cursor.lastrowid
+
+        # Asociar la etiqueta a la tarea
+        cursor.execute(
+            "INSERT INTO task_tags (task_id, tag_value_id, text, color) VALUES (?, ?, ?, ?)",
+            (task_id, tag_val_id, val_text, color)
+        )
+        existing_tags.add(tag_key)
+
 
 def connect_shared_board_from_file(file_path: str, db_path=None):
     """Carga y conecta a la base de datos local un tablero sincronizado existente (.ekboard)
@@ -754,8 +850,12 @@ def connect_shared_board_from_file(file_path: str, db_path=None):
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"El archivo compartido no existe: {file_path}")
 
-    with open(file_path, "r", encoding="utf-8") as f:
-        remote_data = json.load(f)
+    try:
+        remote_data = read_sync_file_with_retry(file_path)
+    except (PermissionError, OSError) as pe:
+        raise PermissionError(f"No se pudo acceder al archivo compartido (bloqueado por otro proceso): {pe}")
+    except Exception as e:
+        raise ValueError(f"El archivo compartido no es un JSON válido: {e}")
 
     b_uuid = remote_data.get("board_uuid")
     if not b_uuid:

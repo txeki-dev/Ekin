@@ -19,6 +19,7 @@ import urllib.request
 import urllib.error
 import atexit
 import subprocess
+import zipfile
 from typing import Optional, Generator, Callable
 from PySide6.QtCore import QThread, Signal
 
@@ -32,13 +33,22 @@ MODEL_PATH = os.path.join(DEFAULT_MODEL_DIR, MODEL_FILENAME)
 RUNNER_EXE_NAME = "llama-server.exe" if sys.platform == "win32" else "llama-server"
 RUNNER_PATH = os.path.join(DEFAULT_RUNNER_DIR, RUNNER_EXE_NAME)
 
+
+def get_runner_download_url() -> str:
+    """Devuelve la URL oficial de descarga del binario portable de llama-server según la plataforma."""
+    if sys.platform == "win32":
+        return "https://github.com/ggerganov/llama.cpp/releases/download/b3900/llama-b3900-bin-win-avx2-x64.zip"
+    elif sys.platform == "darwin":
+        return "https://github.com/ggerganov/llama.cpp/releases/download/b3900/llama-b3900-bin-macos-arm64.zip"
+    else:
+        return "https://github.com/ggerganov/llama.cpp/releases/download/b3900/llama-b3900-bin-ubuntu-x64.zip"
+
+
 # URLs oficiales
 MODEL_DOWNLOAD_URL = (
     "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"
 )
-RUNNER_DOWNLOAD_URL = (
-    "https://github.com/ggerganov/llama.cpp/releases/download/b3900/llama-b3900-bin-win-avx2-x64.zip"
-)
+RUNNER_DOWNLOAD_URL = get_runner_download_url()
 
 MANAGED_SERVER_PORT = 28192
 
@@ -509,13 +519,90 @@ def stream_openai_chat_completion(
                 continue
 
 
-class ModelDownloadThread(QThread):
-    """Hilo para descargar en segundo plano el modelo Qwen 2.5 Coder con reporte de progreso."""
+def download_and_extract_runner(
+    runner_url: Optional[str] = None,
+    runner_dir: Optional[str] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
+    progress_callback: Optional[Callable[[int, float, str], None]] = None,
+) -> tuple[bool, str]:
+    """Descarga y extrae el ejecutable portable de llama-server en runner_dir."""
+    url = runner_url or get_runner_download_url()
+    target_dir = runner_dir or DEFAULT_RUNNER_DIR
+    os.makedirs(target_dir, exist_ok=True)
+    temp_zip = os.path.join(target_dir, ".llama_runner.zip")
+
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) EkinKanban/1.0"}
+        )
+        with urllib.request.urlopen(req, timeout=30.0) as response:
+            total_bytes = int(response.headers.get("Content-Length", 0))
+            downloaded = 0
+            start_time = time.time()
+            last_update = start_time
+            chunk_size = 1024 * 256  # 256 KB
+
+            with open(temp_zip, "wb") as out_file:
+                while True:
+                    if cancel_check and cancel_check():
+                        out_file.close()
+                        if os.path.exists(temp_zip):
+                            os.remove(temp_zip)
+                        return False, "Descarga de runner cancelada."
+
+                    chunk = response.read(chunk_size)
+                    if not chunk:
+                        break
+                    out_file.write(chunk)
+                    downloaded += len(chunk)
+
+                    now = time.time()
+                    if progress_callback and (now - last_update >= 0.4 or downloaded == total_bytes):
+                        elapsed = now - start_time
+                        speed_mb = (downloaded / (1024 * 1024)) / elapsed if elapsed > 0 else 0.0
+                        percent = int((downloaded / total_bytes) * 100) if total_bytes > 0 else 0
+                        remaining_bytes = max(0, total_bytes - downloaded)
+                        eta_sec = int(remaining_bytes / (speed_mb * 1024 * 1024)) if speed_mb > 0 else 0
+                        eta_str = f"{eta_sec // 60}m {eta_sec % 60}s" if eta_sec >= 60 else f"{eta_sec}s"
+                        progress_callback(percent, speed_mb, eta_str)
+                        last_update = now
+
+        # Extraer el archivo ZIP en target_dir
+        with zipfile.ZipFile(temp_zip, "r") as zf:
+            zf.extractall(target_dir)
+
+        if os.path.exists(temp_zip):
+            os.remove(temp_zip)
+
+        # En sistemas Unix/macOS asegurar permisos de ejecución
+        if sys.platform != "win32" and os.path.exists(RUNNER_PATH):
+            try:
+                os.chmod(RUNNER_PATH, os.stat(RUNNER_PATH).st_mode | 0o755)
+            except Exception:
+                pass
+
+        if progress_callback:
+            progress_callback(100, 0.0, "Completado")
+        return True, "Runner descargado e instalado con éxito."
+    except Exception as e:
+        if os.path.exists(temp_zip):
+            try:
+                os.remove(temp_zip)
+            except Exception:
+                pass
+        return False, f"Error durante la descarga del runner: {e}"
+
+
+class RunnerDownloadThread(QThread):
+    """Hilo para descargar y extraer en segundo plano el ejecutable portable de llama-server."""
     progress = Signal(int, float, str)  # porcentaje, velocidad_mb_s, tiempo_restante_str
     download_finished = Signal(bool, str)  # exito, mensaje
 
-    def __init__(self, parent=None):
+    def __init__(self, runner_url: Optional[str] = None, runner_dir: Optional[str] = None, parent=None):
         super().__init__(parent)
+        self.runner_url = runner_url
+        self.runner_dir = runner_dir
         self._is_cancelled = False
 
     def cancel(self):
@@ -523,6 +610,42 @@ class ModelDownloadThread(QThread):
 
     def run(self):
         ensure_directories()
+        success, msg = download_and_extract_runner(
+            runner_url=self.runner_url,
+            runner_dir=self.runner_dir,
+            cancel_check=lambda: self._is_cancelled,
+            progress_callback=lambda p, s, eta: self.progress.emit(p, s, eta),
+        )
+        self.download_finished.emit(success, msg)
+
+
+class ModelDownloadThread(QThread):
+    """Hilo para descargar en segundo plano el modelo Qwen 2.5 Coder con reporte de progreso."""
+    progress = Signal(int, float, str)  # porcentaje, velocidad_mb_s, tiempo_restante_str
+    download_finished = Signal(bool, str)  # exito, mensaje
+
+    def __init__(self, include_runner: bool = False, parent=None):
+        super().__init__(parent)
+        self.include_runner = include_runner
+        self._is_cancelled = False
+
+    def cancel(self):
+        self._is_cancelled = True
+
+    def run(self):
+        ensure_directories()
+
+        # 1. Si se solicita incluir runner y no está instalado, descargarlo primero
+        if self.include_runner and not is_runner_installed():
+            self.progress.emit(0, 0.0, "Descargando motor llama-server...")
+            success, msg = download_and_extract_runner(
+                cancel_check=lambda: self._is_cancelled,
+                progress_callback=lambda p, s, eta: self.progress.emit(int(p * 0.15), s, f"Motor: {eta}"),
+            )
+            if not success:
+                self.download_finished.emit(False, msg)
+                return
+
         target_path = MODEL_PATH
         temp_path = MODEL_PATH + ".part"
 
@@ -558,7 +681,8 @@ class ModelDownloadThread(QThread):
                         if now - last_update >= 0.4:
                             elapsed = now - start_time
                             speed_mb = (downloaded / (1024 * 1024)) / elapsed if elapsed > 0 else 0.0
-                            percent = int((downloaded / total_bytes) * 100) if total_bytes > 0 else 0
+                            raw_percent = int((downloaded / total_bytes) * 100) if total_bytes > 0 else 0
+                            percent = int(15 + raw_percent * 0.85) if self.include_runner else raw_percent
                             remaining_bytes = max(0, total_bytes - downloaded)
                             eta_sec = int(remaining_bytes / (speed_mb * 1024 * 1024)) if speed_mb > 0 else 0
                             eta_str = f"{eta_sec // 60}m {eta_sec % 60}s" if eta_sec >= 60 else f"{eta_sec}s"

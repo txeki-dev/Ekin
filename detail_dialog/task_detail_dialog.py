@@ -721,22 +721,22 @@ class TaskDetailDialog(QDialog):
             if self.due_time_chk.isChecked():
                 due_time = self.due_time_edit.time().toString("HH:mm")
 
-        # Guardar tarea principal (las columnas tag_text/tag_color quedan sin uso: las etiquetas
-        # estructuradas viven en task_tags/tag_values)
-        database.update_task(self.task_id, title, description, "", "#6b7280", due_date, self.db_path)
-        database.set_task_due_time(self.task_id, due_time, self.db_path)
-
-        # Guardar las etiquetas asignadas
+        # Guardar atómicamente todos los atributos de la tarea en una sola transacción
         tag_value_ids = [tag["tag_value_id"] for tag in self.current_tags]
-        database.set_task_tags(self.task_id, tag_value_ids, self.db_path)
+        recurrence_val = self._recurrence_values[self.recurrence_combo.currentIndex()]
+        linked_board_val = self.linked_board_combo.currentData()
 
-        # Guardar la recurrencia
-        database.set_task_recurrence(
-            self.task_id, self._recurrence_values[self.recurrence_combo.currentIndex()], self.db_path
+        database.save_task_full(
+            self.task_id,
+            title=title,
+            description=description,
+            due_date=due_date,
+            due_time=due_time,
+            tag_value_ids=tag_value_ids,
+            recurrence=recurrence_val,
+            linked_board_id=linked_board_val,
+            db_path=self.db_path,
         )
-
-        # Guardar el tablero vinculado
-        database.set_task_linked_board(self.task_id, self.linked_board_combo.currentData(), self.db_path)
 
         self._update_notes_last_edited_label(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         self.modified = True

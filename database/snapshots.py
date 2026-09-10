@@ -6,11 +6,6 @@ no romper la sincronización con OneDrive (.ekboard).
 
 import uuid
 from .connection import get_connection
-from .tasks import get_task, get_tasks
-from .logs import get_logs
-from .links import get_task_links
-from .boards import get_board
-from .columns import get_columns
 
 __all__ = [
     "snapshot_task", "restore_task", "snapshot_column", "restore_column",
@@ -20,12 +15,37 @@ __all__ = [
 
 # --- SNAPSHOT / RESTORE (para deshacer borrados) ---
 
-def snapshot_task(task_id, db_path=None):
-    """Captura todo el contenido de una tarea para poder recrearla (deshacer),
-    incluyendo su identidad global (task_uuid) para mantener compatibilidad con sincronización."""
-    task = get_task(task_id, db_path)
-    if not task:
+def _snapshot_task_in_conn(task_id, conn):
+    cur = conn.cursor()
+    cur.execute(
+        """SELECT column_id, title, description, position, due_date, due_time,
+                  recurrence, linked_board_id, timer_started_at, task_uuid
+           FROM tasks WHERE id = ?""",
+        (task_id,)
+    )
+    row = cur.fetchone()
+    if not row:
         return None
+    task = dict(row)
+
+    cur.execute(
+        "SELECT tag_value_id FROM task_tags WHERE task_id = ? AND tag_value_id IS NOT NULL",
+        (task_id,)
+    )
+    tag_value_ids = [r[0] for r in cur.fetchall()]
+
+    cur.execute(
+        "SELECT content, created_at FROM task_logs WHERE task_id = ? ORDER BY id ASC",
+        (task_id,)
+    )
+    logs = [{"content": r[0], "created_at": r[1]} for r in cur.fetchall()]
+
+    cur.execute(
+        "SELECT url, label, position FROM task_links WHERE task_id = ? ORDER BY position ASC",
+        (task_id,)
+    )
+    links = [{"url": r[0], "label": r[1], "position": r[2]} for r in cur.fetchall()]
+
     return {
         "column_id": task["column_id"],
         "title": task["title"],
@@ -33,16 +53,23 @@ def snapshot_task(task_id, db_path=None):
         "position": task["position"],
         "due_date": task.get("due_date"),
         "due_time": task.get("due_time"),
-        "recurrence": task.get("recurrence", "none"),
+        "recurrence": task.get("recurrence", "none") or "none",
         "linked_board_id": task.get("linked_board_id"),
         "timer_started_at": task.get("timer_started_at"),
         "task_uuid": task.get("task_uuid"),
-        "tag_value_ids": [t["tag_value_id"] for t in task.get("tags", [])],
-        "logs": [{"content": lg["content"], "created_at": lg["created_at"]}
-                 for lg in get_logs(task_id, db_path)],
-        "links": [{"url": lk["url"], "label": lk["label"], "position": lk["position"]}
-                  for lk in get_task_links(task_id, db_path)],
+        "tag_value_ids": tag_value_ids,
+        "logs": logs,
+        "links": links,
     }
+
+
+def snapshot_task(task_id, db_path=None, conn=None):
+    """Captura todo el contenido de una tarea para poder recrearla (deshacer),
+    incluyendo su identidad global (task_uuid) para mantener compatibilidad con sincronización."""
+    if conn is not None:
+        return _snapshot_task_in_conn(task_id, conn)
+    with get_connection(db_path) as c:
+        return _snapshot_task_in_conn(task_id, c)
 
 
 def _restore_task_in_conn(snap, column_id, conn):
@@ -102,16 +129,24 @@ def restore_task(snap, column_id=None, db_path=None, conn=None):
         return _restore_task_in_conn(snap, column_id, c)
 
 
-def snapshot_column(column_id, db_path=None):
-    with get_connection(db_path) as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT board_id, name, color, position, collapsed, column_uuid FROM columns WHERE id = ?", (column_id,))
-        row = cursor.fetchone()
+def _snapshot_column_in_conn(column_id, conn):
+    cur = conn.cursor()
+    cur.execute("SELECT board_id, name, color, position, collapsed, column_uuid FROM columns WHERE id = ?", (column_id,))
+    row = cur.fetchone()
     if not row:
         return None
     snap = dict(row)
-    snap["tasks"] = [snapshot_task(t["id"], db_path) for t in get_tasks(column_id, db_path)]
+    cur.execute("SELECT id FROM tasks WHERE column_id = ? ORDER BY position ASC", (column_id,))
+    task_ids = [r[0] for r in cur.fetchall()]
+    snap["tasks"] = [_snapshot_task_in_conn(tid, conn) for tid in task_ids]
     return snap
+
+
+def snapshot_column(column_id, db_path=None, conn=None):
+    if conn is not None:
+        return _snapshot_column_in_conn(column_id, conn)
+    with get_connection(db_path) as conn_ctx:
+        return _snapshot_column_in_conn(column_id, conn_ctx)
 
 
 def _restore_column_in_conn(snap, board_id, conn):
@@ -141,18 +176,30 @@ def restore_column(snap, board_id=None, db_path=None, conn=None):
         return _restore_column_in_conn(snap, board_id, c)
 
 
-def snapshot_board(board_id, db_path=None):
-    board = get_board(board_id, db_path)
-    if not board:
+def _snapshot_board_in_conn(board_id, conn):
+    cur = conn.cursor()
+    cur.execute("SELECT id, name, color, archived, board_uuid, sync_path FROM boards WHERE id = ?", (board_id,))
+    row = cur.fetchone()
+    if not row:
         return None
+    board = dict(row)
+    cur.execute("SELECT id FROM columns WHERE board_id = ? ORDER BY position ASC", (board_id,))
+    col_ids = [r[0] for r in cur.fetchall()]
     return {
         "name": board["name"],
         "color": board["color"],
         "archived": board.get("archived", 0),
         "board_uuid": board.get("board_uuid"),
         "sync_path": board.get("sync_path"),
-        "columns": [snapshot_column(c["id"], db_path) for c in get_columns(board_id, db_path)],
+        "columns": [_snapshot_column_in_conn(cid, conn) for cid in col_ids],
     }
+
+
+def snapshot_board(board_id, db_path=None, conn=None):
+    if conn is not None:
+        return _snapshot_board_in_conn(board_id, conn)
+    with get_connection(db_path) as c:
+        return _snapshot_board_in_conn(board_id, c)
 
 
 def _restore_board_in_conn(snap, conn):

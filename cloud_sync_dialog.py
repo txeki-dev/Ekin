@@ -1,4 +1,4 @@
-﻿"""
+"""
 Diálogo informativo para vincular tableros con proveedores Cloud
 (Google Drive, Dropbox, OneDrive o carpetas compartidas en red).
 """
@@ -16,6 +16,8 @@ class CloudSyncInfoDialog(QDialog):
     """Diálogo modal explicativo previo a seleccionar la ruta de sincronización en la nube."""
     def __init__(self, board_name: str = "", parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.finished.connect(self.deleteLater)
         self.board_name = board_name
         self.setWindowTitle(t("sync.info_dialog_title"))
         self.resize(580, 480)

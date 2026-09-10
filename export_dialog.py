@@ -33,6 +33,8 @@ class ExportDialog(QDialog):
 
     def __init__(self, db_path=database.DB_NAME, active_board_id=None, parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.finished.connect(self.deleteLater)
         self.db_path = db_path
         self.active_board_id = active_board_id
         self.active_board_name = None
@@ -235,6 +237,8 @@ class ImportConfirmationDialog(QDialog):
 
     def __init__(self, filepath, boards_data, stats, db_path=database.DB_NAME, parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.finished.connect(self.deleteLater)
         self.filepath = filepath
         self.boards_data = boards_data
         self.stats = stats

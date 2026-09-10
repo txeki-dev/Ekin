@@ -23,6 +23,8 @@ class AiSpecDialog(QDialog):
 
     def __init__(self, task_ids: list[int], board_id: int, db_path: str, parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.finished.connect(self.deleteLater)
         self.task_ids = task_ids
         self.board_id = board_id
         self.db_path = db_path

@@ -451,6 +451,8 @@ class CalendarSettingsDialog(QDialog):
     """
     def __init__(self, db_path, parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.finished.connect(self.deleteLater)
         self.db_path = db_path
         self.setWindowTitle(t("calendar.settings_dialog.title"))
         self.setMinimumWidth(520)

@@ -49,6 +49,8 @@ class SettingsDialog(QDialog):
 
     def __init__(self, db_path, parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.finished.connect(self.deleteLater)
         self.db_path = db_path
         self.setWindowTitle(t("settings.window_title"))
         self.setMinimumWidth(560)

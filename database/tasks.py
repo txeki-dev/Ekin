@@ -1,14 +1,15 @@
 import calendar as _cal
 from datetime import datetime, date, timedelta
+from typing import Optional
 from .connection import get_connection
 from .tags import get_task_tags, get_task_tags_bulk
 from .links import get_task_links, get_task_links_bulk
 
 __all__ = [
-    "create_task", "create_tasks_batch", "get_tasks", "get_task", "update_task", "update_task_due_date",
-    "set_task_due_time", "next_occurrence", "set_task_recurrence", "advance_recurrence",
-    "advance_overdue_recurring", "update_task_position", "update_task_positions", "delete_task",
-    "set_task_linked_board", "set_task_timer_started",
+    "create_task", "create_tasks_batch", "get_tasks", "get_task", "update_task", "save_task_full",
+    "update_task_due_date", "set_task_due_time", "next_occurrence", "set_task_recurrence",
+    "advance_recurrence", "advance_overdue_recurring", "update_task_position", "update_task_positions",
+    "delete_task", "set_task_linked_board", "set_task_timer_started",
 ]  # get_task_board_id vive en scheduling.py (junto a get_scheduled_tasks)
 
 # --- OPERACIONES DE TAREAS (TASKS) ---
@@ -146,6 +147,51 @@ def update_task(task_id, title, description, tag_text, tag_color, due_date, db_p
                WHERE id = ?""",
             (title, description, tag_text, tag_color, due_date, task_id)
         )
+
+def save_task_full(
+    task_id: int,
+    title: str,
+    description: str = "",
+    due_date: Optional[str] = None,
+    due_time: Optional[str] = None,
+    tag_value_ids: Optional[list[int]] = None,
+    recurrence: str = "none",
+    linked_board_id: Optional[int] = None,
+    tag_text: str = "",
+    tag_color: str = "#6b7280",
+    db_path: Optional[str] = None,
+):
+    """Guarda atómicamente todos los atributos de una tarea en una única transacción SQLite:
+    título, descripción, fecha/hora de vencimiento, etiquetas, recurrencia y tablero vinculado.
+    Incrementa la versión y actualiza updated_at exactamente una vez."""
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """UPDATE tasks
+               SET title = ?, description = ?, tag_text = ?, tag_color = ?,
+                   due_date = ?, due_time = ?, recurrence = ?, linked_board_id = ?,
+                   version = version + 1, updated_at = CURRENT_TIMESTAMP
+               WHERE id = ?""",
+            (
+                title,
+                description,
+                tag_text,
+                tag_color,
+                due_date or None,
+                due_time or None,
+                recurrence or "none",
+                linked_board_id,
+                task_id,
+            )
+        )
+
+        if tag_value_ids is not None:
+            cursor.execute("DELETE FROM task_tags WHERE task_id = ?", (task_id,))
+            for tag_val_id in tag_value_ids:
+                cursor.execute(
+                    "INSERT INTO task_tags (task_id, tag_value_id, text, color) VALUES (?, ?, '', '#6b7280')",
+                    (task_id, tag_val_id)
+                )
 
 def update_task_due_date(task_id, due_date, db_path=None):
     """Actualiza solo la fecha de vencimiento de una tarea (usado por el arrastre en el calendario).

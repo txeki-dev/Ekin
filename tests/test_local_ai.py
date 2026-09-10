@@ -198,3 +198,105 @@ def test_spec_generation_thread_error_handling_and_cancellation(monkeypatch, qap
     assert fake_resp.closed is True
 
 
+def test_get_runner_download_url():
+    """Verifica que get_runner_download_url retorna una URL válida con terminación .zip."""
+    url = local_ai.get_runner_download_url()
+    assert url.startswith("https://")
+    assert url.endswith(".zip")
+    assert "llama" in url.lower()
+
+
+def test_download_and_extract_runner(tmp_path, monkeypatch):
+    """Verifica la descarga, descompresión del ZIP en el directorio destino y limpieza del archivo temporal."""
+    import zipfile
+    import io
+
+    # Crear un ZIP simulado en memoria con un ejecutable dummy
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w") as zf:
+        zf.writestr(local_ai.RUNNER_EXE_NAME, b"mock-llama-server-binary-content")
+    zip_bytes = zip_buffer.getvalue()
+
+    class FakeZipResponse:
+        status = 200
+        headers = {"Content-Length": str(len(zip_bytes))}
+
+        def __init__(self):
+            self.stream = io.BytesIO(zip_bytes)
+
+        def read(self, chunk_size):
+            return self.stream.read(chunk_size)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr(local_ai.urllib.request, "urlopen", lambda req, timeout=30.0: FakeZipResponse())
+
+    runner_dir = str(tmp_path / "bin")
+    progress_calls = []
+
+    success, msg = local_ai.download_and_extract_runner(
+        runner_dir=runner_dir,
+        progress_callback=lambda p, s, eta: progress_calls.append(p),
+    )
+
+    assert success is True
+    assert "Runner descargado" in msg
+    assert 100 in progress_calls
+
+    extracted_exe = tmp_path / "bin" / local_ai.RUNNER_EXE_NAME
+    assert extracted_exe.exists()
+    assert extracted_exe.read_bytes() == b"mock-llama-server-binary-content"
+
+    # Verificar que el zip temporal fue limpiado
+    assert not (tmp_path / "bin" / ".llama_runner.zip").exists()
+
+
+def test_runner_download_thread(tmp_path, monkeypatch, qapp):
+    """Verifica que RunnerDownloadThread emite las señales de progreso y finalización."""
+    import zipfile
+    import io
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w") as zf:
+        zf.writestr(local_ai.RUNNER_EXE_NAME, b"mock-runner")
+    zip_bytes = zip_buffer.getvalue()
+
+    class FakeZipResponse:
+        status = 200
+        headers = {"Content-Length": str(len(zip_bytes))}
+
+        def __init__(self):
+            self.stream = io.BytesIO(zip_bytes)
+
+        def read(self, chunk_size):
+            return self.stream.read(chunk_size)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr(local_ai.urllib.request, "urlopen", lambda req, timeout=30.0: FakeZipResponse())
+
+    runner_dir = str(tmp_path / "bin_thread")
+    thread = local_ai.RunnerDownloadThread(runner_dir=runner_dir)
+
+    progress_events = []
+    finished_events = []
+
+    thread.progress.connect(lambda p, s, eta: progress_events.append(p))
+    thread.download_finished.connect(lambda ok, m: finished_events.append((ok, m)))
+
+    thread.run()
+
+    assert len(finished_events) == 1
+    assert finished_events[0][0] is True
+    assert (tmp_path / "bin_thread" / local_ai.RUNNER_EXE_NAME).exists()
+
+
+

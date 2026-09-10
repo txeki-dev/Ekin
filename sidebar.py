@@ -1,3 +1,4 @@
+import os
 from PySide6.QtCore import Qt, Signal, QTimer, QPoint, QSize
 from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
@@ -17,6 +18,8 @@ from color_picker import ColorCirclesPicker
 from strings import t
 from version import __version__
 from undo import UndoAction
+
+_APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Nombres cortos en español para el reloj (evita depender de la locale del sistema)
 _DIAS = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
@@ -433,7 +436,10 @@ class SidebarWidget(QFrame):
         title_layout.addStretch()
 
         logo_label = QLabel()
-        logo_pixmap = QPixmap("ekin_icon.png")
+        logo_path = os.path.join(_APP_DIR, "ekin_icon.png")
+        if not os.path.exists(logo_path):
+            logo_path = "ekin_icon.png"
+        logo_pixmap = QPixmap(logo_path)
         if not logo_pixmap.isNull():
             logo_label.setPixmap(
                 logo_pixmap.scaled(28, 28, Qt.KeepAspectRatio, Qt.SmoothTransformation)

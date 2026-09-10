@@ -419,6 +419,165 @@ def test_board_sync_worker(sync_test_db, qapp):
     assert results[0].board_id == board_id
 
 
+def test_sync_exports_and_merges_structured_tags(sync_test_db):
+    """Verifica que las etiquetas estructuradas se exportan con category/value y se fusionan sin pérdida de datos."""
+    db_path = sync_test_db["db_path"]
+    board_id = sync_test_db["board_id"]
+    task1_id = sync_test_db["task1_id"]
+    sync_file = str(sync_test_db["tmp_path"] / "tags_sync.ekboard")
+
+    # 1. Asignar etiqueta local a la Tarea 1
+    tag_val_id = database.get_or_create_tag_value("Dev", "Backend", "#3b82f6", db_path)
+    database.set_task_tags(task1_id, [tag_val_id], db_path)
+
+    # 2. Exportación inicial al archivo compartido
+    res = board_sync.sync_board_with_file(board_id, sync_file, db_path)
+    assert res.status == "exported"
+
+    # Verificar que el JSON contiene la etiqueta exportada con category y value
+    with open(sync_file, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    t1_exported = next(t for t in data["tasks"] if t["title"] == "Tarea 1")
+    assert len(t1_exported["tags"]) == 1
+    assert t1_exported["tags"][0]["category"] == "Dev"
+    assert t1_exported["tags"][0]["value"] == "Backend"
+    assert t1_exported["tags"][0]["color"] == "#3b82f6"
+
+    # 3. Simular que un colaborador en otra máquina añadió una etiqueta remota a Tarea 1
+    # y además creó una nueva Tarea 3 con etiquetas
+    t1_exported["tags"].append({
+        "category": "Sprint",
+        "value": "2026-W37",
+        "color": "#10b981",
+    })
+    t1_exported["version"] = t1_exported.get("version", 1) + 1
+    t1_exported["updated_at"] = (datetime.utcnow() + timedelta(minutes=5)).isoformat()
+
+    col1_uuid = data["columns"][0]["column_uuid"]
+    data["tasks"].append({
+        "task_uuid": "remote-task-uuid-999",
+        "column_uuid": col1_uuid,
+        "title": "Tarea Remota con Tags",
+        "description": "Creada por colaborador",
+        "position": 5,
+        "version": 1,
+        "synced_version": 1,
+        "updated_at": (datetime.utcnow() + timedelta(minutes=5)).isoformat(),
+        "tags": [
+            {"category": "Design", "value": "UI Polish", "color": "#f59e0b"}
+        ],
+        "links": [],
+        "logs": [],
+    })
+
+    with open(sync_file, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+    # 4. Sincronizar: debe fusionar las etiquetas
+    res2 = board_sync.sync_board_with_file(board_id, sync_file, db_path)
+    assert res2.status in ("imported", "merged")
+
+    # 5. Comprobar que Tarea 1 conserva Backend Y ahora tiene Sprint
+    t1_tags = database.get_task_tags(task1_id, db_path)
+    tag_pairs = {(t["category"], t["value"]) for t in t1_tags}
+    assert ("Dev", "Backend") in tag_pairs
+    assert ("Sprint", "2026-W37") in tag_pairs
+
+    # 6. Comprobar que la tarea remota importada tiene su etiqueta Design: UI Polish
+    tasks_col1 = database.get_tasks(sync_test_db["col1_id"], db_path)
+    remote_task = next(t for t in tasks_col1 if t["title"] == "Tarea Remota con Tags")
+    assert len(remote_task["tags"]) == 1
+    assert remote_task["tags"][0]["category"] == "Design"
+    assert remote_task["tags"][0]["value"] == "UI Polish"
 
 
+def test_sync_two_way_merge_combines_tags(sync_test_db):
+    """Verifica que en una fusión bidireccional concurrente, las etiquetas de ambas partes se combinan."""
+    db_path = sync_test_db["db_path"]
+    board_id = sync_test_db["board_id"]
+    task1_id = sync_test_db["task1_id"]
+    sync_file = str(sync_test_db["tmp_path"] / "merge_tags.ekboard")
 
+    # 1. Asignar etiqueta inicial local
+    tag_val1 = database.get_or_create_tag_value("Platform", "Windows", "#3b82f6", db_path)
+    database.set_task_tags(task1_id, [tag_val1], db_path)
+
+    # 2. Exportación inicial
+    board_sync.sync_board_with_file(board_id, sync_file, db_path)
+
+    # 3. Modificación local (añadir etiqueta Linux y modificar título)
+    tag_val2 = database.get_or_create_tag_value("Platform", "Linux", "#10b981", db_path)
+    database.set_task_tags(task1_id, [tag_val1, tag_val2], db_path)
+    database.update_task(task1_id, "Tarea 1 - Editada Local", "Desc local", "", "#6b7280", None, db_path)
+
+    # 4. Modificación remota en el archivo .ekboard (añadir etiqueta macOS y editar descripción)
+    with open(sync_file, "r", encoding="utf-8") as f:
+        file_data = json.load(f)
+    t1_rem = next(t for t in file_data["tasks"] if t["title"] == "Tarea 1")
+    t1_rem["description"] = "Desc remota concurrente"
+    t1_rem["tags"].append({
+        "category": "Platform",
+        "value": "macOS",
+        "color": "#8b5cf6",
+    })
+    t1_rem["version"] = t1_rem.get("version", 1) + 1
+    t1_rem["updated_at"] = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
+    with open(sync_file, "w", encoding="utf-8") as f:
+        json.dump(file_data, f, indent=2)
+
+    # 5. Ejecutar sincronización bidireccional
+    res = board_sync.sync_board_with_file(board_id, sync_file, db_path)
+    assert res.status == "merged"
+
+    # 6. Comprobar que en la base de datos local conviven las tres plataformas sin pérdida
+    final_tags = database.get_task_tags(task1_id, db_path)
+    tag_values = {t["value"] for t in final_tags}
+    assert "Windows" in tag_values
+    assert "Linux" in tag_values
+    assert "macOS" in tag_values
+
+
+def test_read_sync_file_with_retry_and_lock_handling(tmp_path, monkeypatch):
+    """Verifica que read_sync_file_with_retry reintenta ante errores de bloqueo (PermissionError) y se recupera."""
+    test_file = str(tmp_path / "lock_test.ekboard")
+    data = {"board_uuid": "test-uuid-123", "board_name": "Lock Test"}
+    with open(test_file, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+
+    real_open = open
+    attempts = 0
+
+    def mock_open(*args, **kwargs):
+        nonlocal attempts
+        if args and str(args[0]) == test_file:
+            attempts += 1
+            if attempts <= 2:
+                raise PermissionError("El archivo está siendo usado por otro proceso (OneDrive).")
+        return real_open(*args, **kwargs)
+
+    monkeypatch.setattr("builtins.open", mock_open)
+    monkeypatch.setattr(board_sync.time, "sleep", lambda s: None)
+
+    loaded = board_sync.read_sync_file_with_retry(test_file, max_attempts=4)
+    assert loaded["board_uuid"] == "test-uuid-123"
+    assert attempts == 3
+
+
+def test_sync_board_with_file_catches_unresolved_lock(sync_test_db, monkeypatch):
+    """Verifica que sync_board_with_file devuelve SyncResult(status='error') si el archivo persiste bloqueado."""
+    db_path = sync_test_db["db_path"]
+    board_id = sync_test_db["board_id"]
+    sync_file = str(sync_test_db["tmp_path"] / "perm_test.ekboard")
+
+    # Crear archivo compartido inicial
+    board_sync.sync_board_with_file(board_id, sync_file, db_path)
+
+    # Simular bloqueo persistente
+    def mock_read_locked(*args, **kwargs):
+        raise PermissionError("OneDrive file lock persistent")
+
+    monkeypatch.setattr(board_sync, "read_sync_file_with_retry", mock_read_locked)
+
+    res = board_sync.sync_board_with_file(board_id, sync_file, db_path)
+    assert res.status == "error"
+    assert "bloqueado por otro proceso" in res.message

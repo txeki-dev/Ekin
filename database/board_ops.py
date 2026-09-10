@@ -1,3 +1,4 @@
+import uuid
 from .connection import get_connection
 
 __all__ = ["move_column_to_board", "copy_column_to_board", "copy_board"]
@@ -25,13 +26,16 @@ def _duplicate_task_into_column(cursor, task_row, new_column_id):
     duplicar esta lógica dos veces. `task_row` debe incluir title, description,
     tag_text, tag_color, position, due_date, due_time, recurrence, linked_board_id,
     timer_started_at, e id (de la tarea origen)."""
+    t_uuid = str(uuid.uuid4())
     cursor.execute(
         """INSERT INTO tasks (column_id, title, description, tag_text, tag_color, position,
-                               due_date, due_time, recurrence, linked_board_id, timer_started_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                               due_date, due_time, recurrence, linked_board_id, timer_started_at,
+                               task_uuid, version, synced_version)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0)""",
         (new_column_id, task_row["title"], task_row["description"], task_row["tag_text"],
          task_row["tag_color"], task_row["position"], task_row["due_date"], task_row["due_time"],
-         task_row["recurrence"], task_row["linked_board_id"], task_row["timer_started_at"])
+         task_row["recurrence"], task_row["linked_board_id"], task_row["timer_started_at"],
+         t_uuid)
     )
     new_task_id = cursor.lastrowid
     old_task_id = task_row["id"]
@@ -86,9 +90,10 @@ def copy_column_to_board(column_id, target_board_id, db_path=None):
         next_pos = max_pos + 1
 
         # 3. Insertar la nueva columna
+        col_uuid = str(uuid.uuid4())
         cursor.execute(
-            "INSERT INTO columns (board_id, name, color, position) VALUES (?, ?, ?, ?)",
-            (target_board_id, col_name, col_color, next_pos)
+            "INSERT INTO columns (board_id, name, color, position, column_uuid) VALUES (?, ?, ?, ?, ?)",
+            (target_board_id, col_name, col_color, next_pos, col_uuid)
         )
         new_column_id = cursor.lastrowid
 
@@ -113,7 +118,8 @@ def copy_board(board_id, new_name, new_color, db_path=None):
         cursor = conn.cursor()
 
         # 1. Crear el nuevo tablero
-        cursor.execute("INSERT INTO boards (name, color) VALUES (?, ?)", (new_name, new_color))
+        b_uuid = str(uuid.uuid4())
+        cursor.execute("INSERT INTO boards (name, color, board_uuid) VALUES (?, ?, ?)", (new_name, new_color, b_uuid))
         new_board_id = cursor.lastrowid
 
         # 2. Obtener todas las columnas del tablero de origen
@@ -124,9 +130,10 @@ def copy_board(board_id, new_name, new_color, db_path=None):
             old_col_id = col["id"]
 
             # Crear nueva columna en el nuevo tablero
+            c_uuid = str(uuid.uuid4())
             cursor.execute(
-                "INSERT INTO columns (board_id, name, color, position) VALUES (?, ?, ?, ?)",
-                (new_board_id, col["name"], col["color"], col["position"])
+                "INSERT INTO columns (board_id, name, color, position, column_uuid) VALUES (?, ?, ?, ?, ?)",
+                (new_board_id, col["name"], col["color"], col["position"], c_uuid)
             )
             new_col_id = cursor.lastrowid
 
