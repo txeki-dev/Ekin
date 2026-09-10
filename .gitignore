@@ -172,6 +172,12 @@ $RECYCLE.BIN/
 ekin_board.db
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
 
 # Automatic database backups (created at startup)
 backups/

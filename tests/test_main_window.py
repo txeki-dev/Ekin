@@ -103,3 +103,90 @@ def test_main_window_title(qapp, db_path, monkeypatch):
     window = _make_window(monkeypatch)
     assert window.windowTitle() == f"Ekin v{__version__}"
     _close_window(qapp, window)
+
+
+def test_check_for_updates_ignores_untracked_files(qapp, db_path, monkeypatch):
+    """Verifica que archivos no rastreados (como .db-wal, .db-shm o temporales)
+    no bloquean la comprobación de actualizaciones."""
+    orig_check = main_module.MainWindow.check_for_updates
+    monkeypatch.setattr(database, "DB_NAME", db_path)
+    window = _make_window(monkeypatch)
+
+    commands = []
+
+    def fake_run(cmd, **kwargs):
+        commands.append(cmd)
+        args = cmd[1:]
+        if args == ["rev-parse", "--is-inside-work-tree"]:
+            return type("Result", (), {"returncode": 0, "stdout": "true", "stderr": ""})()
+        if args == ["fetch", "origin"]:
+            return type("Result", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+        if args == ["status", "-uno"]:
+            return type("Result", (), {"returncode": 0, "stdout": "Your branch is behind 'origin/main' by 1 commit.", "stderr": ""})()
+        if args == ["status", "--porcelain", "-uno"]:
+            return type("Result", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+        return type("Result", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+
+    monkeypatch.setattr(main_module.subprocess, "run", fake_run)
+    asked = []
+    monkeypatch.setattr(
+        main_module.QMessageBox,
+        "question",
+        lambda *args, **kwargs: asked.append(True) or main_module.QMessageBox.No,
+    )
+    info_shown = []
+    monkeypatch.setattr(
+        main_module.QMessageBox,
+        "information",
+        lambda *args, **kwargs: info_shown.append(args),
+    )
+
+    orig_check(window)
+
+    assert ["git", "status", "--porcelain", "-uno"] in commands
+    assert asked == [True]
+    assert info_shown == []
+    _close_window(qapp, window)
+
+
+def test_check_for_updates_aborts_when_tracked_files_dirty(qapp, db_path, monkeypatch):
+    """Verifica que modificaciones en archivos rastreados sí detienen la actualización y avisan."""
+    orig_check = main_module.MainWindow.check_for_updates
+    monkeypatch.setattr(database, "DB_NAME", db_path)
+    window = _make_window(monkeypatch)
+
+    commands = []
+
+    def fake_run(cmd, **kwargs):
+        commands.append(cmd)
+        args = cmd[1:]
+        if args == ["rev-parse", "--is-inside-work-tree"]:
+            return type("Result", (), {"returncode": 0, "stdout": "true", "stderr": ""})()
+        if args == ["fetch", "origin"]:
+            return type("Result", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+        if args == ["status", "-uno"]:
+            return type("Result", (), {"returncode": 0, "stdout": "behind 'origin/main'", "stderr": ""})()
+        if args == ["status", "--porcelain", "-uno"]:
+            return type("Result", (), {"returncode": 0, "stdout": " M main.py", "stderr": ""})()
+        return type("Result", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+
+    monkeypatch.setattr(main_module.subprocess, "run", fake_run)
+    info_shown = []
+    monkeypatch.setattr(
+        main_module.QMessageBox,
+        "information",
+        lambda *args, **kwargs: info_shown.append(args),
+    )
+    asked = []
+    monkeypatch.setattr(
+        main_module.QMessageBox,
+        "question",
+        lambda *args, **kwargs: asked.append(True) or main_module.QMessageBox.No,
+    )
+
+    orig_check(window)
+
+    assert len(info_shown) == 1
+    assert asked == []
+    _close_window(qapp, window)
+

@@ -471,7 +471,10 @@ class MainWindow(QMainWindow):
 
             # 3. Nunca hacer pull sobre un árbol de trabajo sucio: git pull abortaría y el
             #    directorio de ejecución es también la BD/backups del usuario. Avisar y salir.
-            dirty = _git(["status", "--porcelain"], 5)
+            #    Nota: '-uno' asegura que solo modificaciones a archivos rastreados (staged/unstaged)
+            #    se consideren cambios sin commitear, ignorando archivos temporales no rastreados
+            #    (como .db-wal/.db-shm o notas locales) que no afectan a git pull.
+            dirty = _git(["status", "--porcelain", "-uno"], 5)
             if dirty.returncode != 0 or dirty.stdout.strip():
                 QMessageBox.information(
                     self,
