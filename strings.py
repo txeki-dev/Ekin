@@ -373,6 +373,8 @@ STRINGS = {
     "shortcuts.item_align": "Ctrl+L / Ctrl+E / Ctrl+R / Ctrl+J — Align text (left, center, right, justify)",
     "shortcuts.item_case": "Ctrl+Shift+U / Ctrl+Shift+L / Shift+F3 — UPPERCASE / lowercase",
     "shortcuts.item_nest_bullet": "Tab (on a bullet) — Nest the bullet (inside the editor)",
+    "shortcuts.item_quote": "Ctrl+Shift+Q or typing «> » — Quote / callout block (inside the editor)",
+    "shortcuts.item_paste_plain": "Ctrl+Shift+V — Paste as plain text (inside the editor)",
     "shortcuts.item_arrow": "Typing «-->» becomes → automatically (inside the editor)",
     "shortcuts.item_add_log": "Ctrl+Enter — Add the note to the journal (task detail)",
     "shortcuts.hint": "Press Ctrl+/ anytime to see this window again.",
@@ -407,6 +409,18 @@ STRINGS = {
     "markdown_edit.code_text_label": "Code:",
     "markdown_edit.code_insert_btn": "Insert",
     "markdown_edit.code_cancel_btn": "Cancel",
+    "markdown_edit.quote_tooltip": "Quote / callout block (Ctrl+Shift+Q, or type '> ' at start)",
+    "markdown_edit.quote_placeholder": "Type a quote...",
+    "markdown_edit.paste_plain_menu": "Paste plain text (Ctrl+Shift+V)",
+    "markdown_edit.paste_formatted_menu": "Paste with formatting",
+    "markdown_edit.image_size_menu": "Image size",
+    "markdown_edit.image_size_25": "25% width",
+    "markdown_edit.image_size_50": "50% width",
+    "markdown_edit.image_size_75": "75% width",
+    "markdown_edit.image_size_100": "100% width (fit editor)",
+    "markdown_edit.image_size_custom": "Custom width (px)…",
+    "markdown_edit.image_size_dialog_title": "Resize image",
+    "markdown_edit.image_size_dialog_label": "Image width in pixels:",
     "markdown_edit.delete_code_btn": "Delete",
     "markdown_edit.delete_code_tooltip": "Delete this code block",
     "markdown_edit.delete_code_btn_menu": "Delete code block",
@@ -518,12 +532,35 @@ STRINGS = {
     "task_detail.link_open_failed_msg": (
         "Could not open the link or attachment. It may have been moved or deleted."
     ),
+    "task_detail.link_security_title": "Security warning",
+    "task_detail.link_security_executable_msg": (
+        "'{target}' is an executable program or script ({ext}).\n\n"
+        "Opening executable files from shared or untrusted boards may harm your computer.\n\n"
+        "Are you sure you want to open it?"
+    ),
+    "task_detail.link_security_unc_msg": (
+        "'{target}' is a network share path (UNC).\n\n"
+        "Opening network paths from shared or untrusted boards can expose your network "
+        "credentials or access remote files.\n\n"
+        "Are you sure you want to open it?"
+    ),
+    "task_detail.link_security_unc_executable_msg": (
+        "'{target}' is an executable program or script on a remote network share ({ext}).\n\n"
+        "Opening remote executables from shared or untrusted boards may harm your computer.\n\n"
+        "Are you sure you want to open it?"
+    ),
+    "task_detail.link_security_scheme_msg": (
+        "'{target}' uses an unrecognized or potentially unsafe protocol ({scheme}).\n\n"
+        "Opening this link may harm your computer.\n\n"
+        "Are you sure you want to open it?"
+    ),
     "task_detail.delete_task_btn": "Delete task",
     "task_detail.save_btn": "Save changes",
     "task_detail.close_btn": "Close",
     "task_detail.log_header": "Journal",
     "task_detail.entries_count": "{count} entries",
     "task_detail.notes_kicker": "NOTES",
+    "task_detail.notes_last_edited": "Last edited: {timestamp}",
     "task_detail.saves_hint": "Changes save as you type",
     "task_detail.kicker": "{board} · {column}",
     "task_detail.log_input_placeholder": "Log what you just did… (Ctrl+Enter)",
@@ -545,6 +582,26 @@ STRINGS = {
     "task_detail.delete_log_body": "Delete this journal entry?",
 
     # --- board_sync / sincronización con Cloud (Google Drive, Dropbox, OneDrive, red) ---
+    "board_view.bulk_add_btn": "Bulk add tasks",
+    "board_view.bulk_add_tooltip": "Add multiple tasks at once via table",
+    "bulk_add.dialog_title": "Bulk add tasks",
+    "bulk_add.header": "<b>Bulk add tasks</b>",
+    "bulk_add.instructions": "Define multiple tasks in the table below. You can also paste copied rows from Excel or Sheets.",
+    "bulk_add.col_title": "Title *",
+    "bulk_add.col_description": "Description",
+    "bulk_add.col_column": "Column",
+    "bulk_add.add_row_btn": "Add row",
+    "bulk_add.del_row_btn": "Remove row",
+    "bulk_add.create_btn": "Create tasks",
+    "bulk_add.cancel_btn": "Cancel",
+    "bulk_add.warn_no_tasks": "Please enter at least one task with a title.",
+    "bulk_add.success_toast": "{count} task(s) created successfully.",
+
+    "sync.menu_open_shared": "Connect existing .ekboard file…",
+    "sync.or_connect_existing_prompt": "— or connect a shared cloud board —",
+    "sync.open_shared_title": "Select existing .ekboard file from Cloud / network",
+    "sync.open_shared_success": "Connected shared board «{name}» successfully.",
+    "sync.open_shared_exists": "This board is already in your boards list.",
     "sync.link_btn": "Link to Cloud",
     "sync.link_tooltip": "Link this board to Google Drive, Dropbox, OneDrive or a shared folder (.ekboard)",
     "sync.info_dialog_title": "Link board to Cloud",

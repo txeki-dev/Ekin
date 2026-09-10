@@ -21,6 +21,17 @@ def test_init_db_is_idempotent(db_path):
     assert database.get_board(board_id, db_path) is not None
 
 
+def test_get_connection_pragmas(db_path):
+    with database.get_connection(db_path) as conn:
+        foreign_keys = conn.execute("PRAGMA foreign_keys;").fetchone()[0]
+        busy_timeout = conn.execute("PRAGMA busy_timeout;").fetchone()[0]
+        journal_mode = conn.execute("PRAGMA journal_mode;").fetchone()[0].lower()
+        assert foreign_keys == 1
+        assert busy_timeout >= 10000
+        assert journal_mode in ("wal", "memory")
+
+
+
 # --- Boards ---
 
 def test_create_and_get_board(db_path):
@@ -1048,4 +1059,51 @@ def test_snapshot_and_restore_preserves_uuids(db_path):
     new_b = database.restore_board(snap_b, db_path=db_path)
     restored_board = database.get_board(new_b, db_path)
     assert restored_board["board_uuid"] == orig_board["board_uuid"]
+
+
+def test_create_tasks_batch(db_path):
+    """Verifica la creación atómica por lotes de tareas con cálculo correcto de posiciones."""
+    b = database.create_board("Board Batch", db_path=db_path)
+    c1 = database.create_column(b, "Col 1", db_path=db_path)
+    c2 = database.create_column(b, "Col 2", db_path=db_path)
+
+    # Caso vacío
+    assert database.create_tasks_batch([], db_path=db_path) == []
+
+    # Tarea previa en c1
+    database.create_task(c1, "Previa", db_path=db_path)
+
+    # Inserción por lotes con tuplas cruzadas entre columnas
+    batch_tuples = [
+        (c1, "T1", "Desc 1"),
+        (c2, "T2", "Desc 2"),
+        (c1, "T3", "Desc 3"),
+    ]
+    ids = database.create_tasks_batch(batch_tuples, db_path=db_path)
+    assert len(ids) == 3
+
+    tasks_c1 = database.get_tasks(c1, db_path=db_path)
+    assert len(tasks_c1) == 3
+    assert [t["title"] for t in tasks_c1] == ["Previa", "T1", "T3"]
+    assert [t["position"] for t in tasks_c1] == [0, 1, 2]
+
+    tasks_c2 = database.get_tasks(c2, db_path=db_path)
+    assert len(tasks_c2) == 1
+    assert tasks_c2[0]["title"] == "T2"
+    assert tasks_c2[0]["position"] == 0
+
+    # Inserción por lotes con diccionarios
+    batch_dicts = [
+        {"column_id": c2, "title": "T4", "description": "Desc 4", "due_date": "2026-10-01"},
+        {"column_id": c2, "title": "T5", "description": "Desc 5"},
+    ]
+    ids_dicts = database.create_tasks_batch(batch_dicts, db_path=db_path)
+    assert len(ids_dicts) == 2
+
+    tasks_c2_after = database.get_tasks(c2, db_path=db_path)
+    assert len(tasks_c2_after) == 3
+    assert [t["title"] for t in tasks_c2_after] == ["T2", "T4", "T5"]
+    assert [t["position"] for t in tasks_c2_after] == [0, 1, 2]
+    assert tasks_c2_after[1]["due_date"] == "2026-10-01"
+
 

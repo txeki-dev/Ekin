@@ -21,6 +21,7 @@ import uuid
 import glob
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
+from PySide6.QtCore import QThread, Signal
 
 import database
 
@@ -36,6 +37,24 @@ class SyncResult:
     conflicts_resolved: int = 0
     message: str = ""
     details: list[str] = field(default_factory=list)
+
+
+class BoardSyncWorker(QThread):
+    """Hilo para ejecutar la sincronización de tableros en segundo plano sin bloquear el hilo de la UI."""
+    sync_finished = Signal(object)  # Emite SyncResult
+
+    def __init__(self, board_id: int, sync_path=None, db_path=None, parent=None):
+        super().__init__(parent)
+        self.board_id = board_id
+        self.sync_path = sync_path
+        self.db_path = db_path
+
+    def run(self):
+        try:
+            res = sync_board_with_file(self.board_id, self.sync_path, self.db_path)
+            self.sync_finished.emit(res)
+        except Exception as exc:
+            self.sync_finished.emit(SyncResult(status="error", board_id=self.board_id, message=str(exc)))
 
 
 def calculate_content_hash(data_or_text) -> str:
@@ -380,7 +399,14 @@ def sync_board_with_file(board_id: int, file_path: str = None, db_path=None) -> 
 
     if remote_changed and not local_changed:
         # Solo hubo cambios remotos: aplicar directamente a BD local
-        create_premerge_backup(board_id, db_path)
+        backup_path = create_premerge_backup(board_id, db_path)
+        if not backup_path:
+            return SyncResult(
+                status="error",
+                board_id=board_id,
+                file_path=target_path,
+                message="Error de seguridad: No se pudo crear la copia de seguridad pre-fusión (pre-merge backup). Sincronización abortada para evitar pérdida de datos.",
+            )
         imported_count = _apply_remote_board_clean(board_id, remote_data, db_path)
         now_ts = now_utc_iso()
         database.update_board_sync_state(board_id, now_ts, current_file_hash, db_path)
@@ -394,7 +420,14 @@ def sync_board_with_file(board_id: int, file_path: str = None, db_path=None) -> 
         )
 
     # Ambos cambiaron concurrentemente: ejecutar Fusión Diferencial
-    create_premerge_backup(board_id, db_path)
+    backup_path = create_premerge_backup(board_id, db_path)
+    if not backup_path:
+        return SyncResult(
+            status="error",
+            board_id=board_id,
+            file_path=target_path,
+            message="Error de seguridad: No se pudo crear la copia de seguridad pre-fusión (pre-merge backup). Sincronización abortada para evitar pérdida de datos.",
+        )
     merge_res = _execute_two_way_merge(board_id, remote_data, last_synced_at, db_path)
 
     # Tras fusionar en base de datos local, re-exportar el estado unificado al archivo
@@ -493,7 +526,7 @@ def _apply_remote_board_clean(board_id: int, remote_data: dict, db_path=None) ->
                 task_id = cursor.lastrowid
                 local_tasks[t_uuid] = task_id
 
-            _sync_task_sub_entities(cursor, task_id, r_task)
+            _merge_task_sub_entities(cursor, task_id, r_task)
             tasks_processed += 1
 
         # Eliminar tareas locales que ya no existen en el archivo remoto (borradas por colaboradores)
@@ -562,7 +595,7 @@ def _execute_two_way_merge(board_id: int, remote_data: dict, last_synced_at: str
                     )
                 )
                 task_id = cursor.lastrowid
-                _sync_task_sub_entities(cursor, task_id, r_task)
+                _merge_task_sub_entities(cursor, task_id, r_task)
                 result["imported"] += 1
             else:
                 # Tarea existente en ambos: comparar versiones
@@ -605,7 +638,7 @@ def _execute_two_way_merge(board_id: int, remote_data: dict, last_synced_at: str
                             r_task.get("updated_at", now_utc_iso()), task_id
                         )
                     )
-                    _sync_task_sub_entities(cursor, task_id, r_task)
+                    _merge_task_sub_entities(cursor, task_id, r_task)
                     result["imported"] += 1
 
                 elif local_was_modified and not remote_was_modified:
@@ -680,11 +713,6 @@ def _execute_two_way_merge(board_id: int, remote_data: dict, last_synced_at: str
     return result
 
 
-def _sync_task_sub_entities(cursor, task_id: int, r_task: dict):
-    """Sincroniza tags, enlaces y logs de una tarea remota a la base de datos local."""
-    _merge_task_sub_entities(cursor, task_id, r_task)
-
-
 def _merge_task_sub_entities(cursor, task_id: int, r_task: dict):
     """Fusiona logs, tags y enlaces sin destruir datos existentes."""
     # 1. Logs: añadir los que no existan por contenido exacto
@@ -711,3 +739,52 @@ def _merge_task_sub_entities(cursor, task_id: int, r_task: dict):
                 (task_id, url, link_item.get("label", ""), link_item.get("position", 0))
             )
             existing_links.add(url)
+
+
+def connect_shared_board_from_file(file_path: str, db_path=None):
+    """Carga y conecta a la base de datos local un tablero sincronizado existente (.ekboard)
+    creado por otro usuario en OneDrive, Google Drive, Dropbox o red local.
+
+    Si el tablero (por board_uuid) ya existe en la base de datos local, se vincula y actualiza.
+    Si es nuevo, se crea en la base de datos local preservando el board_uuid compartido y
+    se sincronizan inmediatamente todas sus columnas, tareas, etiquetas, enlaces y diario.
+
+    Devuelve (board_id, sync_result).
+    """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"El archivo compartido no existe: {file_path}")
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        remote_data = json.load(f)
+
+    b_uuid = remote_data.get("board_uuid")
+    if not b_uuid:
+        raise ValueError("El archivo .ekboard no contiene un identificador válido (board_uuid).")
+
+    board_name = remote_data.get("board_name") or remote_data.get("name") or os.path.splitext(os.path.basename(file_path))[0]
+    board_color = remote_data.get("board_color") or remote_data.get("color", "#3b82f6")
+
+    # Buscar si ya existe un tablero local con ese board_uuid
+    existing_board_id = None
+    with database.get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM boards WHERE board_uuid = ?", (b_uuid,))
+        row = cursor.fetchone()
+        if row:
+            existing_board_id = row["id"]
+
+    if existing_board_id is None:
+        # Crear el tablero en la BD local con el mismo UUID del archivo compartido
+        existing_board_id = database.create_board(
+            name=board_name,
+            color=board_color,
+            db_path=db_path,
+            board_uuid=b_uuid
+        )
+
+    # Registrar la ruta de sincronización
+    database.set_board_sync_path(existing_board_id, file_path, db_path)
+
+    # Sincronizar de inmediato
+    res = sync_board_with_file(existing_board_id, file_path, db_path)
+    return existing_board_id, res

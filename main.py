@@ -52,7 +52,7 @@ def register_fonts():
     """Registra las tipografías empaquetadas (Caprasimo display + Figtree body) para que
     los títulos salgan en Caprasimo aunque la fuente no esté instalada en el sistema."""
     fonts_dir = os.path.join(_APP_DIR, "assets", "fonts")
-    for name in ("Caprasimo-Regular.ttf", "Figtree-VariableFont_wght.ttf"):
+    for name in ("Caprasimo-Regular.ttf", "Figtree-VariableFont_wght.ttf", "Figtree-Italic-VariableFont_wght.ttf"):
         path = os.path.join(fonts_dir, name)
         if os.path.exists(path):
             QFontDatabase.addApplicationFont(path)

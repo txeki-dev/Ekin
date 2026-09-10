@@ -1,3 +1,4 @@
+import os
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QSizePolicy
 from datetime import datetime
@@ -157,6 +158,8 @@ class LogEntryWidget(QFrame):
         elif url.startswith("data:image/"):
             show_image_preview(url, self)
         elif url.startswith(("http://", "https://", "mailto:", "file:", "ftp://")):
-            from PySide6.QtGui import QDesktopServices
-            from PySide6.QtCore import QUrl
-            QDesktopServices.openUrl(QUrl(url))
+            from .security_utils import open_link_safely
+            open_link_safely(self.window(), url)
+        elif url and (os.path.exists(url) or (len(url) > 2 and url[1] == ":" and url[2] in ("/", "\\")) or url.startswith(("\\\\", "//"))):
+            from .security_utils import open_link_safely
+            open_link_safely(self.window(), url)

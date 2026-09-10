@@ -1,13 +1,13 @@
 import os
 from datetime import datetime
-from PySide6.QtCore import Qt, QDate, QTime, QUrl, QSize, QTimer, QEvent, QObject, QEventLoop
+from PySide6.QtCore import Qt, QDate, QTime, QSize, QTimer, QEvent, QObject, QEventLoop
 from PySide6.QtWidgets import (
     QDialog, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QScrollArea, QWidget,
     QMessageBox, QCheckBox, QDateEdit, QTimeEdit, QComboBox, QFileDialog,
     QApplication
 )
-from PySide6.QtGui import QKeySequence, QShortcut, QDesktopServices
+from PySide6.QtGui import QKeySequence, QShortcut, QDesktopServices as QDesktopServices
 import database
 import styles
 from strings import t
@@ -18,12 +18,15 @@ from .tag_pill import ClickableTagPill, color_icon
 from .tag_manager_dialog import TagManagerDialog
 from .tag_picker_dialog import TagPickerDialog
 
-_WEB_LINK_SCHEMES = ("http://", "https://", "ftp://", "mailto:", "file://")
+from .security_utils import (
+    _is_local_link, _is_unc_path, _get_target_extension,
+    confirm_open_untrusted_link, open_link_safely
+)
 
-
-def _is_local_link(url):
-    """True a menos que la cadena empiece por un esquema web reconocido (case-insensitive)."""
-    return not url.lower().startswith(_WEB_LINK_SCHEMES)
+__all__ = [
+    "TaskDetailDialog", "_is_unc_path", "_get_target_extension",
+    "_is_local_link", "confirm_open_untrusted_link", "open_link_safely"
+]
 
 
 class _ClickOutsideFilter(QObject):
@@ -218,7 +221,7 @@ class TaskDetailDialog(QDialog):
         row_a.addStretch()
         meta_l.addLayout(row_a)
 
-        # Fila B: etiquetas + prioridad + tablero vinculado
+        # Fila B: etiquetas
         row_b = QHBoxLayout()
         row_b.setSpacing(10)
         row_b.addWidget(QLabel(t("task_detail.tags_label")))
@@ -238,19 +241,26 @@ class TaskDetailDialog(QDialog):
         self.manage_tags_btn.clicked.connect(self.open_tag_manager)
         row_b.addWidget(self.manage_tags_btn)
         row_b.addStretch()
-        row_b.addWidget(QLabel(t("task_detail.priority_label")))
+        meta_l.addLayout(row_b)
+
+        # Fila C: prioridad + tablero vinculado
+        row_c = QHBoxLayout()
+        row_c.setSpacing(10)
+        row_c.addWidget(QLabel(t("task_detail.priority_label")))
         self.priority_combo = QComboBox()
         self.priority_combo.setToolTip(t("task_detail.priority_tooltip"))
         self.priority_combo.setCursor(Qt.PointingHandCursor)
         self._refresh_priority_combo()
         self.priority_combo.currentIndexChanged.connect(self._on_priority_changed)
-        row_b.addWidget(self.priority_combo)
-        row_b.addWidget(QLabel(t("task_detail.linked_board_label")))
+        row_c.addWidget(self.priority_combo)
+        row_c.addSpacing(18)
+        row_c.addWidget(QLabel(t("task_detail.linked_board_label")))
         self.linked_board_combo = QComboBox()
         self.linked_board_combo.setToolTip(t("task_detail.linked_board_tooltip"))
         self.linked_board_combo.setCursor(Qt.PointingHandCursor)
-        row_b.addWidget(self.linked_board_combo)
-        meta_l.addLayout(row_b)
+        row_c.addWidget(self.linked_board_combo)
+        row_c.addStretch()
+        meta_l.addLayout(row_c)
 
         meta_wrap = QWidget()
         meta_wrap_l = QHBoxLayout(meta_wrap)
@@ -270,12 +280,19 @@ class TaskDetailDialog(QDialog):
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(8)
 
+        notes_head = QHBoxLayout()
         notes_kicker = QLabel(t("task_detail.notes_kicker"))
         notes_kicker.setObjectName("TaskDetailKicker")
-        left_layout.addWidget(notes_kicker)
+        notes_head.addWidget(notes_kicker)
+        notes_head.addStretch()
+        self.notes_edited_label = QLabel("")
+        self.notes_edited_label.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 11px;")
+        notes_head.addWidget(self.notes_edited_label)
+        left_layout.addLayout(notes_head)
 
         self.desc_input = MarkdownTextEdit()
-        self.desc_input.image_width_provider = self._chat_image_width
+        self.desc_input.image_width_provider = self._notes_image_width
+        self.desc_input.local_link_pasted.connect(self._on_local_link_pasted)
         self.desc_input.setPlaceholderText(t("task_detail.description_placeholder"))
         left_layout.addWidget(RichTextToolbar(self.desc_input))
         left_layout.addWidget(self.desc_input, 1)
@@ -355,6 +372,7 @@ class TaskDetailDialog(QDialog):
         self.log_input.setMinimumHeight(110)
         self.log_input.setMaximumHeight(260)
         self.log_input.image_width_provider = self._chat_image_width
+        self.log_input.local_link_pasted.connect(self._on_local_link_pasted)
         input_layout.addWidget(RichTextToolbar(self.log_input))
         input_layout.addWidget(self.log_input)
         log_btn_layout = QHBoxLayout()
@@ -465,6 +483,10 @@ class TaskDetailDialog(QDialog):
 
         # Cargar tablero vinculado
         self._refresh_linked_board_combo(task.get("linked_board_id"))
+
+        # Cargar última edición de notas
+        updated_at = task.get("updated_at") or task.get("created_at")
+        self._update_notes_last_edited_label(updated_at)
 
         # Cargar enlaces y logs
         self.reload_links()
@@ -716,8 +738,21 @@ class TaskDetailDialog(QDialog):
         # Guardar el tablero vinculado
         database.set_task_linked_board(self.task_id, self.linked_board_combo.currentData(), self.db_path)
 
+        self._update_notes_last_edited_label(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         self.modified = True
         self.accept()
+
+    def _update_notes_last_edited_label(self, raw_timestamp):
+        """Formatea y muestra la fecha y hora de última edición en la cabecera de NOTES."""
+        if not raw_timestamp or not hasattr(self, "notes_edited_label"):
+            return
+        try:
+            cleaned = str(raw_timestamp).replace("T", " ").split(".")[0]
+            dt = datetime.strptime(cleaned, "%Y-%m-%d %H:%M:%S")
+            formatted = dt.strftime("%d/%m/%Y %H:%M")
+        except Exception:
+            formatted = str(raw_timestamp)
+        self.notes_edited_label.setText(t("task_detail.notes_last_edited", timestamp=formatted))
 
     def _on_timer_toggle_clicked(self):
         """Inicia el temporizador, o lo reinicia a ahora si ya estaba en marcha. Acción
@@ -796,7 +831,8 @@ class TaskDetailDialog(QDialog):
         h.setSpacing(6)
 
         is_local = _is_local_link(link["url"])
-        missing = is_local and not os.path.exists(link["url"])
+        is_unc = _is_unc_path(link["url"])
+        missing = is_local and not is_unc and not os.path.exists(link["url"])
         text_color = styles.COLORS["danger"] if missing else styles.COLORS["accent"]
         icon_name = "paperclip" if is_local else "link-2"
 
@@ -824,12 +860,13 @@ class TaskDetailDialog(QDialog):
         h.addWidget(del_btn)
         return row
 
+    def _confirm_open_untrusted_link(self, url, is_local):
+        """Verifies if the target is a UNC share, executable/script, or unsafe scheme,
+        and prompts the user with a security warning requiring explicit confirmation."""
+        return confirm_open_untrusted_link(self, url, is_local)
+
     def _open_link(self, url, is_local):
-        qurl = QUrl.fromLocalFile(url) if is_local else QUrl(url)
-        if not QDesktopServices.openUrl(qurl):
-            QMessageBox.warning(
-                self, t("task_detail.link_open_failed_title"), t("task_detail.link_open_failed_msg")
-            )
+        open_link_safely(self, url, is_local)
 
     def browse_local_file(self):
         path, _ = QFileDialog.getOpenFileName(self, t("task_detail.browse_file_title"))
@@ -902,7 +939,7 @@ class TaskDetailDialog(QDialog):
         w = self.scroll_area.viewport().width()
         if w <= 0:
             return
-        content_w = max(100, min(330, w - 68))
+        content_w = max(150, min(500, w - 48))
         for i in range(self.logs_layout.count()):
             item = self.logs_layout.itemAt(i)
             if item and item.widget() and isinstance(item.widget(), LogEntryWidget):
@@ -911,10 +948,27 @@ class TaskDetailDialog(QDialog):
     def _chat_image_width(self):
         """Ancho máximo (px) para imágenes y tablas en el chat: reservando márgenes y la
         barra de scroll para que nunca aparezca scroll horizontal ni desborden las tarjetas."""
-        w = self.scroll_area.viewport().width()
+        w = self.scroll_area.viewport().width() if hasattr(self, "scroll_area") else 0
         if w > self.width() * 0.5 or w <= 0:
             w = int(self.width() * 5 / 11) - 40
-        return max(100, min(330, w - 68))
+        return max(150, min(500, w - 48))
+
+    def _notes_image_width(self):
+        """Ancho máximo (px) para imágenes en las notas (panel izquierdo ancho)."""
+        w = self.desc_input.viewport().width() if hasattr(self, "desc_input") else 0
+        return max(150, min(900, w - 24)) if w > 0 else 600
+
+    def _on_local_link_pasted(self, url, label):
+        """Al pegar un enlace o archivo local en Notas o Diario, se añade automáticamente
+        a la lista de enlaces/adjuntos de la tarea si aún no existía."""
+        if not url:
+            return
+        existing_links = database.get_task_links(self.task_id, self.db_path)
+        existing_urls = {lnk["url"] for lnk in existing_links}
+        if url not in existing_urls:
+            database.add_task_link(self.task_id, url, label, self.db_path)
+            self.modified = True
+            self.reload_links()
 
     def add_log_entry(self):
         """Crea una nueva entrada de diario con el texto del input."""

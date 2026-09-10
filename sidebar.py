@@ -182,11 +182,13 @@ class BoardButton(QFrame):
         sync_act = None
         unlink_act = None
         link_act = None
+        connect_act = None
         if self.sync_path:
             sync_act = menu.addAction(t("sync.menu_sync_now"))
             unlink_act = menu.addAction(t("sync.menu_unlink"))
         else:
             link_act = menu.addAction(t("sync.link_btn"))
+            connect_act = menu.addAction(t("sync.menu_open_shared"))
         menu.addSeparator()
         archive_act = menu.addAction(
             t("sidebar.board_button.menu_unarchive") if self.archived else t("sidebar.board_button.menu_archive")
@@ -200,6 +202,8 @@ class BoardButton(QFrame):
             self.sync_action_requested.emit(self.board_id, "unlink")
         elif link_act and selected == link_act:
             self.sync_action_requested.emit(self.board_id, "link")
+        elif connect_act and selected == connect_act:
+            self.sync_action_requested.emit(self.board_id, "connect")
 
     def update_style(self):
         if self.active:
@@ -307,6 +311,24 @@ class BoardEditDialog(QDialog):
 
         layout.addLayout(btn_layout)
 
+        self.connect_requested = False
+        if not name:
+            layout.addSpacing(6)
+            or_sep = QLabel(t("sync.or_connect_existing_prompt"))
+            or_sep.setAlignment(Qt.AlignCenter)
+            or_sep.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 11px; background: transparent;")
+            layout.addWidget(or_sep)
+
+            self.connect_btn = QPushButton(f" {t('sync.menu_open_shared')}")
+            self.connect_btn.setCursor(Qt.PointingHandCursor)
+            self.connect_btn.setIcon(lucide_icon("cloud", styles.COLORS['text_soft'], 15))
+            self.connect_btn.clicked.connect(self._on_connect_clicked)
+            layout.addWidget(self.connect_btn)
+
+    def _on_connect_clicked(self):
+        self.connect_requested = True
+        self.accept()
+
     def _on_color_picked(self, color):
         self.color = color
 
@@ -345,6 +367,7 @@ class BoardConfigDialog(QDialog):
             ("copy", "copy", t("sidebar.copy_board_btn"), False),
             ("archive", "archive",
              t("sidebar.board_button.menu_unarchive") if archived else t("sidebar.board_button.menu_archive"), False),
+            ("connect_cloud", "cloud", t("sync.menu_open_shared"), False),
             ("import", "upload", t("sidebar.import_btn"), False),
             ("export", "download", t("sidebar.export_btn"), False),
             ("delete", "trash-2", t("sidebar.delete_board_btn"), True),
@@ -700,13 +723,47 @@ class SidebarWidget(QFrame):
             self.delete_board()
         elif action == "archive":
             self.handle_archive_toggle(board_id, not archived)
+        elif action == "connect_cloud":
+            self.connect_shared_board()
         elif action == "import":
             self.show_import_dialog()
         elif action == "export":
             self.show_export_dialog()
 
+    def connect_shared_board(self):
+        """Permite al usuario seleccionar un archivo .ekboard compartido existente y conectarlo."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            t("sync.open_shared_title"),
+            "",
+            t("sync.dialog_filter")
+        )
+        if not file_path:
+            return
+
+        try:
+            board_id, res = board_sync.connect_shared_board_from_file(file_path, self.db_path)
+            if res.status != "error":
+                self.reload_boards(select_board_id=board_id)
+                self.select_board(board_id)
+                self.board_changed.emit()
+                board_info = database.get_board(board_id, self.db_path)
+                name = board_info["name"] if board_info else ""
+                QMessageBox.information(
+                    self,
+                    t("sync.success_title"),
+                    t("sync.open_shared_success", name=name)
+                )
+            else:
+                QMessageBox.warning(self, t("sync.error_title"), res.message)
+        except Exception as exc:
+            QMessageBox.warning(self, t("sync.error_title"), str(exc))
+
     def handle_sync_action(self, board_id, action):
         """Gestiona las acciones de sincronización solicitadas desde el menú contextual de un tablero."""
+        if action == "connect":
+            self.connect_shared_board()
+            return
         if action == "sync":
             res = board_sync.sync_board_with_file(board_id, db_path=self.db_path)
             if res.status == "error":
@@ -757,8 +814,6 @@ class SidebarWidget(QFrame):
         """Abre el diálogo modal de exportación (JSON/CSV/MD, todo o tablero activo)."""
         dlg = ExportDialog(self.db_path, active_board_id=self.active_board_id, parent=self)
         dlg.exec()
-
-    show_export_menu = show_export_dialog  # Compatibilidad hacia atrás
 
     def show_import_dialog(self):
         """Abre el selector de archivo JSON y el diálogo de confirmación de importación."""
@@ -836,6 +891,9 @@ class SidebarWidget(QFrame):
         """Abre el diálogo para crear un nuevo tablero con nombre y color."""
         dialog = BoardEditDialog(t("sidebar.board_edit.new_title"), name="", color="#3b82f6", parent=self)
         if dialog.exec() == QDialog.Accepted:
+            if getattr(dialog, "connect_requested", False):
+                self.connect_shared_board()
+                return
             name, color = dialog.get_data()
             board_id = database.create_board(name, color, self.db_path)
             self.reload_boards(select_board_id=board_id)

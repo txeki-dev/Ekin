@@ -436,6 +436,220 @@ def test_open_link_no_warning_when_openurl_succeeds(qapp, db_path, monkeypatch):
     assert warnings == []
 
 
+def test_is_unc_path_detection():
+    _is_unc_path = task_detail_dialog_module._is_unc_path
+    assert _is_unc_path(r"\\server\share\file.pdf") is True
+    assert _is_unc_path("//server/share/file.pdf") is True
+    assert _is_unc_path("file://server/share/file.pdf") is True
+    assert _is_unc_path("file:////server/share/file.pdf") is True
+    assert _is_unc_path(r"C:\Users\foo\bar.pdf") is False
+    assert _is_unc_path("/home/user/file.txt") is False
+    assert _is_unc_path("file:///C:/Users/foo/bar.pdf") is False
+    assert _is_unc_path("https://example.com") is False
+    assert _is_unc_path("") is False
+    assert _is_unc_path(None) is False
+
+
+def _cleanup_dialog(qapp, dlg):
+    dlg.close()
+    dlg.deleteLater()
+    qapp.sendPostedEvents(dlg, QEvent.Type.DeferredDelete)
+
+
+def test_open_link_warns_and_blocks_executable_when_cancelled(qapp, db_path, monkeypatch):
+    task_id = _make_task(db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+    calls = []
+    monkeypatch.setattr(task_detail_dialog_module.QDesktopServices, "openUrl", lambda *a: calls.append(a))
+    warnings = []
+    monkeypatch.setattr(
+        task_detail_dialog_module.QMessageBox, "warning",
+        lambda parent, title, msg, btns=None, default=None: (
+            warnings.append((title, msg)),
+            task_detail_dialog_module.QMessageBox.StandardButton.Cancel
+        )[1]
+    )
+
+    try:
+        dlg._open_link(r"C:\danger\payload.exe", True)
+        assert len(warnings) == 1
+        assert "payload.exe" in warnings[0][1]
+        assert calls == []
+    finally:
+        _cleanup_dialog(qapp, dlg)
+
+
+def test_open_link_allows_executable_when_user_confirms(qapp, db_path, monkeypatch):
+    task_id = _make_task(db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+    calls = []
+    monkeypatch.setattr(task_detail_dialog_module.QDesktopServices, "openUrl", lambda *a: calls.append(a) or True)
+    warnings = []
+    monkeypatch.setattr(
+        task_detail_dialog_module.QMessageBox, "warning",
+        lambda parent, title, msg, btns=None, default=None: (
+            warnings.append((title, msg)),
+            task_detail_dialog_module.QMessageBox.StandardButton.Open
+        )[1]
+    )
+
+    try:
+        dlg._open_link(r"C:\tools\build.bat", True)
+        assert len(warnings) == 1
+        assert "build.bat" in warnings[0][1]
+        assert len(calls) == 1
+    finally:
+        _cleanup_dialog(qapp, dlg)
+
+
+def test_open_link_warns_and_blocks_unc_when_cancelled(qapp, db_path, monkeypatch):
+    task_id = _make_task(db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+    calls = []
+    monkeypatch.setattr(task_detail_dialog_module.QDesktopServices, "openUrl", lambda *a: calls.append(a))
+    warnings = []
+    monkeypatch.setattr(
+        task_detail_dialog_module.QMessageBox, "warning",
+        lambda parent, title, msg, btns=None, default=None: (
+            warnings.append((title, msg)),
+            task_detail_dialog_module.QMessageBox.StandardButton.Cancel
+        )[1]
+    )
+
+    try:
+        dlg._open_link(r"\\remote-server\share\document.pdf", True)
+        assert len(warnings) == 1
+        assert "network share" in warnings[0][1].lower() or "unc" in warnings[0][1].lower()
+        assert calls == []
+    finally:
+        _cleanup_dialog(qapp, dlg)
+
+
+def test_open_link_handles_unc_executable(qapp, db_path, monkeypatch):
+    task_id = _make_task(db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+    calls = []
+    monkeypatch.setattr(task_detail_dialog_module.QDesktopServices, "openUrl", lambda *a: calls.append(a))
+    warnings = []
+    monkeypatch.setattr(
+        task_detail_dialog_module.QMessageBox, "warning",
+        lambda parent, title, msg, btns=None, default=None: (
+            warnings.append((title, msg)),
+            task_detail_dialog_module.QMessageBox.StandardButton.Cancel
+        )[1]
+    )
+
+    try:
+        dlg._open_link(r"\\remote-server\share\payload.ps1", True)
+        assert len(warnings) == 1
+        msg_lower = warnings[0][1].lower()
+        assert "payload.ps1" in msg_lower
+        assert "network share" in msg_lower or "remote" in msg_lower
+        assert calls == []
+    finally:
+        _cleanup_dialog(qapp, dlg)
+
+
+def test_open_link_blocks_file_uri_executable_bypass(qapp, db_path, monkeypatch):
+    task_id = _make_task(db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+    calls = []
+    monkeypatch.setattr(task_detail_dialog_module.QDesktopServices, "openUrl", lambda *a: calls.append(a))
+    warnings = []
+    monkeypatch.setattr(
+        task_detail_dialog_module.QMessageBox, "warning",
+        lambda parent, title, msg, btns=None, default=None: (
+            warnings.append((title, msg)),
+            task_detail_dialog_module.QMessageBox.StandardButton.Cancel
+        )[1]
+    )
+
+    try:
+        # is_local is False for file:// per _is_local_link, but it must still be intercepted
+        dlg._open_link("file:///C:/malicious.cmd", False)
+        assert len(warnings) == 1
+        assert "malicious.cmd" in warnings[0][1]
+        assert calls == []
+    finally:
+        _cleanup_dialog(qapp, dlg)
+
+
+def test_build_link_row_skips_exists_check_on_unc(qapp, db_path, monkeypatch):
+    task_id = _make_task(db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+    exists_calls = []
+    monkeypatch.setattr(
+        task_detail_dialog_module.os.path, "exists",
+        lambda p: exists_calls.append(p) or True
+    )
+
+    link = {"id": 1, "url": r"\\slow-server\share\doc.pdf", "label": "Remote Doc"}
+    row = dlg._build_link_row(link)
+
+    try:
+        assert len(exists_calls) == 0
+    finally:
+        row.deleteLater()
+        _cleanup_dialog(qapp, dlg)
+
+
+def test_markdown_edit_untrusted_link_blocks_executable_when_cancelled(qapp, monkeypatch):
+    from detail_dialog.markdown_edit import MarkdownTextEdit
+    from detail_dialog.security_utils import QMessageBox, QDesktopServices
+    from PySide6.QtCore import QPoint, Qt
+    from PySide6.QtGui import QMouseEvent
+
+    editor = MarkdownTextEdit()
+    editor.setHtml('<p><a href="C:\\danger\\run.bat">Run Me</a></p>')
+
+    calls = []
+    monkeypatch.setattr(QDesktopServices, "openUrl", lambda *a: calls.append(a))
+    warnings = []
+    monkeypatch.setattr(
+        QMessageBox, "warning",
+        lambda parent, title, msg, btns=None, default=None: (
+            warnings.append((title, msg)),
+            QMessageBox.StandardButton.Cancel
+        )[1]
+    )
+
+    # Simular clic sobre el enlace
+    editor._press_pos = QPoint(2, 2)
+    monkeypatch.setattr(editor, "anchorAt", lambda pos: r"C:\danger\run.bat")
+    from PySide6.QtCore import QPointF
+    ev = QMouseEvent(QEvent.Type.MouseButtonRelease, QPointF(2, 2), QPointF(2, 2), Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    editor.mouseReleaseEvent(ev)
+
+    assert len(warnings) == 1
+    assert "run.bat" in warnings[0][1]
+    assert calls == []
+
+
+def test_log_entry_untrusted_link_blocks_executable_when_cancelled(qapp, monkeypatch):
+    from detail_dialog.log_entry import LogEntryWidget
+    from detail_dialog.security_utils import QMessageBox, QDesktopServices
+
+    log_data = {"id": 1, "content": "Test log", "created_at": "2026-09-10 12:00:00"}
+    entry = LogEntryWidget(log_data, delete_callback=lambda: None, save_edit_callback=lambda id, txt: None)
+
+    calls = []
+    monkeypatch.setattr(QDesktopServices, "openUrl", lambda *a: calls.append(a))
+    warnings = []
+    monkeypatch.setattr(
+        QMessageBox, "warning",
+        lambda parent, title, msg, btns=None, default=None: (
+            warnings.append((title, msg)),
+            QMessageBox.StandardButton.Cancel
+        )[1]
+    )
+
+    entry._on_content_link_activated(r"\\evil-server\share\exploit.ps1")
+
+    assert len(warnings) == 1
+    assert "exploit.ps1" in warnings[0][1]
+    assert calls == []
+
+
 # --- SettingsDialog: umbral de aviso del temporizador (v0.9.0) ---
 
 def test_settings_dialog_timer_alert_spin_reflects_saved_value(qapp, db_path):
@@ -1355,6 +1569,103 @@ def test_ai_spec_dialog_expanded_widths(qapp, db_path):
     if dlg.model_combo.lineEdit():
         assert dlg.model_combo.lineEdit().cursorPosition() == 0
     dlg.close()
+
+
+def test_bulk_add_task_dialog(qapp, db_path):
+    """Verifica que BulkAddTaskDialog crea múltiples tareas en las columnas seleccionadas."""
+    import database
+    from bulk_add_dialog import BulkAddTaskDialog
+
+    board_id = database.create_board("Tablero Bulk", db_path=db_path)
+    col1_id = database.create_column(board_id, "Columna 1", db_path=db_path)
+    col2_id = database.create_column(board_id, "Columna 2", db_path=db_path)
+
+    dlg = BulkAddTaskDialog(board_id, db_path=db_path)
+    dlg.table.item(0, 0).setText("Tarea Bulk 1")
+    dlg.table.item(0, 1).setText("Desc Bulk 1")
+    dlg.add_row()
+    dlg.table.item(1, 0).setText("Tarea Bulk 2")
+    dlg.table.item(1, 1).setText("Desc Bulk 2")
+    combo2 = dlg.table.cellWidget(1, 2)
+    combo2.setCurrentIndex(1)
+
+    dlg._on_create()
+
+    tasks1 = database.get_tasks(col1_id, db_path=db_path)
+    tasks2 = database.get_tasks(col2_id, db_path=db_path)
+    assert len(tasks1) == 1
+    assert tasks1[0]["title"] == "Tarea Bulk 1"
+    assert tasks1[0]["description"] == "Desc Bulk 1"
+    assert len(tasks2) == 1
+    assert tasks2[0]["title"] == "Tarea Bulk 2"
+    assert tasks2[0]["description"] == "Desc Bulk 2"
+    dlg.close()
+
+
+def test_task_detail_notes_edited_and_row_c(qapp, db_path):
+    """Verifica el label de última edición de notas y que Priority y LinkedIn board estén en la tercera fila."""
+    import database
+    from detail_dialog import TaskDetailDialog
+
+    board_id = database.create_board("B_Notes", db_path=db_path)
+    col_id = database.create_column(board_id, "C_Notes", db_path=db_path)
+    t_id = database.create_task(col_id, "T_Notes", description="Texto inicial", db_path=db_path)
+
+    dlg = TaskDetailDialog(t_id, db_path=db_path)
+    assert hasattr(dlg, "notes_edited_label")
+    assert dlg.notes_edited_label.text() != ""
+
+    assert hasattr(dlg, "priority_combo")
+    assert hasattr(dlg, "linked_board_combo")
+    assert dlg.priority_combo.count() > 0
+    dlg.close()
+
+
+def test_markdown_edit_quote_and_local_link(qapp):
+    """Verifica la inserción de citas estructuradas y la emisión de señal para enlaces locales."""
+    from detail_dialog.markdown_edit import MarkdownTextEdit
+    from PySide6.QtCore import QMimeData, QUrl
+
+    editor = MarkdownTextEdit()
+    editor.insert_quote()
+    html_content = editor.toHtml()
+    assert "<table" in html_content
+    assert "border=" in html_content or "cellpadding=" in html_content
+
+    received = []
+    editor.local_link_pasted.connect(lambda url, label: received.append((url, label)))
+
+    mime = QMimeData()
+    mime.setUrls([QUrl.fromLocalFile(r"C:\test\documento.pdf")])
+    editor.insertFromMimeData(mime)
+
+    assert len(received) == 1
+    assert "documento.pdf" in received[0][0]
+    assert received[0][1] == "documento.pdf"
+
+
+def test_markdown_edit_image_resize_methods(qapp):
+    """Verifica que el método _resize_image calcula y aplica las dimensiones escaladas."""
+    from detail_dialog.markdown_edit import MarkdownTextEdit
+    from PySide6.QtGui import QImage, QTextCursor
+
+    editor = MarkdownTextEdit()
+    editor._insert_image(QImage(200, 100, QImage.Format.Format_RGB32))
+
+    cursor = editor.textCursor()
+    cursor.movePosition(QTextCursor.Start)
+    cursor.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor)
+
+    editor._resize_image(cursor, 0.5)
+    fmt = cursor.charFormat().toImageFormat()
+    assert fmt.isValid()
+    assert fmt.width() == 100.0
+    assert fmt.height() == 50.0
+
+    editor._resize_image(cursor, custom_width=300, custom_height=150)
+    fmt2 = cursor.charFormat().toImageFormat()
+    assert fmt2.width() == 300.0
+    assert fmt2.height() == 150.0
 
 
 

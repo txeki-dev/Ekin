@@ -334,3 +334,91 @@ def test_sync_remote_deletion_does_not_resurrect(sync_test_db):
     assert len(reloaded_file["tasks"]) == 1
 
 
+def test_connect_shared_board_from_file(sync_test_db, tmp_path):
+    """Verifica que un segundo usuario puede conectar un archivo .ekboard compartido desde la nube."""
+    db_user1 = sync_test_db["db_path"]
+    board_user1_id = sync_test_db["board_id"]
+    sync_file = str(tmp_path / "shared_cloud_board.ekboard")
+
+    # Usuario 1 exporta el tablero a la nube
+    board_sync.sync_board_with_file(board_user1_id, sync_file, db_user1)
+    assert os.path.exists(sync_file)
+
+    # Usuario 2 tiene una base de datos local vacía y conecta el archivo compartido
+    db_user2 = str(tmp_path / "user2.db")
+    database.init_db(db_user2)
+
+    board_user2_id, res = board_sync.connect_shared_board_from_file(sync_file, db_path=db_user2)
+    assert res.status == "imported"
+    assert board_user2_id is not None
+
+    b2 = database.get_board(board_user2_id, db_path=db_user2)
+    assert b2["name"] == "Tablero Sincronizado"
+    assert b2["color"] == "#3b82f6"
+
+    # Verificar que las columnas y tareas se crearon fielmente
+    cols = database.get_columns(board_user2_id, db_path=db_user2)
+    assert len(cols) == 2
+    col_por_hacer = next(c for c in cols if c["name"] == "Por hacer")
+    tasks = database.get_tasks(col_por_hacer["id"], db_path=db_user2)
+    assert len(tasks) == 1
+    assert tasks[0]["title"] == "Tarea 1"
+
+    # Verificar que el sync_path quedó configurado para Usuario 2
+    sync_info = database.get_board_sync_info(board_user2_id, db_path=db_user2)
+    assert sync_info["sync_path"] == sync_file
+
+
+def test_sync_aborts_when_premerge_backup_fails(sync_test_db, monkeypatch):
+    """Verifica que si la copia de seguridad pre-fusión falla (ej. disco lleno),
+    la sincronización destructiva se aborta de inmediato para proteger los datos locales."""
+    db_path = sync_test_db["db_path"]
+    board_id = sync_test_db["board_id"]
+    col1_id = sync_test_db["col1_id"]
+    sync_file = str(sync_test_db["tmp_path"] / "backup_fail_test.ekboard")
+
+    # Exportación inicial
+    board_sync.sync_board_with_file(board_id, sync_file, db_path)
+
+    # Simular cambio remoto en el archivo .ekboard
+    with open(sync_file, "r", encoding="utf-8") as f:
+        file_data = json.load(f)
+    file_data["tasks"][0]["title"] = "Título modificado remotamente"
+    with open(sync_file, "w", encoding="utf-8") as f:
+        json.dump(file_data, f, indent=2)
+
+    # Simular fallo en la creación de backup pre-merge (ej: permiso denegado o error IO)
+    monkeypatch.setattr(board_sync, "create_premerge_backup", lambda *args, **kwargs: "")
+
+    # Intentar sincronizar: debe abortar con status 'error'
+    res = board_sync.sync_board_with_file(board_id, sync_file, db_path)
+    assert res.status == "error"
+    assert "pre-merge backup" in res.message or "pre-fusión" in res.message
+
+    # Verificar que la tarea local no fue alterada ni corrompida
+    local_tasks = database.get_tasks(col1_id, db_path)
+    assert local_tasks[0]["title"] == "Tarea 1"
+
+
+def test_board_sync_worker(sync_test_db, qapp):
+    """Verifica que BoardSyncWorker ejecuta la sincronización en segundo plano y emite sync_finished."""
+    db_path = sync_test_db["db_path"]
+    board_id = sync_test_db["board_id"]
+    sync_file = str(sync_test_db["tmp_path"] / "worker_test.ekboard")
+
+    worker = board_sync.BoardSyncWorker(board_id, sync_path=sync_file, db_path=db_path)
+    results = []
+    worker.sync_finished.connect(lambda res: results.append(res))
+
+    worker.start()
+    worker.wait(5000)
+    qapp.processEvents()
+
+    assert len(results) == 1
+    assert results[0].status in ("exported", "up_to_date")
+    assert results[0].board_id == board_id
+
+
+
+
+

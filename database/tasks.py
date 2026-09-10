@@ -5,7 +5,7 @@ from .tags import get_task_tags, get_task_tags_bulk
 from .links import get_task_links, get_task_links_bulk
 
 __all__ = [
-    "create_task", "get_tasks", "get_task", "update_task", "update_task_due_date",
+    "create_task", "create_tasks_batch", "get_tasks", "get_task", "update_task", "update_task_due_date",
     "set_task_due_time", "next_occurrence", "set_task_recurrence", "advance_recurrence",
     "advance_overdue_recurring", "update_task_position", "update_task_positions", "delete_task",
     "set_task_linked_board", "set_task_timer_started",
@@ -29,6 +29,60 @@ def create_task(column_id, title, description="", tag_text="", tag_color="#6b728
             (column_id, title, description, tag_text, tag_color, next_pos, due_date, t_uuid, version)
         )
         return cursor.lastrowid
+
+
+def create_tasks_batch(tasks_data, db_path=None):
+    """Crea múltiples tareas de forma atómica dentro de una única transacción SQLite.
+
+    tasks_data: iterable de tuplas (column_id, title, description, [tag_text, tag_color, due_date, task_uuid, version])
+                o diccionarios con claves equivalentes.
+    Retorna la lista de IDs autogenerados de las tareas creadas.
+    """
+    if not tasks_data:
+        return []
+    import uuid
+    created_ids = []
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        next_pos_by_col = {}
+
+        for item in tasks_data:
+            if isinstance(item, dict):
+                col_id = item["column_id"]
+                title = item["title"]
+                desc = item.get("description", "")
+                tag_text = item.get("tag_text", "")
+                tag_color = item.get("tag_color", "#6b7280")
+                due_date = item.get("due_date", None)
+                t_uuid = item.get("task_uuid") or str(uuid.uuid4())
+                ver = item.get("version", 1)
+            else:
+                col_id = item[0]
+                title = item[1]
+                desc = item[2] if len(item) > 2 else ""
+                tag_text = item[3] if len(item) > 3 else ""
+                tag_color = item[4] if len(item) > 4 else "#6b7280"
+                due_date = item[5] if len(item) > 5 else None
+                t_uuid = item[6] if len(item) > 6 and item[6] else str(uuid.uuid4())
+                ver = item[7] if len(item) > 7 else 1
+
+            if col_id not in next_pos_by_col:
+                cursor.execute("SELECT COALESCE(MAX(position), -1) FROM tasks WHERE column_id = ?", (col_id,))
+                max_pos = cursor.fetchone()[0]
+                next_pos_by_col[col_id] = max_pos + 1
+            else:
+                next_pos_by_col[col_id] += 1
+
+            pos = next_pos_by_col[col_id]
+
+            cursor.execute(
+                """INSERT INTO tasks (column_id, title, description, tag_text, tag_color, position, due_date, task_uuid, version)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (col_id, title, desc, tag_text, tag_color, pos, due_date, t_uuid, ver)
+            )
+            created_ids.append(cursor.lastrowid)
+
+    return created_ids
 
 _TASK_SELECT_COLUMNS = """
     t.id, t.column_id, t.title, t.description, t.tag_text, t.tag_color, t.position,

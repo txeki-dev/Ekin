@@ -16,8 +16,13 @@ def get_connection(db_path=None):
     if db_path is None:
         import database
         db_path = getattr(database, "DB_NAME", DB_NAME)
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=15.0)
     conn.execute("PRAGMA foreign_keys = ON;")
+    conn.execute("PRAGMA busy_timeout = 15000;")
+    try:
+        conn.execute("PRAGMA journal_mode = WAL;")
+    except Exception:
+        pass
     conn.row_factory = sqlite3.Row  # Permite acceder a las columnas por nombre
     try:
         yield conn

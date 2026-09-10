@@ -1,14 +1,15 @@
-from PySide6.QtCore import Qt, QBuffer, QIODevice, QUrl, QPointF, QSize
+from PySide6.QtCore import Qt, QBuffer, QIODevice, QUrl, QPointF, QSize, Signal
 from PySide6.QtWidgets import (
     QTextEdit, QPushButton, QWidget, QHBoxLayout, QVBoxLayout,
     QInputDialog, QDialog, QLabel, QComboBox, QPlainTextEdit,
-    QColorDialog, QMenu, QLineEdit
+    QColorDialog, QMenu, QLineEdit, QApplication
 )
 from PySide6.QtGui import (
     QFont, QTextCharFormat, QTextListFormat, QTextCursor, QImage,
-    QTextTableFormat, QColor, QDesktopServices,
+    QTextTableFormat, QColor, QTextDocument,
     QPixmap, QPainter, QPen, QIcon
 )
+import os
 import html
 import re
 import styles
@@ -242,6 +243,8 @@ class MarkdownTextEdit(QTextEdit):
     - Enter sobre una viñeta vacía -> sale de la lista (comportamiento habitual).
     """
 
+    local_link_pasted = Signal(str, str)  # (url_or_path, label) emitido al pegar archivo/enlace local
+
     # Marcadores que disparan cada tipo de lista al pulsar espacio
     _BULLET_MARKERS = ("*", "-", "+")
     _ORDERED_RE = re.compile(r"\d+[.)]")
@@ -266,7 +269,7 @@ class MarkdownTextEdit(QTextEdit):
 
     def mouseReleaseEvent(self, event):
         """Un clic (no un arrastre de selección) sobre una imagen pegada la abre en
-        grande; sobre '✕ Borrar' elimina el bloque de código; sobre un enlace web lo abre en el navegador."""
+        grande; sobre '✕ Borrar' elimina el bloque de código; sobre un enlace web o local lo abre con la app predeterminada."""
         pos = event.position().toPoint()
         if event.button() == Qt.LeftButton and self._press_pos is not None:
             moved = (pos - self._press_pos).manhattanLength()
@@ -279,7 +282,12 @@ class MarkdownTextEdit(QTextEdit):
                     show_image_preview(anchor, self)
                     return
                 elif anchor.startswith(("http://", "https://", "mailto:", "file:", "ftp://")):
-                    QDesktopServices.openUrl(QUrl(anchor))
+                    from .security_utils import open_link_safely
+                    open_link_safely(self.window(), anchor)
+                    return
+                elif anchor and (os.path.exists(anchor) or re.match(r'^[a-zA-Z]:[/\\]', anchor) or anchor.startswith(("\\\\", "//"))):
+                    from .security_utils import open_link_safely
+                    open_link_safely(self.window(), anchor)
                     return
         super().mouseReleaseEvent(event)
 
@@ -400,16 +408,146 @@ class MarkdownTextEdit(QTextEdit):
             self.setTextCursor(cursor)
             self.setFocus()
 
+    def _image_cursor_at(self, pos):
+        """Devuelve un QTextCursor posicionado en la imagen bajo `pos`, o None si no hay imagen."""
+        cursor = self.cursorForPosition(pos)
+        pos_idx = cursor.position()
+        doc = self.document()
+        for p in (pos_idx, max(0, pos_idx - 1)):
+            if p < doc.characterCount():
+                c = QTextCursor(doc)
+                c.setPosition(p)
+                c.setPosition(p + 1, QTextCursor.KeepAnchor)
+                if c.charFormat().isImageFormat():
+                    return c
+        return None
+
+    def _resize_image(self, cursor, new_width=None, new_height=None, custom_width=None, custom_height=None):
+        """Ajusta el ancho y alto (px) de la imagen indicada.
+        Si new_width es <= 2.0 (factor de escala como 0.5 o 0.75), se calcula respecto al tamaño actual."""
+        if custom_width is not None:
+            new_width = custom_width
+        if custom_height is not None:
+            new_height = custom_height
+        if new_width is None:
+            return
+        cursor.beginEditBlock()
+        fmt = cursor.charFormat().toImageFormat()
+        old_w = fmt.width()
+        old_h = fmt.height()
+        if (old_w <= 0 or old_h <= 0) and fmt.name():
+            pix = self.document().resource(QTextDocument.ResourceType.ImageResource, QUrl(fmt.name()))
+            if pix and hasattr(pix, "width") and pix.width() > 0:
+                old_w = pix.width()
+                old_h = pix.height()
+
+        if 0 < new_width <= 2.0 and old_w > 0:
+            target_w = int(old_w * new_width)
+        else:
+            target_w = int(new_width)
+
+        if new_height is not None:
+            target_h = int(new_height)
+        elif old_w > 0 and old_h > 0:
+            ratio = old_h / old_w
+            target_h = int(target_w * ratio)
+        else:
+            target_h = target_w
+
+        fmt.setWidth(target_w)
+        fmt.setHeight(target_h)
+        cursor.setCharFormat(fmt)
+        cursor.endEditBlock()
+        self.setFocus()
+
+    def _prompt_custom_image_size(self, cursor, current_w):
+        """Pide al usuario un ancho en píxeles y redimensiona la imagen."""
+        val, ok = QInputDialog.getInt(
+            self,
+            t("markdown_edit.image_size_dialog_title"),
+            t("markdown_edit.image_size_dialog_label"),
+            int(current_w) if current_w > 0 else 300,
+            40,
+            2400
+        )
+        if ok and val > 0:
+            self._resize_image(cursor, val)
+
+    def insert_quote(self):
+        """Inserta un bloque de cita estilizado con barra vertical de acento."""
+        cursor = self.textCursor()
+        selected = cursor.selectedText()
+        accent = styles.COLORS["accent"]
+        text_c = styles.COLORS["text_soft"]
+        cursor.beginEditBlock()
+        if selected:
+            lines = selected.replace('\u2029', '\n').split('\n')
+            inner = "<br/>".join(html.escape(line) for line in lines)
+        else:
+            inner = html.escape(t("markdown_edit.quote_placeholder"))
+        quote_html = (
+            f'<table border="0" cellpadding="0" cellspacing="0" style="margin: 6px 0px 6px 4px;">'
+            f'<tr>'
+            f'<td width="3" bgcolor="{accent}" style="background-color: {accent}; width: 3px;">&nbsp;</td>'
+            f'<td style="padding-left: 10px;">'
+            f'<p style="margin: 0;"><span style="color: {text_c}; font-style: italic;">{inner}</span></p>'
+            f'</td>'
+            f'</tr></table><p></p>'
+        )
+        cursor.insertHtml(quote_html)
+        cursor.endEditBlock()
+        self.setTextCursor(cursor)
+        self.setFocus()
+
+    def paste_plain_text(self):
+        """Pega el contenido del portapapeles como texto plano sin formato."""
+        clipboard = QApplication.clipboard()
+        text = clipboard.text()
+        if text:
+            self.insertPlainText(text)
+
     def contextMenuEvent(self, event):
-        """Menú contextual estándar ampliado con opciones de mayúsculas/minúsculas y borrar código."""
+        """Menú contextual estándar ampliado con opciones de mayúsculas/minúsculas,
+        borrar código, redimensionar imagen y pegar sin formato."""
         menu = self.createStandardContextMenu()
         styles.style_menu(menu)
-        cursor = self.cursorForPosition(event.pos())
+        pos = event.pos()
+        cursor = self.cursorForPosition(pos)
         table = cursor.currentTable()
         if table:
             menu.addSeparator()
             act_del = menu.addAction(f"🗑️ {t('markdown_edit.delete_code_btn_menu')}")
-            act_del.triggered.connect(lambda: self._delete_code_block_at(event.pos()))
+            act_del.triggered.connect(lambda: self._delete_code_block_at(pos))
+
+        # Redimensionar imagen si el clic fue sobre una imagen
+        img_cursor = self._image_cursor_at(pos)
+        if img_cursor:
+            menu.addSeparator()
+            size_menu = menu.addMenu(f"🖼️ {t('markdown_edit.image_size_menu')}")
+            styles.style_menu(size_menu)
+
+            curr_fmt = img_cursor.charFormat().toImageFormat()
+            curr_w = curr_fmt.width() if curr_fmt.width() > 0 else 300
+            editor_w = max(100, self.viewport().width() - 30)
+
+            for label_key, frac in (
+                ("markdown_edit.image_size_25", 0.25),
+                ("markdown_edit.image_size_50", 0.50),
+                ("markdown_edit.image_size_75", 0.75),
+                ("markdown_edit.image_size_100", 1.0),
+            ):
+                target_px = int(editor_w * frac)
+                act = size_menu.addAction(f"{t(label_key)} ({target_px}px)")
+                act.triggered.connect(lambda _=False, c=QTextCursor(img_cursor), w=target_px: self._resize_image(c, w))
+
+            size_menu.addSeparator()
+            act_custom = size_menu.addAction(t("markdown_edit.image_size_custom"))
+            act_custom.triggered.connect(lambda _=False, c=QTextCursor(img_cursor), w=int(curr_w): self._prompt_custom_image_size(c, w))
+
+        # Pegar sin formato
+        menu.addSeparator()
+        act_plain = menu.addAction(t("markdown_edit.paste_plain_menu"))
+        act_plain.triggered.connect(self.paste_plain_text)
 
         text_cur = self.textCursor()
         if text_cur.hasSelection():
@@ -434,17 +572,31 @@ class MarkdownTextEdit(QTextEdit):
         ctrl = bool(event.modifiers() & Qt.ControlModifier)
         shift = bool(event.modifiers() & Qt.ShiftModifier)
 
+        # --- Pegar sin formato: Ctrl+Shift+V ---
+        if ctrl and shift and event.key() == Qt.Key_V:
+            self.paste_plain_text()
+            event.accept()
+            return
+
+        # --- Bloque de cita: Ctrl+Shift+Q ---
+        if ctrl and shift and event.key() == Qt.Key_Q:
+            self.insert_quote()
+            event.accept()
+            return
+
         # --- Negrita: Ctrl+B o Ctrl+N (Negrita en Word en español) ---
         if ctrl and event.key() in (Qt.Key_B, Qt.Key_N):
             fmt = QTextCharFormat()
-            fmt.setFontWeight(QFont.Normal if self.fontWeight() > QFont.Normal else QFont.Bold)
+            is_bold = self.currentCharFormat().fontWeight() >= QFont.Bold or self.fontWeight() > QFont.Normal
+            fmt.setFontWeight(QFont.Normal if is_bold else QFont.Bold)
             self.mergeCurrentCharFormat(fmt)
             event.accept()
             return
         # --- Cursiva: Ctrl+K (Cursiva en Word) o Ctrl+I ---
         if ctrl and event.key() in (Qt.Key_K, Qt.Key_I):
             fmt = QTextCharFormat()
-            fmt.setFontItalic(not self.fontItalic())
+            is_italic = self.currentCharFormat().fontItalic() or self.fontItalic()
+            fmt.setFontItalic(not is_italic)
             self.mergeCurrentCharFormat(fmt)
             event.accept()
             return
@@ -512,7 +664,7 @@ class MarkdownTextEdit(QTextEdit):
                 event.accept()
                 return
 
-        # --- Espacio: intentar convertir el marcador en una lista ---
+        # --- Espacio: intentar convertir el marcador en una lista o cita ---
         if event.key() == Qt.Key_Space and not cursor.hasSelection():
             block = cursor.block()
             # Texto de la línea desde su inicio hasta el cursor
@@ -521,6 +673,15 @@ class MarkdownTextEdit(QTextEdit):
 
             # Solo si aún no estamos dentro de una lista
             if block.textList() is None:
+                if marker == ">":
+                    cursor.beginEditBlock()
+                    cursor.movePosition(QTextCursor.StartOfBlock, QTextCursor.KeepAnchor)
+                    cursor.removeSelectedText()
+                    cursor.endEditBlock()
+                    self.setTextCursor(cursor)
+                    self.insert_quote()
+                    event.accept()
+                    return
                 if marker in self._BULLET_MARKERS:
                     self._convert_line_to_list(QTextListFormat.ListDisc)
                     event.accept()
@@ -603,21 +764,61 @@ class MarkdownTextEdit(QTextEdit):
         super().keyPressEvent(event)
 
     def insertFromMimeData(self, source):
-        """Al pegar: las imágenes se insertan como imagen; las tablas como tablas reales;
-        los enlaces se preservan como hipervínculos clicables; el resto sin formato."""
+        """Al pegar: archivos locales se insertan como enlaces y se emite señal para adjuntos;
+        imágenes se insertan como imagen escalada; el contenido HTML preserva formato de origen
+        (negrita, cursiva, colores, listas, tablas y enlaces); el texto plano se inserta normalmente."""
+        # 1. Archivos locales arrastrados o copiados desde el Explorador de Windows
+        if source.hasUrls():
+            urls = source.urls()
+            local_urls = [u for u in urls if u.isLocalFile() or u.scheme() == "file"]
+            if local_urls:
+                cursor = self.textCursor()
+                cursor.beginEditBlock()
+                for u in local_urls:
+                    local_path = u.toLocalFile() or u.path()
+                    filename = os.path.basename(local_path) or local_path
+                    file_href = u.toString() if u.toString().startswith("file:") else QUrl.fromLocalFile(local_path).toString()
+                    link_html = f'<a href="{file_href}">📄 {html.escape(filename)}</a>&nbsp;'
+                    cursor.insertHtml(link_html)
+                    self.local_link_pasted.emit(local_path, filename)
+                cursor.endEditBlock()
+                self.setTextCursor(cursor)
+                return
+
+        # 2. Si es imagen en portapapeles
         if source.hasImage():
             image = source.imageData()
             if isinstance(image, QImage) and not image.isNull():
                 self._insert_image(image)
                 return
+
+        # 3. Si el texto es una ruta o archivo local en disco
+        if source.hasText():
+            raw_text = source.text().strip().strip('"').strip("'")
+            is_file_url = raw_text.lower().startswith("file:///")
+            is_win_path = bool(re.match(r'^[a-zA-Z]:[/\\]', raw_text)) or raw_text.startswith(("\\\\", "//"))
+            if (is_file_url or is_win_path) and (os.path.exists(raw_text) or is_file_url or is_win_path):
+                local_path = QUrl(raw_text).toLocalFile() if is_file_url else raw_text
+                filename = os.path.basename(local_path) or local_path
+                file_href = raw_text if is_file_url else QUrl.fromLocalFile(local_path).toString()
+                cursor = self.textCursor()
+                cursor.beginEditBlock()
+                cursor.insertHtml(f'<a href="{file_href}">📄 {html.escape(filename)}</a>&nbsp;')
+                cursor.endEditBlock()
+                self.setTextCursor(cursor)
+                self.local_link_pasted.emit(local_path, filename)
+                return
+
+        # 4. Si contiene HTML (mantener formato de origen: negrita, cursiva, colores, tablas, enlaces, etc.)
         if source.hasHtml():
             html_content = source.html()
-            if "<img" in html_content.lower() or "<table" in html_content.lower():
-                from .html_utils import fit_html_images
-                target_w = self.image_width_provider() if self.image_width_provider else max(100, self.viewport().width() - 24)
-                fitted = fit_html_images(html_content, target_w)
-                self.textCursor().insertHtml(fitted)
-                return
+            from .html_utils import fit_html_images
+            target_w = self.image_width_provider() if self.image_width_provider else max(100, self.viewport().width() - 24)
+            fitted = fit_html_images(html_content, target_w)
+            self.textCursor().insertHtml(fitted)
+            return
+
+        # 5. Texto plano: tablas, URLs simples o texto normal
         if source.hasText():
             raw_text = source.text()
             grid = self._grid_from_plain_text(raw_text)
@@ -990,6 +1191,18 @@ class RichTextToolbar(QWidget):
         self.code_btn.clicked.connect(lambda: self.text_edit.open_code_dialog())
         layout.addWidget(self.code_btn)
 
+        self.quote_btn = QPushButton("“ ”")
+        self.quote_btn.setObjectName("FormatButton")
+        self.quote_btn.setToolTip(t("markdown_edit.quote_tooltip"))
+        self.quote_btn.setCursor(Qt.PointingHandCursor)
+        self.quote_btn.setFixedSize(26, 24)
+        q_font = self.quote_btn.font()
+        q_font.setBold(True)
+        q_font.setPointSize(10)
+        self.quote_btn.setFont(q_font)
+        self.quote_btn.clicked.connect(self.text_edit.insert_quote)
+        layout.addWidget(self.quote_btn)
+
         self.link_btn = QPushButton()
         self.link_btn.setObjectName("FormatButton")
         self.link_btn.setToolTip(t("markdown_edit.link_tooltip"))
@@ -1112,8 +1325,8 @@ class RichTextToolbar(QWidget):
 
     def sync_buttons(self, *args):
         fmt = self.text_edit.currentCharFormat()
-        self.bold_btn.setChecked(fmt.fontWeight() == QFont.Bold)
-        self.italic_btn.setChecked(fmt.fontItalic())
+        self.bold_btn.setChecked(fmt.fontWeight() >= QFont.Bold or self.text_edit.fontWeight() >= QFont.Bold)
+        self.italic_btn.setChecked(fmt.fontItalic() or self.text_edit.fontItalic())
         self.strike_btn.setChecked(fmt.fontStrikeOut())
         fg = fmt.foreground().color()
         if fg.isValid() and fg.name() != "#000000":

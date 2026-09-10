@@ -284,6 +284,15 @@ class BoardViewWidget(QFrame):
 
         header_layout.addStretch()
 
+        # Botón de Creación Masiva de Tareas (Bulk Add Tasks)
+        self.bulk_add_btn = QPushButton(f" {t('board_view.bulk_add_btn')}")
+        self.bulk_add_btn.setCursor(Qt.PointingHandCursor)
+        self.bulk_add_btn.setToolTip(t("board_view.bulk_add_tooltip"))
+        self.bulk_add_btn.setIcon(lucide_icon("list", styles.COLORS['text_soft'], 15))
+        self.bulk_add_btn.setIconSize(QSize(15, 15))
+        self.bulk_add_btn.clicked.connect(self._open_bulk_add_dialog)
+        header_layout.addWidget(self.bulk_add_btn)
+
         # Botón de Sincronización OneDrive / Carpeta compartida
         self.sync_btn = QPushButton(t("sync.link_btn"))
         self.sync_btn.setCursor(Qt.PointingHandCursor)
@@ -667,22 +676,49 @@ class BoardViewWidget(QFrame):
             if self._watched_sync_path not in self._file_watcher.files() and os.path.exists(self._watched_sync_path):
                 self._file_watcher.addPath(self._watched_sync_path)
 
-    def _on_debounced_file_sync(self):
-        """Ejecuta la sincronización en diferido cuando OneDrive termina de escribir."""
+    def _run_async_sync(self, user_initiated: bool = False, file_path: str = None):
+        """Ejecuta la sincronización en un hilo secundario sin congelar la UI."""
         if not self.board_id or self.board_id == -1:
             return
-        res = board_sync.sync_board_with_file(self.board_id, db_path=self.db_path)
-        if res.status in ("imported", "merged"):
-            self.load_board(self.board_id, notify=False)
+        if hasattr(self, "_sync_worker") and self._sync_worker and self._sync_worker.isRunning():
+            self._sync_queued = True
+            return
+
+        self._sync_worker = board_sync.BoardSyncWorker(self.board_id, sync_path=file_path, db_path=self.db_path, parent=self)
+        self._sync_worker.sync_finished.connect(lambda res: self._on_sync_finished(res, user_initiated=user_initiated))
+        self._sync_worker.start()
+
+    def _on_sync_finished(self, res, user_initiated: bool = False):
+        self._sync_worker = None
         self._ensure_watcher_path_active()
+
+        if res.status == "error":
+            if user_initiated:
+                QMessageBox.warning(self, t("sync.error_title"), res.message)
+        else:
+            if res.status in ("imported", "merged"):
+                self.load_board(self.board_id, notify=False)
+            if user_initiated and res.status == "merged" and res.conflicts_resolved > 0:
+                QMessageBox.information(
+                    self,
+                    t("sync.success_title"),
+                    t("sync.conflict_merged_toast") + f"\n({res.conflicts_resolved} conflicto(s) archivado(s) en el diario)."
+                )
+
+        if getattr(self, "_sync_queued", False):
+            self._sync_queued = False
+            self._run_async_sync(user_initiated=False)
+
+    def _on_debounced_file_sync(self):
+        """Ejecuta la sincronización en diferido cuando OneDrive termina de escribir."""
+        self._run_async_sync(user_initiated=False)
 
     def _trigger_auto_sync_export(self):
         """Exporta cambios locales en segundo plano si el tablero está vinculado."""
         if hasattr(self, "board_id") and self.board_id and self.board_id != -1:
             sync_info = database.get_board_sync_info(self.board_id, self.db_path)
             if sync_info and sync_info.get("sync_path"):
-                board_sync.sync_board_with_file(self.board_id, db_path=self.db_path)
-                self._ensure_watcher_path_active()
+                self._run_async_sync(user_initiated=False)
 
     def _on_sync_btn_clicked(self):
         """Maneja el clic en el botón de sincronización de la cabecera."""
@@ -690,26 +726,16 @@ class BoardViewWidget(QFrame):
             return
         sync_info = database.get_board_sync_info(self.board_id, self.db_path)
         if not sync_info or not sync_info.get("sync_path"):
-            board_name = self.board_title_label.text().strip().replace(" ", "_")
-            info_dlg = CloudSyncInfoDialog(board_name=board_name, parent=self.window())
-            if info_dlg.exec() != QDialog.Accepted:
-                return
+            menu = QMenu(self)
+            styles.style_menu(menu)
+            link_act = menu.addAction(t("sync.link_btn"))
+            connect_act = menu.addAction(t("sync.menu_open_shared"))
 
-            file_path, _ = QFileDialog.getSaveFileName(
-                self,
-                t("sync.dialog_title_link"),
-                f"{board_name}.ekboard",
-                t("sync.dialog_filter")
-            )
-            if file_path:
-                res = board_sync.sync_board_with_file(self.board_id, file_path, self.db_path)
-                if res.status != "error":
-                    self.load_board(self.board_id)
-                    parent_win = self.window()
-                    if hasattr(parent_win, "sidebar"):
-                        parent_win.sidebar.reload_boards()
-                else:
-                    QMessageBox.warning(self, t("sync.error_title"), res.message)
+            chosen = menu.exec(self.sync_btn.mapToGlobal(self.sync_btn.rect().bottomLeft()))
+            if chosen == link_act:
+                self._link_board_new_file()
+            elif chosen == connect_act:
+                self._connect_shared_board_file()
         else:
             # Menú de opciones del tablero ya vinculado
             menu = QMenu(self)
@@ -741,22 +767,89 @@ class BoardViewWidget(QFrame):
                     if hasattr(parent_win, "sidebar"):
                         parent_win.sidebar.reload_boards()
 
-    def sync_current_board_now(self):
-        """Sincroniza el tablero actual inmediatamente y notifica si hubo fusión."""
-        if not self.board_id or self.board_id == -1:
+    def _link_board_new_file(self):
+        """Crea un nuevo archivo .ekboard compartido para el tablero actual."""
+        board_name = self.board_title_label.text().strip().replace(" ", "_")
+        info_dlg = CloudSyncInfoDialog(board_name=board_name, parent=self.window())
+        if info_dlg.exec() != QDialog.Accepted:
             return
-        res = board_sync.sync_board_with_file(self.board_id, db_path=self.db_path)
-        if res.status == "error":
-            QMessageBox.warning(self, t("sync.error_title"), res.message)
-        else:
-            if res.status in ("imported", "merged"):
-                self.load_board(self.board_id, notify=False)
-            if res.status == "merged" and res.conflicts_resolved > 0:
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            t("sync.dialog_title_link"),
+            f"{board_name}.ekboard",
+            t("sync.dialog_filter")
+        )
+        if file_path:
+            res = board_sync.sync_board_with_file(self.board_id, file_path, self.db_path)
+            if res.status != "error":
+                self.load_board(self.board_id)
+                parent_win = self.window()
+                if hasattr(parent_win, "sidebar"):
+                    parent_win.sidebar.reload_boards(select_board_id=self.board_id)
+            else:
+                QMessageBox.warning(self, t("sync.error_title"), res.message)
+
+    def _connect_shared_board_file(self):
+        """Conecta un archivo .ekboard existente y cambia la vista a dicho tablero."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            t("sync.open_shared_title"),
+            "",
+            t("sync.dialog_filter")
+        )
+        if not file_path:
+            return
+
+        try:
+            board_id, res = board_sync.connect_shared_board_from_file(file_path, self.db_path)
+            if res.status != "error":
+                self.load_board(board_id)
+                parent_win = self.window()
+                if hasattr(parent_win, "sidebar"):
+                    parent_win.sidebar.reload_boards(select_board_id=board_id)
+                board_info = database.get_board(board_id, self.db_path)
+                name = board_info["name"] if board_info else ""
                 QMessageBox.information(
                     self,
                     t("sync.success_title"),
-                    t("sync.conflict_merged_toast") + f"\n({res.conflicts_resolved} conflicto(s) archivado(s) en el diario)."
+                    t("sync.open_shared_success", name=name)
                 )
+            else:
+                QMessageBox.warning(self, t("sync.error_title"), res.message)
+        except Exception as exc:
+            QMessageBox.warning(self, t("sync.error_title"), str(exc))
+
+    def sync_current_board_now(self, blocking: bool = False):
+        """Sincroniza el tablero actual inmediatamente y notifica si hubo fusión."""
+        if not self.board_id or self.board_id == -1:
+            return
+        if blocking:
+            res = board_sync.sync_board_with_file(self.board_id, db_path=self.db_path)
+            self._on_sync_finished(res, user_initiated=True)
+        else:
+            self._run_async_sync(user_initiated=True)
+
+    def closeEvent(self, event):
+        """Espera a que termine cualquier hilo de sincronización activo antes de destruir el widget."""
+        if hasattr(self, "_sync_worker") and self._sync_worker and self._sync_worker.isRunning():
+            self._sync_worker.wait(2000)
+        super().closeEvent(event)
+
+    def _open_bulk_add_dialog(self):
+        """Abre el diálogo para crear múltiples tareas en una tabla."""
+        if not self.board_id or self.board_id == -1:
+            return
+        from bulk_add_dialog import BulkAddTaskDialog
+        dlg = BulkAddTaskDialog(
+            self.board_id,
+            self.db_path,
+            initial_column_id=getattr(self, "last_active_column_id", None),
+            parent=self.window()
+        )
+        if dlg.exec() == QDialog.Accepted:
+            self.load_board(self.board_id)
+            self.data_changed.emit()
 
     # --- SELECCIÓN MÚLTIPLE DE TARJETAS & IA LOCAL ---
 
