@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 
 import database
 import styles
+import strings
 from strings import t
 from icons import lucide_icon
 
@@ -43,7 +44,8 @@ class ToggleSwitch(QCheckBox):
 
 
 class SettingsDialog(QDialog):
-    theme_changed = Signal(str)   # "dark" | "light"
+    theme_changed = Signal(str)      # "dark" | "light"
+    language_changed = Signal(str)   # "en" | "es"
 
     def __init__(self, db_path, parent=None):
         super().__init__(parent)
@@ -76,6 +78,17 @@ class SettingsDialog(QDialog):
         layout.addLayout(head)
 
         # === Backing widgets ocultos (estado + persistencia; los tests dependen de ellos) ===
+        self.lang_combo = QComboBox()
+        self._languages = ["en", "es"]
+        self.lang_combo.addItem(t("settings.language_en"))
+        self.lang_combo.addItem(t("settings.language_es"))
+        current_lang = database.get_setting("language", "en", self.db_path)
+        self.lang_combo.setCurrentIndex(
+            self._languages.index(current_lang) if current_lang in self._languages else 0
+        )
+        self.lang_combo.currentIndexChanged.connect(self._on_language_changed)
+        self.lang_combo.hide()
+
         self.theme_combo = QComboBox()
         self._themes = ["dark", "light"]
         self.theme_combo.addItem(t("settings.theme_dark"))
@@ -98,13 +111,19 @@ class SettingsDialog(QDialog):
         self.timer_alert_spin.valueChanged.connect(self._on_timer_value_changed)
         self.timer_alert_spin.hide()
 
-        # === Fila 1: Tema (segmentado Light / Dark) ===
+        # === Fila 1: Idioma (segmentado English / Español) ===
+        layout.addWidget(self._row(
+            t("settings.language_label"), t("settings.language_desc"), self._build_language_segment()
+        ))
+        layout.addWidget(self._divider())
+
+        # === Fila 2: Tema (segmentado Light / Dark) ===
         layout.addWidget(self._row(
             t("settings.theme_label"), t("settings.theme_desc"), self._build_theme_segment()
         ))
         layout.addWidget(self._divider())
 
-        # === Fila 2: Notificaciones (interruptor) ===
+        # === Fila 3: Notificaciones (interruptor) ===
         self.notif_switch = ToggleSwitch()
         self.notif_switch.setChecked(self.notif_chk.isChecked())
         self.notif_switch.toggled.connect(self.notif_chk.setChecked)
@@ -157,6 +176,30 @@ class SettingsDialog(QDialog):
         line.setFixedHeight(1)
         line.setStyleSheet(f"background-color: {styles.COLORS['border']};")
         return line
+
+    def _build_language_segment(self):
+        """Segmentado English / Español que maneja el lang_combo de respaldo."""
+        seg = QFrame()
+        seg.setStyleSheet(
+            f"QFrame {{ border: 1px solid {styles.COLORS['border']}; border-radius: 19px; background: transparent; }}"
+        )
+        h = QHBoxLayout(seg)
+        h.setContentsMargins(4, 4, 4, 4)
+        h.setSpacing(4)
+        self._lang_group = QButtonGroup(self)
+        self._lang_group.setExclusive(True)
+        labels = [(t("settings.language_en"), "en"), (t("settings.language_es"), "es")]
+        current_lang = self._languages[self.lang_combo.currentIndex()]
+        for text, key in labels:
+            b = QPushButton(text)
+            b.setCheckable(True)
+            b.setCursor(Qt.PointingHandCursor)
+            b.setChecked(key == current_lang)
+            b.setStyleSheet(self._segment_button_css())
+            b.clicked.connect(lambda _=False, k=key: self.lang_combo.setCurrentIndex(self._languages.index(k)))
+            self._lang_group.addButton(b)
+            h.addWidget(b)
+        return seg
 
     def _build_theme_segment(self):
         """Segmentado Light / Dark que maneja el theme_combo de respaldo."""
@@ -233,3 +276,10 @@ class SettingsDialog(QDialog):
         theme = self._themes[index]
         database.set_setting("theme", theme, self.db_path)
         self.theme_changed.emit(theme)
+
+    def _on_language_changed(self, index):
+        lang = self._languages[index]
+        database.set_setting("language", lang, self.db_path)
+        strings.set_language(lang)
+        self.language_changed.emit(lang)
+

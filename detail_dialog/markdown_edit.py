@@ -19,6 +19,64 @@ from icons import lucide_icon
 from .image_preview_dialog import show_image_preview
 
 
+_WARM_STYLE_CACHE = None
+
+
+def _get_warm_pygments_style():
+    """Devuelve la clase de estilo Pygments ajustada a la paleta Warm Shell / Night Lanes."""
+    global _WARM_STYLE_CACHE
+    if _WARM_STYLE_CACHE is not None:
+        return _WARM_STYLE_CACHE
+    try:
+        from pygments.style import Style
+        from pygments.token import (
+            Comment, Keyword, Name, String, Number, Operator, Punctuation, Generic, Error
+        )
+
+        class WarmOrganicStyle(Style):
+            default_style = ""
+            styles = {
+                Comment: "italic #8c8273",
+                Comment.Preproc: "noitalic #d68b54",
+                Keyword: "bold #d67f48",
+                Keyword.Constant: "#e09f67",
+                Keyword.Declaration: "bold #c67139",
+                Keyword.Namespace: "#b39b82",
+                Keyword.Pseudo: "#d67f48",
+                Keyword.Type: "#8fa073",
+                Operator: "#b3a892",
+                Operator.Word: "bold #d67f48",
+                Name: "#f5ead8",
+                Name.Class: "bold #e0af68",
+                Name.Function: "#d4a373",
+                Name.Namespace: "#b39b82",
+                Name.Exception: "bold #c1683a",
+                Name.Variable: "#f5ead8",
+                Name.Constant: "#e09f67",
+                Name.Attribute: "#8fa073",
+                Name.Tag: "bold #d67f48",
+                Name.Decorator: "bold #a3907c",
+                String: "#8fa073",
+                String.Doc: "italic #8c8273",
+                String.Interpol: "#e09f67",
+                String.Escape: "bold #d68b54",
+                String.Regex: "#8fa073",
+                Number: "#d68b54",
+                Punctuation: "#b3a892",
+                Generic.Heading: "bold #f5ead8",
+                Generic.Subheading: "bold #d67f48",
+                Generic.Deleted: "#c1683a",
+                Generic.Inserted: "#8fa073",
+                Generic.Error: "#c1683a",
+                Error: "border:#c1683a",
+            }
+
+        _WARM_STYLE_CACHE = WarmOrganicStyle
+        return _WARM_STYLE_CACHE
+    except Exception:
+        return "monokai"
+
+
 def format_code_block_html(code: str, language: str = "python") -> str:
     """Formatea código con resaltado de sintaxis (pygments) dentro de un bloque visual
     con fondo oscuro y tipografía monospace, compatible con el motor HTML de Qt."""
@@ -37,7 +95,8 @@ def format_code_block_html(code: str, language: str = "python") -> str:
         try:
             import pygments
             from pygments.formatters import HtmlFormatter
-            formatter = HtmlFormatter(nowrap=True, noclasses=True, style="monokai")
+            style_cls = _get_warm_pygments_style()
+            formatter = HtmlFormatter(nowrap=True, noclasses=True, style=style_cls)
             highlighted = pygments.highlight(code_clean, lexer, formatter).strip()
         except Exception:
             highlighted = html.escape(code_clean)

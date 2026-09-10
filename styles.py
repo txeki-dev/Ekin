@@ -633,6 +633,90 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
     background-color: {c["accent"]};
     color: {c["on_accent"]};
 }}
+
+/* --- QCalendarWidget (Popups de fecha y selector de vencimientos) --- */
+QCalendarWidget {{
+    background-color: {c["bg_card"]};
+    border: 1px solid {c["border"]};
+    border-radius: 12px;
+}}
+
+QCalendarWidget QWidget#qt_calendar_navigationbar {{
+    background-color: {c["bg_card"]};
+    border-bottom: 1px solid {c["border"]};
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    padding: 4px;
+}}
+
+QCalendarWidget QToolButton {{
+    color: {c["text_main"]};
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    margin: 2px;
+    padding: 4px 8px;
+    font-weight: 600;
+}}
+
+QCalendarWidget QToolButton:hover {{
+    background-color: {c["bg_hover"]};
+    border-color: {c["border"]};
+}}
+
+QCalendarWidget QToolButton:pressed {{
+    background-color: {c["bg_hover"]};
+}}
+
+QCalendarWidget QToolButton#qt_calendar_prevmonth,
+QCalendarWidget QToolButton#qt_calendar_nextmonth {{
+    width: 24px;
+    height: 24px;
+}}
+
+QCalendarWidget QSpinBox {{
+    background-color: {c["bg_main"]};
+    border: 1px solid {c["border"]};
+    border-radius: 6px;
+    color: {c["text_main"]};
+    padding: 2px 6px;
+}}
+
+QCalendarWidget QSpinBox::up-button, QCalendarWidget QSpinBox::down-button {{
+    subcontrol-origin: border;
+    width: 16px;
+}}
+
+QCalendarWidget QTableView {{
+    background-color: {c["bg_card"]};
+    border: none;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+    selection-background-color: {c["accent"]};
+    selection-color: {c["on_accent"]};
+    color: {c["text_main"]};
+    outline: none;
+}}
+
+QCalendarWidget QTableView:item:hover {{
+    background-color: {c["bg_hover"]};
+    border-radius: 4px;
+}}
+
+QCalendarWidget QTableView:item:selected {{
+    background-color: {c["accent"]};
+    color: {c["on_accent"]};
+    border-radius: 4px;
+}}
+
+QCalendarWidget QHeaderView::section {{
+    background-color: {c["bg_card"]};
+    color: {c["text_muted"]};
+    font-size: 11px;
+    font-weight: 600;
+    border: none;
+    padding: 4px;
+}}
 """
 
 

@@ -27,6 +27,7 @@ import detail_dialog.markdown_edit as markdown_edit_module
 import detail_dialog.image_preview_dialog as image_preview_module
 import detail_dialog.log_entry as log_entry_module
 from widgets import ColumnWidget, TaskCard
+import strings
 from strings import t
 
 
@@ -1668,6 +1669,79 @@ def test_markdown_edit_image_resize_methods(qapp):
     fmt2 = cursor.charFormat().toImageFormat()
     assert fmt2.width() == 300.0
     assert fmt2.height() == 150.0
+
+
+# --- i18n & SettingsDialog: Idioma / Polish ---
+
+def test_settings_dialog_constructs_with_saved_language(qapp, db_path):
+    database.set_setting("language", "es", db_path)
+    dlg = SettingsDialog(db_path)
+    assert dlg.lang_combo.currentIndex() == 1
+    # Cleanup
+    strings.set_language("en")
+
+
+def test_settings_dialog_language_change_persists_and_emits(qapp, db_path):
+    database.set_setting("language", "en", db_path)
+    dlg = SettingsDialog(db_path)
+    emitted = []
+    dlg.language_changed.connect(emitted.append)
+    dlg.lang_combo.setCurrentIndex(1)
+    assert emitted == ["es"]
+    assert database.get_setting("language", "en", db_path) == "es"
+    assert strings.get_language() == "es"
+    # Cleanup
+    strings.set_language("en")
+
+
+def test_i18n_strings_catalog_and_fallback():
+    langs = strings.get_available_languages()
+    assert "en" in langs and "es" in langs
+    assert strings.get_language() == "en"
+
+    # Switch to Spanish
+    strings.set_language("es")
+    assert strings.get_language() == "es"
+    assert strings.t("settings.header") == "Ajustes"
+    assert strings.t("main.window_title", version="1.2.3") == "Ekin v1.2.3"
+
+    # Switch back to English
+    strings.set_language("en")
+    assert strings.get_language() == "en"
+    assert strings.t("settings.header") == "Settings"
+
+    # Fallback to English when key missing in Spanish
+    orig_es = strings.STRINGS_ES.get("test.only_in_en")
+    try:
+        strings.STRINGS_EN["test.only_in_en"] = "Hello English Only"
+        if "test.only_in_en" in strings.STRINGS_ES:
+            del strings.STRINGS_ES["test.only_in_en"]
+        strings.set_language("es")
+        assert strings.t("test.only_in_en") == "Hello English Only"
+    finally:
+        strings.STRINGS_EN.pop("test.only_in_en", None)
+        if orig_es:
+            strings.STRINGS_ES["test.only_in_en"] = orig_es
+        strings.set_language("en")
+
+
+def test_styles_qcalendarwidget_rules():
+    qss = styles.build_qss(styles.COLORS)
+    assert "QCalendarWidget" in qss
+    assert "qt_calendar_navigationbar" in qss
+    assert "QCalendarWidget QTableView" in qss
+    assert "QCalendarWidget QToolButton" in qss
+
+
+def test_warm_syntax_highlighting_style():
+    from detail_dialog.markdown_edit import format_code_block_html, _get_warm_pygments_style
+    style_cls = _get_warm_pygments_style()
+    assert style_cls is not None
+    html_code = format_code_block_html("def foo():\n    return 'bar'", "python")
+    assert "<pre" in html_code
+    assert "action:delete_code_block" in html_code
+    assert "#2e2b25" in html_code
+
 
 
 

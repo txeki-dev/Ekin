@@ -22,6 +22,7 @@ from PySide6.QtGui import QIcon, QShortcut, QKeySequence, QFontDatabase
 import database
 import backups
 import styles
+import strings
 from strings import t
 from sidebar import SidebarWidget
 from board_view import BoardViewWidget
@@ -90,9 +91,10 @@ class MainWindow(QMainWindow):
         # Gestor de deshacer/rehacer (borrados)
         self.undo_manager = UndoManager()
 
-        # Tema guardado: se aplica ANTES de construir la UI, para que los widgets que
-        # fijan su estilo una sola vez en construcción (p. ej. el título del tablero)
-        # nazcan ya con la paleta correcta en vez de con el valor por defecto.
+        # Tema e idioma guardados: se aplican ANTES de construir la UI, para que los widgets que
+        # fijan su estilo o textos una sola vez en construcción nazcan ya con la configuración correcta.
+        strings.set_language(database.get_setting("language", "en"))
+        self.setWindowTitle(t("main.window_title", version=__version__))
         self.apply_theme(database.get_setting("theme", "light"), reload=False)
 
         self.init_ui()
@@ -265,10 +267,20 @@ class MainWindow(QMainWindow):
                 self.board_view.load_board(self.sidebar.active_board_id, notify=False)
 
     def show_settings(self):
-        """Abre la pantalla de Ajustes (tema, notificaciones)."""
+        """Abre la pantalla de Ajustes (tema, notificaciones, idioma)."""
         dlg = SettingsDialog(database.DB_NAME, self)
         dlg.theme_changed.connect(lambda theme: self.apply_theme(theme, reload=True))
+        dlg.language_changed.connect(self._on_language_changed)
         dlg.exec()
+
+    def _on_language_changed(self, lang):
+        """Aplica el cambio de idioma a toda la interfaz y sus elementos persistentes."""
+        strings.set_language(lang)
+        self.setWindowTitle(t("main.window_title", version=__version__))
+        self.sidebar.refresh_theme()
+        if self.sidebar.active_board_id:
+            self.board_view.load_board(self.sidebar.active_board_id, notify=False)
+        self.setup_tray()
 
     def show_shortcuts(self):
         """Abre la ventana de referencia de atajos de teclado (Ctrl+/)."""
