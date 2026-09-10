@@ -129,11 +129,12 @@ def test_check_for_updates_ignores_untracked_files(qapp, db_path, monkeypatch):
 
     monkeypatch.setattr(main_module.subprocess, "run", fake_run)
     asked = []
-    monkeypatch.setattr(
-        main_module.QMessageBox,
-        "question",
-        lambda *args, **kwargs: asked.append(True) or main_module.QMessageBox.No,
-    )
+
+    def fake_question(*args, **kwargs):
+        asked.append(True)
+        return main_module.QMessageBox.No
+
+    monkeypatch.setattr(main_module.QMessageBox, "question", fake_question)
     info_shown = []
     monkeypatch.setattr(
         main_module.QMessageBox,
@@ -178,11 +179,12 @@ def test_check_for_updates_aborts_when_tracked_files_dirty(qapp, db_path, monkey
         lambda *args, **kwargs: info_shown.append(args),
     )
     asked = []
-    monkeypatch.setattr(
-        main_module.QMessageBox,
-        "question",
-        lambda *args, **kwargs: asked.append(True) or main_module.QMessageBox.No,
-    )
+
+    def fake_question(*args, **kwargs):
+        asked.append(True)
+        return main_module.QMessageBox.No
+
+    monkeypatch.setattr(main_module.QMessageBox, "question", fake_question)
 
     orig_check(window)
 

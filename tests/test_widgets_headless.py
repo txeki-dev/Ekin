@@ -1623,6 +1623,7 @@ def test_task_detail_notes_edited_and_row_c(qapp, db_path):
 
 def test_markdown_edit_quote_and_local_link(qapp):
     """Verifica la inserción de citas estructuradas y la emisión de señal para enlaces locales."""
+    import os
     from detail_dialog.markdown_edit import MarkdownTextEdit
     from PySide6.QtCore import QMimeData, QUrl
 
@@ -1636,7 +1637,8 @@ def test_markdown_edit_quote_and_local_link(qapp):
     editor.local_link_pasted.connect(lambda url, label: received.append((url, label)))
 
     mime = QMimeData()
-    mime.setUrls([QUrl.fromLocalFile(r"C:\test\documento.pdf")])
+    test_file = os.path.abspath("documento.pdf")
+    mime.setUrls([QUrl.fromLocalFile(test_file)])
     editor.insertFromMimeData(mime)
 
     assert len(received) == 1

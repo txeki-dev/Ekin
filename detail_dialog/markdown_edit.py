@@ -776,7 +776,8 @@ class MarkdownTextEdit(QTextEdit):
                 cursor.beginEditBlock()
                 for u in local_urls:
                     local_path = u.toLocalFile() or u.path()
-                    filename = os.path.basename(local_path) or local_path
+                    norm_path = local_path.replace("\\", "/")
+                    filename = os.path.basename(norm_path.rstrip("/")) or local_path
                     file_href = u.toString() if u.toString().startswith("file:") else QUrl.fromLocalFile(local_path).toString()
                     link_html = f'<a href="{file_href}">📄 {html.escape(filename)}</a>&nbsp;'
                     cursor.insertHtml(link_html)
@@ -799,7 +800,8 @@ class MarkdownTextEdit(QTextEdit):
             is_win_path = bool(re.match(r'^[a-zA-Z]:[/\\]', raw_text)) or raw_text.startswith(("\\\\", "//"))
             if (is_file_url or is_win_path) and (os.path.exists(raw_text) or is_file_url or is_win_path):
                 local_path = QUrl(raw_text).toLocalFile() if is_file_url else raw_text
-                filename = os.path.basename(local_path) or local_path
+                norm_path = local_path.replace("\\", "/")
+                filename = os.path.basename(norm_path.rstrip("/")) or local_path
                 file_href = raw_text if is_file_url else QUrl.fromLocalFile(local_path).toString()
                 cursor = self.textCursor()
                 cursor.beginEditBlock()
