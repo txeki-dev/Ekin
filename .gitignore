@@ -54,6 +54,10 @@ share/python-wheels/
 #  before PyInstaller builds the exe, so they can be injected.
 *.manifest
 *.spec
+!ekin.spec
+
+# Inno Setup
+Output/
 
 # Installer logs
 pip-log.txt

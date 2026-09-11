@@ -15,9 +15,9 @@ import subprocess
 from datetime import date
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QSplitter, QWidget, QHBoxLayout, QMessageBox,
-    QStackedWidget, QSystemTrayIcon, QMenu
+    QStackedWidget, QSystemTrayIcon, QMenu, QProgressDialog
 )
-from PySide6.QtCore import Qt, QTimer, QByteArray
+from PySide6.QtCore import Qt, QTimer, QByteArray, QThread, Signal
 from PySide6.QtGui import QIcon, QShortcut, QKeySequence, QFontDatabase
 import database
 import backups
@@ -35,10 +35,10 @@ from undo import UndoManager
 import ics_export
 from version import __version__
 
-# Directorio de la app: los iconos deben resolverse por ruta ABSOLUTA. Con ruta relativa,
-# al lanzar desde el acceso directo (con otro directorio de trabajo) QIcon no carga el
-# archivo y Windows cae al icono genérico de python en la barra de tareas.
-_APP_DIR = os.path.dirname(os.path.abspath(__file__))
+if getattr(sys, "frozen", False):
+    _APP_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(sys.executable)))
+else:
+    _APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def app_icon():
@@ -57,6 +57,102 @@ def register_fonts():
         path = os.path.join(fonts_dir, name)
         if os.path.exists(path):
             QFontDatabase.addApplicationFont(path)
+
+
+def parse_version_tuple(v_str: str):
+    """Convierte cadenas como '1.0.0' o 'v1.0.1' en tupla de enteros (1, 0, 1) para comparación segura."""
+    import re
+    digits = re.findall(r"\d+", v_str)
+    return tuple(int(x) for x in digits) if digits else (0,)
+
+
+class ReleaseCheckThread(QThread):
+    update_available = Signal(str, str, str)  # (remote_version, download_url, notes)
+
+    def run(self):
+        try:
+            import urllib.request
+            import json
+
+            url = "https://api.github.com/repos/txeki-dev/Ekin/releases/latest"
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": f"Ekin-Kanban/{__version__}",
+                    "Accept": "application/vnd.github.v3+json",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=6) as resp:
+                if resp.status != 200:
+                    return
+                data = json.loads(resp.read().decode("utf-8"))
+
+            tag_name = data.get("tag_name", "")
+            remote_ver = tag_name.lstrip("vV").strip()
+            if not remote_ver:
+                return
+
+            if parse_version_tuple(remote_ver) <= parse_version_tuple(__version__):
+                return
+
+            download_url = None
+            assets = data.get("assets", [])
+            for asset in assets:
+                name = asset.get("name", "").lower()
+                if name.endswith(".exe") and "setup" in name:
+                    download_url = asset.get("browser_download_url")
+                    break
+            if not download_url:
+                for asset in assets:
+                    if asset.get("name", "").lower().endswith(".exe"):
+                        download_url = asset.get("browser_download_url")
+                        break
+
+            if download_url:
+                self.update_available.emit(remote_ver, download_url, data.get("body", "") or "")
+        except Exception:
+            pass
+
+
+class InstallerDownloadThread(QThread):
+    progress = Signal(int, int)  # bytes_downloaded, total_bytes
+    finished = Signal(str)       # file_path
+    error = Signal(str)
+
+    def __init__(self, download_url, dest_path, parent=None):
+        super().__init__(parent)
+        self.download_url = download_url
+        self.dest_path = dest_path
+        self._cancelled = False
+
+    def cancel(self):
+        self._cancelled = True
+
+    def run(self):
+        try:
+            import urllib.request
+            req = urllib.request.Request(
+                self.download_url,
+                headers={"User-Agent": f"Ekin-Kanban/{__version__}"}
+            )
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                total = int(resp.headers.get("Content-Length", 0))
+                downloaded = 0
+                chunk_size = 65536
+                with open(self.dest_path, "wb") as f:
+                    while True:
+                        if self._cancelled:
+                            return
+                        chunk = resp.read(chunk_size)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        self.progress.emit(downloaded, total)
+            if not self._cancelled:
+                self.finished.emit(self.dest_path)
+        except Exception as exc:
+            self.error.emit(str(exc))
 
 
 class MainWindow(QMainWindow):
@@ -311,6 +407,11 @@ class MainWindow(QMainWindow):
             )
         except Exception:
             pass
+        if hasattr(self, "_release_checker") and self._release_checker.isRunning():
+            self._release_checker.wait(500)
+        if hasattr(self, "_installer_download_thread") and self._installer_download_thread.isRunning():
+            self._installer_download_thread.cancel()
+            self._installer_download_thread.wait(500)
         super().closeEvent(event)
 
     def _open_task_detail(self, task_id):
@@ -445,12 +546,80 @@ class MainWindow(QMainWindow):
         self.sidebar.setVisible(not self.sidebar.isVisible())
 
     def check_for_updates(self):
-        """Verifica de forma silenciosa si hay actualizaciones en el repo de GitHub.
-
-        Endurecido: solo actúa sobre un checkout de git real, nunca hace pull sobre un
-        árbol de trabajo sucio (el directorio de ejecución contiene la base de datos y
-        las copias de seguridad del usuario) y solo reinicia si el pull tuvo éxito.
+        """Verifica de forma silenciosa si hay actualizaciones.
+        - En modo standalone/frozen (PyInstaller): consulta la API pública de GitHub Releases.
+        - En modo desarrollo (código fuente): actúa sobre el checkout de git.
         """
+        if getattr(sys, "frozen", False):
+            self._check_release_updates()
+        else:
+            self._check_git_updates()
+
+    def _check_release_updates(self):
+        """Inicia comprobación asíncrona de releases públicas en GitHub."""
+        self._release_checker = ReleaseCheckThread(self)
+        self._release_checker.update_available.connect(self._on_release_update_available)
+        self._release_checker.start()
+
+    def _on_release_update_available(self, remote_version, download_url, release_notes):
+        """Muestra confirmación al usuario y descarga el instalador si acepta."""
+        confirm = QMessageBox.question(
+            self,
+            t("main.update.available_title"),
+            t("main.update.release_available_body", version=remote_version),
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
+        )
+        if confirm != QMessageBox.Yes:
+            return
+
+        import tempfile
+        dest_path = os.path.join(tempfile.gettempdir(), f"Ekin-Setup-v{remote_version}.exe")
+
+        progress_dlg = QProgressDialog(
+            t("main.update.downloading"),
+            t("board_view.column_edit.cancel"),
+            0,
+            100,
+            self,
+        )
+        progress_dlg.setWindowTitle(t("main.update.available_title"))
+        progress_dlg.setWindowModality(Qt.WindowModal)
+        progress_dlg.setMinimumDuration(0)
+        progress_dlg.setValue(0)
+
+        download_thread = InstallerDownloadThread(download_url, dest_path, self)
+
+        def on_progress(downloaded, total):
+            if total > 0:
+                percent = int((downloaded / total) * 100)
+                progress_dlg.setValue(percent)
+
+        def on_finished(installer_path):
+            progress_dlg.close()
+            try:
+                subprocess.Popen([installer_path])
+                QApplication.quit()
+            except Exception as exc:
+                QMessageBox.warning(self, t("main.update.failed_title"), str(exc))
+
+        def on_error(err_msg):
+            progress_dlg.close()
+            QMessageBox.warning(
+                self,
+                t("main.update.failed_title"),
+                t("main.update.download_failed"),
+            )
+
+        progress_dlg.canceled.connect(download_thread.cancel)
+        download_thread.progress.connect(on_progress)
+        download_thread.finished.connect(on_finished)
+        download_thread.error.connect(on_error)
+        self._installer_download_thread = download_thread
+        download_thread.start()
+
+    def _check_git_updates(self):
+        """Verifica de forma silenciosa si hay actualizaciones en el repo de GitHub (modo git dev)."""
         try:
             startupinfo = None
             if os.name == 'nt':

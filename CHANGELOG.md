@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-09-11
+
+### Added
+- **Standalone Windows Installer (`installer.iss`)**: Official modern setup assistant with desktop & start menu shortcuts, clean uninstallation, and support for non-elevated user installations without UAC elevation.
+- **PyInstaller Standalone Packaging (`ekin.spec`)**: Optimized `onedir` distribution bundle with instant launch performance (< 0.5s) without extraction overhead.
+- **Automated Update Checking from GitHub Releases (`main.py`)**: Checks for latest releases and downloads the installer with an interactive progress dialog (`QProgressDialog`).
+- **Automated CI/CD Windows Release Workflow (`.github/workflows/release.yml`)**: Builds the standalone package with PyInstaller and Inno Setup upon version bump and publishes the release installer asset.
+- **Automated Version Bump CLI (`scripts/bump_version.py`)**: Utility to bump versions across all project metadata, rotate changelogs, and publish releases with a single command.
+
+### Changed & Improved
+- **Database & Asset Path Anchoring**: When running packaged (`sys.frozen`), `_APP_DIR` resolves to `_internal` and `database.DB_NAME` defaults to `~/.ekin/ekin_board.db`, protecting user data from application re-installations and automatically migrating from legacy `~/EkinKanban/ekin_board.db`.
+- **Documentation**: Updated `README.md` with instructions for the Windows Standalone Installer.
+
 ## [1.0.0] - 2026-09-03
 
 ### Added

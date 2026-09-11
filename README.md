@@ -41,36 +41,34 @@ Ekin Kanban is a sleek, resource-friendly, and offline-first personal Kanban boa
 
 ## 🛠️ Setup & Installation
 
-Ekin Kanban can be installed automatically on Windows in one step, or manually on any platform.
+### 🚀 Standalone Windows Installer (Recommended for Users)
 
-### Prerequisites
-Before installing, ensure you have **Python 3.10+** and **Git** installed on your system and added to your system PATH.
-* [Download Python](https://www.python.org/downloads/)
-* [Download Git](https://git-scm.com/downloads)
+No Python, Git, or administrative rights required!
+
+1. Download the latest installer (`Ekin-Setup-vX.X.X.exe`) from the [**GitHub Releases**](https://github.com/txeki-dev/Ekin/releases/latest) page.
+2. Double-click the installer and follow the wizard.
+3. Launch Ekin Kanban directly from your Desktop or Start Menu shortcut.
+
+> [!TIP]
+> **Automatic Updates**: When a new release is published, Ekin automatically detects it on startup, notifies you, and can download and apply the update seamlessly with one click.
 
 ---
 
-### 🚀 Easy Installation (Windows - One Click)
+### 💻 Developer Installation (From Source)
 
-Open **PowerShell** and run the following command to download and execute the automatic installer:
+If you prefer to run from source, contribute, or are on macOS/Linux:
 
+#### Prerequisites
+Ensure you have **Python 3.10+** and **Git** installed on your system.
+* [Download Python](https://www.python.org/downloads/)
+* [Download Git](https://git-scm.com/downloads)
+
+#### Quick Setup (Windows PowerShell)
 ```powershell
 irm https://raw.githubusercontent.com/txeki-dev/Ekin/main/install.ps1 | iex
 ```
 
-**What the installer does:**
-1. Clones this repository into `~/EkinKanban` (your home directory).
-2. Sets up a local Python virtual environment (`venv`).
-3. Installs `PySide6` (the GUI library).
-4. Generates a silent launcher script (`lanzar.bat`).
-5. **Creates a shortcut on your Desktop** labeled **Ekin Kanban** to launch the app instantly without showing background terminal windows.
-
----
-
-### 💻 Manual Installation (All Platforms)
-
-If you prefer to install it manually or are using macOS/Linux:
-
+#### Manual Setup (All Platforms)
 1. **Clone the repository**:
    ```bash
    git clone https://github.com/txeki-dev/Ekin.git

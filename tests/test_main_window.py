@@ -192,3 +192,144 @@ def test_check_for_updates_aborts_when_tracked_files_dirty(qapp, db_path, monkey
     assert asked == []
     _close_window(qapp, window)
 
+
+def test_parse_version_tuple():
+    from main import parse_version_tuple
+    assert parse_version_tuple("1.0.0") == (1, 0, 0)
+    assert parse_version_tuple("v1.2.3") == (1, 2, 3)
+    assert parse_version_tuple("v2.10.4-rc1") == (2, 10, 4, 1)
+    assert parse_version_tuple("1.0.0") < parse_version_tuple("1.0.1")
+    assert parse_version_tuple("1.9.0") < parse_version_tuple("1.10.0")
+
+
+def test_get_default_db_path_behavior(monkeypatch, tmp_path):
+    from database.connection import get_default_db_path
+    import sys
+
+    # Dev mode: returns ekin_board.db
+    monkeypatch.setattr(sys, "frozen", False, raising=False)
+    monkeypatch.delenv("EKIN_DB_PATH", raising=False)
+    assert get_default_db_path() == "ekin_board.db"
+
+    # Frozen mode: returns ~/.ekin/ekin_board.db
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    custom_home = str(tmp_path / "home")
+    monkeypatch.setenv("USERPROFILE", custom_home)
+    monkeypatch.setenv("HOME", custom_home)
+    path = get_default_db_path()
+    assert ".ekin" in path
+    assert path.endswith("ekin_board.db")
+
+
+def test_release_check_thread_detects_newer_version(monkeypatch):
+    import json
+    from main import ReleaseCheckThread
+
+    mock_release = {
+        "tag_name": "v99.0.0",
+        "body": "Release 99 notes",
+        "assets": [
+            {
+                "name": "Ekin-Setup-v99.0.0.exe",
+                "browser_download_url": "https://github.com/txeki-dev/Ekin/releases/download/v99.0.0/Ekin-Setup-v99.0.0.exe",
+            }
+        ],
+    }
+    payload = json.dumps(mock_release).encode("utf-8")
+
+    class MockResponse:
+        status = 200
+
+        def read(self):
+            return payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr("urllib.request.urlopen", lambda req, timeout=6: MockResponse())
+
+    emitted = []
+    thread = ReleaseCheckThread()
+    thread.update_available.connect(lambda ver, url, notes: emitted.append((ver, url, notes)))
+    thread.run()
+
+    assert len(emitted) == 1
+    assert emitted[0][0] == "99.0.0"
+    assert "Ekin-Setup-v99.0.0.exe" in emitted[0][1]
+    assert emitted[0][2] == "Release 99 notes"
+
+
+def test_release_check_thread_ignores_older_or_same_version(monkeypatch):
+    import json
+    from main import ReleaseCheckThread
+
+    mock_release = {
+        "tag_name": "v0.1.0",
+        "assets": [{"name": "Ekin-Setup.exe", "browser_download_url": "http://test"}],
+    }
+    payload = json.dumps(mock_release).encode("utf-8")
+
+    class MockResponse:
+        status = 200
+
+        def read(self):
+            return payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr("urllib.request.urlopen", lambda req, timeout=6: MockResponse())
+
+    emitted = []
+    thread = ReleaseCheckThread()
+    thread.update_available.connect(lambda *args: emitted.append(args))
+    thread.run()
+
+    assert emitted == []
+
+
+def test_installer_download_thread(tmp_path, monkeypatch):
+    import io
+    from main import InstallerDownloadThread
+
+    content = b"MZ\x90\x00InstallerMockContent"
+
+    class MockDownloadResponse:
+        headers = {"Content-Length": str(len(content))}
+
+        def __init__(self):
+            self.buf = io.BytesIO(content)
+
+        def read(self, size=65536):
+            return self.buf.read(size)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr("urllib.request.urlopen", lambda req, timeout=30: MockDownloadResponse())
+
+    dest_file = str(tmp_path / "Ekin-Setup-Test.exe")
+    thread = InstallerDownloadThread("https://example.com/setup.exe", dest_file)
+    finished_files = []
+    progress_updates = []
+    thread.finished.connect(lambda p: finished_files.append(p))
+    thread.progress.connect(lambda d, t: progress_updates.append((d, t)))
+
+    thread.run()
+
+    assert finished_files == [dest_file]
+    assert len(progress_updates) > 0
+    assert progress_updates[-1] == (len(content), len(content))
+    with open(dest_file, "rb") as f:
+        assert f.read() == content
+
+

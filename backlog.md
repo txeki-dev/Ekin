@@ -650,8 +650,8 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
   correctly kept opaque — not something to remove.
 
 ### Packaging & distribution
-- [ ] **Standalone executable** (PyInstaller) so non-developers don't need Python/git.
-- [ ] **Update from Releases** instead of `git pull` (download the latest release asset).
+- [x] **Standalone executable** (PyInstaller) so non-developers don't need Python/git. *(Done 2026-09-11 — `ekin.spec` & `installer.iss`)*
+- [x] **Update from Releases** instead of `git pull` (download the latest release asset). *(Done 2026-09-11 — `main.py` ReleaseCheckThread)*
 
 ---
 
@@ -766,13 +766,9 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
    URL link preservation and browser opening; full regression coverage.
    213/213 tests passing (10 new), ruff clean. Cut as **v0.9.7**.~~ ✅ 2026-09-03.
 
-### 🎯 Theme D — Distribution (parked)
-**PyInstaller** standalone build + **update-from-Releases** (replaces the `git pull` auto-updater).
-Parked per the user's direction: the project stays dev-mode (run from source) until there's a
-reason to distribute it to non-developers.
+### 🎯 Theme D — Distribution ✅ (Done 2026-09-11)
+**PyInstaller** standalone build (`ekin.spec`) + **Inno Setup installer** (`installer.iss`) + **update-from-Releases** (`main.py` `ReleaseCheckThread`) + automated Windows CI/CD release workflow (`.github/workflows/release.yml`) + version bump CLI (`scripts/bump_version.py`).
 
 ### 🔧 Ongoing tech debt (fold into any wave)
-Full i18n (an actual English translation + a language switcher in Settings — today's pass was
-extraction-only, Spanish stays the only active language); remaining inline QSS beyond
-QMenu/swatch/tag-pill (misc one-off buttons, not actually duplicated so lower value); auto-updater
-still uses `git pull` (tied to Theme D).
+Remaining inline QSS beyond QMenu/swatch/tag-pill (misc one-off buttons, not actually duplicated so lower value).
+

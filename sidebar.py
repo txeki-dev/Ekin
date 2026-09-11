@@ -1,4 +1,5 @@
 import os
+import sys
 from PySide6.QtCore import Qt, Signal, QTimer, QPoint, QSize
 from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
@@ -19,7 +20,10 @@ from strings import t
 from version import __version__
 from undo import UndoAction
 
-_APP_DIR = os.path.dirname(os.path.abspath(__file__))
+if getattr(sys, "frozen", False):
+    _APP_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(sys.executable)))
+else:
+    _APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Nombres cortos en español para el reloj (evita depender de la locale del sistema)
 _DIAS = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
