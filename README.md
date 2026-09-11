@@ -52,6 +52,9 @@ No Python, Git, or administrative rights required!
 > [!TIP]
 > **Automatic Updates**: When a new release is published, Ekin automatically detects it on startup, notifies you, and can download and apply the update seamlessly with one click.
 
+> [!NOTE]
+> **Windows SmartScreen Notice**: Windows may display a blue warning (*"Windows protected your PC / Unknown publisher"*) when launching the installer for the first time. This is standard for newly released software that does not carry an expensive enterprise commercial signing certificate. Simply click **"More info"** and then click **"Run anyway"**.
+
 ---
 
 ### 💻 Developer Installation (From Source)
