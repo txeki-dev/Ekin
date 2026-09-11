@@ -441,8 +441,9 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
   the folded line (incl. the leading space) stays ≤75; unit-tested. **(P3)**
 - [x] **Same-column drag reorder off-by-one** *(Done in v0.4.0.)* — the dragged card is excluded from
   the drop-index calc (`widgets.compute_drop_index`), with a regression test. **(P2 — bug)**
-- [ ] **Auto-updater uses `git pull`** (`main.py`) — requires git + a clean tree on the user's machine.
-  Consider updating from GitHub Release assets (ties into packaging, below). **(P2)**
+- [x] **Auto-updater uses `git pull`** *(Done 2026-09-11 in Theme D)* — implemented hybrid updater:
+  checks GitHub Release assets when frozen/installed via `ReleaseCheckThread` and downloads setup executable,
+  preserving git pull fallback in development. **(P2)**
 - [x] **Systemic double-commit pattern beyond `create_log`** *(Audited and ruled out 2026-08-10 —
   see the forensic-pass section above.)* Found during the 2026-08-07 forensic pass while fixing
   `create_log`'s premature commit; the dedicated audit this item asked for happened as a side
