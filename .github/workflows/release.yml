@@ -35,7 +35,7 @@ jobs:
           $content = Get-Content version.py -Raw
           if ($content -match '__version__\s*=\s*["'']([^"'']+)["'']') {
             $version = $matches[1]
-            echo "version=$version" >> $env:GITHUB_OUTPUT
+            "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
             Write-Host "Detected version: $version"
           } else {
             Write-Error "Could not parse version from version.py"
@@ -47,12 +47,13 @@ jobs:
         shell: pwsh
         run: |
           $ver = "${{ steps.ver.outputs.version }}"
-          $tagExists = git rev-parse -q --verify "refs/tags/v$ver"
-          if ($LASTEXITCODE -eq 0) {
-            echo "exists=true" >> $env:GITHUB_OUTPUT
+          $existing = git tag -l "v$ver"
+          if ($existing) {
+            "exists=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
             Write-Host "Tag v$ver already exists — nothing to release."
           } else {
-            echo "exists=false" >> $env:GITHUB_OUTPUT
+            "exists=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+            Write-Host "Tag v$ver does not exist yet — proceeding with release."
           }
 
       - name: Build release notes from CHANGELOG
@@ -88,18 +89,20 @@ jobs:
         env:
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) {
+          $iscc = Get-Command iscc -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue
+          if (-not $iscc) {
             if (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe") {
-              Set-Alias iscc "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+              $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
             } elseif (Test-Path "C:\Program Files\Inno Setup 6\ISCC.exe") {
-              Set-Alias iscc "C:\Program Files\Inno Setup 6\ISCC.exe"
+              $iscc = "C:\Program Files\Inno Setup 6\ISCC.exe"
             } else {
               Write-Host "Installing Inno Setup via Chocolatey..."
               choco install innosetup --no-progress
-              Set-Alias iscc "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+              $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
             }
           }
-          iscc /DMyAppVersion="$env:VERSION" installer.iss
+          Write-Host "Using Inno Setup compiler: $iscc"
+          & "$iscc" "/DMyAppVersion=$env:VERSION" installer.iss
 
       - name: Create tag and GitHub Release with Installer asset
         if: steps.check.outputs.exists == 'false'
