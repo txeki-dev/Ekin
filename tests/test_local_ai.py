@@ -15,6 +15,7 @@ def test_format_tasks_for_prompt():
             "due_date": "2026-10-01",
             "tags": [{"category": "AUTH", "value": "SECURITY", "color": "#ef4444"}],
             "logs": [{"content": "Nota: verificar redirección en localhost."}],
+            "links": [{"url": "https://oauth.net/2", "label": "OAuth Spec"}],
         },
         {
             "id": 2,
@@ -24,15 +25,22 @@ def test_format_tasks_for_prompt():
             "due_date": None,
             "tags": [],
             "logs": [],
+            "links": [{"url": "C:/data/tokens.db", "label": "Local DB"}],
         },
     ]
 
     formatted = local_ai.format_tasks_for_prompt(tasks)
     assert "OAuth2 con Google" in formatted
-    assert "Backlog" in formatted
-    assert "AUTH:SECURITY" in formatted
-    assert "verificar redirección" in formatted
+    assert "Implementar flujo PKCE" in formatted
     assert "Persistir Tokens en SQLite" in formatted
+    assert "https://oauth.net/2" in formatted
+    assert "web_link" in formatted
+    assert "local_file" in formatted
+    # Se omiten etiquetas, fechas y registros de diario para enviar solo contexto limpio:
+    assert "AUTH" not in formatted
+    assert "SECURITY" not in formatted
+    assert "2026-10-01" not in formatted
+    assert "verificar redirección" not in formatted
 
 
 def test_build_spec_prompts_coding_agent():

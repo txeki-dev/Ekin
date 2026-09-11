@@ -74,8 +74,8 @@ class TaskDetailDialog(QDialog):
         self._click_outside_filter = None
 
         self.setWindowTitle(t("task_detail.window_title"))
-        self.resize(1260, 740)
-        self.setMinimumSize(1120, 600)
+        self.resize(1300, 780)
+        self.setMinimumSize(1160, 640)
 
         self.init_ui()
         self.load_task_data()
@@ -333,11 +333,11 @@ class TaskDetailDialog(QDialog):
         add_link_row.addWidget(add_link_btn)
         left_layout.addLayout(add_link_row)
 
-        body_l.addWidget(left_panel, 5)
+        body_l.addWidget(left_panel, 6)
 
         # --- Panel derecho: Journal ---
         self.right_panel = QWidget()
-        self.right_panel.setMinimumWidth(485)
+        self.right_panel.setMinimumWidth(480)
         right_layout = QVBoxLayout(self.right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(10)
@@ -356,10 +356,11 @@ class TaskDetailDialog(QDialog):
         self.scroll_area.setObjectName("ChatScrollArea")
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scroll_area.verticalScrollBar().setSingleStep(25)
         self.logs_container = QWidget()
         self.logs_layout = QVBoxLayout(self.logs_container)
-        self.logs_layout.setContentsMargins(12, 10, 22, 10)
-        self.logs_layout.setSpacing(8)
+        self.logs_layout.setContentsMargins(10, 10, 10, 10)
+        self.logs_layout.setSpacing(10)
         self.scroll_area.setWidget(self.logs_container)
         right_layout.addWidget(self.scroll_area, 1)
 
@@ -916,11 +917,16 @@ class TaskDetailDialog(QDialog):
         # Pequeño retardo para dar tiempo a Qt a renderizar antes de bajar el scroll
         self.scroll_to_bottom()
 
-    def edit_log_entry(self, log_id, new_html):
-        """Guarda la edición de un comentario (o cancela si new_html es None) y recarga."""
+    def edit_log_entry(self, log_id, new_html, widget=None):
+        """Guarda la edición de un comentario (o cancela si new_html es None) in-place sin parpadeos."""
         if new_html is not None:
             database.update_log(log_id, new_html, self.db_path)
             self.modified = True
+            if widget is not None:
+                widget.update_content_in_place(new_html)
+                return
+        elif widget is not None:
+            return
         self.reload_logs()
 
     def showEvent(self, event):
@@ -995,6 +1001,9 @@ class TaskDetailDialog(QDialog):
             database.delete_log(log_id, self.db_path)
             self.modified = True
             widget.deleteLater()
+            if hasattr(self, "entries_count_label"):
+                remaining_count = len(database.get_logs(self.task_id, self.db_path))
+                self.entries_count_label.setText(t("task_detail.entries_count", count=remaining_count))
 
     def scroll_to_bottom(self):
         """Mueve la barra de desplazamiento del diario hasta abajo."""

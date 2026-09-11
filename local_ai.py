@@ -228,76 +228,82 @@ atexit.register(stop_managed_runner)
 
 
 def format_tasks_for_prompt(tasks: list[dict]) -> str:
-    """Formatea la lista de tarjetas de tareas seleccionadas en un bloque de texto legible."""
-    parts = []
+    """Prepara un JSON estructurado con las tareas seleccionadas conteniendo
+    ÚNICAMENTE título, descripción y enlaces/adjuntos (descartando etiquetas, fechas y diario)."""
+    import re
+    import html
+
+    cleaned = []
     for idx, t in enumerate(tasks, 1):
-        title = t.get("title", "Sin título")
-        col = t.get("column_name", "Backlog")
-        desc = t.get("description", "").strip() or "Sin descripción detallada."
-        due = t.get("due_date") or "Sin fecha límite"
-        
-        # Tags
-        tags = t.get("tags", [])
-        tags_str = ", ".join(f"{tag.get('category', '')}:{tag.get('value', '')}" for tag in tags) if tags else "Ninguna"
+        raw_desc = t.get("description", "").strip()
+        clean_desc = re.sub(r'<br\s*/?>', '\n', raw_desc, flags=re.IGNORECASE)
+        clean_desc = re.sub(r'</p\s*>', '\n\n', clean_desc, flags=re.IGNORECASE)
+        clean_desc = re.sub(r'<[^>]+>', '', clean_desc).strip()
+        clean_desc = html.unescape(clean_desc) or "Sin descripción detallada."
 
-        # Logs / Diario
-        logs = t.get("logs", [])
-        logs_text = ""
-        if logs:
-            clean_logs = [entry.get("content", "").replace("<p>", "").replace("</p>", "").strip() for entry in logs[:5]]
-            logs_text = "\n  - " + "\n  - ".join(clean_logs)
+        links = []
+        for link_item in t.get("links", []):
+            url = link_item.get("url", "")
+            is_local = (
+                os.path.isabs(url)
+                or (len(url) > 2 and url[1] == ":" and url[2] in ("/", "\\"))
+                or url.startswith(("\\\\", "//"))
+            )
+            links.append({
+                "label": link_item.get("label") or os.path.basename(url),
+                "target": url,
+                "type": "local_file" if is_local else "web_link"
+            })
 
-        part = (
-            f"### Tarea {idx}: {title}\n"
-            f"- **Columna / Estado**: {col}\n"
-            f"- **Vencimiento**: {due}\n"
-            f"- **Etiquetas**: {tags_str}\n"
-            f"- **Descripción**:\n{desc}\n"
-        )
-        if logs_text:
-            part += f"- **Notas de Discusión / Chat**:{logs_text}\n"
+        cleaned.append({
+            "task_number": idx,
+            "title": t.get("title", ""),
+            "description": clean_desc,
+            "links": links
+        })
 
-        parts.append(part)
-
-    return "\n---\n".join(parts)
+    return json.dumps(cleaned, indent=2, ensure_ascii=False)
 
 
-def build_spec_prompts(tasks: list[dict], mode: str = "coding_agent", custom_instructions: str = "") -> tuple[str, str]:
-    """Genera el system prompt y user prompt según el modo de especificación seleccionado."""
-    tasks_block = format_tasks_for_prompt(tasks)
+def build_spec_prompts(tasks: list[dict], mode: str = "sw_feature_plan", custom_instructions: str = "") -> tuple[str, str]:
+    """Genera el system prompt y user prompt según el objetivo y plantilla seleccionada."""
+    tasks_json = format_tasks_for_prompt(tasks)
 
-    if mode == "coding_agent":
+    # Compatibilidad con identificadores previos
+    if mode in ("coding_agent", "sw_feature_plan"):
         system_prompt = (
             "Eres un Arquitecto de Software Principal y Líder Técnico Senior especializado en preparar "
-            "Especificaciones Técnicas (SPEC) de alta precisión para Agentes Autónomos de IA "
-            "(como Google Antigravity, Claude Code, Cursor y Windsurf).\n"
-            "Tu objetivo es convertir tareas de Backlog en un documento exhaustivo, libre de ambigüedades, "
+            "Especificaciones Técnicas (Feature Plans / Technical Specs) de alta precisión para Desarrolladores "
+            "y Agentes Autónomos de IA (Google Antigravity, Claude Code, Cursor, Windsurf).\n"
+            "Tu objetivo es transformar los requisitos y referencias en un plan de ingeniería exhaustivo, libre de ambigüedades, "
             "con arquitectura clara, contratos de datos, pasos de implementación ordenados y criterios de verificación."
         )
-        user_prompt = f"""Analiza las siguientes tareas de Kanban/Backlog seleccionadas por el equipo y genera una ESPECIFICACIÓN TÉCNICA (SPEC) completa para un Agente de IA.
+        user_prompt = f"""Analiza las siguientes tareas de desarrollo y sus referencias asociadas (enlaces y archivos locales) presentadas en JSON y elabora una ESPECIFICACIÓN TÉCNICA (FEATURE PLAN) completa:
 
-{tasks_block}
+```json
+{tasks_json}
+```
 
 {f"Instrucciones adicionales del usuario: {custom_instructions}" if custom_instructions else ""}
 
 La especificación DEBE seguir rigurosamente esta estructura en Markdown:
 
-# SPEC: [Título Sintético de la Iniciativa]
+# FEATURE PLAN: [Título Sintético de la Iniciativa]
 
 ## 1. Resumen Ejecutivo & Objetivo
 - Propósito técnico y valor aportado.
-- Alcance (Scope) y qué queda explícitamente fuera de alcance (Out-of-Scope).
+- Alcance (Scope) y exclusiones explícitas (Out-of-Scope).
 
-## 2. Desglose de Tareas & Requisitos Técnicos
-- Mapeo detallado de cada una de las tareas seleccionadas con sus requisitos funcionales.
-- Dependencias y orden crítico de ejecución.
+## 2. Desglose de Requisitos & Mapeo de Tareas
+- Análisis de cada una de las tareas especificadas y referencias adjuntas.
+- Dependencias técnicas y orden crítico de ejecución.
 
 ## 3. Arquitectura del Sistema & Diseño de Componentes
 - Módulos, servicios o archivos afectados.
 - Esquema de base de datos / modelos de datos / contratos de interfaz (firmas de funciones clave).
 
 ## 4. Plan de Implementación Paso a Paso
-- Secuencia de pasos atómicos de implementación que el agente de IA debe ejecutar en la codebase.
+- Secuencia de pasos atómicos de implementación que el desarrollador o agente de IA debe ejecutar en la codebase.
 
 ## 5. Casos Límite (Edge Cases), Errores & Seguridad
 - Validaciones, manejo de fallos y condiciones de carrera a prever.
@@ -307,161 +313,278 @@ La especificación DEBE seguir rigurosamente esta estructura en Markdown:
 - Checklist de verificación paso a paso para dar la iniciativa por completada.
 """
 
-    elif mode == "user_stories":
+    elif mode == "study_socratic":
         system_prompt = (
-            "Eres un Product Owner y Agile Coach Senior. Tu función es transformar requisitos y notas "
-            "de tarjetas Kanban en Historias de Usuario completas bajo el formato estándar de la industria "
-            "con Criterios de Aceptación en formato Gherkin (Given-When-Then)."
+            "Eres un Tutor y Mentor Académico de Alto Rendimiento, especialista en el Método Socrático, "
+            "Técnicas de Estudio Avanzadas (Active Recall, Técnica Feynman, Repetición Espaciada) y preparación "
+            "de Oposiciones y Exámenes Oficiales.\n"
+            "Tu objetivo es transformar los temas y referencias en un Plan de Estudio profundo, estructurado y "
+            "estimulante que garantice la asimilación conceptual duradera."
         )
-        user_prompt = f"""Convierte las siguientes tareas de Backlog en un conjunto formal de Historias de Usuario con Criterios de Aceptación:
+        user_prompt = f"""Analiza las siguientes materias, temas y referencias proporcionadas en JSON y elabora un PLAN DE ESTUDIO & EVALUACIÓN SOCRÁTICA exhaustivo:
 
-{tasks_block}
+```json
+{tasks_json}
+```
 
-{f"Instrucciones adicionales: {custom_instructions}" if custom_instructions else ""}
+{f"Instrucciones adicionales del usuario: {custom_instructions}" if custom_instructions else ""}
 
-Genera la salida estructurada con:
-1. **Épica / Tema Principal**
-2. Para cada tarea:
-   - **Título de la Historia de Usuario**
-   - **Narrativa**: *Como [rol], quiero [acción], para [beneficio]*
-   - **Criterios de Aceptación (Given-When-Then)**
-   - **Condiciones de Frontera y Consideraciones UX/Técnicas**
+Estructura el documento rigurosamente en Markdown:
+
+# PLAN DE ESTUDIO & PREGUNTAS SOCRÁTICAS: [Tema / Materia Principal]
+
+## 1. Resumen Conceptual & Síntesis Estructurada
+- Marco teórico fundamental explicado con máxima claridad pedagógica.
+- Ideas fuerza y principios esenciales.
+
+## 2. Glosario de Conceptos Clave & Relaciones
+- Definiciones precisas de los términos nucleares y sus interconexiones.
+
+## 3. Esquema Mnemotécnico & Mapas Mentales
+- Reglas de asociación mental, acrónimos o esquemas visuales para memorización a largo plazo.
+
+## 4. Batería de Preguntas Socráticas de Autoevaluación
+- Batería de preguntas desafiantes diseñadas para estimular la reflexión crítica (con sus correspondientes soluciones explicadas al detalle para autotest).
+
+## 5. Supuestos Prácticos & Casos de Examen
+- Ejercicios prácticos o preguntas tipo test/desarrollo representativas de examen real.
 """
 
-    else:  # qa_tests
+    elif mode == "analyst_business":
         system_prompt = (
-            "Eres un QA Lead y Especialista en Pruebas de Software. Tu objetivo es crear un Plan de Verificación "
-            "y Matriz de Pruebas detallada para validar las funcionalidades descritas en las tareas de Backlog."
+            "Eres un Consultor Estratégico Senior y Analista de Negocio y Operaciones especializado en "
+            "evaluación de viabilidad, diseño de modelos de negocio, proyectos de montaje e innovación de producto.\n"
+            "Tu objetivo es evaluar iniciativas y estructurar planes de viabilidad comercial, técnica y operativa rigurosos."
         )
-        user_prompt = f"""Diseña un Plan de Pruebas y Matriz de QA exhaustiva para las siguientes tareas:
+        user_prompt = f"""Analiza las siguientes iniciativas, ideas o proyectos descritos en JSON junto con sus referencias y elabora un PLAN DE ANÁLISIS DE NEGOCIO Y VIABILIDAD completo:
 
-{tasks_block}
+```json
+{tasks_json}
+```
 
-{f"Instrucciones adicionales: {custom_instructions}" if custom_instructions else ""}
+{f"Instrucciones adicionales del usuario: {custom_instructions}" if custom_instructions else ""}
 
-Estructura el documento con:
-1. **Estrategia de Prueba (Unitarias, Integración, UI/E2E)**
-2. **Matriz de Casos de Prueba (ID, Precondición, Pasos, Resultado Esperado)**
-3. **Casos Límite y Pruebas Negativas (Edge Cases)**
-4. **Criterios de Éxito para Release**
+Estructura el documento en Markdown con:
+
+# PLAN DE NEGOCIO & ANÁLISIS DE VIABILIDAD: [Iniciativa Principal]
+
+## 1. Resumen Ejecutivo & Propuesta de Valor
+- Justificación del proyecto y propuesta de valor diferencial.
+
+## 2. Análisis de Viabilidad Técnica, Operativa y de Mercado
+- Factibilidad técnica, requerimientos de fabricación/montaje/desarrollo y demanda potencial.
+
+## 3. Matriz DAFO (SWOT)
+- Fortalezas, Oportunidades, Debilidades y Amenazas detalladas.
+
+## 4. Desglose de Recursos, Materiales y Presupuesto
+- Equipamiento, componentes, materiales, herramientas y estimación presupuestaria.
+
+## 5. Matriz de Riesgos & Plan de Mitigación
+- Riesgos operacionales, técnicos y financieros con sus medidas de contingencia.
+
+## 6. Plan de Acción por Fases, Hitos y Métricas (KPIs)
+- Cronograma de ejecución por etapas y métricas de éxito para validación.
+"""
+
+    elif mode == "user_stories":
+        system_prompt = (
+            "Eres un Product Owner y Agile Coach Senior especializado en Especificaciones de Requisitos.\n"
+            "Tu objetivo es transformar los requerimientos en Historias de Usuario con criterios de aceptación Gherkin."
+        )
+        user_prompt = f"""Analiza las siguientes tareas en JSON y elabora historias de usuario con criterios Given-When-Then:
+
+```json
+{tasks_json}
+```
+
+{f"Instrucciones adicionales del usuario: {custom_instructions}" if custom_instructions else ""}
+"""
+
+    elif mode == "qa_tests":
+        system_prompt = (
+            "Eres un QA Lead y Test Architect Senior especializado en aseguramiento de calidad de software.\n"
+            "Tu objetivo es diseñar una Matriz de Casos de Prueba exhaustiva y plan de pruebas automatizadas."
+        )
+        user_prompt = f"""Analiza las siguientes tareas en JSON y genera la Matriz de Casos de Prueba con escenarios límite:
+
+```json
+{tasks_json}
+```
+
+{f"Instrucciones adicionales del usuario: {custom_instructions}" if custom_instructions else ""}
+"""
+
+    else:  # action_breakdown fallback
+        system_prompt = (
+            "Eres un Director de Proyectos Senior (PMP / Agile Coach) enfocado en ejecución operativa impecable.\n"
+            "Tu objetivo es descomponer iniciativas complejas en planes de acción accionables paso a paso con hitos, "
+            "dependencias y entregables claramente definidos."
+        )
+        user_prompt = f"""Analiza las siguientes tareas y referencias descritas en JSON y elabora un PLAN DE ACCIÓN Y DESGLOSE OPERATIVO detallado:
+
+```json
+{tasks_json}
+```
+
+{f"Instrucciones adicionales del usuario: {custom_instructions}" if custom_instructions else ""}
+
+Estructura el documento en Markdown con:
+
+# PLAN DE ACCIÓN & DESGLOSE OPERATIVO: [Objetivo de la Iniciativa]
+
+## 1. Objetivo Global & Alcance del Plan
+- Meta concreta a alcanzar y criterios de éxito.
+
+## 2. Hitos Clave y Cronograma
+- Fases temporales y momentos de entrega clave.
+
+## 3. Desglose de Tareas Atómicas con Dependencias
+- Acciones ordenadas paso a paso para cada una de las tareas especificadas.
+
+## 4. Checklist de Entregables & Criterios de Aceptación
+- Lista de verificación final para asegurar el cumplimiento del 100% de los requisitos.
 """
 
     return system_prompt, user_prompt
 
 
-def generate_structural_spec(tasks: list[dict], mode: str = "coding_agent", custom_instructions: str = "") -> str:
+def generate_structural_spec(tasks: list[dict], mode: str = "sw_feature_plan", custom_instructions: str = "") -> str:
     """Generador offline instantáneo que sintetiza una SPEC estructurada sin necesidad de descargar el modelo."""
+    import re
     task_count = len(tasks)
     initiative_title = " - ".join(t.get("title", "Tarea") for t in tasks[:3])
     if task_count > 3:
         initiative_title += f" (+{task_count - 3} tareas)"
 
-    if mode == "coding_agent":
+    if mode in ("coding_agent", "sw_feature_plan"):
+        header_title = f"# SPEC: {initiative_title}" if mode == "coding_agent" else f"# FEATURE PLAN: {initiative_title}"
         lines = [
-            f"# SPEC: {initiative_title}",
+            header_title,
             "",
             "## 1. Resumen Ejecutivo & Objetivo",
-            f"Esta especificación técnica agrupa y estructura **{task_count} tareas de backlog** seleccionadas para su ejecución coordinada por un agente autónomo de IA.",
+            f"Esta especificación técnica estructura **{task_count} tareas** seleccionadas para su ejecución técnica coordinada.",
             "",
             "- **Objetivo principal**: Implementar, verificar e integrar las tareas descritas manteniendo coherencia arquitectónica.",
             "- **Alcance**: Modificaciones en la lógica de negocio, interfaz de usuario y modelos de datos pertinentes.",
             "",
-            "## 2. Desglose de Tareas & Requisitos",
+            "## 2. Desglose de Requisitos & Mapeo de Tareas",
             "",
         ]
         for idx, t in enumerate(tasks, 1):
             title = t.get("title", "")
-            desc = t.get("description", "").strip() or "Sin descripción detallada."
-            col = t.get("column_name", "General")
-            lines.append(f"### 2.{idx}. {title} `[{col}]`")
-            lines.append(f"**Detalle de la tarea**: {desc}")
-            if t.get("due_date"):
-                lines.append(f"- **Vencimiento objetivo**: `{t.get('due_date')}`")
-            if t.get("tags"):
-                tags_formatted = " ".join(f"`{tag.get('category')}:{tag.get('value')}`" for tag in t["tags"])
-                lines.append(f"- **Etiquetas**: {tags_formatted}")
+            raw_desc = t.get("description", "").strip()
+            desc = re.sub(r'<[^>]+>', '', raw_desc).strip() or "Sin descripción detallada."
+            lines.append(f"### 2.{idx}. {title}")
+            lines.append(f"**Detalle**: {desc}")
+            links = t.get("links", [])
+            if links:
+                links_str = ", ".join(f"[{lnk.get('label') or 'Enlace'}]({lnk.get('url', '')})" for lnk in links)
+                lines.append(f"- **Referencias / Enlaces**: {links_str}")
             lines.append("")
 
         lines.extend([
             "## 3. Arquitectura del Sistema & Componentes Afectados",
-            "- **Modularidad**: Separar responsabilidades entre el almacenamiento de datos, lógica de dominio e interfaz.",
-            "- **Persistencia**: Aplicar transacciones atómicas con rollback seguro.",
+            "- **Modularidad**: Separación de responsabilidades entre persistencia, lógica de dominio e interfaz.",
+            "- **Persistencia**: Transacciones atómicas seguras y consistentes.",
             "- **Contratos**: Garantizar consistencia en tipos de retorno y manejo explícito de errores.",
             "",
             "## 4. Plan de Implementación Paso a Paso",
-            "1. **Preparación y Validación de Entorno**: Comprobar el estado de los tests actuales antes de comenzar.",
-            "2. **Implementación de Modelos / Lógica Base**: Crear o extender las funciones de soporte necesarias.",
-            "3. **Integración con la Interfaz de Usuario**: Conectar los nuevos flujos con widgets o controles interactivos.",
-            "4. **Manejo de Errores y Casos Límite**: Validar entradas nulas, desconexiones o fallos en cascada.",
-            "5. **Pruebas Automatizadas**: Crear tests unitarios dedicados con aserciones rigurosas.",
+            "1. **Preparación de Entorno**: Validar la suite de pruebas antes de comenzar.",
+            "2. **Lógica de Negocio / Modelos**: Implementar o extender las funciones de soporte requeridas.",
+            "3. **Integración UI**: Conectar los nuevos flujos con widgets o controles interactivos.",
+            "4. **Casos Límite**: Gestionar validaciones, desconexiones o entradas atípicas.",
+            "5. **Pruebas Automatizadas**: Crear tests unitarios con aserciones exhaustivas.",
             "",
             "## 5. Casos Límite & Consideraciones de Seguridad",
-            "- Prevenir bloqueos de UI delegando tareas pesadas a hilos secundarios (`QThread`).",
-            "- Asegurar que las modificaciones no introduzcan regresiones en el flujo existente.",
-            "- Manejar codificación UTF-8 e interoperabilidad multiplataforma.",
+            "- Mantener la fluidez de la UI delegando operaciones asíncronas.",
+            "- Prevenir regresiones en flujos existentes.",
             "",
             "## 6. Criterios de Aceptación & Definición de Hecho (DoD)",
             "- [ ] Todas las tareas seleccionadas han sido implementadas de acuerdo a sus especificaciones.",
             "- [ ] La suite de pruebas unitarias pasa al 100% sin advertencias ni regresiones.",
-            "- [ ] La documentación y comentarios de código reflejan los cambios introducidos.",
+            "- [ ] La documentación y comentarios reflejan fielmente los cambios introducidos.",
         ])
 
-    elif mode == "user_stories":
+    elif mode == "study_socratic":
         lines = [
-            f"# HISTORIAS DE USUARIO: {initiative_title}",
+            f"# PLAN DE ESTUDIO & PREGUNTAS SOCRÁTICAS: {initiative_title}",
             "",
-            f"Documento de requerimientos ágiles derivado de **{task_count} tareas de backlog**.",
+            f"Plan conceptual y batería de autoevaluación socrática para **{task_count} temas**.",
+            "",
+            "## 1. Resumen Conceptual & Síntesis",
+        ]
+        for idx, t in enumerate(tasks, 1):
+            title = t.get("title", "")
+            raw_desc = t.get("description", "").strip()
+            desc = re.sub(r'<[^>]+>', '', raw_desc).strip() or "Desarrollo del tema requerido."
+            lines.append(f"### Tema {idx}: {title}")
+            lines.append(f"- **Conceptos clave**: {desc}")
+            links = t.get("links", [])
+            if links:
+                links_str = ", ".join(f"[{lnk.get('label') or 'Material'}]({lnk.get('url', '')})" for lnk in links)
+                lines.append(f"- **Materiales / Fuentes**: {links_str}")
+            lines.append("")
+
+        lines.extend([
+            "## 2. Batería de Preguntas Socráticas de Autoevaluación",
+            "1. *¿Cuál es el principio subyacente que conecta los temas analizados y cómo se aplica a un caso real?*",
+            "   - **Explicación**: El dominio conceptual exige distinguir la causa fundamental de los efectos secundarios.",
+            "2. *¿Qué sucedería si se altera una de las variables o premisas básicas planteadas?*",
+            "   - **Explicación**: Permite verificar la solidez del razonamiento y detectar lagunas teóricas.",
+            "",
+            "## 3. Reglas Mnemotécnicas & Consejos de Fijación",
+            "- Aplicar active recall mediante explicaciones en voz alta con palabras propias.",
+            "- Relacionar cada término técnico con una analogía práctica visualizable.",
+        ])
+
+    elif mode == "analyst_business":
+        lines = [
+            f"# PLAN DE NEGOCIO & ANÁLISIS DE VIABILIDAD: {initiative_title}",
+            "",
+            f"Análisis estratégico y de recursos para **{task_count} iniciativas**.",
+            "",
+            "## 1. Resumen Ejecutivo & Propuesta de Valor",
+            "Evaluación de viabilidad y requerimientos operativos para la ejecución exitosa de la iniciativa.",
+            "",
+            "## 2. Matriz DAFO (SWOT)",
+            "- **Fortalezas (F)**: Dominio técnico, herramientas disponibles y alcance acotado.",
+            "- **Oportunidades (O)**: Automatización, escalabilidad y optimización de flujos.",
+            "- **Debilidades (D)**: Curva de aprendizaje inicial o dependencias externas.",
+            "- **Amenazas (A)**: Tiempos de entrega ajustados o cambios imprevistos en requisitos.",
+            "",
+            "## 3. Recursos & Plan de Acción",
+        ]
+        for idx, t in enumerate(tasks, 1):
+            title = t.get("title", "")
+            lines.append(f"### Fase {idx}: {title}")
+            lines.append("- **Acción**: Diseñar, validar y poner en marcha los entregables correspondientes.")
+            lines.append("- **Métrica (KPI)**: Entregable validado y sin incidencias operativas.")
+            lines.append("")
+
+    else:  # action_breakdown / user_stories / qa_tests
+        lines = [
+            f"# PLAN DE ACCIÓN & DESGLOSE OPERATIVO: {initiative_title}",
+            "",
+            f"Desglose táctico de ejecución para **{task_count} tareas**.",
+            "",
+            "## Desglose de Acciones por Tarea",
             "",
         ]
         for idx, t in enumerate(tasks, 1):
             title = t.get("title", "")
-            desc = t.get("description", "").strip() or "Implementación requerida."
-            lines.extend([
-                f"## HU-{idx:02d}: {title}",
-                "",
-                "**Como** usuario del sistema,",
-                f"**Quiero** {desc.lower() if len(desc) < 120 else title.lower()},",
-                "**Para** optimizar el flujo de trabajo y productividad en el tablero.",
-                "",
-                "### Criterios de Aceptación (Gherkin):",
-                "```gherkin",
-                f"Escenario: Ejecución exitosa de {title}",
-                "  Dado que el usuario accede a la sección correspondiente",
-                "  Cuando realiza la acción prevista",
-                "  Entonces el sistema responde de forma inmediata y persiste los cambios",
-                "```",
-                "",
-            ])
-
-    else:  # qa_tests
-        lines = [
-            f"# PLAN DE PRUEBAS & QA: {initiative_title}",
-            "",
-            f"Matriz de verificación técnica para **{task_count} tareas**.",
-            "",
-            "## Matriz de Casos de Prueba",
-            "",
-            "| ID | Tarea Evaluada | Tipo de Prueba | Precondición | Resultado Esperado |",
-            "|---|---|---|---|---|",
-        ]
-        for idx, t in enumerate(tasks, 1):
-            lines.append(
-                f"| TC-{idx:02d} | {t.get('title', '')} | Funcional / Integración | Entorno listo | Cumple el criterio sin errores |"
-            )
-        lines.extend([
-            "",
-            "## Checklist de Verificación Manual",
-            "- [ ] Comprobación visual y respuesta de la UI.",
-            "- [ ] Validación con datos de prueba reales y entradas atípicas.",
-            "- [ ] Comprobación de persistencia tras reiniciar la aplicación.",
-        ])
+            raw_desc = t.get("description", "").strip()
+            desc = re.sub(r'<[^>]+>', '', raw_desc).strip() or "Acción requerida."
+            lines.append(f"### Acción {idx}: {title}")
+            lines.append(f"- **Descripción**: {desc}")
+            lines.append("- **Criterio de éxito**: Ejecución completada y verificada.")
+            lines.append("")
 
     if custom_instructions:
         lines.extend([
-            "",
             "---",
-            "### Notas e Instrucciones Adicionales del Equipo:",
-            f"> {custom_instructions}",
+            f"**Instrucciones Adicionales**: {custom_instructions}",
+            "",
         ])
 
     return "\n".join(lines)

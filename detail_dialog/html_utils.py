@@ -147,3 +147,62 @@ def apply_word_style_to_qt_table(table, rows: int, cols: int, cell_texts=None, b
             if cell_texts and r < len(cell_texts) and c < len(cell_texts[r]):
                 cur.insertText(cell_texts[r][c])
 
+
+def format_single_cell(cell, is_header: bool = False, bg_header=None):
+    """Aplica el estilo estándar de celda (padding, centrado y opcionalmente estilo cabecera)."""
+    from PySide6.QtGui import QTextCharFormat, QColor, QFont
+    from PySide6.QtCore import Qt
+
+    bg_header = bg_header or "#f8fafc"
+    cell_fmt = cell.format().toTableCellFormat()
+    cell_fmt.setVerticalAlignment(QTextCharFormat.VerticalAlignment.AlignMiddle)
+    cell_fmt.setTopPadding(6)
+    cell_fmt.setBottomPadding(6)
+    cell_fmt.setLeftPadding(8)
+    cell_fmt.setRightPadding(8)
+    if is_header:
+        cell_fmt.setBackground(QColor(bg_header))
+    cell.setFormat(cell_fmt)
+
+    cur = cell.firstCursorPosition()
+    b_fmt = cur.blockFormat()
+    b_fmt.setAlignment(Qt.AlignCenter)
+    cur.setBlockFormat(b_fmt)
+
+    if is_header:
+        c_fmt = cur.charFormat()
+        c_fmt.setFontWeight(QFont.Bold)
+        cur.setCharFormat(c_fmt)
+
+
+def format_table_all_cells(table, border_color=None, bg_header=None):
+    """Reaplica el formato de bordes, padding y cabecera a todas las celdas de una tabla existente."""
+    from PySide6.QtGui import QTextFrameFormat, QColor
+    from PySide6.QtCore import Qt
+
+    border_color = border_color or "#e2e8f0"
+    bg_header = bg_header or "#f8fafc"
+
+    rows = table.rows()
+    cols = table.columns()
+    if rows <= 0 or cols <= 0:
+        return
+
+    fmt = table.format()
+    fmt.setCellPadding(6)
+    fmt.setCellSpacing(0)
+    fmt.setBorder(1)
+    fmt.setBorderStyle(QTextFrameFormat.BorderStyle_Solid)
+    fmt.setBorderBrush(QColor(border_color))
+    fmt.setAlignment(Qt.AlignCenter)
+    if rows > 1:
+        fmt.setHeaderRowCount(1)
+    table.setFormat(fmt)
+
+    for r in range(rows):
+        is_hdr = (r == 0 and rows > 1)
+        for c in range(cols):
+            cell = table.cellAt(r, c)
+            if cell.isValid():
+                format_single_cell(cell, is_header=is_hdr, bg_header=bg_header)
+

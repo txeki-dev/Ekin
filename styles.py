@@ -488,21 +488,25 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
 
 #LogEntryWidget {{
     background-color: {c["bg_card"]};
-    border: none;
-    border-radius: 20px;
+    border: 1px solid {c["border"]};
+    border-radius: 12px;
+}}
+
+#LogEntryWidget:hover {{
+    border-color: {c["border"]};
 }}
 
 #LogTimestamp {{
     font-size: 10px;
     color: {c["text_muted"]};
     font-weight: bold;
-    background-color: {c["bg_card"]};
+    background-color: transparent;
 }}
 
 #LogContent {{
     font-size: 13px;
     color: {c["text_main"]};
-    background-color: {c["bg_card"]};
+    background-color: transparent;
 }}
 
 /* --- Filas de valores en el Gestor de Etiquetas --- */

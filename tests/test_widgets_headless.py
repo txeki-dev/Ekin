@@ -1437,7 +1437,7 @@ def test_ai_spec_dialog_loads_and_generates(qapp, db_path):
     qapp.processEvents()
 
     spec_text = dlg.spec_edit.toPlainText()
-    assert "# SPEC:" in spec_text
+    assert "# FEATURE PLAN:" in spec_text or "# SPEC:" in spec_text
     assert "Autenticación OAuth2" in spec_text
     assert "Tokens en SQLite" in spec_text
 

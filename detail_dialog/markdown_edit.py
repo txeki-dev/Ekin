@@ -2,7 +2,7 @@ from PySide6.QtCore import Qt, QBuffer, QIODevice, QUrl, QPointF, QSize, Signal
 from PySide6.QtWidgets import (
     QTextEdit, QPushButton, QWidget, QHBoxLayout, QVBoxLayout,
     QInputDialog, QDialog, QLabel, QComboBox, QPlainTextEdit,
-    QColorDialog, QMenu, QLineEdit, QApplication
+    QColorDialog, QMenu, QLineEdit, QApplication, QFormLayout, QSpinBox
 )
 from PySide6.QtGui import (
     QFont, QTextCharFormat, QTextListFormat, QTextCursor, QImage,
@@ -294,6 +294,78 @@ class LinkDialog(QDialog):
         return url, label or url
 
 
+class TableInsertDialog(QDialog):
+    """Diálogo modal para configurar e insertar una tabla con número inicial de filas y columnas."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(t("markdown_edit.table_dialog_title"))
+        self.setFixedWidth(320)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.finished.connect(self.deleteLater)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(14)
+
+        header = QLabel(f"<b>{t('markdown_edit.table_dialog_title')}</b>")
+        header.setStyleSheet(f"font-size: 14px; color: {styles.COLORS['text_main']};")
+        layout.addWidget(header)
+
+        form = QFormLayout()
+        form.setSpacing(10)
+
+        self.rows_spin = QSpinBox()
+        self.rows_spin.setRange(1, 50)
+        self.rows_spin.setValue(3)
+        self.rows_spin.setStyleSheet(f"""
+            QSpinBox {{
+                background-color: {styles.COLORS['bg_card']};
+                color: {styles.COLORS['text_main']};
+                border: 1px solid {styles.COLORS['border']};
+                border-radius: 6px;
+                padding: 4px 8px;
+            }}
+        """)
+
+        self.cols_spin = QSpinBox()
+        self.cols_spin.setRange(1, 20)
+        self.cols_spin.setValue(3)
+        self.cols_spin.setStyleSheet(f"""
+            QSpinBox {{
+                background-color: {styles.COLORS['bg_card']};
+                color: {styles.COLORS['text_main']};
+                border: 1px solid {styles.COLORS['border']};
+                border-radius: 6px;
+                padding: 4px 8px;
+            }}
+        """)
+
+        lbl_rows = QLabel(t("markdown_edit.table_rows_label"))
+        lbl_cols = QLabel(t("markdown_edit.table_cols_label"))
+        form.addRow(lbl_rows, self.rows_spin)
+        form.addRow(lbl_cols, self.cols_spin)
+        layout.addLayout(form)
+
+        btns = QHBoxLayout()
+        btns.addStretch()
+        cancel_btn = QPushButton(t("markdown_edit.link_cancel_btn"))
+        cancel_btn.setCursor(Qt.PointingHandCursor)
+        cancel_btn.clicked.connect(self.reject)
+        btns.addWidget(cancel_btn)
+
+        accept_btn = QPushButton(t("markdown_edit.code_insert_btn"))
+        accept_btn.setObjectName("PrimaryButton")
+        accept_btn.setCursor(Qt.PointingHandCursor)
+        accept_btn.clicked.connect(self.accept)
+        btns.addWidget(accept_btn)
+
+        layout.addLayout(btns)
+
+    def get_dimensions(self) -> tuple[int, int]:
+        return self.rows_spin.value(), self.cols_spin.value()
+
+
 class MarkdownTextEdit(QTextEdit):
     """QTextEdit con atajos tipo Markdown para crear listas al vuelo.
 
@@ -329,6 +401,7 @@ class MarkdownTextEdit(QTextEdit):
     def mouseReleaseEvent(self, event):
         """Un clic (no un arrastre de selección) sobre una imagen pegada la abre en
         grande; sobre '✕ Borrar' elimina el bloque de código; sobre un enlace web o local lo abre con la app predeterminada."""
+        super().mouseReleaseEvent(event)
         pos = event.position().toPoint()
         if event.button() == Qt.LeftButton and self._press_pos is not None:
             moved = (pos - self._press_pos).manhattanLength()
@@ -348,7 +421,168 @@ class MarkdownTextEdit(QTextEdit):
                     from .security_utils import open_link_safely
                     open_link_safely(self.window(), anchor)
                     return
-        super().mouseReleaseEvent(event)
+
+                # Si se pulsó dentro de una cita cuyo texto es el placeholder, limpiarlo automáticamente
+                click_cur = self.cursorForPosition(pos)
+                tbl = click_cur.currentTable() or self.textCursor().currentTable()
+                if tbl and self._is_quote_table(tbl):
+                    cell = tbl.cellAt(0, 1)
+                    if cell.isValid():
+                        first_cur = cell.firstCursorPosition()
+                        cell_text = first_cur.block().text().strip()
+                        if self._is_quote_placeholder_text(cell_text):
+                            cur = cell.firstCursorPosition()
+                            cur.beginEditBlock()
+                            cur.select(QTextCursor.BlockUnderCursor)
+                            cur.removeSelectedText()
+                            cur.endEditBlock()
+                            self.setTextCursor(cur)
+                            return
+
+    @staticmethod
+    def _is_quote_placeholder_text(text: str) -> bool:
+        if not text:
+            return False
+        clean = text.strip().lower()
+        placeholders = {
+            t("markdown_edit.quote_placeholder").strip().lower(),
+            "type something...",
+            "type something",
+            "type a quote...",
+            "type a quote",
+            "escribe una cita...",
+            "escribe una cita",
+            "markdown_edit.quote_placeholder",
+        }
+        return clean in placeholders
+
+    @staticmethod
+    def _is_code_block_table(table) -> bool:
+        if not table:
+            return False
+        first_cur = table.firstCursorPosition()
+        block = first_cur.block()
+        it = block.begin()
+        while not it.atEnd():
+            frag = it.fragment()
+            if frag.isValid() and frag.charFormat().anchorHref().startswith("action:delete_code_block"):
+                return True
+            it += 1
+        return False
+
+    @staticmethod
+    def _is_quote_table(table) -> bool:
+        if not table:
+            return False
+        return table.rows() == 1 and table.columns() == 2 and table.format().border() == 0
+
+    def insert_table_row_above(self, table=None, row_idx=None):
+        cursor = self.textCursor()
+        table = table or cursor.currentTable()
+        if not table:
+            return
+        if row_idx is None:
+            cell = table.cellAt(cursor)
+            row_idx = cell.row() if cell.isValid() else 0
+        cursor.beginEditBlock()
+        table.insertRows(row_idx, 1)
+        from .html_utils import format_table_all_cells
+        format_table_all_cells(table, border_color=styles.COLORS["border"], bg_header=styles.COLORS["bg_card"])
+        cursor.endEditBlock()
+
+    def insert_table_row_below(self, table=None, row_idx=None):
+        cursor = self.textCursor()
+        table = table or cursor.currentTable()
+        if not table:
+            return
+        if row_idx is None:
+            cell = table.cellAt(cursor)
+            row_idx = cell.row() if cell.isValid() else table.rows() - 1
+        cursor.beginEditBlock()
+        table.insertRows(row_idx + 1, 1)
+        from .html_utils import format_table_all_cells
+        format_table_all_cells(table, border_color=styles.COLORS["border"], bg_header=styles.COLORS["bg_card"])
+        cursor.endEditBlock()
+
+    def insert_table_col_left(self, table=None, col_idx=None):
+        cursor = self.textCursor()
+        table = table or cursor.currentTable()
+        if not table:
+            return
+        if col_idx is None:
+            cell = table.cellAt(cursor)
+            col_idx = cell.column() if cell.isValid() else 0
+        cursor.beginEditBlock()
+        table.insertColumns(col_idx, 1)
+        from .html_utils import format_table_all_cells
+        format_table_all_cells(table, border_color=styles.COLORS["border"], bg_header=styles.COLORS["bg_card"])
+        cursor.endEditBlock()
+
+    def insert_table_col_right(self, table=None, col_idx=None):
+        cursor = self.textCursor()
+        table = table or cursor.currentTable()
+        if not table:
+            return
+        if col_idx is None:
+            cell = table.cellAt(cursor)
+            col_idx = cell.column() if cell.isValid() else table.columns() - 1
+        cursor.beginEditBlock()
+        table.insertColumns(col_idx + 1, 1)
+        from .html_utils import format_table_all_cells
+        format_table_all_cells(table, border_color=styles.COLORS["border"], bg_header=styles.COLORS["bg_card"])
+        cursor.endEditBlock()
+
+    def delete_table_row(self, table=None, row_idx=None):
+        cursor = self.textCursor()
+        table = table or cursor.currentTable()
+        if not table:
+            return
+        if row_idx is None:
+            cell = table.cellAt(cursor)
+            row_idx = cell.row() if cell.isValid() else 0
+        if table.rows() <= 1:
+            self.delete_table(table)
+            return
+        cursor.beginEditBlock()
+        table.removeRows(row_idx, 1)
+        from .html_utils import format_table_all_cells
+        format_table_all_cells(table, border_color=styles.COLORS["border"], bg_header=styles.COLORS["bg_card"])
+        cursor.endEditBlock()
+
+    def delete_table_col(self, table=None, col_idx=None):
+        cursor = self.textCursor()
+        table = table or cursor.currentTable()
+        if not table:
+            return
+        if col_idx is None:
+            cell = table.cellAt(cursor)
+            col_idx = cell.column() if cell.isValid() else 0
+        if table.columns() <= 1:
+            self.delete_table(table)
+            return
+        cursor.beginEditBlock()
+        table.removeColumns(col_idx, 1)
+        from .html_utils import format_table_all_cells
+        format_table_all_cells(table, border_color=styles.COLORS["border"], bg_header=styles.COLORS["bg_card"])
+        cursor.endEditBlock()
+
+    def delete_table(self, table=None):
+        cursor = self.textCursor()
+        table = table or cursor.currentTable()
+        if not table:
+            return
+        from PySide6.QtGui import QTextTable
+        parent_frame = table.parentFrame()
+        outer_table = parent_frame if isinstance(parent_frame, QTextTable) else table
+        first_pos = outer_table.firstCursorPosition().position()
+        last_pos = outer_table.lastCursorPosition().position()
+        del_cursor = self.textCursor()
+        del_cursor.beginEditBlock()
+        del_cursor.setPosition(max(0, first_pos - 1))
+        del_cursor.setPosition(min(self.document().characterCount() - 1, last_pos + 1), QTextCursor.KeepAnchor)
+        del_cursor.removeSelectedText()
+        del_cursor.endEditBlock()
+        self.setTextCursor(del_cursor)
 
     def _delete_code_block_at(self, pos, anchor="action:delete_code_block"):
         """Elimina la tabla/bloque de código donde se pulsó 'Borrar' o donde se encuentra el cursor."""
@@ -538,12 +772,14 @@ class MarkdownTextEdit(QTextEdit):
         selected = cursor.selectedText()
         accent = styles.COLORS["accent"]
         text_c = styles.COLORS["text_soft"]
+        has_selection = bool(selected)
         cursor.beginEditBlock()
-        if selected:
+        placeholder = t("markdown_edit.quote_placeholder")
+        if has_selection:
             lines = selected.replace('\u2029', '\n').split('\n')
             inner = "<br/>".join(html.escape(line) for line in lines)
         else:
-            inner = html.escape(t("markdown_edit.quote_placeholder"))
+            inner = html.escape(placeholder)
         quote_html = (
             f'<table border="0" cellpadding="0" cellspacing="0" style="margin: 6px 0px 6px 4px;">'
             f'<tr>'
@@ -555,7 +791,26 @@ class MarkdownTextEdit(QTextEdit):
         )
         cursor.insertHtml(quote_html)
         cursor.endEditBlock()
-        self.setTextCursor(cursor)
+
+        if not has_selection:
+            # Posicionar el cursor dentro de la celda de la cita y seleccionar el placeholder
+            from PySide6.QtGui import QTextTable
+            tables = [f for f in self.document().rootFrame().childFrames() if isinstance(f, QTextTable)]
+            if tables:
+                cur_tbl = tables[-1]
+                if cur_tbl.columns() >= 2:
+                    cell = cur_tbl.cellAt(0, 1)
+                    first_cur = cell.firstCursorPosition()
+                    last_cur = cell.lastCursorPosition()
+                    sel_cur = QTextCursor(first_cur)
+                    sel_cur.setPosition(last_cur.position(), QTextCursor.KeepAnchor)
+                    self.setTextCursor(sel_cur)
+                else:
+                    self.setTextCursor(cursor)
+            else:
+                self.setTextCursor(cursor)
+        else:
+            self.setTextCursor(cursor)
         self.setFocus()
 
     def paste_plain_text(self):
@@ -565,18 +820,90 @@ class MarkdownTextEdit(QTextEdit):
         if text:
             self.insertPlainText(text)
 
+    def _is_code_block_table(self, table):
+        """Identifica si una tabla corresponde a un bloque de código."""
+        if not table:
+            return False
+        first_cur = table.cellAt(0, 0).firstCursorPosition()
+        last_cur = table.cellAt(table.rows() - 1, table.columns() - 1).lastCursorPosition()
+        check_cur = QTextCursor(first_cur)
+        check_cur.setPosition(last_cur.position(), QTextCursor.KeepAnchor)
+        it = check_cur.block().begin()
+        while not it.atEnd():
+            frag = it.fragment()
+            if frag.isValid() and frag.charFormat().anchorHref().startswith("action:delete_code_block"):
+                return True
+            it += 1
+        return False
+
+    def _is_quote_table(self, table):
+        """Identifica si una tabla corresponde a un bloque de cita (1 fila, 2 columnas, borde 0)."""
+        if not table:
+            return False
+        return table.rows() == 1 and table.columns() == 2 and table.format().border() == 0
+
+    def _is_quote_placeholder_text(self, text):
+        """Comprueba si el texto coincide con alguno de los placeholders conocidos de citas."""
+        cleaned = text.strip().lower()
+        placeholders = [
+            t("markdown_edit.quote_placeholder").strip().lower(),
+            "escribe una cita...",
+            "escribe una cita…",
+            "type a quote...",
+            "type a quote…",
+            "type something...",
+            "type something…"
+        ]
+        return cleaned in placeholders
+
     def contextMenuEvent(self, event):
         """Menú contextual estándar ampliado con opciones de mayúsculas/minúsculas,
-        borrar código, redimensionar imagen y pegar sin formato."""
+        borrar código, manipulación y formato de tablas, redimensionar imagen y pegar sin formato."""
         menu = self.createStandardContextMenu()
         styles.style_menu(menu)
         pos = event.pos()
         cursor = self.cursorForPosition(pos)
         table = cursor.currentTable()
         if table:
-            menu.addSeparator()
-            act_del = menu.addAction(f"🗑️ {t('markdown_edit.delete_code_btn_menu')}")
-            act_del.triggered.connect(lambda: self._delete_code_block_at(pos))
+            if self._is_code_block_table(table):
+                menu.addSeparator()
+                act_del = menu.addAction(f"🗑️ {t('markdown_edit.delete_code_btn_menu')}")
+                act_del.triggered.connect(lambda: self._delete_code_block_at(pos))
+            elif not self._is_quote_table(table):
+                cell = table.cellAt(cursor)
+                r = cell.row() if cell.isValid() else 0
+                c = cell.column() if cell.isValid() else 0
+
+                menu.addSeparator()
+                table_menu = menu.addMenu(f"📊 {t('markdown_edit.table_menu')}")
+                styles.style_menu(table_menu)
+
+                act_row_above = table_menu.addAction(f"➕ {t('markdown_edit.table_insert_row_above')}")
+                act_row_above.triggered.connect(lambda _=False, tbl=table, row=r: self.insert_table_row_above(tbl, row))
+
+                act_row_below = table_menu.addAction(f"➕ {t('markdown_edit.table_insert_row_below')}")
+                act_row_below.triggered.connect(lambda _=False, tbl=table, row=r: self.insert_table_row_below(tbl, row))
+
+                table_menu.addSeparator()
+
+                act_col_left = table_menu.addAction(f"➕ {t('markdown_edit.table_insert_col_left')}")
+                act_col_left.triggered.connect(lambda _=False, tbl=table, col=c: self.insert_table_col_left(tbl, col))
+
+                act_col_right = table_menu.addAction(f"➕ {t('markdown_edit.table_insert_col_right')}")
+                act_col_right.triggered.connect(lambda _=False, tbl=table, col=c: self.insert_table_col_right(tbl, col))
+
+                table_menu.addSeparator()
+
+                act_del_row = table_menu.addAction(f"➖ {t('markdown_edit.table_delete_row')}")
+                act_del_row.triggered.connect(lambda _=False, tbl=table, row=r: self.delete_table_row(tbl, row))
+
+                act_del_col = table_menu.addAction(f"➖ {t('markdown_edit.table_delete_col')}")
+                act_del_col.triggered.connect(lambda _=False, tbl=table, col=c: self.delete_table_col(tbl, col))
+
+                table_menu.addSeparator()
+
+                act_del_tbl = table_menu.addAction(f"🗑️ {t('markdown_edit.table_delete_table')}")
+                act_del_tbl.triggered.connect(lambda _=False, tbl=table: self.delete_table(tbl))
 
         # Redimensionar imagen si el clic fue sobre una imagen
         img_cursor = self._image_cursor_at(pos)
@@ -630,6 +957,25 @@ class MarkdownTextEdit(QTextEdit):
         cursor = self.textCursor()
         ctrl = bool(event.modifiers() & Qt.ControlModifier)
         shift = bool(event.modifiers() & Qt.ShiftModifier)
+
+        # --- Limpiar texto predefinido de cita al comenzar a escribir o pulsar borrar ---
+        cur_tbl = cursor.currentTable()
+        if cur_tbl and self._is_quote_table(cur_tbl):
+            cell = cur_tbl.cellAt(cursor)
+            if cell.isValid() and cell.column() == 1:
+                first_cur = cell.firstCursorPosition()
+                cell_text = first_cur.block().text().strip()
+                if self._is_quote_placeholder_text(cell_text):
+                    if event.text() or event.key() in (Qt.Key_Backspace, Qt.Key_Delete):
+                        cursor.beginEditBlock()
+                        sel = cell.firstCursorPosition()
+                        sel.select(QTextCursor.BlockUnderCursor)
+                        sel.removeSelectedText()
+                        cursor.endEditBlock()
+                        self.setTextCursor(cell.firstCursorPosition())
+                        if event.key() in (Qt.Key_Backspace, Qt.Key_Delete):
+                            event.accept()
+                            return
 
         # --- Pegar sin formato: Ctrl+Shift+V ---
         if ctrl and shift and event.key() == Qt.Key_V:
@@ -924,8 +1270,10 @@ class MarkdownTextEdit(QTextEdit):
         """Inserta una tabla `rows`x`cols` en la posición del cursor con diseño estilo Microsoft Word:
         bordes estilizados, cabecera resaltada, celdas con padding generoso y texto centrado."""
         from .html_utils import apply_word_style_to_qt_table
+        cursor = self.textCursor()
+        cursor.beginEditBlock()
         fmt = QTextTableFormat()
-        table = self.textCursor().insertTable(rows, cols, fmt)
+        table = cursor.insertTable(rows, cols, fmt)
         apply_word_style_to_qt_table(
             table,
             rows,
@@ -934,6 +1282,11 @@ class MarkdownTextEdit(QTextEdit):
             border_color=styles.COLORS["border"],
             bg_header=styles.COLORS["bg_card"],
         )
+        cursor.endEditBlock()
+        first_cur = table.cellAt(0, 0).firstCursorPosition()
+        self.setTextCursor(first_cur)
+        self.setFocus()
+        return table
 
     @staticmethod
     def _image_to_data_uri(image):
@@ -1318,18 +1671,11 @@ class RichTextToolbar(QWidget):
         self.text_edit.setFocus()
 
     def insert_table_dialog(self):
-        """Pide filas y columnas y crea una tabla vacía en la posición del cursor."""
-        rows, ok = QInputDialog.getInt(
-            self, t("markdown_edit.table_dialog_title"), t("markdown_edit.table_rows_label"), 3, 1, 20
-        )
-        if not ok:
-            return
-        cols, ok = QInputDialog.getInt(
-            self, t("markdown_edit.table_dialog_title"), t("markdown_edit.table_cols_label"), 3, 1, 20
-        )
-        if not ok:
-            return
-        self.text_edit.insert_table(rows, cols)
+        """Pide filas y columnas mediante un diálogo unificado e inserta la tabla estilizada."""
+        dlg = TableInsertDialog(self.window())
+        if dlg.exec() == QDialog.Accepted:
+            rows, cols = dlg.get_dimensions()
+            self.text_edit.insert_table(rows, cols)
         self.text_edit.setFocus()
 
     def show_color_menu(self):

@@ -4,7 +4,7 @@ para agentes de IA a partir de múltiples tarjetas seleccionadas.
 """
 
 import sys
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, QTimer
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QComboBox, QPlainTextEdit, QLineEdit, QMessageBox, QFileDialog,
@@ -16,6 +16,85 @@ import database
 from strings import t
 import local_ai
 from icons import lucide_icon
+
+
+class PromptViewerDialog(QDialog):
+    """Diálogo modal para inspeccionar el prompt maestro ensamblado antes de enviarlo o copiarlo."""
+
+    def __init__(self, prompt_text: str, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(t("ai_spec.view_prompt_title"))
+        self.resize(860, 600)
+        self.setMinimumSize(600, 400)
+        self.setStyleSheet(f"background-color: {styles.COLORS['bg_main']}; color: {styles.COLORS['text_main']};")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(12)
+
+        header = QLabel(f"<b>{t('ai_spec.view_prompt_title')}</b>")
+        header.setStyleSheet(f"font-size: 16px; color: {styles.COLORS['text_main']};")
+        layout.addWidget(header)
+
+        desc = QLabel(
+            "Prompt final ensamblado con las tareas, descripciones estructuradas y enlaces para alimentar a cualquier IA (Claude, ChatGPT, Gemini, etc.):"
+        )
+        desc.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 12px;")
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+
+        text_edit = QPlainTextEdit()
+        font = QFont("Consolas" if sys.platform == "win32" else "Monospace", 10)
+        font.setStyleHint(QFont.Monospace)
+        text_edit.setFont(font)
+        text_edit.setPlainText(prompt_text)
+        text_edit.setReadOnly(True)
+        text_edit.setStyleSheet(f"""
+            QPlainTextEdit {{
+                background-color: {styles.COLORS['bg_dark']};
+                color: {styles.COLORS['bg_hover']};
+                border: 1px solid {styles.COLORS['border']};
+                border-radius: 6px;
+                padding: 10px;
+                line-height: 140%;
+            }}
+        """)
+        layout.addWidget(text_edit, stretch=1)
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
+        btn_row.addStretch()
+
+        copy_btn = QPushButton(t("ai_spec.copy_prompt_btn"))
+        copy_btn.setObjectName("PrimaryButton")
+        copy_btn.setCursor(Qt.PointingHandCursor)
+
+        def _copy():
+            QApplication.clipboard().setText(prompt_text)
+            copy_btn.setText(t("ai_spec.prompt_copied_toast"))
+            QTimer.singleShot(2500, lambda: copy_btn.setText(t("ai_spec.copy_prompt_btn")))
+
+        copy_btn.clicked.connect(_copy)
+        btn_row.addWidget(copy_btn)
+
+        close_btn = QPushButton("Cerrar")
+        close_btn.setCursor(Qt.PointingHandCursor)
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {styles.COLORS['bg_card']};
+                border: 1px solid {styles.COLORS['border']};
+                border-radius: 6px;
+                padding: 6px 14px;
+                color: {styles.COLORS['text_main']};
+                font-size: 12px;
+            }}
+            QPushButton:hover {{
+                background-color: {styles.COLORS['bg_hover']};
+            }}
+        """)
+        close_btn.clicked.connect(self.accept)
+        btn_row.addWidget(close_btn)
+
+        layout.addLayout(btn_row)
 
 
 class AiSpecDialog(QDialog):
@@ -37,13 +116,14 @@ class AiSpecDialog(QDialog):
         self.init_ui()
 
     def _load_tasks_data(self) -> list[dict]:
-        """Carga la metadata completa de las tareas seleccionadas (incluyendo logs y tags)."""
+        """Carga la metadata completa de las tareas seleccionadas (incluyendo enlaces y tags)."""
         loaded = []
         for tid in self.task_ids:
             t_data = database.get_task(tid, self.db_path)
             if t_data:
                 t_data["tags"] = database.get_task_tags(tid, self.db_path)
                 t_data["logs"] = database.get_logs(tid, self.db_path)
+                t_data["links"] = database.get_task_links(tid, self.db_path)
                 col = database.get_column(t_data["column_id"], self.db_path)
                 t_data["column_name"] = col["name"] if col else "Backlog"
                 loaded.append(t_data)
@@ -97,9 +177,10 @@ class AiSpecDialog(QDialog):
         row1.addWidget(self.mode_label)
 
         self.mode_combo = QComboBox()
-        self.mode_combo.addItem(t("ai_spec.mode_coding_agent"), "coding_agent")
-        self.mode_combo.addItem(t("ai_spec.mode_user_stories"), "user_stories")
-        self.mode_combo.addItem(t("ai_spec.mode_qa_plan"), "qa_tests")
+        self.mode_combo.addItem(t("ai_spec.mode_sw_feature_plan"), "sw_feature_plan")
+        self.mode_combo.addItem(t("ai_spec.mode_study_socratic"), "study_socratic")
+        self.mode_combo.addItem(t("ai_spec.mode_analyst_business"), "analyst_business")
+        self.mode_combo.addItem(t("ai_spec.mode_action_breakdown"), "action_breakdown")
         self.mode_combo.setStyleSheet(f"""
             QComboBox {{
                 background-color: {styles.COLORS['bg_main']};
@@ -230,7 +311,6 @@ class AiSpecDialog(QDialog):
         self.refresh_models_btn.clicked.connect(lambda: self._refresh_engine_status(manual=True))
         row2.addWidget(self.refresh_models_btn)
 
-        # Instrucciones adicionales opcionales
         self.custom_prompt_input = QLineEdit()
         self.custom_prompt_input.setPlaceholderText("Extra instructions (optional)…")
         self.custom_prompt_input.setStyleSheet(f"""
@@ -244,6 +324,37 @@ class AiSpecDialog(QDialog):
             }}
         """)
         row2.addWidget(self.custom_prompt_input, stretch=1)
+
+        btn_secondary_style = f"""
+            QPushButton {{
+                background-color: {styles.COLORS['bg_main']};
+                border: 1px solid {styles.COLORS['border']};
+                border-radius: 6px;
+                padding: 6px 12px;
+                color: {styles.COLORS['text_main']};
+                font-size: 12px;
+                font-weight: 500;
+            }}
+            QPushButton:hover {{
+                background-color: {styles.COLORS['bg_hover']};
+                border-color: {styles.COLORS['accent_blue']};
+                color: {styles.COLORS['accent_blue']};
+            }}
+        """
+
+        self.view_prompt_btn = QPushButton(t("ai_spec.view_prompt_btn"))
+        self.view_prompt_btn.setStyleSheet(btn_secondary_style)
+        self.view_prompt_btn.setCursor(Qt.PointingHandCursor)
+        self.view_prompt_btn.setToolTip("Ver el prompt maestro ensamblado para inspeccionarlo antes de enviarlo")
+        self.view_prompt_btn.clicked.connect(self.view_master_prompt)
+        row2.addWidget(self.view_prompt_btn)
+
+        self.copy_prompt_btn = QPushButton(t("ai_spec.copy_prompt_btn"))
+        self.copy_prompt_btn.setStyleSheet(btn_secondary_style)
+        self.copy_prompt_btn.setCursor(Qt.PointingHandCursor)
+        self.copy_prompt_btn.setToolTip("Copiar el prompt maestro al portapapeles para usarlo en Claude, ChatGPT, Gemini, etc.")
+        self.copy_prompt_btn.clicked.connect(self.copy_master_prompt)
+        row2.addWidget(self.copy_prompt_btn)
 
         self.generate_btn = QPushButton(t("ai_spec.generate_btn"))
         self.generate_btn.setObjectName("PrimaryButton")
@@ -412,6 +523,31 @@ class AiSpecDialog(QDialog):
             self._gen_thread.cancel()
             self._gen_thread.wait(400)
         super().closeEvent(event)
+
+    def get_master_prompt(self) -> str:
+        """Ensambla el prompt maestro completo listo para usar en cloud LLMs o inspección."""
+        mode = self.mode_combo.currentData() or "sw_feature_plan"
+        custom = self.custom_prompt_input.text().strip()
+        system_prompt, user_prompt = local_ai.build_spec_prompts(
+            self.tasks_data,
+            mode=mode,
+            custom_instructions=custom,
+        )
+        return f"# SYSTEM INSTRUCTIONS\n{system_prompt}\n\n---\n\n# CONTEXT & REQUEST\n{user_prompt}"
+
+    def view_master_prompt(self):
+        """Abre el diálogo para visualizar el prompt maestro ensamblado."""
+        prompt_text = self.get_master_prompt()
+        dialog = PromptViewerDialog(prompt_text, parent=self)
+        dialog.exec()
+
+    def copy_master_prompt(self):
+        """Copia el prompt maestro ensamblado directamente al portapapeles."""
+        prompt_text = self.get_master_prompt()
+        QApplication.clipboard().setText(prompt_text)
+        original_text = self.copy_prompt_btn.text()
+        self.copy_prompt_btn.setText(t("ai_spec.prompt_copied_toast"))
+        QTimer.singleShot(2500, lambda: self.copy_prompt_btn.setText(original_text))
 
     def copy_to_clipboard(self):
         """Copia la SPEC generada al portapapeles del sistema."""
