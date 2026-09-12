@@ -227,19 +227,80 @@ def stop_managed_runner():
 atexit.register(stop_managed_runner)
 
 
-def format_tasks_for_prompt(tasks: list[dict]) -> str:
-    """Prepara un JSON estructurado con las tareas seleccionadas conteniendo
-    ÚNICAMENTE título, descripción y enlaces/adjuntos (descartando etiquetas, fechas y diario)."""
+def clean_html_description(raw: str) -> str:
+    """Limpia a fondo cualquier residuo HTML/CSS generado por editores enriquecidos o Qt.
+    Elimina bloques <head>, <style>, <script>, comentarios y selectores CSS residuales,
+    preservando únicamente el texto descriptivo limpio."""
+    if not raw or not isinstance(raw, str):
+        return ""
     import re
     import html
 
+    # 1. Eliminar cabeceras, estilos embebidos, scripts y comentarios completos
+    text = re.sub(r'<head\b[^>]*>.*?</head>', '', raw, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r'<style\b[^>]*>.*?</style>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r'<script\b[^>]*>.*?</script>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r'<!--.*?-->', '', text, flags=re.DOTALL)
+
+    # 2. Convertir etiquetas de bloque o salto de línea en saltos reales
+    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</p\s*>', '\n\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</(?:tr|div|h[1-6])\s*>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'<li\b[^>]*>', '• ', text, flags=re.IGNORECASE)
+    text = re.sub(r'</li\s*>', '\n', text, flags=re.IGNORECASE)
+
+    # 3. Eliminar etiquetas HTML restantes
+    text = re.sub(r'<[^>]+>', '', text)
+
+    # 4. Decodificar entidades HTML (&nbsp;, &lt;, &quot;, etc.)
+    text = html.unescape(text)
+
+    # 5. Barrido preventivo contra reglas CSS que pudieran haberse filtrado sin tags
+    text = re.sub(r'(?:[a-zA-Z0-9_\-\.\#\:\s,]+)\s*\{[^}]*\}', '', text)
+
+    # 6. Normalizar saltos de línea y espacios
+    lines = [line.rstrip() for line in text.splitlines()]
+    text = "\n".join(lines)
+    text = re.sub(r'\n{3,}', '\n\n', text).strip()
+    return text
+
+
+def _analyze_task_for_spec(task: dict) -> dict:
+    """Realiza un análisis heurístico de la tarea para deducir el dominio arquitectónico,
+    identificar componentes y generar un desglose técnico rico en lugar de un volcado plano."""
+    title = task.get("title", "").strip() or "Tarea sin título"
+    raw_desc = task.get("description", "")
+    desc = clean_html_description(raw_desc) or "Sin descripción detallada proporcionada."
+    combined = f"{title} {desc}".lower()
+
+    domains = []
+    if any(k in combined for k in ("api", "ree", "omie", "omip", "http", "request", "endpoint", "rest", "red", "crawler", "sync", "scrap", "json", "webhook", "curl", "url")):
+        domains.append("Integración de Red & APIs Externas")
+    if any(k in combined for k in ("db", "bd", "sql", "sqlite", "query", "migra", "persisten", "tabla", "modelo", "schema", "repositorio")):
+        domains.append("Persistencia & Modelo de Datos")
+    if any(k in combined for k in ("ui", "dialog", "boton", "botón", "interfaz", "widget", "vista", "pantalla", "menu", "css", "color", "render", "ventana", "layout", "toolbar")):
+        domains.append("Interfaz de Usuario & Presentación (GUI)")
+    if any(k in combined for k in ("test", "prueba", "qa", "cobertura", "assert", "mock", "validar", "escenario")):
+        domains.append("Aseguramiento de Calidad & Tests")
+    if any(k in combined for k in ("auth", "token", "seguridad", "cifrado", "password", "permiso", "login", "jwt", "credencial")):
+        domains.append("Seguridad & Gestión de Accesos")
+    if not domains:
+        domains.append("Lógica de Dominio & Procesamiento Central")
+
+    return {
+        "title": title,
+        "clean_desc": desc,
+        "domain": " + ".join(domains),
+        "links": task.get("links", [])
+    }
+
+
+def format_tasks_for_prompt(tasks: list[dict]) -> str:
+    """Prepara un JSON estructurado con las tareas seleccionadas conteniendo
+    ÚNICAMENTE título, descripción depurada y enlaces/adjuntos clasificados (descartando etiquetas, fechas y diario)."""
     cleaned = []
     for idx, t in enumerate(tasks, 1):
-        raw_desc = t.get("description", "").strip()
-        clean_desc = re.sub(r'<br\s*/?>', '\n', raw_desc, flags=re.IGNORECASE)
-        clean_desc = re.sub(r'</p\s*>', '\n\n', clean_desc, flags=re.IGNORECASE)
-        clean_desc = re.sub(r'<[^>]+>', '', clean_desc).strip()
-        clean_desc = html.unescape(clean_desc) or "Sin descripción detallada."
+        clean_desc = clean_html_description(t.get("description", "")) or "Sin descripción detallada."
 
         links = []
         for link_item in t.get("links", []):
@@ -255,9 +316,11 @@ def format_tasks_for_prompt(tasks: list[dict]) -> str:
                 "type": "local_file" if is_local else "web_link"
             })
 
+        analysis = _analyze_task_for_spec(t)
         cleaned.append({
             "task_number": idx,
             "title": t.get("title", ""),
+            "inferred_domain": analysis["domain"],
             "description": clean_desc,
             "links": links
         })
@@ -286,6 +349,11 @@ def build_spec_prompts(tasks: list[dict], mode: str = "sw_feature_plan", custom_
 
 {f"Instrucciones adicionales del usuario: {custom_instructions}" if custom_instructions else ""}
 
+INSTRUCCIONES DE ANÁLISIS EXHAUSTIVO (NO COPIAR Y PEGAR):
+- No te limites a volcar los títulos y descripciones de las tareas.
+- Analiza cada tarea en profundidad: deduce las capas arquitectónicas afectadas (persistencia, APIs de red, UI, lógica de dominio), identifica componentes clave y anticipa posibles cuellos de botella o fallos de conexión.
+- Desglosa cada tarea en pasos atómicos de implementación con criterios de verificación concretos.
+
 La especificación DEBE seguir rigurosamente esta estructura en Markdown:
 
 # FEATURE PLAN: [Título Sintético de la Iniciativa]
@@ -295,7 +363,8 @@ La especificación DEBE seguir rigurosamente esta estructura en Markdown:
 - Alcance (Scope) y exclusiones explícitas (Out-of-Scope).
 
 ## 2. Desglose de Requisitos & Mapeo de Tareas
-- Análisis de cada una de las tareas especificadas y referencias adjuntas.
+- Análisis técnico enriquecido de cada tarea y referencias adjuntas.
+- Identificación de componentes y contratos afectados.
 - Dependencias técnicas y orden crítico de ejecución.
 
 ## 3. Arquitectura del Sistema & Diseño de Componentes
@@ -451,7 +520,6 @@ Estructura el documento en Markdown con:
 
 def generate_structural_spec(tasks: list[dict], mode: str = "sw_feature_plan", custom_instructions: str = "") -> str:
     """Generador offline instantáneo que sintetiza una SPEC estructurada sin necesidad de descargar el modelo."""
-    import re
     task_count = len(tasks)
     initiative_title = " - ".join(t.get("title", "Tarea") for t in tasks[:3])
     if task_count > 3:
@@ -472,12 +540,21 @@ def generate_structural_spec(tasks: list[dict], mode: str = "sw_feature_plan", c
             "",
         ]
         for idx, t in enumerate(tasks, 1):
-            title = t.get("title", "")
-            raw_desc = t.get("description", "").strip()
-            desc = re.sub(r'<[^>]+>', '', raw_desc).strip() or "Sin descripción detallada."
+            analysis = _analyze_task_for_spec(t)
+            title = analysis["title"]
+            desc = analysis["clean_desc"]
+            domain = analysis["domain"]
             lines.append(f"### 2.{idx}. {title}")
-            lines.append(f"**Detalle**: {desc}")
-            links = t.get("links", [])
+            lines.append(f"- **Capa / Dominio Arquitectónico**: {domain}")
+            lines.append(f"- **Análisis del Requerimiento**: {desc}")
+            lines.append("- **Desglose Técnico & Pasos Operativos**:")
+            lines.append(f"  1. *Modelado & Contratos*: Definir estructuras de datos, interfaces y firmas para `{title}`.")
+            lines.append("  2. *Lógica Central*: Implementar procesamiento, validaciones y tratamiento de errores/fallos de red.")
+            lines.append("  3. *Verificación & Testing*: Crear pruebas unitarias con casos nominales y escenarios límite.")
+            lines.append("- **Criterios de Aceptación & DoD Específico**:")
+            lines.append(f"  - [ ] Implementación de `{title}` completada sin regresiones.")
+            lines.append("  - [ ] Validación mediante suite de tests automatizados al 100%.")
+            links = analysis["links"]
             if links:
                 links_str = ", ".join(f"[{lnk.get('label') or 'Enlace'}]({lnk.get('url', '')})" for lnk in links)
                 lines.append(f"- **Referencias / Enlaces**: {links_str}")
@@ -515,12 +592,19 @@ def generate_structural_spec(tasks: list[dict], mode: str = "sw_feature_plan", c
             "## 1. Resumen Conceptual & Síntesis",
         ]
         for idx, t in enumerate(tasks, 1):
-            title = t.get("title", "")
-            raw_desc = t.get("description", "").strip()
-            desc = re.sub(r'<[^>]+>', '', raw_desc).strip() or "Desarrollo del tema requerido."
+            analysis = _analyze_task_for_spec(t)
+            title = analysis["title"]
+            desc = analysis["clean_desc"]
+            domain = analysis["domain"]
             lines.append(f"### Tema {idx}: {title}")
-            lines.append(f"- **Conceptos clave**: {desc}")
-            links = t.get("links", [])
+            lines.append(f"- **Área Conceptual**: {domain}")
+            lines.append(f"- **Síntesis del Contenido**: {desc}")
+            lines.append("- **Puntos Nucleares para Active Recall**:")
+            lines.append(f"  1. *Definición precisa*: Explicar con palabras propias qué es `{title}` y cuál es su principio fundamental.")
+            lines.append("  2. *Mecanismo de acción*: Cómo interactúa con los conceptos adyacentes de su disciplina.")
+            lines.append("  3. *Aplicación en supuesto real*: Resolver un problema práctico fundamentando cada decisión.")
+            lines.append(f"- **Pregunta Socrática de Reflexión**: *¿Por qué `{title}` es crítico en este campo y qué fallo conceptual se cometería al ignorar sus premisas básicas?*")
+            links = analysis["links"]
             if links:
                 links_str = ", ".join(f"[{lnk.get('label') or 'Material'}]({lnk.get('url', '')})" for lnk in links)
                 lines.append(f"- **Materiales / Fuentes**: {links_str}")
@@ -556,10 +640,22 @@ def generate_structural_spec(tasks: list[dict], mode: str = "sw_feature_plan", c
             "## 3. Recursos & Plan de Acción",
         ]
         for idx, t in enumerate(tasks, 1):
-            title = t.get("title", "")
+            analysis = _analyze_task_for_spec(t)
+            title = analysis["title"]
+            desc = analysis["clean_desc"]
+            domain = analysis["domain"]
             lines.append(f"### Fase {idx}: {title}")
-            lines.append("- **Acción**: Diseñar, validar y poner en marcha los entregables correspondientes.")
-            lines.append("- **Métrica (KPI)**: Entregable validado y sin incidencias operativas.")
+            lines.append(f"- **Área de Impacto**: {domain}")
+            lines.append(f"- **Diagnóstico de Necesidad**: {desc}")
+            lines.append("- **Plan de Ejecución & Recursos**:")
+            lines.append(f"  1. *Evaluación previa*: Cuantificar viabilidad técnica y dependencias operativas de `{title}`.")
+            lines.append("  2. *Despliegue operativo*: Asignar herramientas, responsables y cronograma de hitos.")
+            lines.append("  3. *Control de calidad*: Pruebas de aceptación y mitigación de desviaciones de presupuesto/tiempo.")
+            lines.append(f"- **Métrica Clave (KPI)**: Entregable de `{title}` operativo con 100% de cumplimiento funcional.")
+            links = analysis["links"]
+            if links:
+                links_str = ", ".join(f"[{lnk.get('label') or 'Referencia'}]({lnk.get('url', '')})" for lnk in links)
+                lines.append(f"- **Fuentes / Documentación**: {links_str}")
             lines.append("")
 
     else:  # action_breakdown / user_stories / qa_tests
@@ -572,12 +668,22 @@ def generate_structural_spec(tasks: list[dict], mode: str = "sw_feature_plan", c
             "",
         ]
         for idx, t in enumerate(tasks, 1):
-            title = t.get("title", "")
-            raw_desc = t.get("description", "").strip()
-            desc = re.sub(r'<[^>]+>', '', raw_desc).strip() or "Acción requerida."
+            analysis = _analyze_task_for_spec(t)
+            title = analysis["title"]
+            desc = analysis["clean_desc"]
+            domain = analysis["domain"]
             lines.append(f"### Acción {idx}: {title}")
-            lines.append(f"- **Descripción**: {desc}")
-            lines.append("- **Criterio de éxito**: Ejecución completada y verificada.")
+            lines.append(f"- **Ámbito Operativo**: {domain}")
+            lines.append(f"- **Alcance & Objetivo**: {desc}")
+            lines.append("- **Sub-tareas Atómicas**:")
+            lines.append(f"  1. Preparación de entorno y dependencias para `{title}`.")
+            lines.append("  2. Ejecución directa del desarrollo o actividad operativa.")
+            lines.append("  3. Verificación de calidad, revisión de resultados y cierre formal.")
+            lines.append(f"- **Entregable Verificable**: Hito `{title}` completado y validado.")
+            links = analysis["links"]
+            if links:
+                links_str = ", ".join(f"[{lnk.get('label') or 'Referencia'}]({lnk.get('url', '')})" for lnk in links)
+                lines.append(f"- **Recursos / Enlaces**: {links_str}")
             lines.append("")
 
     if custom_instructions:

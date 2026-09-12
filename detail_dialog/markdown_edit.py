@@ -301,8 +301,8 @@ class TableInsertDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(t("markdown_edit.table_dialog_title"))
         self.setFixedWidth(320)
-        self.setAttribute(Qt.WA_DeleteOnClose)
-        self.finished.connect(self.deleteLater)
+        self.selected_rows = 3
+        self.selected_cols = 3
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
@@ -356,14 +356,20 @@ class TableInsertDialog(QDialog):
 
         accept_btn = QPushButton(t("markdown_edit.code_insert_btn"))
         accept_btn.setObjectName("PrimaryButton")
+        accept_btn.setDefault(True)
         accept_btn.setCursor(Qt.PointingHandCursor)
         accept_btn.clicked.connect(self.accept)
         btns.addWidget(accept_btn)
 
         layout.addLayout(btns)
 
+    def accept(self):
+        self.selected_rows = self.rows_spin.value()
+        self.selected_cols = self.cols_spin.value()
+        super().accept()
+
     def get_dimensions(self) -> tuple[int, int]:
-        return self.rows_spin.value(), self.cols_spin.value()
+        return self.selected_rows, self.selected_cols
 
 
 class MarkdownTextEdit(QTextEdit):

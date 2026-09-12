@@ -235,3 +235,100 @@ def test_journal_chat_ux_and_inplace_editing(qapp, db_path):
     assert "Texto editado exitosamente" in log_widget.content_label.text()
 
     dlg.reject()
+
+
+def test_table_dialog_insert_dimensions(qapp):
+    """Verifica que TableInsertDialog admita dimensiones personalizadas y que su botón de inserción
+    no sufra errores de ciclo de vida (libshiboken) al ejecutarse."""
+    from detail_dialog.markdown_edit import TableInsertDialog
+    from PySide6.QtCore import QTimer
+    from PySide6.QtWidgets import QDialog
+
+    edit = MarkdownTextEdit()
+    dlg = TableInsertDialog()
+    dlg.rows_spin.setValue(4)
+    dlg.cols_spin.setValue(5)
+
+    QTimer.singleShot(10, dlg.accept)
+    res = dlg.exec()
+    assert res == QDialog.Accepted
+    rows, cols = dlg.get_dimensions()
+    assert rows == 4
+    assert cols == 5
+
+    tbl = edit.insert_table(rows, cols)
+    assert tbl is not None
+    assert tbl.rows() == 4
+    assert tbl.columns() == 5
+    assert "<table" in edit.toHtml()
+
+
+def test_html_description_clean_and_domain_analysis():
+    """Verifica la eliminación total de CSS (<style>) residual de Qt y el análisis de dominio arquitectónico."""
+    raw_html = (
+        '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd">\n'
+        '<html><head><meta name="qrichtext" content="1" /><style type="text/css">\n'
+        'p, li { white-space: pre-wrap; }\n'
+        'hr { height: 1px; border-width: 0; }\n'
+        'li.unchecked::marker { content: "\\2610"; }\n'
+        'li.checked::marker { content: "\\2612"; }\n'
+        '</style></head><body>\n'
+        '<p>Necesito integrar el OMIE y OMIP para obtener datos de los precios de mercado en los 96 periodos.</p>\n'
+        '</body></html>'
+    )
+
+    clean_text = local_ai.clean_html_description(raw_html)
+    assert "white-space" not in clean_text
+    assert "border-width" not in clean_text
+    assert "marker" not in clean_text
+    assert "Necesito integrar el OMIE y OMIP" in clean_text
+
+    task_sample = {
+        "title": "Integración API REE",
+        "description": raw_html,
+        "links": [{"label": "Documentación OMIE", "url": "https://www.omie.es"}]
+    }
+
+    # Comprobar análisis
+    analysis = local_ai._analyze_task_for_spec(task_sample)
+    assert "Integración de Red & APIs Externas" in analysis["domain"]
+    assert "white-space" not in analysis["clean_desc"]
+
+    # Comprobar generación estructural enriquecida
+    spec = local_ai.generate_structural_spec([task_sample], mode="sw_feature_plan")
+    assert "## 2. Desglose de Requisitos & Mapeo de Tareas" in spec
+    assert "### 2.1. Integración API REE" in spec
+    assert "Capa / Dominio Arquitectónico" in spec
+    assert "Desglose Técnico & Pasos Operativos" in spec
+    assert "Criterios de Aceptación & DoD Específico" in spec
+    assert "white-space" not in spec
+
+
+def test_task_detail_meta_card_4_rows(qapp, db_path):
+    """Verifica que los metadatos se organicen en 4 filas dentro del panel izquierdo,
+    dejando el espacio vertical completo para el Journal."""
+    from PySide6.QtWidgets import QFrame
+
+    board_id = database.create_board("Layout Board", db_path=db_path)
+    col_id = database.create_column(board_id, "Todo", db_path=db_path)
+    tid = database.create_task(col_id, "Tarea Layout 4 Filas", db_path=db_path)
+
+    dlg = TaskDetailDialog(tid, db_path=db_path)
+
+    # 1. Comprobar que TaskMetaCard está en el panel izquierdo (no en root superior)
+    meta_card = dlg.findChild(QFrame, "TaskMetaCard")
+    assert meta_card is not None
+    assert meta_card.parent() == dlg.findChild(type(dlg.findChild(QFrame))) or meta_card.parent() is not None
+
+    # 2. Comprobar que meta_card tiene 4 layouts de fila
+    meta_layout = meta_card.layout()
+    assert meta_layout.count() == 4
+
+    # 3. Comprobar que el combo de recurrencia está en la segunda fila (row_2)
+    assert hasattr(dlg, "recurrence_combo")
+    assert hasattr(dlg, "due_date_edit")
+    assert hasattr(dlg, "timer_toggle_btn")
+    assert hasattr(dlg, "priority_combo")
+
+    dlg.reject()
+
