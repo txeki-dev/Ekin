@@ -231,6 +231,16 @@ def init_db(db_path=None):
             )
         """)
 
+        # Índices de alto rendimiento para claves foráneas, ordenación y resolución UUID
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_columns_board_pos ON columns(board_id, position)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_columns_column_uuid ON columns(column_uuid)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_tasks_column_pos ON tasks(column_id, position)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_tasks_task_uuid ON tasks(task_uuid)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_logs_task ON task_logs(task_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_tags_task ON task_tags(task_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_tags_value ON task_tags(tag_value_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_links_task_pos ON task_links(task_id, position)")
+
 
 # Re-exportar el API público de cada módulo de dominio, para que
 # `database.xxx(...)` siga funcionando exactamente igual que antes del split.

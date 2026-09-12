@@ -57,14 +57,6 @@ class BoardSyncWorker(QThread):
             self.sync_finished.emit(SyncResult(status="error", board_id=self.board_id, message=str(exc)))
 
 
-def calculate_content_hash(data_or_text) -> str:
-    """Calcula el hash SHA-256 de una cadena de texto o diccionario JSON."""
-    if isinstance(data_or_text, dict):
-        text = json.dumps(data_or_text, sort_keys=True, ensure_ascii=False)
-    else:
-        text = str(data_or_text)
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
 
 def calculate_file_hash(file_path: str, max_attempts: int = 4) -> str:
     """Calcula el hash SHA-256 de un archivo en disco con reintentos para mitigar bloqueos temporales."""

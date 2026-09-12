@@ -79,3 +79,20 @@ def test_report_markdown(db_path):
     assert "primera nota" in md
     assert "*(archivado)*" in md          # el tablero archivado aparece marcado
 
+
+def test_exporter_plain_strips_rich_text_css():
+    rich_html = (
+        '<html><head><style type="text/css">\n'
+        'p, li { white-space: pre-wrap; }\n'
+        'hr { height: 1px; border-width: 0; }\n'
+        'li.unchecked::marker { content: "\\2610"; }\n'
+        '</style></head><body>'
+        '<p>Contenido limpio</p>'
+        '</body></html>'
+    )
+    plain = exporter._plain(rich_html)
+    assert "white-space: pre-wrap" not in plain
+    assert "border-width" not in plain
+    assert "content:" not in plain
+    assert plain == "Contenido limpio"
+

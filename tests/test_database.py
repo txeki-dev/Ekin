@@ -15,6 +15,26 @@ def test_init_db_creates_expected_tables(db_path):
     assert {"boards", "columns", "tasks", "task_logs", "task_tags"} <= tables
 
 
+def test_init_db_creates_expected_indexes(db_path):
+    conn = sqlite3.connect(db_path)
+    indexes = {
+        row[0]
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type='index'")
+    }
+    conn.close()
+    expected = {
+        "idx_columns_board_pos",
+        "idx_columns_column_uuid",
+        "idx_tasks_column_pos",
+        "idx_tasks_task_uuid",
+        "idx_task_logs_task",
+        "idx_task_tags_task",
+        "idx_task_tags_value",
+        "idx_task_links_task_pos",
+    }
+    assert expected <= indexes
+
+
 def test_init_db_is_idempotent(db_path):
     board_id = database.create_board("Persistente", db_path=db_path)
     database.init_db(db_path)  # No debe borrar datos ni fallar al re-ejecutarse
@@ -1217,3 +1237,42 @@ def test_snapshot_and_restore_board_single_connection(db_path):
     restored_tasks_c1 = database.get_tasks(restored_cols[0]["id"], db_path=db_path)
     assert len(restored_tasks_c1) == 1
     assert restored_tasks_c1[0]["title"] == "Task 1"
+
+
+def test_bulk_queries_chunking_handles_large_task_lists(db_path):
+    """Verifica que get_task_tags_bulk, get_logs_bulk y get_task_links_bulk dividen
+    las listas masivas de IDs en lotes respetando el límite de parámetros de SQLite."""
+    b_id = database.create_board("Large Board", db_path=db_path)
+    c_id = database.create_column(b_id, "Col", db_path=db_path)
+    t1 = database.create_task(c_id, "Task 1", db_path=db_path)
+    t2 = database.create_task(c_id, "Task 2", db_path=db_path)
+
+    tv = database.get_or_create_tag_value("Cat", "Val", "#123456", db_path=db_path)
+    database.set_task_tags(t1, [tv], db_path=db_path)
+    database.create_log(t1, "Log text", db_path=db_path)
+    database.add_task_link(t2, "https://example.com", "Link label", db_path=db_path)
+
+    # Simular una lista con 1200 IDs (superando el límite estándar de 999 variables de SQLite)
+    large_id_list = [t1, t2] + list(range(10000, 11200))
+
+    # Ejecutar con chunk_size por defecto (500)
+    tags_res = database.get_task_tags_bulk(large_id_list, db_path=db_path)
+    logs_res = database.get_logs_bulk(large_id_list, db_path=db_path)
+    links_res = database.get_task_links_bulk(large_id_list, db_path=db_path)
+
+    assert len(tags_res[t1]) == 1
+    assert tags_res[t1][0]["value"] == "Val"
+    assert len(tags_res[t2]) == 0
+
+    assert len(logs_res[t1]) == 1
+    assert logs_res[t1][0]["content"] == "Log text"
+    assert len(logs_res[t2]) == 0
+
+    assert len(links_res[t2]) == 1
+    assert links_res[t2][0]["url"] == "https://example.com"
+    assert len(links_res[t1]) == 0
+
+    # Verificar con un chunk_size ultra reducido (ej. 2) para forzar múltiples iteraciones de chunking
+    tags_small = database.get_task_tags_bulk([t1, t2, 99999], db_path=db_path, chunk_size=1)
+    assert len(tags_small[t1]) == 1
+

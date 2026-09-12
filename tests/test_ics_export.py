@@ -131,3 +131,23 @@ def test_build_ics_per_board_filter(db_path):
     only_b1 = ics_export.build_ics(db_path, board_id=b1)
     assert "Tarea B1" in only_b1 and "Tarea B2" not in only_b1
     assert only_b1.count("BEGIN:VEVENT") == 1
+
+
+def test_build_ics_strips_rich_text_css_and_html(db_path):
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    rich_desc = (
+        '<!DOCTYPE HTML><html><head><style type="text/css">\n'
+        'p, li { white-space: pre-wrap; }\nhr { height: 1px; }\n'
+        '</style></head><body>'
+        '<p>Nota importante:</p><ul><li>Punto 1</li><li>Punto 2</li></ul>'
+        '</body></html>'
+    )
+    database.create_task(c, "Tarea con CSS", description=rich_desc, due_date="2026-08-01", db_path=db_path)
+
+    content = ics_export.build_ics(db_path)
+    assert "white-space: pre-wrap" not in content
+    assert "height: 1px" not in content
+    assert "Nota importante:" in content
+    assert "Punto 1" in content
+

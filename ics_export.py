@@ -4,10 +4,10 @@ Cada tarea con fecha de vencimiento se convierte en un evento de día completo, 
 que el archivo pueda importarse o suscribirse desde Google Calendar, Apple Calendar u
 Outlook. Sin dependencias externas: el formato iCalendar es texto plano.
 """
-import re
 from datetime import datetime, timedelta, timezone
 
 import database
+from html_utils import clean_html_description
 
 
 def _escape(text):
@@ -21,17 +21,8 @@ def _escape(text):
 
 
 def _strip_html(html):
-    """Convierte la descripción HTML de una tarea en texto plano razonable."""
-    if not html:
-        return ""
-    text = re.sub(r"<br\s*/?>", "\n", html, flags=re.IGNORECASE)
-    text = re.sub(r"</(p|div|li)>", "\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"<[^>]+>", "", text)  # eliminar el resto de etiquetas
-    text = (text.replace("&nbsp;", " ").replace("&amp;", "&")
-                .replace("&lt;", "<").replace("&gt;", ">").replace("&#39;", "'"))
-    # Colapsar líneas en blanco excesivas
-    text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)
-    return text.strip()
+    """Convierte la descripción HTML de una tarea en texto plano limpio para iCalendar."""
+    return clean_html_description(html)
 
 
 _SEQ_BASE = datetime(2020, 1, 1)

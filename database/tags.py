@@ -24,32 +24,34 @@ def get_task_tags(task_id, db_path=None):
         )
         return [dict(row) for row in cursor.fetchall()]
 
-def get_task_tags_bulk(task_ids, db_path=None):
-    """Devuelve {task_id: [etiquetas]} para varias tareas en UNA sola consulta.
+def get_task_tags_bulk(task_ids, db_path=None, chunk_size=500):
+    """Devuelve {task_id: [etiquetas]} para varias tareas en consultas por lotes (chunked).
 
-    Evita el patrón N+1 (una conexión/consulta por tarea) al cargar tableros,
-    el calendario o la campana. Cada etiqueta tiene la misma forma que en
-    get_task_tags (sin incluir task_id)."""
+    Evita el patrón N+1 al cargar tableros, el calendario o la campana, y previene
+    errores de 'too many SQL variables' en SQLite con tableros masivos (>999 tareas)."""
     result = {tid: [] for tid in task_ids}
-    if not task_ids:
+    id_list = list(task_ids)
+    if not id_list:
         return result
-    placeholders = ",".join("?" * len(task_ids))
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
-        cursor.execute(
-            f"""SELECT tt.task_id AS task_id, tv.id AS tag_value_id, tc.id AS category_id,
-                       tc.name AS category, tv.value AS value, tv.color AS color
-                FROM task_tags tt
-                JOIN tag_values tv ON tt.tag_value_id = tv.id
-                JOIN tag_categories tc ON tv.category_id = tc.id
-                WHERE tt.task_id IN ({placeholders})
-                ORDER BY tt.task_id ASC, tt.id ASC""",
-            list(task_ids)
-        )
-        for row in cursor.fetchall():
-            data = dict(row)
-            task_id = data.pop("task_id")
-            result.setdefault(task_id, []).append(data)
+        for i in range(0, len(id_list), chunk_size):
+            chunk = id_list[i:i + chunk_size]
+            placeholders = ",".join("?" * len(chunk))
+            cursor.execute(
+                f"""SELECT tt.task_id AS task_id, tv.id AS tag_value_id, tc.id AS category_id,
+                           tc.name AS category, tv.value AS value, tv.color AS color
+                    FROM task_tags tt
+                    JOIN tag_values tv ON tt.tag_value_id = tv.id
+                    JOIN tag_categories tc ON tv.category_id = tc.id
+                    WHERE tt.task_id IN ({placeholders})
+                    ORDER BY tt.task_id ASC, tt.id ASC""",
+                chunk
+            )
+            for row in cursor.fetchall():
+                data = dict(row)
+                task_id = data.pop("task_id")
+                result.setdefault(task_id, []).append(data)
     return result
 
 def set_task_tags(task_id, tag_value_ids, db_path=None):

@@ -333,3 +333,45 @@ def test_installer_download_thread(tmp_path, monkeypatch):
         assert f.read() == content
 
 
+def test_installer_download_thread_cancelled_removes_incomplete_file(tmp_path, monkeypatch):
+    import io
+    import os
+    from main import InstallerDownloadThread
+
+    content = b"X" * 100000
+
+    class SlowMockDownloadResponse:
+        headers = {"Content-Length": str(len(content))}
+
+        def __init__(self, thread_ref):
+            self.buf = io.BytesIO(content)
+            self.thread_ref = thread_ref
+
+        def read(self, size=65536):
+            # Simulate cancellation arriving while reading the first chunk
+            self.thread_ref.cancel()
+            return self.buf.read(size)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    thread_ref = []
+    monkeypatch.setattr("urllib.request.urlopen", lambda req, timeout=30: SlowMockDownloadResponse(thread_ref[0]))
+
+    dest_file = str(tmp_path / "Ekin-Setup-Cancelled.exe")
+    thread = InstallerDownloadThread("https://example.com/setup.exe", dest_file)
+    thread_ref.append(thread)
+
+    finished_files = []
+    thread.finished.connect(lambda p: finished_files.append(p))
+
+    thread.run()
+
+    # Neither finished nor file should exist after cancel
+    assert finished_files == []
+    assert not os.path.exists(dest_file)
+
+

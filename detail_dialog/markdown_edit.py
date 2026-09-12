@@ -17,6 +17,12 @@ from strings import t
 from widgets import FlowLayout
 from icons import lucide_icon
 from .image_preview_dialog import show_image_preview
+from .html_utils import (
+    format_table_all_cells,
+    fit_html_images,
+    linkify_urls,
+    apply_word_style_to_qt_table,
+)
 
 
 _WARM_STYLE_CACHE = None
@@ -492,7 +498,6 @@ class MarkdownTextEdit(QTextEdit):
             row_idx = cell.row() if cell.isValid() else 0
         cursor.beginEditBlock()
         table.insertRows(row_idx, 1)
-        from .html_utils import format_table_all_cells
         format_table_all_cells(table, border_color=styles.COLORS["border"], bg_header=styles.COLORS["bg_card"])
         cursor.endEditBlock()
 
@@ -506,7 +511,6 @@ class MarkdownTextEdit(QTextEdit):
             row_idx = cell.row() if cell.isValid() else table.rows() - 1
         cursor.beginEditBlock()
         table.insertRows(row_idx + 1, 1)
-        from .html_utils import format_table_all_cells
         format_table_all_cells(table, border_color=styles.COLORS["border"], bg_header=styles.COLORS["bg_card"])
         cursor.endEditBlock()
 
@@ -520,7 +524,6 @@ class MarkdownTextEdit(QTextEdit):
             col_idx = cell.column() if cell.isValid() else 0
         cursor.beginEditBlock()
         table.insertColumns(col_idx, 1)
-        from .html_utils import format_table_all_cells
         format_table_all_cells(table, border_color=styles.COLORS["border"], bg_header=styles.COLORS["bg_card"])
         cursor.endEditBlock()
 
@@ -534,7 +537,6 @@ class MarkdownTextEdit(QTextEdit):
             col_idx = cell.column() if cell.isValid() else table.columns() - 1
         cursor.beginEditBlock()
         table.insertColumns(col_idx + 1, 1)
-        from .html_utils import format_table_all_cells
         format_table_all_cells(table, border_color=styles.COLORS["border"], bg_header=styles.COLORS["bg_card"])
         cursor.endEditBlock()
 
@@ -551,7 +553,6 @@ class MarkdownTextEdit(QTextEdit):
             return
         cursor.beginEditBlock()
         table.removeRows(row_idx, 1)
-        from .html_utils import format_table_all_cells
         format_table_all_cells(table, border_color=styles.COLORS["border"], bg_header=styles.COLORS["bg_card"])
         cursor.endEditBlock()
 
@@ -568,7 +569,6 @@ class MarkdownTextEdit(QTextEdit):
             return
         cursor.beginEditBlock()
         table.removeColumns(col_idx, 1)
-        from .html_utils import format_table_all_cells
         format_table_all_cells(table, border_color=styles.COLORS["border"], bg_header=styles.COLORS["bg_card"])
         cursor.endEditBlock()
 
@@ -1225,7 +1225,6 @@ class MarkdownTextEdit(QTextEdit):
         # 4. Si contiene HTML (mantener formato de origen: negrita, cursiva, colores, tablas, enlaces, etc.)
         if source.hasHtml():
             html_content = source.html()
-            from .html_utils import fit_html_images
             target_w = self.image_width_provider() if self.image_width_provider else max(100, self.viewport().width() - 24)
             fitted = fit_html_images(html_content, target_w)
             self.textCursor().insertHtml(fitted)
@@ -1250,7 +1249,6 @@ class MarkdownTextEdit(QTextEdit):
                     cursor.insertHtml(f'<a href="{url}">{html.escape(url)}</a>')
                 return
             # Si el texto contiene enlaces web en medio del texto
-            from .html_utils import linkify_urls
             if re.search(r'https?://[^\s<>"\'`]+', raw_text):
                 escaped = html.escape(raw_text).replace("\r\n", "\n").replace("\r", "\n").replace("\n", "<br/>")
                 linkified = linkify_urls(escaped)
@@ -1275,7 +1273,6 @@ class MarkdownTextEdit(QTextEdit):
     def insert_table(self, rows, cols, cell_texts=None):
         """Inserta una tabla `rows`x`cols` en la posición del cursor con diseño estilo Microsoft Word:
         bordes estilizados, cabecera resaltada, celdas con padding generoso y texto centrado."""
-        from .html_utils import apply_word_style_to_qt_table
         cursor = self.textCursor()
         cursor.beginEditBlock()
         fmt = QTextTableFormat()

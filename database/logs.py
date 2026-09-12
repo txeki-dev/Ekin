@@ -28,24 +28,27 @@ def get_logs(task_id, db_path=None):
         )
         return [dict(row) for row in cursor.fetchall()]
 
-def get_logs_bulk(task_ids, db_path=None):
-    """{task_id: [entradas de diario]} para varias tareas en UNA sola consulta (evita
-    el patrón N+1 al exportar). Cada entrada tiene la misma forma que en get_logs."""
+def get_logs_bulk(task_ids, db_path=None, chunk_size=500):
+    """{task_id: [entradas de diario]} para varias tareas en lotes paginados (evita
+    el patrón N+1 y el límite de variables SQL de SQLite). Cada entrada tiene la misma forma que en get_logs."""
     result = {tid: [] for tid in task_ids}
-    if not task_ids:
+    id_list = list(task_ids)
+    if not id_list:
         return result
-    placeholders = ",".join("?" * len(task_ids))
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
-        cursor.execute(
-            f"SELECT id, task_id, content, created_at FROM task_logs "
-            f"WHERE task_id IN ({placeholders}) ORDER BY task_id ASC, id ASC",
-            list(task_ids)
-        )
-        for row in cursor.fetchall():
-            data = dict(row)
-            task_id = data.pop("task_id")
-            result.setdefault(task_id, []).append(data)
+        for i in range(0, len(id_list), chunk_size):
+            chunk = id_list[i:i + chunk_size]
+            placeholders = ",".join("?" * len(chunk))
+            cursor.execute(
+                f"SELECT id, task_id, content, created_at FROM task_logs "
+                f"WHERE task_id IN ({placeholders}) ORDER BY task_id ASC, id ASC",
+                chunk
+            )
+            for row in cursor.fetchall():
+                data = dict(row)
+                task_id = data.pop("task_id")
+                result.setdefault(task_id, []).append(data)
     return result
 
 def update_log(log_id, content, db_path=None):

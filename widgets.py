@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QWidget, QMenu, QApplication, QLayout, QGraphicsDropShadowEffect
 )
-from PySide6.QtGui import QDrag, QPixmap, QCursor, QPainter, QColor, QIcon, QPolygon, QPen
+from PySide6.QtGui import QDrag, QPixmap, QCursor, QPainter, QColor
 from datetime import datetime
 import styles
 from strings import t
@@ -88,51 +88,6 @@ class FlowLayout(QLayout):
 
         return y + lineHeight - rect.y() + bottom
 
-
-def make_glyph_icon(kind, color, size=16):
-    """Dibuja un icono (triángulo o lápiz) como QPixmap, sin depender de fuentes.
-
-    Los glifos Unicode de flechas/lápiz no se renderizan de forma fiable en todas las
-    fuentes/instalaciones de Windows, así que los pintamos a mano (siempre visibles)."""
-    pix = QPixmap(size, size)
-    pix.fill(Qt.transparent)
-    p = QPainter(pix)
-    p.setRenderHint(QPainter.Antialiasing)
-    c = QColor(color)
-    s = float(size)
-    if kind in ("left", "right"):
-        p.setPen(Qt.NoPen)
-        p.setBrush(c)
-        if kind == "left":   # ◀
-            pts = [QPoint(int(s * 0.62), int(s * 0.20)),
-                   QPoint(int(s * 0.62), int(s * 0.80)),
-                   QPoint(int(s * 0.33), int(s * 0.50))]
-        else:                # ▶
-            pts = [QPoint(int(s * 0.38), int(s * 0.20)),
-                   QPoint(int(s * 0.38), int(s * 0.80)),
-                   QPoint(int(s * 0.67), int(s * 0.50))]
-        p.drawPolygon(QPolygon(pts))
-    elif kind == "pencil":   # lápiz (editar)
-        pen = QPen(c, max(2, int(s * 0.16)))
-        pen.setCapStyle(Qt.FlatCap)
-        p.setPen(pen)
-        p.drawLine(int(s * 0.28), int(s * 0.72), int(s * 0.60), int(s * 0.40))  # cuerpo
-        p.setPen(Qt.NoPen)
-        p.setBrush(c)
-        p.drawPolygon(QPolygon([          # punta (triángulo)
-            QPoint(int(s * 0.58), int(s * 0.38)),
-            QPoint(int(s * 0.82), int(s * 0.18)),
-            QPoint(int(s * 0.68), int(s * 0.48)),
-        ]))
-    elif kind == "cross":    # ✕ (borrar)
-        pen = QPen(c, max(2, int(s * 0.16)))
-        pen.setCapStyle(Qt.RoundCap)
-        p.setPen(pen)
-        m = s * 0.28
-        p.drawLine(int(m), int(m), int(s - m), int(s - m))
-        p.drawLine(int(s - m), int(m), int(m), int(s - m))
-    p.end()
-    return QIcon(pix)
 
 
 def compute_drop_index(cards_geom, drop_y, dragged_id):
@@ -945,15 +900,6 @@ class ColumnWidget(QFrame):
             self.copy_column_requested.emit(self.column_id)
         elif action == delete_action:
             self.delete_column_requested.emit(self.column_id)
-
-    def clear_tasks(self):
-        """Elimina todos los widgets de tarea de la columna."""
-        # Limpiar el layout
-        while self.list_area.list_layout.count():
-            item = self.list_area.list_layout.takeAt(0)
-            widget = item.widget()
-            if widget:
-                widget.deleteLater()
 
     def add_task_card(self, card_widget):
         """Añade una tarjeta de tarea a la columna (no-op si está plegada)."""

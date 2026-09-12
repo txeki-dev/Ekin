@@ -263,6 +263,45 @@ def test_download_and_extract_runner(tmp_path, monkeypatch):
     assert not (tmp_path / "bin" / ".llama_runner.zip").exists()
 
 
+def test_download_and_extract_runner_blocks_zip_slip(tmp_path, monkeypatch):
+    """Verifica que si el ZIP contiene rutas maliciosas hacia directorios superiores (Zip Slip), la extracción es abortada."""
+    import zipfile
+    import io
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w") as zf:
+        zf.writestr("../../../malicious_payload.exe", b"malicious-payload")
+    zip_bytes = zip_buffer.getvalue()
+
+    class MaliciousZipResponse:
+        status = 200
+        headers = {"Content-Length": str(len(zip_bytes))}
+
+        def __init__(self):
+            self.stream = io.BytesIO(zip_bytes)
+
+        def read(self, chunk_size):
+            return self.stream.read(chunk_size)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr(local_ai.urllib.request, "urlopen", lambda req, timeout=30.0: MaliciousZipResponse())
+
+    runner_dir = str(tmp_path / "bin")
+    success, msg = local_ai.download_and_extract_runner(runner_dir=runner_dir)
+
+    assert success is False
+    assert "Zip Slip" in msg
+    assert not (tmp_path / "malicious_payload.exe").exists()
+    assert not (tmp_path / "bin" / ".llama_runner.zip").exists()
+
+
+
+
 def test_runner_download_thread(tmp_path, monkeypatch, qapp):
     """Verifica que RunnerDownloadThread emite las señales de progreso y finalización."""
     import zipfile

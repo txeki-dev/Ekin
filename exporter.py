@@ -7,22 +7,15 @@ así como exportación completa o de solo estructura (plantilla).
 import csv
 import io
 import json
-import re
 from datetime import date
 
 import database
+from html_utils import clean_html_description
 
 
 def _plain(html):
-    """Convierte HTML (descripción/nota) en texto plano razonable para exportar."""
-    if not html:
-        return ""
-    text = re.sub(r"<br\s*/?>", "\n", html, flags=re.IGNORECASE)
-    text = re.sub(r"</(p|div|li)>", "\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"<[^>]+>", "", text)
-    text = (text.replace("&nbsp;", " ").replace("&amp;", "&")
-                .replace("&lt;", "<").replace("&gt;", ">").replace("&#39;", "'"))
-    return re.sub(r"\n\s*\n\s*\n+", "\n\n", text).strip()
+    """Convierte HTML (descripción/nota) en texto plano limpio para exportar."""
+    return clean_html_description(html)
 
 
 def _tags_str(task):

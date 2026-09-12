@@ -142,17 +142,31 @@ class InstallerDownloadThread(QThread):
                 with open(self.dest_path, "wb") as f:
                     while True:
                         if self._cancelled:
-                            return
+                            break
                         chunk = resp.read(chunk_size)
                         if not chunk:
                             break
                         f.write(chunk)
                         downloaded += len(chunk)
                         self.progress.emit(downloaded, total)
-            if not self._cancelled:
-                self.finished.emit(self.dest_path)
+
+            if self._cancelled:
+                if os.path.exists(self.dest_path):
+                    try:
+                        os.remove(self.dest_path)
+                    except Exception:
+                        pass
+                return
+
+            self.finished.emit(self.dest_path)
         except Exception as exc:
-            self.error.emit(str(exc))
+            if os.path.exists(self.dest_path):
+                try:
+                    os.remove(self.dest_path)
+                except Exception:
+                    pass
+            if not self._cancelled:
+                self.error.emit(str(exc))
 
 
 class MainWindow(QMainWindow):

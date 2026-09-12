@@ -22,6 +22,7 @@ import subprocess
 import zipfile
 from typing import Optional, Generator, Callable
 from PySide6.QtCore import QThread, Signal
+from html_utils import clean_html_description
 
 # Rutas estándar de almacenamiento de modelos y binarios de Ekin
 DEFAULT_EKIN_DIR = os.path.expanduser("~/.ekin")
@@ -44,10 +45,6 @@ def get_runner_download_url() -> str:
         return "https://github.com/ggerganov/llama.cpp/releases/download/b3900/llama-b3900-bin-ubuntu-x64.zip"
 
 
-# URLs oficiales
-MODEL_DOWNLOAD_URL = (
-    "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"
-)
 RUNNER_DOWNLOAD_URL = get_runner_download_url()
 
 MANAGED_SERVER_PORT = 28192
@@ -226,43 +223,6 @@ def stop_managed_runner():
 
 atexit.register(stop_managed_runner)
 
-
-def clean_html_description(raw: str) -> str:
-    """Limpia a fondo cualquier residuo HTML/CSS generado por editores enriquecidos o Qt.
-    Elimina bloques <head>, <style>, <script>, comentarios y selectores CSS residuales,
-    preservando únicamente el texto descriptivo limpio."""
-    if not raw or not isinstance(raw, str):
-        return ""
-    import re
-    import html
-
-    # 1. Eliminar cabeceras, estilos embebidos, scripts y comentarios completos
-    text = re.sub(r'<head\b[^>]*>.*?</head>', '', raw, flags=re.DOTALL | re.IGNORECASE)
-    text = re.sub(r'<style\b[^>]*>.*?</style>', '', text, flags=re.DOTALL | re.IGNORECASE)
-    text = re.sub(r'<script\b[^>]*>.*?</script>', '', text, flags=re.DOTALL | re.IGNORECASE)
-    text = re.sub(r'<!--.*?-->', '', text, flags=re.DOTALL)
-
-    # 2. Convertir etiquetas de bloque o salto de línea en saltos reales
-    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
-    text = re.sub(r'</p\s*>', '\n\n', text, flags=re.IGNORECASE)
-    text = re.sub(r'</(?:tr|div|h[1-6])\s*>', '\n', text, flags=re.IGNORECASE)
-    text = re.sub(r'<li\b[^>]*>', '• ', text, flags=re.IGNORECASE)
-    text = re.sub(r'</li\s*>', '\n', text, flags=re.IGNORECASE)
-
-    # 3. Eliminar etiquetas HTML restantes
-    text = re.sub(r'<[^>]+>', '', text)
-
-    # 4. Decodificar entidades HTML (&nbsp;, &lt;, &quot;, etc.)
-    text = html.unescape(text)
-
-    # 5. Barrido preventivo contra reglas CSS que pudieran haberse filtrado sin tags
-    text = re.sub(r'(?:[a-zA-Z0-9_\-\.\#\:\s,]+)\s*\{[^}]*\}', '', text)
-
-    # 6. Normalizar saltos de línea y espacios
-    lines = [line.rstrip() for line in text.splitlines()]
-    text = "\n".join(lines)
-    text = re.sub(r'\n{3,}', '\n\n', text).strip()
-    return text
 
 
 def _analyze_task_for_spec(task: dict) -> dict:
@@ -797,9 +757,14 @@ def download_and_extract_runner(
                         progress_callback(percent, speed_mb, eta_str)
                         last_update = now
 
-        # Extraer el archivo ZIP en target_dir
+        # Extraer el archivo ZIP en target_dir de forma segura (mitigación CWE-22 / Zip Slip)
+        resolved_target = os.path.abspath(target_dir)
         with zipfile.ZipFile(temp_zip, "r") as zf:
-            zf.extractall(target_dir)
+            for member in zf.infolist():
+                dest_path = os.path.abspath(os.path.join(resolved_target, member.filename))
+                if os.path.commonpath([resolved_target, dest_path]) != resolved_target:
+                    raise RuntimeError(f"Ruta no permitida en archivo comprimido (Zip Slip): {member.filename}")
+            zf.extractall(resolved_target)
 
         if os.path.exists(temp_zip):
             os.remove(temp_zip)
@@ -846,93 +811,6 @@ class RunnerDownloadThread(QThread):
             progress_callback=lambda p, s, eta: self.progress.emit(p, s, eta),
         )
         self.download_finished.emit(success, msg)
-
-
-class ModelDownloadThread(QThread):
-    """Hilo para descargar en segundo plano el modelo Qwen 2.5 Coder con reporte de progreso."""
-    progress = Signal(int, float, str)  # porcentaje, velocidad_mb_s, tiempo_restante_str
-    download_finished = Signal(bool, str)  # exito, mensaje
-
-    def __init__(self, include_runner: bool = False, parent=None):
-        super().__init__(parent)
-        self.include_runner = include_runner
-        self._is_cancelled = False
-
-    def cancel(self):
-        self._is_cancelled = True
-
-    def run(self):
-        ensure_directories()
-
-        # 1. Si se solicita incluir runner y no está instalado, descargarlo primero
-        if self.include_runner and not is_runner_installed():
-            self.progress.emit(0, 0.0, "Descargando motor llama-server...")
-            success, msg = download_and_extract_runner(
-                cancel_check=lambda: self._is_cancelled,
-                progress_callback=lambda p, s, eta: self.progress.emit(int(p * 0.15), s, f"Motor: {eta}"),
-            )
-            if not success:
-                self.download_finished.emit(False, msg)
-                return
-
-        target_path = MODEL_PATH
-        temp_path = MODEL_PATH + ".part"
-
-        try:
-            req = urllib.request.Request(
-                MODEL_DOWNLOAD_URL,
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) EkinKanban/1.0"}
-            )
-            with urllib.request.urlopen(req, timeout=30.0) as response:
-                total_bytes = int(response.headers.get("Content-Length", 0))
-                downloaded = 0
-                start_time = time.time()
-                last_update = start_time
-                chunk_size = 1024 * 512  # 512 KB
-
-                with open(temp_path, "wb") as out_file:
-                    while True:
-                        if self._is_cancelled:
-                            out_file.close()
-                            if os.path.exists(temp_path):
-                                os.remove(temp_path)
-                            self.download_finished.emit(False, "Descarga cancelada.")
-                            return
-
-                        chunk = response.read(chunk_size)
-                        if not chunk:
-                            break
-
-                        out_file.write(chunk)
-                        downloaded += len(chunk)
-
-                        now = time.time()
-                        if now - last_update >= 0.4:
-                            elapsed = now - start_time
-                            speed_mb = (downloaded / (1024 * 1024)) / elapsed if elapsed > 0 else 0.0
-                            raw_percent = int((downloaded / total_bytes) * 100) if total_bytes > 0 else 0
-                            percent = int(15 + raw_percent * 0.85) if self.include_runner else raw_percent
-                            remaining_bytes = max(0, total_bytes - downloaded)
-                            eta_sec = int(remaining_bytes / (speed_mb * 1024 * 1024)) if speed_mb > 0 else 0
-                            eta_str = f"{eta_sec // 60}m {eta_sec % 60}s" if eta_sec >= 60 else f"{eta_sec}s"
-
-                            self.progress.emit(percent, speed_mb, eta_str)
-                            last_update = now
-
-            # Renombrar atómicamente el archivo temporal
-            if os.path.exists(target_path):
-                os.remove(target_path)
-            os.rename(temp_path, target_path)
-
-            self.progress.emit(100, 0.0, "Completado")
-            self.download_finished.emit(True, "Modelo descargado e instalado con éxito.")
-        except Exception as e:
-            if os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except Exception:
-                    pass
-            self.download_finished.emit(False, f"Error durante la descarga: {e}")
 
 
 class SpecGenerationThread(QThread):
