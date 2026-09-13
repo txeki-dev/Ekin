@@ -3,6 +3,132 @@
 Living planning doc: forensic findings (tech debt) + ideas for future releases.
 Ordered roughly by value/effort. Checkboxes track what's done.
 
+## 🎯 Prioritized Backlog
+
+_Added 2026-09-13 from an RDi exploration session (`<rdi_exploration_protocol>`), grounded in
+graphify AST analysis and cross-referenced against this backlog. Listed simplest → hardest by
+estimated complexity. (WAL/`busy_timeout`/`foreign_keys`, EN/ES i18n + live switcher, and Lucide
+icon `@lru_cache` were screened out as already shipped.)_
+
+- [x] **DONE (2026-09-13) — Post-sync outcome summary** `[FEAT]` (sync observability)
+  · Impact: Med · Complexity: S · `board_view.format_sync_summary` — concise result shown after any
+    user-initiated sync + in the sync-button tooltip. 4 tests. (Persistent per-board history left as a
+    later nice-to-have — kept to no schema change.)
+  - **Problem:** the two-way merge engine silently archives superseded edits into the task diary
+    (`board_sync.py`); the user only sees a static status badge and never learns what a sync did.
+    `SyncResult` already carries the outcome and flows through `board_view._on_sync_finished()`.
+  - **Solution:** surface a concise summary from the existing `SyncResult` after each sync
+    ("Synced · 2 tasks updated · 1 conflict auto-archived"); optionally persist a small per-board
+    sync log viewable from the sync context menu. Builds on data that already exists — no engine changes.
+
+- [x] **DONE (2026-09-13) — Application diagnostic logging + global crash handler** `[RESILIENCE]`
+  · Impact: High · Complexity: S–M · `logging_setup.py` (rotating `~/.ekin/logs/ekin.log`, `sys.excepthook`
+    non-fatal dialog, Qt message handler); wired in `main()`, silent `print`s → `log`; "Open logs folder"
+    palette command. 3 tests.
+  - **Problem:** no logging infrastructure exists anywhere (no `logging`, `sys.excepthook`, or
+    `qInstallMessageHandler`). Many past field failures were un-observable (icon-cache staleness,
+    partial `install.ps1` clones, sync `WinError 32`, CI flakiness), and the recurring critical bugs
+    (`Ctrl+Z` FK `IntegrityError`, leaked-timer `STATUS_HEAP_CORRUPTION`) share one class: an uncaught
+    exception in a Qt slot terminates the process silently.
+  - **Solution:** a rotating file logger under `~/.ekin/logs/` (`RotatingFileHandler`) installed at the
+    top of `main()`; a `sys.excepthook` **and** `qInstallMessageHandler` that log the traceback and show
+    a non-fatal "Something went wrong (details saved to log)" dialog instead of hard-crashing; structured
+    log lines around sync/update/download paths (`board_sync.py`, `local_ai.py` runner,
+    `ReleaseCheckThread`/`InstallerDownloadThread`); optional "Open logs folder" entry in Settings.
+
+- [x] **DONE (2026-09-13) — Per-column WIP limits** `[FEAT]` · Impact: Med–High · Complexity: S–M
+  · nullable `columns.wip_limit` (migration) threaded through `columns.py`; stepper in `ColumnEditDialog`;
+    `ColumnWidget` header shows `n/limit`, danger accent when exceeded. 5 tests.
+  - **Problem:** no WIP-limit concept exists (a core Kanban capability). The board header already
+    computes a live task count in `load_board`, and `ColumnWidget`/`ColumnEditDialog` are self-contained.
+  - **Solution:** nullable `columns.wip_limit INTEGER` (additive migration matching the existing
+    `PRAGMA table_info` pattern in `database/__init__.py`); an optional stepper in `ColumnEditDialog`;
+    `ColumnWidget` header shows `count / limit` and switches to the warm `danger` accent when exceeded
+    (reuses `contrast_text()`/existing pill styling). Soft visual signal only — no drag-blocking.
+
+- [x] **DONE (2026-09-13) — Extract a `BoardSyncController` from the `BoardViewWidget` god object** `[ARCH]`
+  · Impact: Med · Complexity: M · `board_sync_controller.py` (`BoardSyncController(QObject)`); decouples
+    `BoardSyncWorker` concurrency, `QFileSystemWatcher` debounce, and sync status from the view. 5 tests.
+  - **Problem:** `BoardViewWidget` is a god node (91 edges, betweenness 0.090, cross-community bridge).
+    A whole sync cluster lives on the widget: `_run_async_sync`, `_on_sync_finished`, `_on_sync_btn_clicked`,
+    `_update_sync_ui`, `_link_board_new_file`, plus the `QFileSystemWatcher` + `BoardSyncWorker` wiring —
+    the app's trickiest concurrency entangled with UI code.
+  - **Solution:** move sync-worker lifecycle, the debounced file-watcher reactive reload, and sync-status
+    state into a dedicated `BoardSyncController(QObject)` that emits signals the widget renders. Shrinks the
+    widget's fan-in and makes the concurrency path independently testable. Preserve public
+    signatures/signals so the current test suite stays green.
+
+- [x] **DONE (2026-09-13) — Incremental board rendering for single-item mutations** `[PERF]`
+  · Impact: Med · Complexity: M–L · Surgical single-column rebuild (`_rebuild_single_column`) and header
+    counter refresh (`_update_board_counts`) on `add_task`, `create_quick_task`, `edit_column`,
+    `handle_column_collapse`, `handle_task_drop`, and `open_task_details`. 5 tests.
+  - **Problem:** `load_board()` tears down and rebuilds every `ColumnWidget`/`TaskCard` on nearly every
+    operation (add/delete/move task, timer changes, theme toggle). The surgical path already exists —
+    `_rebuild_single_column()` — but is used only for hover-expand; the ~6 UI "Refine rounds" below were
+    largely repaint quirks that only surface during full-board reconstruction.
+  - **Solution:** route single-item mutations through targeted updates (`_rebuild_single_column` for the
+    affected column, in-place `TaskCard` refresh for badges) instead of `load_board()`; keep full
+    `load_board()` only for board switch / structural reload.
+
+_Added 2026-09-13 from a Product Strategy discovery session (`<product_strategy_discovery>`), grounded
+in `README.md` + graphify workflow analysis. Ekin is offline-first / single-user / PolyForm-Noncommercial,
+so these raise product & (potential) commercial value **within** that model — no server-side RBAC / SaaS
+proposed. Ready for the `<feature_plan_tdd>` protocol._
+
+- [x] **DONE (2026-09-13) — Command Palette (`Ctrl+K`): unified search + actions + quick capture** `[PRODUCT]` `[UX-REV]`
+  · Impact: High · Effort: M · `command_palette.py` (reuses `search_tasks`; commands + `+ title`
+    quick capture via `board_view.create_quick_task`); `Ctrl+K` + shortcuts dialog; 5 tests, 320 green.
+  - **Friction:** actions scattered across ~15 shortcuts/menus; creating/finding anything requires
+    navigating to the right board+column first (README benchmarks against Linear, which has this).
+  - **Solution:** a `Ctrl+K` overlay reusing `SearchDialog.search_tasks()` for fuzzy task/board lookup
+    **and** a command list (new task/column, go to board, open Calendar/Settings, export, toggle theme);
+    inline quick-capture (`+ title @board`). Jump reuses `on_notification_task`/`on_calendar_task`.
+
+- [x] **DONE (2026-09-13) — "My Work / Today" cross-board home view** `[PRODUCT]` `[UX-REV]`
+  · Impact: High · Effort: M · `my_work_view.py` (list icon in sidebar + `Ctrl+0`); 5 tests, 309 green.
+  - **Friction:** Ekin shows one board at a time; the deadline bell is a popup, not a workspace. No single
+    place to see everything due today across all boards.
+  - **Solution:** a home view (sidebar entry / `Ctrl+0`) aggregating Overdue · Today · Tomorrow · This week
+    + an "In progress" group (running timer). Reuses `get_scheduled_tasks()` (already spans all boards) and
+    the notification aggregation; each row jumps to its card. New view only — no schema change.
+
+- [x] **DONE (2026-09-13) — In-app Analytics Dashboard + PDF report export** `[PRODUCT]` `[DATA-EXP]`
+  · Impact: High · Effort: M–L · `analytics.py` (pure `gather_stats` + `render_report_html` + `export_report_pdf`
+    via `QPdfWriter`, no new deps) + `dashboard_view.py` (stat tiles + hand-painted bar charts); `Ctrl+D` +
+    palette command. 4 tests, 332 green.
+  - **Friction:** rich data (tags, priorities, due dates, timer elapsed, per-board counts, diary
+    timestamps) exists but the only output is raw JSON/CSV/MD from `exporter.py` — no visualization,
+    no client-ready report.
+  - **Solution:** a dashboard view with charts grounded strictly in existing data (task distribution by
+    column/board/tag/priority, overdue-vs-due-soon, total timer time per board/tag, diary activity over
+    time) + a **PDF export** extending the Markdown-report path in `exporter.py`. (Cycle-time deferred —
+    needs column-transition history the app doesn't record yet.)
+
+- [x] **DONE (2026-09-13) — Smart reminders (lead-time) + weekly review digest** `[PRODUCT]` `[AUTOMATION]`
+  · Impact: Med–High · Effort: M · `reminders.py` + Settings (lead-days stepper, digest toggle);
+    widened `notify_due_today` window + once-per-ISO-week `WeeklyDigestDialog`; 6 tests, 315 green.
+  - **Friction:** notifications only fire day-of ("due today") — no advance warning, no periodic summary.
+  - **Solution:** configurable **reminder lead-time** (notify N hours/days before due) layered on the
+    existing due-scan + tray toasts + `.ics` `VALARM`; plus an auto-generated **weekly digest** (due next
+    week, overdue, what moved) via `exporter.py`, surfaced on the first launch of each week using the
+    existing once-per-day check scheduler in `main.py`.
+
+- [x] **DONE (2026-09-13, offline-first) — Extend the Local-AI engine into workflows (task breakdown + diary summarizer)** `[PRODUCT]` `[BIZ-CAP]`
+  · Impact: High · Effort: M · `local_ai.suggest_subtasks_offline`/`parse_subtask_lines`/`summarize_diary_offline`
+    + `ai_assist_dialog.py`; two ✨ buttons in Task Detail (break down → create sibling tasks; summarize →
+    post to journal). 8 tests, 328 green.
+  - [x] **DONE (2026-09-13) — LLM-streaming enhancement:** added `task_breakdown`/`diary_summary` modes to
+    `build_spec_prompts` + `generate_structural_spec`; `AiAssistDialog` now shows "✨ Enhance with local AI"
+    that streams via `SpecGenerationThread` (falls back to the offline draft). 6 tests.
+  - **Friction:** the local-AI engine (Ekin's rarest differentiator) is siloed to the multi-select
+    "generate SPEC" flow; it does nothing for everyday task hygiene.
+  - **Solution:** two additive local-AI actions reusing `local_ai.py` + `SpecGenerationThread` streaming +
+    offline fallback: (a) **AI task breakdown** — one large card → suggested child tasks acceptable into
+    the column; (b) **AI diary/standup summarizer** — condense a task's/board's diary into "what happened /
+    what's next". Same engine, model selector, offline fallback already shipped. Premium "Pro AI" candidate.
+
+---
+
 ## 🚧 In progress (2026-09-05 — UI Refactor: "Warm Shell" from Claude Design handoff)
 
 Full presentation refactor per the `Refactor UI para EKIN-handoff.zip` spec (design system

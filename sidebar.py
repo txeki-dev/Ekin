@@ -404,6 +404,7 @@ class SidebarWidget(QFrame):
     board_selected = Signal(int)          # Emite el board_id seleccionado
     board_changed = Signal()              # Emite cuando se añade/edita/borra un tablero
     open_calendar_requested = Signal()    # Emite al pulsar el botón de calendario
+    open_my_work_requested = Signal()     # Emite al pulsar el botón de "Mi trabajo"
     open_search_requested = Signal()      # Emite al pulsar el botón de búsqueda
     open_settings_requested = Signal()    # Emite al pulsar el botón de ajustes
     open_shortcuts_requested = Signal()   # Emite al pulsar el botón de atajos de teclado
@@ -538,6 +539,17 @@ class SidebarWidget(QFrame):
         icons_row.setSpacing(6)
         icons_row.addStretch()
 
+        # "Mi trabajo": panel transversal con todo lo que vence / está en curso
+        self.mywork_btn = QPushButton()
+        self.mywork_btn.setObjectName("UtilityIconButton")
+        self.mywork_btn.setIcon(lucide_icon("list", styles.COLORS['text_soft'], 17))
+        self.mywork_btn.setIconSize(QSize(17, 17))
+        self.mywork_btn.setFixedSize(34, 28)
+        self.mywork_btn.setCursor(Qt.PointingHandCursor)
+        self.mywork_btn.setToolTip(t("sidebar.mywork_tooltip"))
+        self.mywork_btn.clicked.connect(self.open_my_work_requested.emit)
+        icons_row.addWidget(self.mywork_btn)
+
         # Campana con badge de conteo superpuesto
         bell_container = QWidget()
         bell_container.setFixedSize(34, 28)
@@ -644,6 +656,7 @@ class SidebarWidget(QFrame):
         chip de versión, tagline). Sin esto, al conmutar de tema estos iconos/colores quedan
         con la paleta anterior (p. ej. iconos oscuros e invisibles sobre el sidebar oscuro)."""
         soft = styles.COLORS["text_soft"]
+        self.mywork_btn.setIcon(lucide_icon("list", soft, 17))
         self.bell_btn.setIcon(lucide_icon("bell", soft, 17))
         self.search_btn.setIcon(lucide_icon("search", soft, 17))
         self.calendar_btn.setIcon(lucide_icon("calendar", soft, 17))

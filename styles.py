@@ -562,7 +562,7 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
     border-radius: 28px;
 }}
 
-#NotificationItem {{
+#NotificationItem, #CommandItem {{
     background-color: transparent;
     border: none;
     border-radius: 16px;
@@ -571,7 +571,7 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
     font-weight: 500;
 }}
 
-#NotificationItem:hover {{
+#NotificationItem:hover, #CommandItem:hover {{
     background-color: {c["bg_hover"]};
 }}
 
@@ -584,6 +584,12 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
     font-family: 'Caprasimo', 'Segoe UI', serif;
     font-size: 32px;
     color: {c["text_main"]};
+}}
+
+#MyWorkTitle, #DashboardTitle {{
+    font-family: 'Caprasimo', 'Segoe UI', serif;
+    font-size: 28px;
+    color: {c["accent"]};
 }}
 
 #WeekdayHeader {{

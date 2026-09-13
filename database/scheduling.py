@@ -1,7 +1,7 @@
 from .connection import get_connection
 from .tags import get_task_tags_bulk
 
-__all__ = ["get_scheduled_tasks", "get_task_board_id"]
+__all__ = ["get_scheduled_tasks", "get_task_board_id", "get_active_timer_tasks"]
 
 # --- CONSULTAS DE VENCIMIENTOS Y CALENDARIO ---
 
@@ -41,6 +41,30 @@ def get_scheduled_tasks(start_date=None, end_date=None, board_id=None, db_path=N
     for t in tasks:
         t["tags"] = tags_by_task.get(t["id"], [])
     return tasks
+
+def get_active_timer_tasks(db_path=None):
+    """Devuelve las tareas con el temporizador en marcha (timer_started_at no nulo),
+    junto con su tablero y etiquetas. Ordenadas por inicio del temporizador (la que
+    lleva más tiempo corriendo, primero). Mismo shape que get_scheduled_tasks."""
+    query = (
+        "SELECT t.id, t.title, t.description, t.due_date, t.due_time, t.recurrence,"
+        " t.column_id, t.updated_at, t.timer_started_at,"
+        " c.board_id AS board_id, b.name AS board_name, b.color AS board_color"
+        " FROM tasks t"
+        " JOIN columns c ON t.column_id = c.id"
+        " JOIN boards b ON c.board_id = b.id"
+        " WHERE t.timer_started_at IS NOT NULL AND t.timer_started_at != ''"
+        " ORDER BY t.timer_started_at ASC"
+    )
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(query)
+        tasks = [dict(row) for row in cursor.fetchall()]
+    tags_by_task = get_task_tags_bulk([t["id"] for t in tasks], db_path)
+    for t in tasks:
+        t["tags"] = tags_by_task.get(t["id"], [])
+    return tasks
+
 
 def get_task_board_id(task_id, db_path=None):
     """Devuelve el board_id al que pertenece una tarea (o None si no existe)."""

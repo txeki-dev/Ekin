@@ -27,6 +27,7 @@ def _make_window(monkeypatch):
     __init__ ya resuelva a la versión parcheada."""
     monkeypatch.setattr(main_module.MainWindow, "notify_due_today", lambda self: None)
     monkeypatch.setattr(main_module.MainWindow, "check_for_updates", lambda self: None)
+    monkeypatch.setattr(main_module.MainWindow, "_maybe_show_weekly_digest", lambda self: None)
     return main_module.MainWindow()
 
 

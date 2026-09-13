@@ -7,7 +7,7 @@ __all__ = [
 
 # --- OPERACIONES DE COLUMNAS (COLUMNS) ---
 
-def create_column(board_id, name, color='#3b82f6', db_path=None, column_uuid=None):
+def create_column(board_id, name, color='#3b82f6', db_path=None, column_uuid=None, wip_limit=None):
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         import uuid
@@ -18,8 +18,8 @@ def create_column(board_id, name, color='#3b82f6', db_path=None, column_uuid=Non
         next_pos = max_pos + 1
 
         cursor.execute(
-            "INSERT INTO columns (board_id, name, color, position, column_uuid) VALUES (?, ?, ?, ?, ?)",
-            (board_id, name, color, next_pos, c_uuid)
+            "INSERT INTO columns (board_id, name, color, position, column_uuid, wip_limit) VALUES (?, ?, ?, ?, ?, ?)",
+            (board_id, name, color, next_pos, c_uuid, wip_limit)
         )
         return cursor.lastrowid
 
@@ -27,7 +27,7 @@ def get_columns(board_id, db_path=None):
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, board_id, name, color, position, collapsed, column_uuid FROM columns WHERE board_id = ? ORDER BY position ASC",
+            "SELECT id, board_id, name, color, position, collapsed, column_uuid, wip_limit FROM columns WHERE board_id = ? ORDER BY position ASC",
             (board_id,)
         )
         return [dict(row) for row in cursor.fetchall()]
@@ -36,17 +36,17 @@ def get_column(column_id, db_path=None):
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, board_id, name, color, position, collapsed, column_uuid FROM columns WHERE id = ?",
+            "SELECT id, board_id, name, color, position, collapsed, column_uuid, wip_limit FROM columns WHERE id = ?",
             (column_id,)
         )
         row = cursor.fetchone()
         return dict(row) if row else None
 
-def update_column(column_id, name, color, db_path=None):
+def update_column(column_id, name, color, db_path=None, wip_limit=None):
     with get_connection(db_path) as conn:
         conn.execute(
-            "UPDATE columns SET name = ?, color = ? WHERE id = ?",
-            (name, color, column_id)
+            "UPDATE columns SET name = ?, color = ?, wip_limit = ? WHERE id = ?",
+            (name, color, wip_limit, column_id)
         )
 
 def set_column_collapsed(column_id, collapsed, db_path=None):

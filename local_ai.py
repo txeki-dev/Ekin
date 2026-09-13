@@ -12,6 +12,7 @@ Soporta:
 """
 
 import os
+import re
 import sys
 import json
 import time
@@ -23,6 +24,7 @@ import zipfile
 from typing import Optional, Generator, Callable
 from PySide6.QtCore import QThread, Signal
 from html_utils import clean_html_description
+from strings import t as _t  # alias: `t` se usa como variable de bucle en este módulo
 
 # Rutas estándar de almacenamiento de modelos y binarios de Ekin
 DEFAULT_EKIN_DIR = os.path.expanduser("~/.ekin")
@@ -444,6 +446,34 @@ Estructura el documento en Markdown con:
 {f"Instrucciones adicionales del usuario: {custom_instructions}" if custom_instructions else ""}
 """
 
+    elif mode == "task_breakdown":
+        system_prompt = (
+            "Eres un ingeniero senior que descompone una tarea en subtareas atómicas y accionables.\n"
+            "Devuelve EXCLUSIVAMENTE una lista de títulos de subtarea, uno por línea, sin numeración, "
+            "sin viñetas, sin markdown y sin texto introductorio ni de cierre."
+        )
+        user_prompt = f"""Descompón la siguiente tarea (en JSON) en subtareas concretas. Un título por línea:
+
+```json
+{tasks_json}
+```
+
+{f"Instrucciones adicionales del usuario: {custom_instructions}" if custom_instructions else ""}"""
+
+    elif mode == "diary_summary":
+        system_prompt = (
+            "Eres un asistente que resume el diario de trabajo de una tarea de forma concisa y útil.\n"
+            "Devuelve dos secciones en markdown: '## Qué se hizo' con viñetas de lo realizado y "
+            "'## Siguiente paso' con la acción siguiente recomendada. Sin texto adicional."
+        )
+        user_prompt = f"""Resume el diario de la siguiente tarea (el texto del diario está en la descripción del JSON):
+
+```json
+{tasks_json}
+```
+
+{f"Instrucciones adicionales del usuario: {custom_instructions}" if custom_instructions else ""}"""
+
     else:  # action_breakdown fallback
         system_prompt = (
             "Eres un Director de Proyectos Senior (PMP / Agile Coach) enfocado en ejecución operativa impecable.\n"
@@ -618,6 +648,16 @@ def generate_structural_spec(tasks: list[dict], mode: str = "sw_feature_plan", c
                 lines.append(f"- **Fuentes / Documentación**: {links_str}")
             lines.append("")
 
+    elif mode == "task_breakdown":
+        lines = suggest_subtasks_offline(tasks[0]) if tasks else []
+
+    elif mode == "diary_summary":
+        desc = clean_html_description(tasks[0].get("description", "")) if tasks else ""
+        paras = [p.strip() for p in desc.splitlines() if p.strip()]
+        lines = [f"## {_t('ai.summary.what_happened')}"]
+        lines += [f"- {p[:200]}" for p in paras[-6:]] or [f"- {_t('ai.summary.empty')}"]
+        lines += ["", f"## {_t('ai.summary.next_step')}", f"- {paras[-1][:200] if paras else ''}"]
+
     else:  # action_breakdown / user_stories / qa_tests
         lines = [
             f"# PLAN DE ACCIÓN & DESGLOSE OPERATIVO: {initiative_title}",
@@ -653,6 +693,67 @@ def generate_structural_spec(tasks: list[dict], mode: str = "sw_feature_plan", c
             "",
         ])
 
+    return "\n".join(lines)
+
+
+# --- Ayudantes de flujo por tarea (offline, deterministas) -------------------
+# Usados por la vista de detalle de tarea: desglose en subtareas y resumen del diario.
+# Son 100% offline (mismo espíritu que el sintetizador estructural), por lo que funcionan
+# sin descargar el modelo. Lógica pura -> probada sin bucle de eventos.
+
+def suggest_subtasks_offline(task: dict) -> list[str]:
+    """Descompone una tarea en títulos de subtareas (tareas hermanas) de forma
+    determinista. Si la descripción trae viñetas/líneas, las usa; si no, genera un
+    desglose por fases (Planificar / Implementar / Verificar)."""
+    title = (task.get("title") or "").strip() or _t("ai.breakdown.default_title")
+    desc = clean_html_description(task.get("description", "") or "")
+    items = parse_subtask_lines(desc)
+    if items:
+        return items[:8]
+    return [
+        _t("ai.breakdown.phase_plan", title=title),
+        _t("ai.breakdown.phase_implement", title=title),
+        _t("ai.breakdown.phase_verify", title=title),
+    ]
+
+
+def parse_subtask_lines(text: str) -> list[str]:
+    """Convierte un texto (una tarea por línea) en títulos limpios: quita viñetas,
+    numeración y markdown, y descarta líneas vacías o de cabecera (#). Se reutiliza al
+    aceptar el desglose para crear las tareas."""
+    titles = []
+    for raw in (text or "").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        line = line.lstrip("-*•").strip()
+        line = re.sub(r"^\d+[.)]\s*", "", line).strip()
+        line = line.strip("`").strip()
+        if line:
+            titles.append(line[:200])
+    return titles
+
+
+def summarize_diary_offline(logs: list[dict], task_title: str = "") -> str:
+    """Resumen determinista del diario de una tarea: 'Qué se hizo' (últimas entradas) +
+    'Siguiente paso'. `logs` son las entradas (con 'content' HTML y 'created_at')."""
+    entries = []
+    for log in logs:
+        text = clean_html_description(log.get("content", "") or "").strip()
+        if text:
+            entries.append((log.get("created_at", "") or "", text))
+    if not entries:
+        return _t("ai.summary.empty")
+
+    recent = entries[-6:]
+    lines = [f"## {_t('ai.summary.what_happened')}"]
+    for created, text in recent:
+        first = text.splitlines()[0][:200]
+        date_str = created[:10]
+        lines.append(f"- {date_str + ' — ' if date_str else ''}{first}")
+    lines.append("")
+    lines.append(f"## {_t('ai.summary.next_step')}")
+    lines.append(f"- {recent[-1][1].splitlines()[0][:200]}")
     return "\n".join(lines)
 
 

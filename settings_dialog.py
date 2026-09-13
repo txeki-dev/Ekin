@@ -113,6 +113,21 @@ class SettingsDialog(QDialog):
         self.timer_alert_spin.valueChanged.connect(self._on_timer_value_changed)
         self.timer_alert_spin.hide()
 
+        self.reminder_lead_spin = QSpinBox()
+        self.reminder_lead_spin.setRange(0, 30)
+        self.reminder_lead_spin.setValue(int(database.get_setting("reminder_lead_days", "0", self.db_path)))
+        self.reminder_lead_spin.valueChanged.connect(
+            lambda v: database.set_setting("reminder_lead_days", str(v), self.db_path)
+        )
+        self.reminder_lead_spin.hide()
+
+        self.digest_chk = QCheckBox()
+        self.digest_chk.setChecked(database.get_setting("weekly_digest_enabled", "1", self.db_path) != "0")
+        self.digest_chk.toggled.connect(
+            lambda on: database.set_setting("weekly_digest_enabled", "1" if on else "0", self.db_path)
+        )
+        self.digest_chk.hide()
+
         # === Fila 1: Idioma (segmentado English / Español) ===
         layout.addWidget(self._row(
             t("settings.language_label"), t("settings.language_desc"), self._build_language_segment()
@@ -137,6 +152,22 @@ class SettingsDialog(QDialog):
         # === Fila 3: Umbral del temporizador (stepper) ===
         layout.addWidget(self._row(
             t("settings.timer_alert_label"), t("settings.timer_alert_desc"), self._build_stepper()
+        ))
+        layout.addWidget(self._divider())
+
+        # === Fila 4: Aviso por anticipación (stepper en días) ===
+        layout.addWidget(self._row(
+            t("settings.reminder_lead_label"), t("settings.reminder_lead_desc"),
+            self._make_stepper(self.reminder_lead_spin, "d")
+        ))
+        layout.addWidget(self._divider())
+
+        # === Fila 5: Resumen semanal (interruptor) ===
+        self.digest_switch = ToggleSwitch()
+        self.digest_switch.setChecked(self.digest_chk.isChecked())
+        self.digest_switch.toggled.connect(self.digest_chk.setChecked)
+        layout.addWidget(self._row(
+            t("settings.weekly_digest_label"), t("settings.weekly_digest_desc"), self.digest_switch
         ))
 
         layout.addStretch()
@@ -266,6 +297,39 @@ class SettingsDialog(QDialog):
         )
         self._stepper_value.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
         h.addWidget(self._stepper_value)
+        h.addWidget(round_btn("plus", 1))
+        return wrap
+
+    def _make_stepper(self, spin, suffix):
+        """Stepper −/+ genérico ligado a un QSpinBox de respaldo; muestra `valor suffix`."""
+        wrap = QFrame()
+        h = QHBoxLayout(wrap)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(10)
+
+        value_lbl = QLabel(f"{spin.value()} {suffix}")
+        value_lbl.setAlignment(Qt.AlignCenter)
+        value_lbl.setMinimumWidth(56)
+        value_lbl.setStyleSheet(
+            f"font-family: 'Caprasimo', 'Segoe UI', serif; font-size: 17px; color: {styles.COLORS['text_main']}; background: transparent;"
+        )
+        value_lbl.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        spin.valueChanged.connect(lambda v: value_lbl.setText(f"{v} {suffix}"))
+
+        def round_btn(icon_name, delta):
+            b = QPushButton()
+            b.setFixedSize(30, 30)
+            b.setCursor(Qt.PointingHandCursor)
+            b.setIcon(lucide_icon(icon_name, styles.COLORS["text_soft"], 15))
+            b.setStyleSheet(
+                f"QPushButton {{ background: transparent; border: 1px solid {styles.COLORS['border']}; border-radius: 15px; }}"
+                f"QPushButton:hover {{ background-color: {styles.COLORS['bg_hover']}; }}"
+            )
+            b.clicked.connect(lambda: spin.setValue(spin.value() + delta))
+            return b
+
+        h.addWidget(round_btn("minus", -1))
+        h.addWidget(value_lbl)
         h.addWidget(round_btn("plus", 1))
         return wrap
 

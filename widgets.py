@@ -767,6 +767,21 @@ class ColumnWidget(QFrame):
         # ventana (caja oscura) si no se le fija; se iguala al de la columna.
         self.title_label.setStyleSheet(f"background-color: {styles.COLORS['bg_column']};")
         header_layout.addWidget(self.title_label)
+
+        # Límite WIP: muestra "n/límite" y avisa en color danger si se supera.
+        wip = self.column_data.get("wip_limit")
+        if wip:
+            count = self.column_data.get("task_count", 0)
+            over = count > wip
+            self.wip_label = QLabel(f"{count}/{wip}")
+            self.wip_label.setToolTip(t("widgets.column.wip_tooltip", count=count, limit=wip))
+            color = styles.COLORS["danger"] if over else styles.COLORS["text_muted"]
+            weight = "bold" if over else "normal"
+            self.wip_label.setStyleSheet(
+                f"color: {color}; font-size: 11px; font-weight: {weight}; background: transparent;"
+            )
+            header_layout.addWidget(self.wip_label)
+
         header_layout.addStretch()
 
         # Botón para plegar la columna (triángulo hacia la izquierda, pintado)

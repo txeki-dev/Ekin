@@ -10,8 +10,11 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QKeySequence, QShortcut, QDesktopServices as QDesktopServices
 import database
 import styles
+import local_ai
 from strings import t
 from icons import lucide_icon
+from html_utils import clean_html_description
+from ai_assist_dialog import AiAssistDialog
 from .markdown_edit import MarkdownTextEdit, RichTextToolbar
 from .log_entry import LogEntryWidget
 from .tag_pill import ClickableTagPill, color_icon
@@ -299,6 +302,16 @@ class TaskDetailDialog(QDialog):
         left_layout.addWidget(RichTextToolbar(self.desc_input))
         left_layout.addWidget(self.desc_input, 1)
 
+        breakdown_row = QHBoxLayout()
+        breakdown_row.addStretch()
+        self.breakdown_btn = QPushButton(t("task_detail.breakdown_btn"))
+        self.breakdown_btn.setCursor(Qt.PointingHandCursor)
+        self.breakdown_btn.setIcon(lucide_icon("sparkles", styles.COLORS['text_soft'], 14))
+        self.breakdown_btn.setIconSize(QSize(14, 14))
+        self.breakdown_btn.clicked.connect(self._open_breakdown)
+        breakdown_row.addWidget(self.breakdown_btn)
+        left_layout.addLayout(breakdown_row)
+
         # Adjuntos
         links_kicker = QLabel(t("task_detail.links_label"))
         left_layout.addWidget(links_kicker)
@@ -349,6 +362,12 @@ class TaskDetailDialog(QDialog):
         journal_title.setObjectName("JournalHeader")
         journal_head.addWidget(journal_title)
         journal_head.addStretch()
+        self.summarize_btn = QPushButton(t("task_detail.summarize_btn"))
+        self.summarize_btn.setCursor(Qt.PointingHandCursor)
+        self.summarize_btn.setIcon(lucide_icon("sparkles", styles.COLORS['text_soft'], 14))
+        self.summarize_btn.setIconSize(QSize(14, 14))
+        self.summarize_btn.clicked.connect(self._open_summary)
+        journal_head.addWidget(self.summarize_btn)
         self.entries_count_label = QLabel("")
         self.entries_count_label.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 12px;")
         journal_head.addWidget(self.entries_count_label)
@@ -988,6 +1007,69 @@ class TaskDetailDialog(QDialog):
         self.modified = True
 
         # En vez de recargar todo, recargamos para asegurar sincronización limpia
+        self.reload_logs()
+
+    # --- Asistentes de IA local (offline) por tarea ---
+
+    def _open_breakdown(self):
+        """Abre el asistente que desglosa esta tarea en subtareas (tareas hermanas en la
+        misma columna). Offline y determinista; el usuario edita antes de crear."""
+        task = database.get_task(self.task_id, self.db_path)
+        if not task:
+            return
+        titles = local_ai.suggest_subtasks_offline(task)
+        dlg = AiAssistDialog(
+            t("ai.breakdown.title"), "\n".join(titles),
+            t("ai.breakdown.confirm_btn"), t("ai.breakdown.hint"),
+            mode="task_breakdown", ai_tasks=[task], parent=self,
+        )
+        dlg.confirmed.connect(self._apply_breakdown)
+        dlg.exec()
+
+    def _apply_breakdown(self, text):
+        task = database.get_task(self.task_id, self.db_path)
+        if not task:
+            return
+        titles = local_ai.parse_subtask_lines(text)
+        if not titles:
+            return
+        for title in titles:
+            database.create_task(task["column_id"], title, db_path=self.db_path)
+        self.modified = True
+        QMessageBox.information(
+            self, t("ai.breakdown.title"), t("ai.breakdown.created", count=len(titles))
+        )
+
+    def _open_summary(self):
+        """Abre el asistente que resume el diario de esta tarea (offline)."""
+        logs = database.get_logs(self.task_id, self.db_path)
+        task = database.get_task(self.task_id, self.db_path)
+        title = task["title"] if task else ""
+        # Para la mejora por IA: una tarea sintética cuyo "description" lleva el texto del
+        # diario, de modo que el prompt de resumen lo reciba sin tocar el generador.
+        diary_text = "\n".join(
+            clean_html_description(log.get("content", "") or "") for log in logs
+        )
+        ai_tasks = [{"title": title, "description": diary_text, "links": []}]
+        dlg = AiAssistDialog(
+            t("ai.summary.title"), local_ai.summarize_diary_offline(logs, title),
+            t("ai.summary.confirm_btn"), t("ai.summary.hint"),
+            mode="diary_summary", ai_tasks=ai_tasks, parent=self,
+        )
+        dlg.confirmed.connect(self._apply_summary)
+        dlg.exec()
+
+    def _apply_summary(self, text):
+        text = (text or "").strip()
+        if not text:
+            return
+
+        def _esc(s):
+            return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+        html_body = "".join(f"<p>{_esc(line)}</p>" for line in text.split("\n") if line.strip())
+        database.create_log(self.task_id, html_body, self.db_path)
+        self.modified = True
         self.reload_logs()
 
     def delete_log_entry(self, log_id, widget):

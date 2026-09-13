@@ -35,6 +35,14 @@ Ekin Kanban is a sleek, resource-friendly, and offline-first personal Kanban boa
 - **Automatic Backups**: On every startup Ekin snapshots your database into a `backups/` folder (keeping the most recent few) before applying any changes — a cheap safety net against accidents.
 - **Collapsible Sidebar**: Hide or reveal the sidebar using the toggle (`☰`) button in the board header to maximize work space.
 - **Column & Board Copying/Moving**: Easily move or copy columns to other boards, or copy complete boards with all sub-tasks, tags, and diaries.
+- **"My Work / Today" Cross-Board Workspace**: A dedicated home view (sidebar list icon or **Ctrl+0**) aggregating everything due Today, Tomorrow, Overdue, and This Week across all your boards, plus an active "In Progress" section tracking running timers. Click any task to navigate directly to its card.
+- **Command Palette (`Ctrl+K`) & Quick Capture**: Unified search overlay and command runner. Instant fuzzy search across boards and tasks, one-click execution of navigation and view commands, and inline quick capture (`+ title`) to create tasks on the fly without changing views.
+- **In-App Analytics Dashboard & PDF Report Export**: Real-time metrics dashboard (**Ctrl+D**) with custom-rendered charts for task distribution by status, column, tag, priority, and board, alongside timer analytics and diary velocity. Export clean, client-ready PDF reports natively with zero external dependencies.
+- **Smart Reminders & Weekly Digest**: Configurable advance notifications (alert N days prior to due dates in Settings) plus automated once-per-week Monday morning digests summarizing upcoming deadlines, overdue tasks, and past week completions.
+- **Offline-First AI Workflows & LLM Streaming**: Direct AI hygiene actions in Task Detail (✨ buttons) to break down large tasks into manageable child cards or summarize verbose task diaries, powered by instant offline heuristic generators or streaming local neural models (Qwen 2.5 Coder 1.5B / Ollama).
+- **Per-Column WIP Limits**: Set Work-in-Progress thresholds on columns via the column editor; displays a live counter badge (`count / limit`) that turns terracotta when limits are exceeded to keep workflows healthy.
+- **Post-Sync Outcome Summaries & Decoupled Architecture**: Real-time outcome transparency for two-way cloud merges ("Synced · 2 tasks updated · 1 conflict auto-archived") backed by an isolated background synchronization controller and reactive file watcher.
+- **Application Diagnostic Logging & Crash Guard**: File logging with rotation under `~/.ekin/logs/ekin.log` and non-fatal crash handlers intercepting unexpected exceptions to safeguard user data.
 - **"Warm Shell" Organic Design**: A calm, modern interface built on a single warm accent (terracotta) over a cream ground, with Caprasimo display type and Lucide icons. Ships with a **light "Warm Shell"** theme (the default) and a warm-espresso **"Night Lanes"** dark theme, both switchable live from Settings, plus customizable colors for columns, boards, and tags.
 
 ---
@@ -179,7 +187,10 @@ Every time Ekin starts it also writes an automatic **backup** of your database i
 Press **Ctrl+/** anywhere, or click the **❔** button in the sidebar utility bar, to open a reference dialog listing every shortcut in the app, grouped by category — the list below is a summary:
 * **Ctrl+N** — new task in the last column you interacted with (opened a card in, clicked "+ Añadir Tarea" in, or just clicked); falls back to the first column if nothing qualifies yet. **Ctrl+Shift+N** — new column in the active board.
 * **Ctrl+1** … **Ctrl+9** — jump straight to the 1st through 9th board in the sidebar. **Alt+↑ / Alt+↓** — previous/next board.
-* **Ctrl+F** — global search. **Ctrl+,** — open Ajustes. **Ctrl+Shift+C** — open the Calendar.
+* **Ctrl+K** — Command Palette (search tasks and boards, run commands, inline quick task capture with `+ title`).
+* **Ctrl+0** — open "My Work / Today" cross-board overview.
+* **Ctrl+D** — open Analytics Dashboard with visual charts and PDF report export.
+* **Ctrl+F** — global search dialog. **Ctrl+,** — open Settings. **Ctrl+Shift+C** — open the Calendar.
 * **Ctrl+Z / Ctrl+Y** (or **Ctrl+Shift+Z**) — undo/redo. **Esc** — close the open dialog.
 * Inside the description/diary editor: **bold** (Ctrl+B or Ctrl+N), *italic* (Ctrl+K or Ctrl+I), ~~strikethrough~~ (Ctrl+Shift+X), **Tab** to nest a bullet, typing `-->` for **→**, and **Ctrl+Enter** to post a diary note.
 

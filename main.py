@@ -12,13 +12,14 @@ if os.name == "nt":
         pass
 
 import subprocess
-from datetime import date
+import logging
+from datetime import date, timedelta
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QSplitter, QWidget, QHBoxLayout, QMessageBox,
     QStackedWidget, QSystemTrayIcon, QMenu, QProgressDialog
 )
-from PySide6.QtCore import Qt, QTimer, QByteArray, QThread, Signal
-from PySide6.QtGui import QIcon, QShortcut, QKeySequence, QFontDatabase
+from PySide6.QtCore import Qt, QTimer, QByteArray, QThread, Signal, QUrl
+from PySide6.QtGui import QIcon, QShortcut, QKeySequence, QFontDatabase, QDesktopServices
 import database
 import backups
 import styles
@@ -27,13 +28,20 @@ from strings import t
 from sidebar import SidebarWidget
 from board_view import BoardViewWidget
 from calendar_view import CalendarViewWidget
+from my_work_view import MyWorkWidget
+from dashboard_view import DashboardWidget
 from detail_dialog import TaskDetailDialog
 from search_dialog import SearchDialog
+from command_palette import CommandPalette
 from settings_dialog import SettingsDialog
 from shortcuts_dialog import ShortcutsDialog
 from undo import UndoManager
+import reminders
+import logging_setup
 import ics_export
 from version import __version__
+
+log = logging.getLogger("ekin")
 
 if getattr(sys, "frozen", False):
     _APP_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(sys.executable)))
@@ -183,7 +191,7 @@ class MainWindow(QMainWindow):
         try:
             backups.backup_database(database.DB_NAME)
         except Exception as exc:
-            print(f"No se pudo crear la copia de seguridad: {exc}")
+            log.warning("No se pudo crear la copia de seguridad: %s", exc)
 
         # Inicializar base de datos
         database.init_db()
@@ -191,7 +199,7 @@ class MainWindow(QMainWindow):
         try:
             database.advance_overdue_recurring(date.today().isoformat())
         except Exception as exc:
-            print(f"No se pudieron adelantar tareas recurrentes: {exc}")
+            log.warning("No se pudieron adelantar tareas recurrentes: %s", exc)
         self.check_onboarding()
 
         # Contenido del último .ics sincronizado por feed (para no reescribir si no
@@ -217,6 +225,7 @@ class MainWindow(QMainWindow):
         self._last_notified = None
         self.setup_tray()
         QTimer.singleShot(1500, self.notify_due_today)
+        QTimer.singleShot(2500, self._maybe_show_weekly_digest)
         self._notify_timer = QTimer(self)
         self._notify_timer.timeout.connect(self._maybe_notify_new_day)
         self._notify_timer.start(60 * 60 * 1000)  # revisión horaria (por cambio de día)
@@ -259,12 +268,19 @@ class MainWindow(QMainWindow):
         # Ctrl+Shift+N: nueva columna en el tablero activo
         QShortcut(QKeySequence("Ctrl+Shift+N"), self).activated.connect(self.board_view.add_column)
 
-        # Ctrl+,: abrir Ajustes; Ctrl+Shift+C: abrir el Calendario
+        # Ctrl+,: abrir Ajustes; Ctrl+Shift+C: abrir el Calendario; Ctrl+0: "Mi trabajo"
         QShortcut(QKeySequence("Ctrl+,"), self).activated.connect(self.show_settings)
         QShortcut(QKeySequence("Ctrl+Shift+C"), self).activated.connect(self.show_calendar_view)
+        QShortcut(QKeySequence("Ctrl+0"), self).activated.connect(self.show_my_work_view)
 
         # Ctrl+/: ventana de referencia de atajos de teclado
         QShortcut(QKeySequence("Ctrl+/"), self).activated.connect(self.show_shortcuts)
+
+        # Ctrl+K: paleta de comandos (buscar tareas + ejecutar acciones)
+        QShortcut(QKeySequence("Ctrl+K"), self).activated.connect(self.show_command_palette)
+
+        # Ctrl+D: panel de Analíticas
+        QShortcut(QKeySequence("Ctrl+D"), self).activated.connect(self.show_dashboard_view)
 
         # Comprobar actualizaciones tras 1 segundo
         QTimer.singleShot(1000, self.check_for_updates)
@@ -296,10 +312,14 @@ class MainWindow(QMainWindow):
         # 2. Área central conmutable: vista de tablero <-> vista de calendario
         self.board_view = BoardViewWidget(database.DB_NAME, self)
         self.calendar_view = CalendarViewWidget(database.DB_NAME, self)
+        self.my_work_view = MyWorkWidget(database.DB_NAME, self)
+        self.dashboard_view = DashboardWidget(database.DB_NAME, self)
 
         self.center_stack = QStackedWidget()
         self.center_stack.addWidget(self.board_view)     # índice 0
         self.center_stack.addWidget(self.calendar_view)  # índice 1
+        self.center_stack.addWidget(self.my_work_view)   # índice 2
+        self.center_stack.addWidget(self.dashboard_view) # índice 3
         splitter.addWidget(self.center_stack)
 
         # Proporciones iniciales: 20% para el sidebar, 80% para el tablero
@@ -322,12 +342,18 @@ class MainWindow(QMainWindow):
 
         # Campana de vencimientos y vista de calendario
         self.sidebar.open_calendar_requested.connect(self.show_calendar_view)
+        self.sidebar.open_my_work_requested.connect(self.show_my_work_view)
         self.sidebar.open_search_requested.connect(self.show_search)
         self.sidebar.open_settings_requested.connect(self.show_settings)
         self.sidebar.open_shortcuts_requested.connect(self.show_shortcuts)
         self.sidebar.open_task_requested.connect(self.on_notification_task)
         self.calendar_view.close_requested.connect(self.show_board_view)
         self.calendar_view.task_activated.connect(self.on_calendar_task)
+        # Vista "Mi trabajo": saltar a la tarea (como la campana) o volver al tablero
+        self.my_work_view.task_activated.connect(self.on_notification_task)
+        self.my_work_view.close_requested.connect(self.show_board_view)
+        # Panel de Analíticas: volver al tablero al cerrar
+        self.dashboard_view.close_requested.connect(self.show_board_view)
         # Reprogramar una tarea arrastrándola en el calendario refresca campana y .ics
         self.calendar_view.data_changed.connect(self.sidebar.refresh_notifications)
         self.calendar_view.data_changed.connect(self.sync_ics)
@@ -335,7 +361,10 @@ class MainWindow(QMainWindow):
         # Cuando el tablero (re)carga datos, refrescar campana, calendario y el .ics sincronizado
         self.board_view.data_changed.connect(self.sidebar.refresh_notifications)
         self.board_view.data_changed.connect(self.calendar_view.refresh)
+        self.board_view.data_changed.connect(self.my_work_view.refresh)
+        self.board_view.data_changed.connect(self.dashboard_view.refresh)
         self.board_view.data_changed.connect(self.sync_ics)
+        self.calendar_view.data_changed.connect(self.my_work_view.refresh)
 
         # Pastilla de "tablero enlazado" en una tarjeta: saltar directamente a ese tablero
         self.board_view.board_link_activated.connect(self.on_board_link_activated)
@@ -359,11 +388,76 @@ class MainWindow(QMainWindow):
     def show_board_view(self):
         self.center_stack.setCurrentWidget(self.board_view)
 
+    def show_my_work_view(self):
+        """Muestra el panel transversal "Mi trabajo" (todo lo que vence / está en curso)."""
+        self.my_work_view.refresh()
+        self.center_stack.setCurrentWidget(self.my_work_view)
+
+    def show_dashboard_view(self):
+        """Muestra el panel de Analíticas (métricas transversales + exportar PDF)."""
+        self.dashboard_view.refresh()
+        self.center_stack.setCurrentWidget(self.dashboard_view)
+
     def show_search(self):
         """Abre el diálogo de búsqueda global; al elegir un resultado salta a su tarjeta."""
         dialog = SearchDialog(database.DB_NAME, self)
         dialog.task_activated.connect(self.on_notification_task)
         dialog.exec()
+
+    def show_command_palette(self):
+        """Abre la paleta de comandos (Ctrl+K): buscar tareas, ejecutar acciones o
+        capturar una tarea rápida escribiendo `+ <título>`."""
+        commands = [
+            ("new_task", t("palette.cmd_new_task")),
+            ("new_column", t("palette.cmd_new_column")),
+            ("new_board", t("palette.cmd_new_board")),
+            ("my_work", t("palette.cmd_my_work")),
+            ("dashboard", t("palette.cmd_dashboard")),
+            ("calendar", t("palette.cmd_calendar")),
+            ("search", t("palette.cmd_search")),
+            ("settings", t("palette.cmd_settings")),
+            ("shortcuts", t("palette.cmd_shortcuts")),
+            ("toggle_theme", t("palette.cmd_toggle_theme")),
+            ("open_logs", t("palette.cmd_open_logs")),
+        ]
+        dlg = CommandPalette(database.DB_NAME, commands, self)
+        dlg.command_invoked.connect(self._run_command)
+        dlg.task_activated.connect(self.on_notification_task)
+        dlg.quick_capture_requested.connect(self._quick_capture)
+        dlg.exec()
+
+    def _run_command(self, command_id):
+        dispatch = {
+            "new_task": self.board_view.quick_add_task,
+            "new_column": self.board_view.add_column,
+            "new_board": self.sidebar.add_board,
+            "my_work": self.show_my_work_view,
+            "dashboard": self.show_dashboard_view,
+            "calendar": self.show_calendar_view,
+            "search": self.show_search,
+            "settings": self.show_settings,
+            "shortcuts": self.show_shortcuts,
+            "toggle_theme": self._toggle_theme,
+            "open_logs": self._open_logs_folder,
+        }
+        fn = dispatch.get(command_id)
+        if fn:
+            fn()
+
+    def _open_logs_folder(self):
+        """Abre la carpeta de logs de diagnóstico en el explorador de archivos."""
+        QDesktopServices.openUrl(QUrl.fromLocalFile(logging_setup.get_log_dir()))
+
+    def _toggle_theme(self):
+        current = database.get_setting("theme", "light")
+        new_theme = "dark" if current == "light" else "light"
+        database.set_setting("theme", new_theme)
+        self.apply_theme(new_theme, reload=True)
+
+    def _quick_capture(self, title):
+        """Crea una tarea con `title` en el tablero activo (captura rápida de la paleta)."""
+        self.show_board_view()
+        self.board_view.create_quick_task(title)
 
     def apply_theme(self, theme, reload=True):
         """Aplica el tema (oscuro/claro) al vuelo. `reload` recarga el tablero para que
@@ -487,7 +581,7 @@ class MainWindow(QMainWindow):
                 f.write(content)
             self._last_synced_ics[cache_key] = content
         except Exception as exc:
-            print(f"Error al sincronizar el .ics ({cache_key}): {exc}")
+            log.error("Error al sincronizar el .ics (%s): %s", cache_key, exc)
 
     # --- Bandeja del sistema y notificaciones ---
 
@@ -535,16 +629,22 @@ class MainWindow(QMainWindow):
             return
         if database.get_setting("notifications_enabled", "1") == "0":
             return
-        today = date.today().isoformat()
-        tasks = database.get_scheduled_tasks(today, today)
-        self._last_notified = date.today()
+        today = date.today()
+        try:
+            lead = max(0, int(database.get_setting("reminder_lead_days", "0")))
+        except (TypeError, ValueError):
+            lead = 0
+        end = (today + timedelta(days=lead)).isoformat()
+        tasks = database.get_scheduled_tasks(today.isoformat(), end)
+        self._last_notified = today
         if not tasks:
             return
         titles = ", ".join(task["title"] for task in tasks[:5])
         if len(tasks) > 5:
             titles += "…"
+        title_key = "main.tray.due_soon_title" if lead > 0 else "main.tray.due_today_title"
         self.tray.showMessage(
-            t("main.tray.due_today_title", count=len(tasks)),
+            t(title_key, count=len(tasks)),
             titles,
             QSystemTrayIcon.MessageIcon.Information,
             8000
@@ -554,6 +654,26 @@ class MainWindow(QMainWindow):
         """Con la revisión horaria, notifica de nuevo si ha cambiado el día."""
         if self._last_notified != date.today():
             self.notify_due_today()
+
+    def _maybe_show_weekly_digest(self):
+        """Una vez por semana ISO (si está activado), muestra el resumen semanal:
+        atrasadas + lo que vence esta semana, con salto a cada tarea o a "Mi trabajo"."""
+        enabled = database.get_setting("weekly_digest_enabled", "1") != "0"
+        last_key = database.get_setting("last_weekly_digest_week", "")
+        today = date.today()
+        if not reminders.should_show_weekly_digest(last_key, today, enabled):
+            return
+        week_end = (today + timedelta(days=reminders.THIS_WEEK_DAYS)).isoformat()
+        # Sin start_date -> incluye también las atrasadas; split_digest_tasks las separa.
+        tasks = database.get_scheduled_tasks(end_date=week_end)
+        groups = reminders.split_digest_tasks(tasks, today.isoformat())
+        if not (groups["overdue"] or groups["this_week"]):
+            return  # nada que mostrar: no marcamos la semana, reintenta cuando haya datos
+        database.set_setting("last_weekly_digest_week", reminders.current_week_key(today))
+        dlg = reminders.WeeklyDigestDialog(groups["overdue"], groups["this_week"], self)
+        dlg.task_activated.connect(self.on_notification_task)
+        dlg.open_my_work_requested.connect(self.show_my_work_view)
+        dlg.exec()
 
     def toggle_sidebar(self):
         """Muestra u oculta la barra lateral."""
@@ -708,7 +828,7 @@ class MainWindow(QMainWindow):
             os.execv(sys.executable, [sys.executable] + sys.argv)
         except Exception as e:
             # Fallar en silencio si no hay conexión o no es una instalación Git
-            print(f"Error al comprobar actualizaciones: {e}")
+            log.warning("Error al comprobar actualizaciones: %s", e)
 
     def check_onboarding(self):
         """Verifica si es la primera vez que se abre la app y crea datos de ejemplo."""
@@ -763,7 +883,10 @@ def apply_win32_icon(window):
 
 
 def main():
+    logging_setup.setup_logging()
     app = QApplication(sys.argv)
+    logging_setup.install_excepthook()
+    logging_setup.install_qt_message_handler()
     register_fonts()
     app.setWindowIcon(app_icon())
 

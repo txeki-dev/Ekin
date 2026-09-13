@@ -63,6 +63,8 @@ def init_db(db_path=None):
             import uuid
             for r in cursor.fetchall():
                 cursor.execute("UPDATE columns SET column_uuid = ? WHERE id = ?", (str(uuid.uuid4()), r[0]))
+        if "wip_limit" not in columns_cols:
+            cursor.execute("ALTER TABLE columns ADD COLUMN wip_limit INTEGER")
 
         # Tabla de tareas (tasks)
         cursor.execute("""

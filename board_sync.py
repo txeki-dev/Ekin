@@ -880,3 +880,8 @@ def connect_shared_board_from_file(file_path: str, db_path=None):
     # Sincronizar de inmediato
     res = sync_board_with_file(existing_board_id, file_path, db_path)
     return existing_board_id, res
+
+
+# Expose BoardSyncController and format_sync_summary for convenience
+from board_sync_controller import BoardSyncController, format_sync_summary  # noqa: E402, F401
+

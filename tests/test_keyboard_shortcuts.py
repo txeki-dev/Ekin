@@ -83,7 +83,7 @@ def test_add_column_shortcut_works_normally_with_board_selected(qapp, db_path, m
             return QDialog.Accepted
 
         def get_data(self):
-            return "Nueva columna", "#3b82f6"
+            return "Nueva columna", "#3b82f6", None
 
     monkeypatch.setattr(board_view_module, "ColumnEditDialog", _AutoAccept)
 

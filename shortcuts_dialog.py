@@ -36,12 +36,15 @@ class ShortcutsDialog(QDialog):
         content_layout.setSpacing(10)
 
         general_keys = [
+            "shortcuts.item_command_palette",
             "shortcuts.item_search",
             "shortcuts.item_new_task",
             "shortcuts.item_new_column",
             "shortcuts.item_prev_next_board",
             "shortcuts.item_jump_board",
             "shortcuts.item_calendar",
+            "shortcuts.item_my_work",
+            "shortcuts.item_dashboard",
             "shortcuts.item_settings",
             "shortcuts.item_shortcuts",
             "shortcuts.item_undo_redo",

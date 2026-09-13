@@ -1,13 +1,14 @@
 import os
-from PySide6.QtCore import Qt, Signal, QSize, QTimer, QFileSystemWatcher, QUrl
+from PySide6.QtCore import Qt, Signal, QSize, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QInputDialog, QMessageBox, QDialog, QLineEdit,
-    QComboBox, QFileDialog, QMenu
+    QComboBox, QFileDialog, QMenu, QSpinBox
 )
 import database
 import board_sync
+from board_sync_controller import BoardSyncController, format_sync_summary  # noqa: F401
 import styles
 from styles import hex_to_rgb
 from strings import t
@@ -66,7 +67,7 @@ class BoardColumnsArea(QWidget):
 
 class ColumnEditDialog(QDialog):
     """Diálogo para crear o editar una columna (nombre y color)."""
-    def __init__(self, title="Editar Columna", name="", color="#3b82f6", parent=None):
+    def __init__(self, title="Editar Columna", name="", color="#3b82f6", wip_limit=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setMinimumWidth(440)
@@ -87,6 +88,14 @@ class ColumnEditDialog(QDialog):
         self.color_picker = ColorCirclesPicker(self.color)
         self.color_picker.color_changed.connect(self._on_color_picked)
         layout.addWidget(self.color_picker)
+
+        # Límite WIP (0 = sin límite): aviso visual cuando la columna lo supera
+        layout.addWidget(QLabel(t("board_view.column_edit.wip_label")))
+        self.wip_input = QSpinBox()
+        self.wip_input.setRange(0, 99)
+        self.wip_input.setValue(int(wip_limit or 0))
+        self.wip_input.setSpecialValueText(t("board_view.column_edit.wip_none"))  # texto para el 0
+        layout.addWidget(self.wip_input)
         layout.addStretch()
 
         # Botones OK / Cancelar
@@ -116,7 +125,8 @@ class ColumnEditDialog(QDialog):
         self.accept()
 
     def get_data(self):
-        return self.name_input.text().strip(), self.color
+        wip = self.wip_input.value()
+        return self.name_input.text().strip(), self.color, (wip or None)
 
 
 class BoardSelectionDialog(QDialog):
@@ -204,12 +214,50 @@ class BoardViewWidget(QFrame):
         self.selected_task_ids = set()
         self.setObjectName("BoardViewWidget")
 
+        # Controlador desacoplado de sincronización y file watcher
+        self.sync_controller = BoardSyncController(parent=self, db_path=self.db_path)
+        self.sync_controller.sync_status_changed.connect(self._on_sync_status_changed)
+        self.sync_controller.sync_finished.connect(self._on_sync_finished)
+        self.sync_controller.board_data_reloaded.connect(lambda: self.load_board(self.board_id, notify=False))
+
         self._timer_badge_refresh_timer = QTimer(self)
         self._timer_badge_refresh_timer.timeout.connect(self.refresh_timer_badges)
         self._timer_badge_refresh_timer.start(60_000)  # refresca las insignias cada 60s
 
         self.init_ui()
         self.data_changed.connect(self._trigger_auto_sync_export)
+
+    @property
+    def _sync_worker(self):
+        return self.sync_controller.worker
+
+    @_sync_worker.setter
+    def _sync_worker(self, val):
+        self.sync_controller._sync_worker = val
+
+    @property
+    def _last_sync_summary(self):
+        return self.sync_controller.last_sync_summary
+
+    @_last_sync_summary.setter
+    def _last_sync_summary(self, val):
+        self.sync_controller._last_sync_summary = val
+
+    @property
+    def _current_sync_info(self):
+        return self.sync_controller.current_sync_info
+
+    @_current_sync_info.setter
+    def _current_sync_info(self, val):
+        self.sync_controller._current_sync_info = val
+
+    @property
+    def _file_watcher(self):
+        return self.sync_controller._file_watcher
+
+    @property
+    def _watched_sync_path(self):
+        return self.sync_controller._watched_sync_path
 
     def _refresh_current(self):
         if self.board_id and self.board_id != -1:
@@ -538,33 +586,14 @@ class BoardViewWidget(QFrame):
         columns = database.get_columns(board_id, self.db_path)
         timer_alert_hours = int(database.get_setting("timer_alert_hours", "24", self.db_path))
 
-        total_tasks = 0
-        due_this_week = 0
-        from datetime import date, timedelta
-        week_end = date.today() + timedelta(days=7)
-
         for col_data in columns:
-            # Cargar las tareas primero: hace falta el contador para la vista plegada.
             tasks = database.get_tasks(col_data["id"], self.db_path)
             col_data["task_count"] = len(tasks)
-            total_tasks += len(tasks)
-            for tk in tasks:
-                due = tk.get("due_date")
-                if due:
-                    try:
-                        if date.today() <= date.fromisoformat(due) <= week_end:
-                            due_this_week += 1
-                    except (ValueError, TypeError):
-                        pass
-
             col_widget = self._build_column_widget(col_data, tasks, board_info, timer_alert_hours)
-
             self.columns_layout.addWidget(col_widget)
             self.column_widgets[col_data["id"]] = col_widget
 
-        self.board_counts_chip.setText(
-            t("board_view.header.counts", tasks=total_tasks, due=due_this_week)
-        )
+        self._update_board_counts()
 
         # Añadir el botón "+ Añadir Columna" al final
         self.add_column_card = QFrame()
@@ -593,8 +622,8 @@ class BoardViewWidget(QFrame):
 
         self.columns_layout.addWidget(self.add_column_card)
 
-        # Actualizar botón de sincronización y file watcher reactivo
-        self._update_sync_ui(board_id)
+        # Actualizar botón de sincronización y file watcher reactivo vía controller
+        self.sync_controller.set_board(board_id, self.db_path)
 
         # Actualizar visibilidad de selección múltiple
         self._update_cards_selection_ui()
@@ -602,15 +631,45 @@ class BoardViewWidget(QFrame):
         if notify:
             self.data_changed.emit()
 
-    def _update_sync_ui(self, board_id):
-        """Actualiza el botón y estado de sincronización con OneDrive."""
-        sync_info = database.get_board_sync_info(board_id, self.db_path)
-        self._current_sync_info = sync_info
+    def _update_board_counts(self):
+        """Actualiza el chip de recuento de tareas y vencimientos de la semana sin recargar columnas."""
+        if not self.board_id or self.board_id == -1:
+            self.board_counts_chip.setText("")
+            return
+
+        columns = database.get_columns(self.board_id, self.db_path)
+        total_tasks = 0
+        due_this_week = 0
+        from datetime import date, timedelta
+        week_end = date.today() + timedelta(days=7)
+        today = date.today()
+
+        for col_data in columns:
+            tasks = database.get_tasks(col_data["id"], self.db_path)
+            total_tasks += len(tasks)
+            for tk in tasks:
+                due = tk.get("due_date")
+                if due:
+                    try:
+                        if today <= date.fromisoformat(due) <= week_end:
+                            due_this_week += 1
+                    except (ValueError, TypeError):
+                        pass
+
+        self.board_counts_chip.setText(
+            t("board_view.header.counts", tasks=total_tasks, due=due_this_week)
+        )
+
+    def _on_sync_status_changed(self, sync_info):
+        """Actualiza el botón y estado de sincronización con OneDrive/archivo compartido."""
         if sync_info and sync_info.get("sync_path"):
             path = sync_info["sync_path"]
             self.sync_btn.setText(t("sync.synced_badge"))
             last_sync = sync_info.get("last_synced_at") or "-"
-            self.sync_btn.setToolTip(f"Synced with:\n{path}\nLast sync: {last_sync}")
+            tooltip = f"Synced with:\n{path}\nLast sync: {last_sync}"
+            if self.sync_controller.last_sync_summary:
+                tooltip += f"\n{self.sync_controller.last_sync_summary}"
+            self.sync_btn.setToolTip(tooltip)
             self.sync_btn.setIcon(lucide_icon("cloud", styles.COLORS['accent_2'], 15))
             self.sync_btn.setIconSize(QSize(15, 15))
             self.sync_btn.setStyleSheet(f"""
@@ -625,7 +684,6 @@ class BoardViewWidget(QFrame):
                 }}
                 QPushButton:hover {{ background-color: {styles.COLORS['bg_hover']}; }}
             """)
-            self._setup_file_watcher(path)
         else:
             self.sync_btn.setText(t("sync.link_btn"))
             self.sync_btn.setToolTip(t("sync.link_tooltip"))
@@ -645,80 +703,38 @@ class BoardViewWidget(QFrame):
                     color: {styles.COLORS['text_main']};
                 }}
             """)
-            self._setup_file_watcher(None)
+
+    def _update_sync_ui(self, board_id=None):
+        """Compatibilidad hacia atrás: actualiza el controlador de sincronización."""
+        target_id = board_id if board_id is not None else self.board_id
+        if target_id is not None:
+            self.sync_controller.set_board(target_id, self.db_path)
 
     def _setup_file_watcher(self, path):
-        """Configura el watcher para detectar reactivamente cambios externos en el archivo .ekboard."""
-        if not hasattr(self, "_file_watcher"):
-            self._file_watcher = QFileSystemWatcher(self)
-            self._file_watcher.fileChanged.connect(self._on_sync_file_changed)
-            self._sync_debounce_timer = QTimer(self)
-            self._sync_debounce_timer.setSingleShot(True)
-            self._sync_debounce_timer.setInterval(600)
-            self._sync_debounce_timer.timeout.connect(self._on_debounced_file_sync)
-
-        existing = self._file_watcher.files()
-        if existing:
-            self._file_watcher.removePaths(existing)
-        if path and os.path.exists(path):
-            self._file_watcher.addPath(path)
-            self._watched_sync_path = path
-        else:
-            self._watched_sync_path = None
-
-    def _on_sync_file_changed(self, path):
-        """Evento de cambio detectado por el sistema de archivos (OneDrive)."""
-        self._sync_debounce_timer.start()
+        """Compatibilidad hacia atrás: delega en sync_controller."""
+        self.sync_controller.setup_file_watcher(path)
 
     def _ensure_watcher_path_active(self):
-        """Asegura que el archivo sincronizado esté registrado en QFileSystemWatcher tras reemplazo atómico en Windows."""
-        if hasattr(self, "_watched_sync_path") and self._watched_sync_path and hasattr(self, "_file_watcher"):
-            if self._watched_sync_path not in self._file_watcher.files() and os.path.exists(self._watched_sync_path):
-                self._file_watcher.addPath(self._watched_sync_path)
+        """Compatibilidad hacia atrás: delega en sync_controller."""
+        self.sync_controller.ensure_watcher_path_active()
 
     def _run_async_sync(self, user_initiated: bool = False, file_path: str = None):
-        """Ejecuta la sincronización en un hilo secundario sin congelar la UI."""
-        if not self.board_id or self.board_id == -1:
-            return
-        if hasattr(self, "_sync_worker") and self._sync_worker and self._sync_worker.isRunning():
-            self._sync_queued = True
-            return
-
-        self._sync_worker = board_sync.BoardSyncWorker(self.board_id, sync_path=file_path, db_path=self.db_path, parent=self)
-        self._sync_worker.sync_finished.connect(lambda res: self._on_sync_finished(res, user_initiated=user_initiated))
-        self._sync_worker.start()
+        """Ejecuta la sincronización en segundo plano delegando en el controlador."""
+        self.sync_controller.sync_now(user_initiated=user_initiated, blocking=False, file_path=file_path)
 
     def _on_sync_finished(self, res, user_initiated: bool = False):
-        self._sync_worker = None
-        self._ensure_watcher_path_active()
-
+        """Gestiona el diálogo de resultado cuando la sincronización es manual."""
         if res.status == "error":
             if user_initiated:
                 QMessageBox.warning(self, t("sync.error_title"), res.message)
-        else:
-            if res.status in ("imported", "merged"):
-                self.load_board(self.board_id, notify=False)
-            if user_initiated and res.status == "merged" and res.conflicts_resolved > 0:
-                QMessageBox.information(
-                    self,
-                    t("sync.success_title"),
-                    t("sync.conflict_merged_toast") + f"\n({res.conflicts_resolved} conflicto(s) archivado(s) en el diario)."
-                )
-
-        if getattr(self, "_sync_queued", False):
-            self._sync_queued = False
-            self._run_async_sync(user_initiated=False)
-
-    def _on_debounced_file_sync(self):
-        """Ejecuta la sincronización en diferido cuando OneDrive termina de escribir."""
-        self._run_async_sync(user_initiated=False)
+        elif user_initiated and res.status != "not_linked":
+            QMessageBox.information(
+                self, t("sync.success_title"), self.sync_controller.last_sync_summary
+            )
 
     def _trigger_auto_sync_export(self):
-        """Exporta cambios locales en segundo plano si el tablero está vinculado."""
-        if hasattr(self, "board_id") and self.board_id and self.board_id != -1:
-            sync_info = database.get_board_sync_info(self.board_id, self.db_path)
-            if sync_info and sync_info.get("sync_path"):
-                self._run_async_sync(user_initiated=False)
+        """Exporta cambios locales en segundo plano delegando en el controlador."""
+        self.sync_controller.trigger_auto_sync_export()
 
     def _on_sync_btn_clicked(self):
         """Maneja el clic en el botón de sincronización de la cabecera."""
@@ -761,7 +777,7 @@ class BoardViewWidget(QFrame):
                     QMessageBox.No
                 )
                 if reply == QMessageBox.Yes:
-                    database.unlink_board_sync(self.board_id, self.db_path)
+                    self.sync_controller.unlink_current_board()
                     self.load_board(self.board_id)
                     parent_win = self.window()
                     if hasattr(parent_win, "sidebar"):
@@ -824,16 +840,11 @@ class BoardViewWidget(QFrame):
         """Sincroniza el tablero actual inmediatamente y notifica si hubo fusión."""
         if not self.board_id or self.board_id == -1:
             return
-        if blocking:
-            res = board_sync.sync_board_with_file(self.board_id, db_path=self.db_path)
-            self._on_sync_finished(res, user_initiated=True)
-        else:
-            self._run_async_sync(user_initiated=True)
+        self.sync_controller.sync_now(user_initiated=True, blocking=blocking)
 
     def closeEvent(self, event):
         """Espera a que termine cualquier hilo de sincronización activo antes de destruir el widget."""
-        if hasattr(self, "_sync_worker") and self._sync_worker and self._sync_worker.isRunning():
-            self._sync_worker.wait(2000)
+        self.sync_controller.wait_for_worker(2000)
         super().closeEvent(event)
 
     def _open_bulk_add_dialog(self):
@@ -918,8 +929,8 @@ class BoardViewWidget(QFrame):
         
         dialog = ColumnEditDialog(t("board_view.column_edit.new_title"), name="", color="#3b82f6", parent=self)
         if dialog.exec() == QDialog.Accepted:
-            name, color = dialog.get_data()
-            database.create_column(self.board_id, name, color, self.db_path)
+            name, color, wip_limit = dialog.get_data()
+            database.create_column(self.board_id, name, color, self.db_path, wip_limit=wip_limit)
             self.load_board(self.board_id)
 
     def edit_column(self, column_id):
@@ -932,12 +943,15 @@ class BoardViewWidget(QFrame):
             t("board_view.column_edit.edit_title"),
             name=col_widget.column_data["name"],
             color=col_widget.column_data["color"],
+            wip_limit=col_widget.column_data.get("wip_limit"),
             parent=self
         )
         if dialog.exec() == QDialog.Accepted:
-            name, color = dialog.get_data()
-            database.update_column(column_id, name, color, self.db_path)
-            self.load_board(self.board_id)
+            name, color, wip_limit = dialog.get_data()
+            database.update_column(column_id, name, color, self.db_path, wip_limit=wip_limit)
+            self._rebuild_single_column(column_id)
+            self.data_changed.emit()
+            self._trigger_auto_sync_export()
 
     def delete_column(self, column_id):
         """Confirma y borra una columna."""
@@ -971,11 +985,11 @@ class BoardViewWidget(QFrame):
         self.toggle_sidebar_requested.emit()
 
     def handle_column_collapse(self, column_id):
-        """Pliega o despliega una columna (persiste el estado) y recarga el tablero."""
+        """Pliega o despliega una columna (persiste el estado) y recarga solo esa columna."""
         col_widget = self.column_widgets.get(column_id)
         new_state = not (col_widget.collapsed if col_widget else False)
         database.set_column_collapsed(column_id, new_state, self.db_path)
-        self.load_board(self.board_id)
+        self._rebuild_single_column(column_id)
 
     def handle_collapsed_card_drop(self, task_id, column_id):
         """Soltar una tarjeta sobre una columna plegada: la despliega y coloca la tarjeta al final."""
@@ -1094,7 +1108,35 @@ class BoardViewWidget(QFrame):
         )
         if ok and title.strip():
             database.create_task(column_id, title.strip(), db_path=self.db_path)
-            self.load_board(self.board_id)
+            self._rebuild_single_column(column_id)
+            self._update_board_counts()
+            self.data_changed.emit()
+            self._trigger_auto_sync_export()
+
+    def create_quick_task(self, title):
+        """Crea una tarea con `title` en la última columna activa (o la primera) del
+        tablero activo, sin diálogo. Devuelve el id de la tarea creada, o None si no hay
+        tablero/columna o el título está vacío. Lo usa la paleta de comandos (captura
+        rápida) reutilizando la misma resolución de columna que quick_add_task."""
+        title = (title or "").strip()
+        if not title or not self.board_id or self.board_id == -1:
+            return None
+        columns = database.get_columns(self.board_id, self.db_path)
+        if not columns:
+            return None
+        column_ids = [c["id"] for c in columns]
+        target_id = (
+            self._last_active_column_id
+            if self._last_active_column_id in column_ids
+            else column_ids[0]
+        )
+        self._last_active_column_id = target_id
+        task_id = database.create_task(target_id, title, db_path=self.db_path)
+        self._rebuild_single_column(target_id)
+        self._update_board_counts()
+        self.data_changed.emit()
+        self._trigger_auto_sync_export()
+        return task_id
 
     def _handle_task_card_clicked(self, task_id, column_id):
         self._set_last_active_column(column_id)
@@ -1102,6 +1144,9 @@ class BoardViewWidget(QFrame):
 
     def open_task_details(self, task_id):
         """Abre el diálogo de detalle/chat de una tarea."""
+        task_before = database.get_task(task_id, self.db_path)
+        source_col_id = task_before["column_id"] if task_before else None
+
         dialog = TaskDetailDialog(task_id, self.db_path, self)
         dialog.exec()
 
@@ -1118,7 +1163,13 @@ class BoardViewWidget(QFrame):
         # enlaces o si se eliminó la tarea. Si solo se abrió para consultar, no
         # hace falta recargar nada.
         if getattr(dialog, "modified", False) or getattr(dialog, "task_deleted", False):
-            self.load_board(self.board_id)
+            if source_col_id and source_col_id in self.column_widgets:
+                self._rebuild_single_column(source_col_id)
+                self._update_board_counts()
+                self.data_changed.emit()
+                self._trigger_auto_sync_export()
+            else:
+                self.load_board(self.board_id)
 
     # --- DRAG & DROP DE TAREAS ---
 
@@ -1177,5 +1228,12 @@ class BoardViewWidget(QFrame):
         # 3. Guardar las nuevas posiciones en la base de datos
         database.update_task_positions(updates, self.db_path)
 
-        # 4. Recargar el tablero para actualizar la UI con la base de datos como fuente de verdad
-        self.load_board(self.board_id)
+        # 4. Actualización incremental: reconstruir únicamente las columnas afectadas
+        if source_column_id == target_column_id:
+            self._rebuild_single_column(source_column_id)
+        else:
+            self._rebuild_single_column(source_column_id)
+            self._rebuild_single_column(target_column_id)
+        self._update_board_counts()
+        self.data_changed.emit()
+        self._trigger_auto_sync_export()
