@@ -20,7 +20,7 @@ hidden_imports = [
 ] + collect_submodules("pygments")
 
 datas = [
-    ("assets/fonts", "assets/fonts"),
+    ("assets", "assets"),
     ("ekin_icon.png", "."),
     ("ekin_icon.ico", "."),
 ]
