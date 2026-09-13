@@ -356,8 +356,17 @@ def test_is_local_link_classifies_urls_vs_paths():
     assert _is_local_link("http://x.com") is False
     assert _is_local_link("mailto:a@b.com") is False
     assert _is_local_link("file://C:/x.txt") is False
+    assert _is_local_link("calc:") is False
+    assert _is_local_link("powershell:test") is False
+    assert _is_local_link("javascript:alert(1)") is False
+    assert _is_local_link("ms-msdt:") is False
     assert _is_local_link(r"C:\Users\foo\bar.pdf") is True
+    assert _is_local_link("C:/Users/foo/bar.pdf") is True
     assert _is_local_link("/home/user/file.txt") is True
+    assert _is_local_link(r"\\server\share\doc.pdf") is True
+    assert _is_local_link("relative/path/file.txt") is True
+    assert _is_local_link("") is False
+    assert _is_local_link(None) is False
 
 
 def test_browse_local_file_fills_url_and_autofills_empty_label(qapp, db_path):
@@ -571,6 +580,53 @@ def test_open_link_blocks_file_uri_executable_bypass(qapp, db_path, monkeypatch)
         assert len(warnings) == 1
         assert "malicious.cmd" in warnings[0][1]
         assert calls == []
+    finally:
+        _cleanup_dialog(qapp, dlg)
+
+
+def test_open_link_blocks_untrusted_uri_scheme_when_cancelled(qapp, db_path, monkeypatch):
+    task_id = _make_task(db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+    calls = []
+    monkeypatch.setattr(task_detail_dialog_module.QDesktopServices, "openUrl", lambda *a: calls.append(a))
+    warnings = []
+    monkeypatch.setattr(
+        task_detail_dialog_module.QMessageBox, "warning",
+        lambda parent, title, msg, btns=None, default=None: (
+            warnings.append((title, msg)),
+            task_detail_dialog_module.QMessageBox.StandardButton.Cancel
+        )[1]
+    )
+
+    try:
+        # powershell: scheme must be intercepted even if is_local was passed as True or False
+        dlg._open_link("powershell:Invoke-Item", True)
+        assert len(warnings) == 1
+        assert "powershell" in warnings[0][1].lower()
+        assert calls == []
+    finally:
+        _cleanup_dialog(qapp, dlg)
+
+
+def test_open_link_allows_untrusted_uri_scheme_when_confirmed(qapp, db_path, monkeypatch):
+    task_id = _make_task(db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+    calls = []
+    monkeypatch.setattr(task_detail_dialog_module.QDesktopServices, "openUrl", lambda *a: calls.append(a) or True)
+    warnings = []
+    monkeypatch.setattr(
+        task_detail_dialog_module.QMessageBox, "warning",
+        lambda parent, title, msg, btns=None, default=None: (
+            warnings.append((title, msg)),
+            task_detail_dialog_module.QMessageBox.StandardButton.Open
+        )[1]
+    )
+
+    try:
+        dlg._open_link("calc:", False)
+        assert len(warnings) == 1
+        assert "calc" in warnings[0][1].lower()
+        assert len(calls) == 1
     finally:
         _cleanup_dialog(qapp, dlg)
 
@@ -1791,3 +1847,52 @@ def test_secondary_dialogs_schedule_delete_later_on_finished(qapp, db_path):
     dlg_sync.reject()
     qapp.sendPostedEvents(None, QEvent.DeferredDelete)
     assert dlg_sync not in parent.children()
+
+
+def test_column_edit_dialog_validation_and_data(qapp):
+    from board_dialogs import ColumnEditDialog
+    from PySide6.QtWidgets import QMessageBox
+
+    dlg = ColumnEditDialog(title="Nueva Columna", name="", color="#3b82f6", wip_limit=5)
+    # Nombre vacío no debe aceptar
+    dlg.name_input.setText("   ")
+    warned = []
+    orig_warn = QMessageBox.warning
+    try:
+        QMessageBox.warning = lambda *a, **k: warned.append(a)
+        dlg.validate_and_accept()
+        assert len(warned) == 1
+        assert dlg.result() != ColumnEditDialog.Accepted
+
+        # Con nombre válido
+        dlg.name_input.setText("En Revisión")
+        dlg.validate_and_accept()
+        assert dlg.result() == ColumnEditDialog.Accepted
+        name, color, wip = dlg.get_data()
+        assert name == "En Revisión"
+        assert color == "#3b82f6"
+        assert wip == 5
+    finally:
+        QMessageBox.warning = orig_warn
+        dlg.close()
+
+
+def test_board_selection_dialog_empty_and_selection(qapp, db_path):
+    from board_dialogs import BoardSelectionDialog
+    import database
+
+    # Caso 1: Sin otros tableros disponibles
+    b1 = database.create_board("Tablero 1", db_path=db_path)
+    dlg_empty = BoardSelectionDialog("Mover", "Mover Columna", exclude_board_id=b1, db_path=db_path)
+    assert not dlg_empty.ok_btn.isEnabled()
+    dlg_empty.close()
+
+    # Caso 2: Con tableros disponibles
+    b2 = database.create_board("Tablero 2", db_path=db_path)
+    dlg = BoardSelectionDialog("Mover", "Mover Columna", exclude_board_id=b1, db_path=db_path)
+    assert dlg.ok_btn.isEnabled()
+    assert len(dlg.available_boards) == 1
+    assert dlg.available_boards[0]["id"] == b2
+    dlg.accept_selection()
+    assert dlg.selected_board_id == b2
+    dlg.close()

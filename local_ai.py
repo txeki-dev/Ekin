@@ -16,6 +16,7 @@ import re
 import sys
 import json
 import time
+import socket
 import urllib.request
 import urllib.error
 import atexit
@@ -763,6 +764,7 @@ def stream_openai_chat_completion(
     user_prompt: str,
     model_name: str = "qwen2.5-coder",
     timeout: float = 60.0,
+    read_timeout: Optional[float] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
     on_response: Optional[Callable[[object], None]] = None,
 ) -> Generator[str, None, None]:
@@ -788,25 +790,39 @@ def stream_openai_chat_completion(
     with urllib.request.urlopen(req, timeout=timeout) as response:
         if on_response is not None:
             on_response(response)
-        for line in response:
-            if cancel_check is not None and cancel_check():
-                break
-            line_str = line.decode("utf-8", errors="replace").strip()
-            if not line_str.startswith("data:"):
-                continue
-            data_str = line_str[5:].strip()
-            if data_str == "[DONE]":
-                break
+
+        # Si se especifica un timeout de lectura por token distinto, aplicarlo al socket
+        if read_timeout is not None:
             try:
-                data = json.loads(data_str)
-                choices = data.get("choices", [])
-                if choices:
-                    delta = choices[0].get("delta", {})
-                    content = delta.get("content", "")
-                    if content:
-                        yield content
+                sock = getattr(getattr(response, "fp", None), "raw", None)
+                if sock and hasattr(sock, "_sock"):
+                    sock._sock.settimeout(read_timeout)
             except Exception:
-                continue
+                pass
+
+        try:
+            for line in response:
+                if cancel_check is not None and cancel_check():
+                    break
+                line_str = line.decode("utf-8", errors="replace").strip()
+                if not line_str.startswith("data:"):
+                    continue
+                data_str = line_str[5:].strip()
+                if data_str == "[DONE]":
+                    break
+                try:
+                    data = json.loads(data_str)
+                    choices = data.get("choices", [])
+                    if choices:
+                        delta = choices[0].get("delta", {})
+                        content = delta.get("content", "")
+                        if content:
+                            yield content
+                except Exception:
+                    continue
+        except (socket.timeout, TimeoutError) as exc:
+            effective_timeout = read_timeout if read_timeout is not None else timeout
+            raise TimeoutError(f"Streaming token delivery stalled after {effective_timeout}s: {exc}") from exc
 
 
 def download_and_extract_runner(
@@ -887,31 +903,6 @@ def download_and_extract_runner(
             except Exception:
                 pass
         return False, f"Error durante la descarga del runner: {e}"
-
-
-class RunnerDownloadThread(QThread):
-    """Hilo para descargar y extraer en segundo plano el ejecutable portable de llama-server."""
-    progress = Signal(int, float, str)  # porcentaje, velocidad_mb_s, tiempo_restante_str
-    download_finished = Signal(bool, str)  # exito, mensaje
-
-    def __init__(self, runner_url: Optional[str] = None, runner_dir: Optional[str] = None, parent=None):
-        super().__init__(parent)
-        self.runner_url = runner_url
-        self.runner_dir = runner_dir
-        self._is_cancelled = False
-
-    def cancel(self):
-        self._is_cancelled = True
-
-    def run(self):
-        ensure_directories()
-        success, msg = download_and_extract_runner(
-            runner_url=self.runner_url,
-            runner_dir=self.runner_dir,
-            cancel_check=lambda: self._is_cancelled,
-            progress_callback=lambda p, s, eta: self.progress.emit(p, s, eta),
-        )
-        self.download_finished.emit(success, msg)
 
 
 class SpecGenerationThread(QThread):

@@ -83,7 +83,11 @@ def test_refresh_timer_badges_noop_on_welcome_screen(qapp, db_path):
     board_view = BoardViewWidget(db_path=db_path)
     board_view.load_board(-1)
 
+    assert board_view.board_id == -1
+    assert board_view.column_widgets == {}
+
     board_view.refresh_timer_badges()  # column_widgets está vacío: no debe reventar
+    assert board_view.column_widgets == {}
 
 
 def test_load_board_reads_timer_alert_hours_once_regardless_of_column_count(qapp, db_path, monkeypatch):

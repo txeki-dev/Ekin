@@ -1,7 +1,5 @@
-"""Pruebas de las copias de seguridad automáticas de la base de datos."""
 import os
 import sqlite3
-import time
 
 import backups
 import database
@@ -32,10 +30,18 @@ def test_backup_rotation_keeps_only_n(db_path, tmp_path):
     keep = 2
     for _ in range(5):
         backups.backup_database(db_path, keep=keep, backup_dir=backup_dir)
-        time.sleep(0.02)  # marcas de tiempo distintas (evita colisión de nombre)
 
     remaining = [f for f in os.listdir(backup_dir) if f.endswith(".bak")]
     assert len(remaining) == keep
+
+
+def test_backup_rapid_calls_never_collide(db_path, tmp_path):
+    backup_dir = str(tmp_path / "backups")
+    paths = [backups.backup_database(db_path, keep=10, backup_dir=backup_dir) for _ in range(5)]
+    assert len(paths) == 5
+    assert len(set(paths)) == 5
+    for p in paths:
+        assert os.path.exists(p)
 
 
 def test_backup_returns_none_when_source_missing(tmp_path):
@@ -47,7 +53,6 @@ def test_backup_rotation_zero_or_negative_keep_does_not_prune(db_path, tmp_path)
     backup_dir = str(tmp_path / "backups")
     for _ in range(3):
         backups.backup_database(db_path, keep=0, backup_dir=backup_dir)
-        time.sleep(0.02)
     remaining = [f for f in os.listdir(backup_dir) if f.endswith(".bak")]
     assert len(remaining) == 3
 

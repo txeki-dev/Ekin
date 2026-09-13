@@ -1276,3 +1276,45 @@ def test_bulk_queries_chunking_handles_large_task_lists(db_path):
     tags_small = database.get_task_tags_bulk([t1, t2, 99999], db_path=db_path, chunk_size=1)
     assert len(tags_small[t1]) == 1
 
+
+def test_tag_category_and_value_crud_lifecycle(db_path):
+    # 1. create_tag_category y deduplicación case-insensitive
+    cat_id1 = database.create_tag_category("Prioridad", db_path=db_path)
+    cat_id2 = database.create_tag_category("  prioridad  ", db_path=db_path)
+    assert cat_id1 == cat_id2
+
+    categories = database.get_tag_categories(db_path=db_path)
+    assert any(c["id"] == cat_id1 and c["name"] == "Prioridad" for c in categories)
+
+    # 2. rename_tag_category
+    database.rename_tag_category(cat_id1, "Urgencia", db_path=db_path)
+    categories = database.get_tag_categories(db_path=db_path)
+    assert any(c["id"] == cat_id1 and c["name"] == "Urgencia" for c in categories)
+
+    # 3. create_tag_value y value_exists_in_category
+    val_id1 = database.create_tag_value(cat_id1, "Alta", "#ef4444", db_path=db_path)
+    assert database.value_exists_in_category(cat_id1, "alta", db_path=db_path) is True
+    assert database.value_exists_in_category(cat_id1, "Baja", db_path=db_path) is False
+    assert database.value_exists_in_category(cat_id1, "alta", exclude_value_id=val_id1, db_path=db_path) is False
+
+    # 4. update_tag_value
+    database.update_tag_value(val_id1, "Critica", "#991b1b", db_path=db_path)
+    tag_val = database.get_tag_value(val_id1, db_path=db_path)
+    assert tag_val is not None
+    assert tag_val["value"] == "Critica"
+    assert tag_val["color"] == "#991b1b"
+    assert tag_val["category"] == "Urgencia"
+
+    # 5. Asignar a tarea y verificar borrado en cascada
+    b = database.create_board("B", db_path=db_path)
+    c = database.create_column(b, "C", db_path=db_path)
+    t = database.create_task(c, "T", db_path=db_path)
+    database.set_task_tags(t, [val_id1], db_path=db_path)
+    assert len(database.get_task_tags(t, db_path=db_path)) == 1
+
+    # 6. delete_tag_category cascada a valores y asignaciones
+    database.delete_tag_category(cat_id1, db_path=db_path)
+    assert database.get_tag_value(val_id1, db_path=db_path) is None
+    assert database.get_tag_values(cat_id1, db_path=db_path) == []
+    assert database.get_task_tags(t, db_path=db_path) == []
+

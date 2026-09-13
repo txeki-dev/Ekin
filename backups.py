@@ -33,6 +33,14 @@ def backup_database(db_path, keep=5, backup_dir=None):
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     dest = os.path.join(backup_dir, f"{base}.{timestamp}.bak")
+    if os.path.exists(dest):
+        counter = 1
+        while True:
+            candidate = os.path.join(backup_dir, f"{base}.{timestamp}_{counter:04d}.bak")
+            if not os.path.exists(candidate):
+                dest = candidate
+                break
+            counter += 1
 
     # Copia consistente con la API de backup de SQLite (soporta BD abierta/en uso).
     src = sqlite3.connect(db_path)

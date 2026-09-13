@@ -1,6 +1,7 @@
 """Utilidades de seguridad para la validación y apertura segura de hipervínculos
 y rutas locales en Ekin (prevención de ejecución de código arbitrario y fugas UNC)."""
 import os
+import re
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import QMessageBox
 from PySide6.QtGui import QDesktopServices
@@ -9,6 +10,9 @@ from strings import t
 _WEB_LINK_SCHEMES = ("http://", "https://", "ftp://", "mailto:", "file://")
 
 _SAFE_WEB_SCHEMES = ("http", "https", "mailto", "ftp")
+
+_SCHEME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*:")
+_DRIVE_RE = re.compile(r"^[a-zA-Z]:[\\/]")
 
 _DANGEROUS_EXTENSIONS = {
     # Binarios y ejecutables de Windows
@@ -26,8 +30,20 @@ _DANGEROUS_EXTENSIONS = {
 
 
 def _is_local_link(url: str) -> bool:
-    """True a menos que la cadena empiece por un esquema web reconocido (case-insensitive)."""
-    return not url.lower().startswith(_WEB_LINK_SCHEMES)
+    """True si la cadena representa una ruta de archivo local o de red (UNC / relativa / absoluta),
+    y False si contiene un esquema de protocolo URI (p. ej. http, https, file, mailto, calc, powershell)."""
+    if not url:
+        return False
+    clean = url.strip()
+    if not clean:
+        return False
+    if _DRIVE_RE.match(clean):
+        return True
+    if clean.startswith(("/", "\\\\", "//")):
+        return True
+    if _SCHEME_RE.match(clean):
+        return False
+    return True
 
 
 def _is_unc_path(url: str) -> bool:
@@ -64,7 +80,7 @@ def confirm_open_untrusted_link(parent, url: str, is_local: bool = None) -> bool
     """Verifica si el enlace apunta a un recurso compartido UNC, script/ejecutable potencialmente
     peligroso o esquema de URL inseguro, solicitando confirmación explícita al usuario."""
     clean = url.strip()
-    if is_local is None:
+    if is_local is None or (is_local and _SCHEME_RE.match(clean) and not _DRIVE_RE.match(clean) and not clean.lower().startswith("file:")):
         is_local = _is_local_link(clean)
 
     is_unc = _is_unc_path(clean)
@@ -111,8 +127,9 @@ def open_link_safely(parent, url: str, is_local: bool = None) -> bool:
     Muestra un diálogo de confirmación si el destino puede ejecutar código arbitrario o exponer UNC."""
     if not url:
         return False
-    if is_local is None:
-        is_local = _is_local_link(url)
+    clean = url.strip()
+    if is_local is None or (is_local and _SCHEME_RE.match(clean) and not _DRIVE_RE.match(clean) and not clean.lower().startswith("file:")):
+        is_local = _is_local_link(clean)
 
     if not confirm_open_untrusted_link(parent, url, is_local):
         return False

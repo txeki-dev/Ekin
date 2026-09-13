@@ -302,25 +302,22 @@ def test_download_and_extract_runner_blocks_zip_slip(tmp_path, monkeypatch):
 
 
 
-def test_runner_download_thread(tmp_path, monkeypatch, qapp):
-    """Verifica que RunnerDownloadThread emite las señales de progreso y finalización."""
-    import zipfile
-    import io
+def test_stream_openai_chat_completion_success(monkeypatch):
+    lines = [
+        b'data: {"choices": [{"delta": {"content": "SPEC: "}}]}\n',
+        b'data: {"choices": [{"delta": {"content": "Auth Flow"}}]}\n',
+        b'data: [DONE]\n',
+    ]
 
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w") as zf:
-        zf.writestr(local_ai.RUNNER_EXE_NAME, b"mock-runner")
-    zip_bytes = zip_buffer.getvalue()
-
-    class FakeZipResponse:
-        status = 200
-        headers = {"Content-Length": str(len(zip_bytes))}
-
+    class MockStreamResponse:
         def __init__(self):
-            self.stream = io.BytesIO(zip_bytes)
+            self.lines = iter(lines)
 
-        def read(self, chunk_size):
-            return self.stream.read(chunk_size)
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            return next(self.lines)
 
         def __enter__(self):
             return self
@@ -328,22 +325,66 @@ def test_runner_download_thread(tmp_path, monkeypatch, qapp):
         def __exit__(self, *args):
             pass
 
-    monkeypatch.setattr(local_ai.urllib.request, "urlopen", lambda req, timeout=30.0: FakeZipResponse())
+    monkeypatch.setattr(local_ai.urllib.request, "urlopen", lambda req, timeout=60.0: MockStreamResponse())
 
-    runner_dir = str(tmp_path / "bin_thread")
-    thread = local_ai.RunnerDownloadThread(runner_dir=runner_dir)
+    tokens = list(local_ai.stream_openai_chat_completion("http://127.0.0.1:8080", "system", "user"))
+    assert tokens == ["SPEC: ", "Auth Flow"]
 
-    progress_events = []
-    finished_events = []
 
-    thread.progress.connect(lambda p, s, eta: progress_events.append(p))
-    thread.download_finished.connect(lambda ok, m: finished_events.append((ok, m)))
+def test_stream_openai_chat_completion_timeout_raises(monkeypatch):
+    import socket
+    import pytest
 
-    thread.run()
+    class TimeoutStreamResponse:
+        def __iter__(self):
+            return self
 
-    assert len(finished_events) == 1
-    assert finished_events[0][0] is True
-    assert (tmp_path / "bin_thread" / local_ai.RUNNER_EXE_NAME).exists()
+        def __next__(self):
+            raise socket.timeout("Read timed out")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr(local_ai.urllib.request, "urlopen", lambda req, timeout=60.0: TimeoutStreamResponse())
+
+    with pytest.raises(TimeoutError, match="stalled"):
+        list(local_ai.stream_openai_chat_completion("http://127.0.0.1:8080", "system", "user", read_timeout=5.0))
+
+
+def test_stream_openai_chat_completion_cancelled(monkeypatch):
+    lines = [
+        b'data: {"choices": [{"delta": {"content": "Token1"}}]}\n',
+        b'data: {"choices": [{"delta": {"content": "Token2"}}]}\n',
+    ]
+
+    class MockStreamResponse:
+        def __init__(self):
+            self.lines = iter(lines)
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            return next(self.lines)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr(local_ai.urllib.request, "urlopen", lambda req, timeout=60.0: MockStreamResponse())
+
+    tokens = []
+    for token in local_ai.stream_openai_chat_completion(
+        "http://127.0.0.1:8080", "system", "user", cancel_check=lambda: len(tokens) >= 1
+    ):
+        tokens.append(token)
+
+    assert tokens == ["Token1"]
 
 
 
