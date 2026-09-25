@@ -81,6 +81,8 @@ class TagPickerDialog(QDialog):
             self.category_combo.blockSignals(True)
             self.category_combo.clear()
             for cat in database.get_tag_categories(self.db_path):
+                if cat["name"].strip().lower() in ("priority", "prioridad"):
+                    continue
                 self.category_combo.addItem(cat["name"], cat["id"])
             self.category_combo.blockSignals(False)
         self.reload_values()

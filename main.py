@@ -118,8 +118,10 @@ class ReleaseCheckThread(QThread):
 
             if download_url:
                 self.update_available.emit(remote_ver, download_url, data.get("body", "") or "")
-        except Exception:
-            pass
+        except Exception as exc:
+            import logging
+            logging.getLogger("ekin.release_check").warning("Release check encountered error: %s", exc)
+
 
 
 class InstallerDownloadThread(QThread):
@@ -421,10 +423,21 @@ class MainWindow(QMainWindow):
             ("open_logs", t("palette.cmd_open_logs")),
         ]
         dlg = CommandPalette(database.DB_NAME, commands, self)
-        dlg.command_invoked.connect(self._run_command)
-        dlg.task_activated.connect(self.on_notification_task)
-        dlg.quick_capture_requested.connect(self._quick_capture)
+        chosen_action = [None]
+        dlg.command_invoked.connect(lambda cid: chosen_action.__setitem__(0, ("cmd", cid)))
+        dlg.task_activated.connect(lambda tid, bid: chosen_action.__setitem__(0, ("task", (tid, bid))))
+        dlg.quick_capture_requested.connect(lambda title: chosen_action.__setitem__(0, ("capture", title)))
         dlg.exec()
+
+        action = chosen_action[0]
+        if action:
+            act_type, val = action
+            if act_type == "cmd":
+                self._run_command(val)
+            elif act_type == "task":
+                self.on_notification_task(*val)
+            elif act_type == "capture":
+                self._quick_capture(val)
 
     def _run_command(self, command_id):
         dispatch = {

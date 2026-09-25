@@ -581,3 +581,60 @@ def test_sync_board_with_file_catches_unresolved_lock(sync_test_db, monkeypatch)
     res = board_sync.sync_board_with_file(board_id, sync_file, db_path)
     assert res.status == "error"
     assert "bloqueado por otro proceso" in res.message
+
+
+def test_get_synced_boards_lifecycle(sync_test_db):
+    """Verifica que get_synced_boards refleja adecuadamente la vinculación y desvinculación."""
+    db_path = sync_test_db["db_path"]
+    board_id = sync_test_db["board_id"]
+
+    # Inicialmente ningún tablero tiene ruta de sincronización
+    assert database.get_synced_boards(db_path=db_path) == []
+
+    # Configurar ruta de sincronización
+    fake_sync_path = "C:/tmp/test_sync.ekboard"
+    database.set_board_sync_path(board_id, fake_sync_path, db_path=db_path)
+
+    synced = database.get_synced_boards(db_path=db_path)
+    assert len(synced) == 1
+    assert synced[0]["id"] == board_id
+    assert synced[0]["sync_path"] == fake_sync_path
+    assert synced[0]["board_uuid"] is not None
+
+    # Desvincular
+    database.unlink_board_sync(board_id, db_path=db_path)
+    assert database.get_synced_boards(db_path=db_path) == []
+
+
+def test_get_board_by_uuid(sync_test_db):
+    """Verifica que get_board_by_uuid recupera el tablero por su UUID y maneja casos bordes."""
+    db_path = sync_test_db["db_path"]
+    board_id = sync_test_db["board_id"]
+
+    assert database.get_board_by_uuid(None, db_path=db_path) is None
+    assert database.get_board_by_uuid("", db_path=db_path) is None
+    assert database.get_board_by_uuid("non-existent-uuid", db_path=db_path) is None
+
+    board_info = database.get_board(board_id, db_path=db_path)
+    board_uuid = board_info["board_uuid"]
+    assert board_uuid is not None
+
+    found = database.get_board_by_uuid(board_uuid, db_path=db_path)
+    assert found is not None
+    assert found["id"] == board_id
+    assert found["name"] == "Tablero Sincronizado"
+
+
+def test_get_board_last_local_modified(sync_test_db):
+    """Verifica que get_board_last_local_modified devuelve el MAX(updated_at) o None si no hay tareas."""
+    db_path = sync_test_db["db_path"]
+    board_id = sync_test_db["board_id"]
+
+    last_mod = database.get_board_last_local_modified(board_id, db_path=db_path)
+    assert last_mod is not None
+
+    # Crear tablero vacío sin tareas
+    empty_board_id = database.create_board("Tablero Vacío", db_path=db_path)
+    database.create_column(empty_board_id, "Columna", db_path=db_path)
+    assert database.get_board_last_local_modified(empty_board_id, db_path=db_path) is None
+

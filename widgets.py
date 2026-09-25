@@ -462,8 +462,10 @@ class TaskCard(QFrame):
         
         drag.setMimeData(mime_data)
 
-        # Generamos una vista preliminar (pixmap) de la tarjeta para mostrarla mientras se arrastra
-        pixmap = QPixmap(self.size())
+        # Generamos una vista preliminar (pixmap) de la tarjeta a escala real para mostrarla nítida y completa
+        dpr = self.devicePixelRatio()
+        pixmap = QPixmap(self.size() * dpr)
+        pixmap.setDevicePixelRatio(dpr)
         pixmap.fill(Qt.transparent)
         
         # Renderizar directamente sobre el pixmap (es un QPaintDevice)
@@ -512,6 +514,7 @@ class TaskListArea(QWidget):
         super().__init__(parent)
         self.column_id = column_id
         self.setAcceptDrops(True)
+        self._drop_indicator = None
 
         # Nota: no llamar a este atributo `layout`; ensombrecería QWidget.layout().
         self.list_layout = QVBoxLayout(self)
@@ -519,20 +522,68 @@ class TaskListArea(QWidget):
         self.list_layout.setSpacing(8)
         self.list_layout.setAlignment(Qt.AlignTop)
 
+    def _ensure_drop_indicator(self):
+        if self._drop_indicator is None:
+            self._drop_indicator = QFrame()
+            self._drop_indicator.setObjectName("DropIndicator")
+            self._drop_indicator.setMinimumHeight(64)
+            self._drop_indicator.setMaximumHeight(80)
+            self._drop_indicator.setStyleSheet(f"""
+                #DropIndicator {{
+                    background-color: {styles.COLORS['accent_tint']};
+                    border: 2px dashed {styles.COLORS['accent']};
+                    border-radius: 16px;
+                }}
+            """)
+        return self._drop_indicator
+
+    def _remove_drop_indicator(self):
+        if self._drop_indicator is not None and self._drop_indicator.parent() is not None:
+            self.list_layout.removeWidget(self._drop_indicator)
+            self._drop_indicator.setParent(None)
+            self._drop_indicator.hide()
+
+    def _get_dragged_task_id(self, event):
+        try:
+            return int(event.mimeData().data("application/x-ekin-task-id").data().decode("utf-8"))
+        except Exception:
+            return -1
+
+    def _update_drop_indicator(self, event):
+        task_id = self._get_dragged_task_id(event)
+        drop_y = event.position().y()
+        cards_geom = []
+        for i in range(self.list_layout.count()):
+            w = self.list_layout.itemAt(i).widget()
+            if isinstance(w, TaskCard) and w is not self._drop_indicator and w.isVisible():
+                cards_geom.append((w.task_id, w.y(), w.height()))
+
+        target_idx = compute_drop_index(cards_geom, drop_y, task_id)
+        indicator = self._ensure_drop_indicator()
+        current_idx = self.list_layout.indexOf(indicator)
+        if current_idx != target_idx:
+            if current_idx >= 0:
+                self.list_layout.removeWidget(indicator)
+            self.list_layout.insertWidget(target_idx, indicator)
+            indicator.show()
+
     def dragEnterEvent(self, event):
         if event.mimeData().hasFormat("application/x-ekin-task-id"):
             event.acceptProposedAction()
             self.drag_entered.emit()
+            self._update_drop_indicator(event)
         else:
             event.ignore()
 
     def dragMoveEvent(self, event):
         if event.mimeData().hasFormat("application/x-ekin-task-id"):
             event.acceptProposedAction()
+            self._update_drop_indicator(event)
         else:
             event.ignore()
 
     def dragLeaveEvent(self, event):
+        self._remove_drop_indicator()
         self.drag_left.emit()
         super().dragLeaveEvent(event)
 
@@ -541,19 +592,17 @@ class TaskListArea(QWidget):
         if mime.hasFormat("application/x-ekin-task-id"):
             task_id = int(mime.data("application/x-ekin-task-id").data().decode("utf-8"))
             event.acceptProposedAction()
-            self.drag_left.emit()
 
-            # Calcular la posición de inserción en base al eje Y. La lógica (excluyendo la
-            # tarjeta arrastrada, que está oculta) vive en compute_drop_index para poder
-            # probarla de forma determinista.
             drop_y = event.position().y()
             cards_geom = []
             for i in range(self.list_layout.count()):
                 w = self.list_layout.itemAt(i).widget()
-                if isinstance(w, TaskCard):
+                if isinstance(w, TaskCard) and w is not self._drop_indicator:
                     cards_geom.append((w.task_id, w.y(), w.height()))
 
             target_pos = compute_drop_index(cards_geom, drop_y, task_id)
+            self._remove_drop_indicator()
+            self.drag_left.emit()
             self.task_dropped.emit(task_id, self.column_id, target_pos)
         else:
             event.ignore()

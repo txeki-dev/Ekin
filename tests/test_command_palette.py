@@ -63,3 +63,14 @@ def test_palette_task_search_click_emits_task_activated(qapp, db_path):
     palette.task_activated.connect(lambda tid, bid: captured.append((tid, bid)))
     task_rows[0].click()
     assert captured == [(task_id, board_id)]
+
+
+def test_palette_no_premature_cpp_deletion(qapp, db_path):
+    """Verifica que CommandPalette no tenga WA_DeleteOnClose activo y no sufra RuntimeError al cerrarse."""
+    from PySide6.QtCore import Qt, QEvent
+    palette = CommandPalette(db_path, COMMANDS)
+    assert not palette.testAttribute(Qt.WA_DeleteOnClose)
+    palette.accept()
+    # Procesar eventos diferidos no debe destruir el objeto en memoria mientras Python mantenga su referencia
+    qapp.sendPostedEvents(None, QEvent.DeferredDelete)
+    assert palette.isVisible() is False

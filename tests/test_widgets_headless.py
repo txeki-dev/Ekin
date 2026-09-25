@@ -344,8 +344,12 @@ def test_task_detail_dialog_without_parent_still_works_as_before(qapp, db_path):
     task_id = _make_task(db_path)
     dlg = TaskDetailDialog(task_id, db_path)
     dlg.reject()
+    assert dlg.result() == 0
     qapp.sendPostedEvents(dlg, QEvent.Type.DeferredDelete)
-    # No debe lanzar ni comportarse de forma distinta a como ya lo hacía sin el fix.
+    with pytest.raises(RuntimeError):
+        dlg.windowTitle()
+
+
 
 
 # --- TaskDetailDialog: adjuntar archivos locales a los enlaces (post-v0.9.0) ---
@@ -950,11 +954,14 @@ def test_markdown_text_edit_open_code_dialog_bool_safe(qapp, monkeypatch):
     """open_code_dialog() no falla si se le pasa un booleano desde la señal clicked de un botón."""
     editor = markdown_edit_module.MarkdownTextEdit()
     # Simular que QDialog.exec devuelve Rejected para no bloquear el test
-    monkeypatch.setattr(markdown_edit_module.CodeBlockDialog, "exec", lambda self: 0)
+    exec_called = []
+    monkeypatch.setattr(markdown_edit_module.CodeBlockDialog, "exec", lambda self: exec_called.append(True) or 0)
     # No debe levantar TypeError: PySide6.QtWidgets.QPlainTextEdit.setPlainText(bool)
     editor.open_code_dialog(False)
     editor.open_code_dialog(True)
     editor.open_code_dialog(None)
+    assert len(exec_called) == 3
+
 
 
 def test_markdown_text_edit_text_color_formatting(qapp):
@@ -1896,3 +1903,43 @@ def test_board_selection_dialog_empty_and_selection(qapp, db_path):
     dlg.accept_selection()
     assert dlg.selected_board_id == b2
     dlg.close()
+
+
+def test_task_list_area_drop_indicator(qapp):
+    from widgets import TaskListArea, TaskCard
+    from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDropEvent
+    from PySide6.QtCore import QMimeData, QPointF, Qt
+
+    area = TaskListArea(column_id=10)
+    task1 = {"id": 101, "title": "Card 1", "column_id": 10, "due_date": None, "timer_started_at": None, "subtasks": []}
+    task2 = {"id": 102, "title": "Card 2", "column_id": 10, "due_date": None, "timer_started_at": None, "subtasks": []}
+    card1 = TaskCard(task1, parent=area)
+    card2 = TaskCard(task2, parent=area)
+    area.list_layout.addWidget(card1)
+    area.list_layout.addWidget(card2)
+
+    mime = QMimeData()
+    mime.setData("application/x-ekin-task-id", b"999")
+
+    # Simular dragEnter
+    enter_ev = QDragEnterEvent(QPointF(10, 5).toPoint(), Qt.MoveAction, mime, Qt.LeftButton, Qt.NoModifier)
+    area.dragEnterEvent(enter_ev)
+    assert area._drop_indicator is not None
+    assert not area._drop_indicator.isHidden()
+    assert area.list_layout.indexOf(area._drop_indicator) == 0
+
+    # Simular dragLeave
+    leave_ev = QDragLeaveEvent()
+    area.dragLeaveEvent(leave_ev)
+    assert area._drop_indicator.parent() is None
+
+    # Simular drop
+    dropped = []
+    area.task_dropped.connect(lambda tid, cid, pos: dropped.append((tid, cid, pos)))
+    drop_ev = QDropEvent(QPointF(10, 150).toPoint(), Qt.MoveAction, mime, Qt.LeftButton, Qt.NoModifier)
+    area.dropEvent(drop_ev)
+    assert len(dropped) == 1
+    assert dropped[0][0] == 999
+    assert dropped[0][1] == 10
+    assert area._drop_indicator.parent() is None
+

@@ -37,8 +37,6 @@ class CommandPalette(QDialog):
 
     def __init__(self, db_path, commands, parent=None):
         super().__init__(parent)
-        self.setAttribute(Qt.WA_DeleteOnClose)
-        self.finished.connect(self.deleteLater)
         self.db_path = db_path
         self.commands = list(commands)  # [(command_id, label), ...]
         self._rows = []                 # [(button, activate_callable), ...]
@@ -187,13 +185,13 @@ class CommandPalette(QDialog):
         self._rows.append((btn, activate))
 
     def _emit_command(self, command_id):
-        self.command_invoked.emit(command_id)
         self.accept()
+        self.command_invoked.emit(command_id)
 
     def _emit_task(self, task_id, board_id):
-        self.task_activated.emit(task_id, board_id)
         self.accept()
+        self.task_activated.emit(task_id, board_id)
 
     def _emit_quick_capture(self, title):
-        self.quick_capture_requested.emit(title)
         self.accept()
+        self.quick_capture_requested.emit(title)

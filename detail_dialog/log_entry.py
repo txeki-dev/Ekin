@@ -83,8 +83,9 @@ class LogEntryWidget(QFrame):
             max_w = parent._chat_image_width()
         content = linkify_urls(log_data["content"])
         content = fit_html_images(content, max_w)
+        wrapped_content = f'<div style="line-height: 135%;">{content}</div>'
 
-        self.content_label = QLabel(content)
+        self.content_label = QLabel(wrapped_content)
         self.content_label.setObjectName("LogContent")
         self.content_label.setWordWrap(True)
         self.content_label.setMinimumWidth(0)
@@ -115,7 +116,8 @@ class LogEntryWidget(QFrame):
                 max_w = 280
         content = linkify_urls(self.log_data["content"])
         content = fit_html_images(content, max_w)
-        self.content_label.setText(content)
+        wrapped_content = f'<div style="line-height: 135%;">{content}</div>'
+        self.content_label.setText(wrapped_content)
 
     def _enter_edit_mode(self):
         """Sustituye el contenido por un editor en línea con Guardar/Cancelar y soporte de atajos."""

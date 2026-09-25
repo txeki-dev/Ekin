@@ -8,7 +8,7 @@ from .links import get_task_links, get_task_links_bulk
 __all__ = [
     "create_task", "create_tasks_batch", "get_tasks", "get_task", "update_task", "save_task_full",
     "update_task_due_date", "set_task_due_time", "next_occurrence", "set_task_recurrence",
-    "advance_recurrence", "advance_overdue_recurring", "update_task_position", "update_task_positions",
+    "advance_recurrence", "advance_overdue_recurring", "update_task_positions",
     "delete_task", "set_task_linked_board", "set_task_timer_started",
 ]  # get_task_board_id vive en scheduling.py (junto a get_scheduled_tasks)
 
@@ -278,13 +278,6 @@ def advance_overdue_recurring(today_iso, db_path=None):
                 conn.execute("UPDATE tasks SET due_date = ? WHERE id = ?", (nxt, row["id"]))
                 advanced += 1
     return advanced
-
-def update_task_position(task_id, new_column_id, new_position, db_path=None):
-    with get_connection(db_path) as conn:
-        conn.execute(
-            "UPDATE tasks SET column_id = ?, position = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (new_column_id, new_position, task_id)
-        )
 
 def update_task_positions(task_positions, db_path=None):
     """Actualiza de golpe la columna y posición de varias tareas (para reordenación drag-and-drop).

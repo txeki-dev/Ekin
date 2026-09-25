@@ -332,3 +332,25 @@ def test_task_detail_meta_card_4_rows(qapp, db_path):
 
     dlg.reject()
 
+
+def test_description_and_journal_line_height(qapp, db_path):
+    """Verifica que el editor de descripción/diario y los widgets de log apliquen interlineado 135%."""
+    from detail_dialog.markdown_edit import MarkdownTextEdit
+    from detail_dialog.log_entry import LogEntryWidget
+
+    edit = MarkdownTextEdit()
+    edit.setPlainText("Línea 1\nLínea 2")
+    block1 = edit.document().findBlockByNumber(0)
+    block2 = edit.document().findBlockByNumber(1)
+    assert block1.blockFormat().lineHeight() == 135.0
+    assert block2.blockFormat().lineHeight() == 135.0
+
+    edit.setHtml("<p>Párrafo 1</p><p>Párrafo 2</p>")
+    assert edit.document().findBlockByNumber(0).blockFormat().lineHeight() == 135.0
+    assert edit.document().findBlockByNumber(1).blockFormat().lineHeight() == 135.0
+
+    # LogEntryWidget debe envolver el contenido en un contenedor con interlineado
+    log_data = {"id": 1, "task_id": 1, "content": "Detalle de progreso", "created_at": "2026-09-25 10:00:00"}
+    log_widget = LogEntryWidget(log_data, lambda *_: None, lambda *_: None)
+    assert "line-height: 135%;" in log_widget.content_label.text()
+

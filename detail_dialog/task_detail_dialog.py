@@ -10,16 +10,14 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QKeySequence, QShortcut, QDesktopServices as QDesktopServices
 import database
 import styles
-import local_ai
 from strings import t
 from icons import lucide_icon
-from html_utils import clean_html_description
-from ai_assist_dialog import AiAssistDialog
 from .markdown_edit import MarkdownTextEdit, RichTextToolbar
 from .log_entry import LogEntryWidget
 from .tag_pill import ClickableTagPill, color_icon
 from .tag_manager_dialog import TagManagerDialog
 from .tag_picker_dialog import TagPickerDialog
+from .task_mixins import TaskTimerMixin, TaskAiMixin
 
 from .security_utils import (
     _is_local_link, _is_unc_path, _get_target_extension,
@@ -65,7 +63,7 @@ class _ClickOutsideFilter(QObject):
         return False
 
 
-class TaskDetailDialog(QDialog):
+class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
     def __init__(self, task_id, db_path=database.DB_NAME, parent=None):
         super().__init__(parent)
         self.task_id = task_id
@@ -261,6 +259,11 @@ class TaskDetailDialog(QDialog):
         self._refresh_priority_combo()
         self.priority_combo.currentIndexChanged.connect(self._on_priority_changed)
         row_4.addWidget(self.priority_combo)
+        self.manage_priority_btn = QPushButton(t("task_detail.manage_priority_btn"))
+        self.manage_priority_btn.setToolTip(t("task_detail.manage_priority_tooltip"))
+        self.manage_priority_btn.setCursor(Qt.PointingHandCursor)
+        self.manage_priority_btn.clicked.connect(self.open_priority_manager)
+        row_4.addWidget(self.manage_priority_btn)
         row_4.addSpacing(18)
         row_4.addWidget(QLabel(t("task_detail.linked_board_label")))
         self.linked_board_combo = QComboBox()
@@ -515,8 +518,9 @@ class TaskDetailDialog(QDialog):
         self.reload_logs()
 
     def render_tags(self):
-        """Dibuja las etiquetas asignadas como pastillas. Clic en la pastilla = editar el
-        valor; el botón × la retira de la tarea."""
+        """Dibuja las etiquetas asignadas como pastillas (excluyendo Prioridad, que tiene su
+        propia sección y selector independiente). Clic en la pastilla = editar el valor;
+        el botón × la retira de la tarea."""
         # Limpiar
         while self.tags_container_layout.count():
             item = self.tags_container_layout.takeAt(0)
@@ -524,14 +528,20 @@ class TaskDetailDialog(QDialog):
             if widget:
                 widget.deleteLater()
 
-        if not self.current_tags:
+        priority_names = {"priority", "prioridad"}
+        regular_tags = [
+            (index, tag) for index, tag in enumerate(self.current_tags)
+            if tag.get("category", "").strip().lower() not in priority_names
+        ]
+
+        if not regular_tags:
             hint = QLabel(t("task_detail.no_tags_hint"))
             hint.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 11px; font-style: italic;")
             self.tags_container_layout.addWidget(hint)
             self._sync_priority_combo_selection()
             return
 
-        for index, tag in enumerate(self.current_tags):
+        for index, tag in regular_tags:
             pill = ClickableTagPill()
             pill.setObjectName("TagPillFrame")
             pill.setCursor(Qt.PointingHandCursor)
@@ -573,19 +583,17 @@ class TaskDetailDialog(QDialog):
         self._sync_priority_combo_selection()
 
     def _ensure_priority_category(self):
-        """Devuelve el id de la etiqueta permanente «Prioridad», asegurando que existan sus
-        niveles por defecto (Baja/Media/Alta) sin duplicar valores que ya existan (p. ej. la
-        etiqueta de ejemplo «Prioridad: Alta» del onboarding)."""
-        cat_id = database.create_tag_category(t("task_detail.priority_category_name"), self.db_path)
-        defaults = (
-            (t("task_detail.priority_low"), styles.COLORS["accent_2"]),
-            (t("task_detail.priority_medium"), styles.COLORS["text_muted"]),
-            (t("task_detail.priority_high"), styles.COLORS["accent_pressed"]),
-        )
-        for value, color in defaults:
-            if not database.value_exists_in_category(cat_id, value, db_path=self.db_path):
-                database.create_tag_value(cat_id, value, color, self.db_path)
-        return cat_id
+        """Devuelve el id de la etiqueta permanente «Prioridad»."""
+        from .priority_dialog import ensure_priority_category
+        return ensure_priority_category(self.db_path)
+
+    def open_priority_manager(self):
+        """Abre el modal propio e independiente de Prioridades."""
+        from .priority_dialog import PriorityManagerDialog
+        dlg = PriorityManagerDialog(self.db_path, parent=self)
+        dlg.exec()
+        self._refresh_priority_combo()
+        self.render_tags()
 
     def _refresh_priority_combo(self):
         """Rellena el selector rápido de Prioridad con los valores actuales del catálogo
@@ -775,42 +783,6 @@ class TaskDetailDialog(QDialog):
         except Exception:
             formatted = str(raw_timestamp)
         self.notes_edited_label.setText(t("task_detail.notes_last_edited", timestamp=formatted))
-
-    def _on_timer_toggle_clicked(self):
-        """Inicia el temporizador, o lo reinicia a ahora si ya estaba en marcha. Acción
-        instantánea (como añadir una nota al diario o un enlace): se persiste en el
-        momento, no espera a "Guardar Cambios"."""
-        self._timer_started_at = datetime.now().isoformat()
-        database.set_task_timer_started(self.task_id, self._timer_started_at, self.db_path)
-        self.modified = True
-        self._refresh_timer_ui()
-
-    def _on_timer_clear_clicked(self):
-        """Detiene y borra el temporizador: deja de contar y quita la insignia de la tarjeta."""
-        self._timer_started_at = None
-        database.set_task_timer_started(self.task_id, None, self.db_path)
-        self.modified = True
-        self._refresh_timer_ui()
-
-    def _refresh_timer_ui(self):
-        """Actualiza el botón y la etiqueta de tiempo transcurrido según self._timer_started_at.
-        Se llama al cargar la tarea, tras cada acción, y cada 30s mientras el diálogo está
-        abierto (self._timer_refresh_timer) para que el contador avance en vivo."""
-        if self._timer_started_at:
-            self.timer_toggle_btn.setText(t("task_detail.timer_restart_btn"))
-            self.timer_clear_btn.show()
-            try:
-                started = datetime.fromisoformat(self._timer_started_at)
-                elapsed = datetime.now() - started
-                self.timer_elapsed_label.setText(
-                    t("task_detail.timer_elapsed", elapsed=styles.format_elapsed_time(elapsed.total_seconds()))
-                )
-            except ValueError:
-                self.timer_elapsed_label.setText("")
-        else:
-            self.timer_toggle_btn.setText(t("task_detail.timer_start_btn"))
-            self.timer_clear_btn.hide()
-            self.timer_elapsed_label.setText("")
 
     def delete_task(self):
         """Borra definitivamente la tarea actual de la base de datos."""
@@ -1007,69 +979,6 @@ class TaskDetailDialog(QDialog):
         self.modified = True
 
         # En vez de recargar todo, recargamos para asegurar sincronización limpia
-        self.reload_logs()
-
-    # --- Asistentes de IA local (offline) por tarea ---
-
-    def _open_breakdown(self):
-        """Abre el asistente que desglosa esta tarea en subtareas (tareas hermanas en la
-        misma columna). Offline y determinista; el usuario edita antes de crear."""
-        task = database.get_task(self.task_id, self.db_path)
-        if not task:
-            return
-        titles = local_ai.suggest_subtasks_offline(task)
-        dlg = AiAssistDialog(
-            t("ai.breakdown.title"), "\n".join(titles),
-            t("ai.breakdown.confirm_btn"), t("ai.breakdown.hint"),
-            mode="task_breakdown", ai_tasks=[task], parent=self,
-        )
-        dlg.confirmed.connect(self._apply_breakdown)
-        dlg.exec()
-
-    def _apply_breakdown(self, text):
-        task = database.get_task(self.task_id, self.db_path)
-        if not task:
-            return
-        titles = local_ai.parse_subtask_lines(text)
-        if not titles:
-            return
-        for title in titles:
-            database.create_task(task["column_id"], title, db_path=self.db_path)
-        self.modified = True
-        QMessageBox.information(
-            self, t("ai.breakdown.title"), t("ai.breakdown.created", count=len(titles))
-        )
-
-    def _open_summary(self):
-        """Abre el asistente que resume el diario de esta tarea (offline)."""
-        logs = database.get_logs(self.task_id, self.db_path)
-        task = database.get_task(self.task_id, self.db_path)
-        title = task["title"] if task else ""
-        # Para la mejora por IA: una tarea sintética cuyo "description" lleva el texto del
-        # diario, de modo que el prompt de resumen lo reciba sin tocar el generador.
-        diary_text = "\n".join(
-            clean_html_description(log.get("content", "") or "") for log in logs
-        )
-        ai_tasks = [{"title": title, "description": diary_text, "links": []}]
-        dlg = AiAssistDialog(
-            t("ai.summary.title"), local_ai.summarize_diary_offline(logs, title),
-            t("ai.summary.confirm_btn"), t("ai.summary.hint"),
-            mode="diary_summary", ai_tasks=ai_tasks, parent=self,
-        )
-        dlg.confirmed.connect(self._apply_summary)
-        dlg.exec()
-
-    def _apply_summary(self, text):
-        text = (text or "").strip()
-        if not text:
-            return
-
-        def _esc(s):
-            return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
-        html_body = "".join(f"<p>{_esc(line)}</p>" for line in text.split("\n") if line.strip())
-        database.create_log(self.task_id, html_body, self.db_path)
-        self.modified = True
         self.reload_logs()
 
     def delete_log_entry(self, log_id, widget):

@@ -122,6 +122,8 @@ class TagManagerDialog(QDialog):
         self.cat_list.blockSignals(True)
         self.cat_list.clear()
         for cat in database.get_tag_categories(self.db_path):
+            if cat["name"].strip().lower() in ("priority", "prioridad"):
+                continue
             item = QListWidgetItem(cat["name"])
             item.setData(Qt.UserRole, cat["id"])
             self.cat_list.addItem(item)

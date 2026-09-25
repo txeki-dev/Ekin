@@ -100,24 +100,24 @@
     "semantic_hash": "931ddfd2974c7fe1ab7938474fc8bf2d"
   },
   "detail_dialog/log_entry.py": {
-    "mtime": 1789158215.8700757,
-    "ast_hash": "75bba6ec38be07513f1c2596fd4bcc81",
+    "mtime": 1790357247.3643792,
+    "ast_hash": "ac5f39a9d79da9680f6c6bfa63bfb4b0",
     "semantic_hash": ""
   },
   "detail_dialog/markdown_edit.py": {
-    "mtime": 1789207110.995247,
-    "ast_hash": "cfa555cc95b8beaedc82d92bf4e5aa47",
+    "mtime": 1790357235.6937318,
+    "ast_hash": "c78843ce271bbf3b28c9cfee9a1f715d",
     "semantic_hash": ""
   },
   "detail_dialog/tag_manager_dialog.py": {
-    "mtime": 1788604531.1147187,
-    "ast_hash": "ae906d5fd52f67ad2bcfd6eb4a4a40c8",
+    "mtime": 1790357349.2867613,
+    "ast_hash": "425d06a7f20d523148b291e97b27bb0c",
     "semantic_hash": ""
   },
   "detail_dialog/tag_picker_dialog.py": {
-    "mtime": 1785788267.453636,
-    "ast_hash": "ab242521d1b4cc141d3c58212309fc9a",
-    "semantic_hash": "ab242521d1b4cc141d3c58212309fc9a"
+    "mtime": 1790357358.1490965,
+    "ast_hash": "3599ce6931ae0d2a413dc81fb0d8c140",
+    "semantic_hash": ""
   },
   "detail_dialog/tag_pill.py": {
     "mtime": 1785751000.6055658,
@@ -125,8 +125,8 @@
     "semantic_hash": "18171b8520d1520329fba7ab6645610b"
   },
   "detail_dialog/task_detail_dialog.py": {
-    "mtime": 1789311779.5719664,
-    "ast_hash": "114983ad086a290b728bec8daec35cd0",
+    "mtime": 1790357383.3477814,
+    "ast_hash": "8abcf5e9b5324f7083e00f9cbff83210",
     "semantic_hash": ""
   },
   "exporter.py": {
@@ -145,8 +145,8 @@
     "semantic_hash": "7130dba7d9eed4113ccfb12d6aff53de"
   },
   "main.py": {
-    "mtime": 1789312204.4968696,
-    "ast_hash": "6b91482f902bb4627b7a9d0bda06379d",
+    "mtime": 1790357145.070592,
+    "ast_hash": "bc69a4d53ed29dc2768094320cb318e8",
     "semantic_hash": ""
   },
   "pyproject.toml": {
@@ -175,8 +175,8 @@
     "semantic_hash": ""
   },
   "strings.py": {
-    "mtime": 1789312421.8834014,
-    "ast_hash": "0eb5ec4b4b3a4aa15dcce8c85380e1ad",
+    "mtime": 1790357333.7314568,
+    "ast_hash": "8bfec7723e7ed9efc54016335cd36fff",
     "semantic_hash": ""
   },
   "styles.py": {
@@ -240,8 +240,8 @@
     "semantic_hash": "3dd3df13194cc9d6f26d3b0329c58312"
   },
   "tests/test_widgets_headless.py": {
-    "mtime": 1789332176.7276554,
-    "ast_hash": "3cb2f58bcc237d6e6bddb97a9e8ccd83",
+    "mtime": 1790359561.9019086,
+    "ast_hash": "d52bcdfe12d228d4eabfc6f1a3a70bff",
     "semantic_hash": ""
   },
   "tests/test_widgets_logic.py": {
@@ -260,8 +260,8 @@
     "semantic_hash": ""
   },
   "widgets.py": {
-    "mtime": 1789312403.253901,
-    "ast_hash": "5796994553c71ab753debe1a29ca76fe",
+    "mtime": 1790359452.6539054,
+    "ast_hash": "130f83394ae60ab7ed96a1114660cd54",
     "semantic_hash": ""
   },
   ".agents/docs/archive/2026-07-22_v0.4.0.md": {
@@ -665,8 +665,8 @@
     "semantic_hash": ""
   },
   "tests/test_ux_enhancements.py": {
-    "mtime": 1789204096.5642803,
-    "ast_hash": "9b9d1f23c4a9bb0f82ba9c569fd53ebd",
+    "mtime": 1790357289.55461,
+    "ast_hash": "4d460c8fb9829c770f2d9bd06a413ded",
     "semantic_hash": ""
   },
   "ai_assist_dialog.py": {
@@ -680,8 +680,8 @@
     "semantic_hash": ""
   },
   "command_palette.py": {
-    "mtime": 1789299939.3348722,
-    "ast_hash": "69ed62cdd1be0a8e4b5920f2e6ca6746",
+    "mtime": 1790357138.030087,
+    "ast_hash": "514bd2bcd88ee1f499d8bfaf30d56c42",
     "semantic_hash": ""
   },
   "dashboard_view.py": {
@@ -715,8 +715,8 @@
     "semantic_hash": ""
   },
   "tests/test_command_palette.py": {
-    "mtime": 1789300072.8562744,
-    "ast_hash": "4f19d82cc995cfa96e9439542a12aa01",
+    "mtime": 1790357164.6170242,
+    "ast_hash": "9b4744cc05de3b40cab3b5067f36f546",
     "semantic_hash": ""
   },
   "tests/test_my_work_view.py": {
@@ -767,6 +767,16 @@
   "board_dialogs.py": {
     "mtime": 1789332128.4016204,
     "ast_hash": "5b9594ec166721f9480a5b6b28f35e6b",
+    "semantic_hash": ""
+  },
+  "detail_dialog/priority_dialog.py": {
+    "mtime": 1790357341.535547,
+    "ast_hash": "ecf68e545b3c26b1e929cfb66ceb9d53",
+    "semantic_hash": ""
+  },
+  "tests/test_priority_manager.py": {
+    "mtime": 1790359368.2709832,
+    "ast_hash": "2518e718a15587e94042d2f10bb98b03",
     "semantic_hash": ""
   }
 }
