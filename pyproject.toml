@@ -24,9 +24,9 @@ py-modules = [
     "cloud_sync_dialog", "color_picker", "command_palette", "dashboard_view",
     "ekin_mcp", "export_dialog", "exporter", "html_utils", "icons",
     "ics_export", "importer", "local_ai", "logging_setup", "main",
-    "mcp_server", "mcp_sync_dialog", "my_work_view", "reminders",
-    "search_dialog", "settings_dialog", "shortcuts_dialog", "sidebar",
-    "strings", "styles", "templates", "undo", "version", "widgets"
+    "mcp_server", "mcp_sync_dialog", "my_work_view", "onboarding_dialog",
+    "reminders", "search_dialog", "settings_dialog", "shortcuts_dialog",
+    "sidebar", "strings", "styles", "templates", "undo", "version", "widgets"
 ]
 packages = ["database", "detail_dialog"]
 

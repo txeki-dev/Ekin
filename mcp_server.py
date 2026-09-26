@@ -178,13 +178,13 @@ def get_mcp_tools_schema() -> List[Dict[str, Any]]:
         },
         {
             "name": "move_task",
-            "description": "Mueve una tarea de una columna a otra o cambia su posición dentro de la columna.",
+            "description": "Mueve una tarea de una columna a otra o cambia su posición. Por defecto se ubica en la parte superior (posición 0, más reciente arriba).",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "task_id": {"type": "integer", "description": "ID de la tarea a desplazar."},
                     "target_column_id": {"type": "integer", "description": "ID de la columna de destino."},
-                    "target_position": {"type": "integer", "description": "Posición ordinal en la columna (opcional)."},
+                    "target_position": {"type": "integer", "description": "Posición ordinal en la columna (opcional, por defecto 0 para situarla arriba del todo)."},
                 },
                 "required": ["task_id", "target_column_id"],
             },
@@ -495,17 +495,24 @@ class McpToolExecutor:
 
         with database.get_connection(self.db_path) as conn:
             cursor = conn.cursor()
-            if target_pos is None:
-                cursor.execute("SELECT COALESCE(MAX(position), -1) FROM tasks WHERE column_id = ?", (target_col_id,))
-                max_pos = cursor.fetchone()[0]
-                target_pos = max_pos + 1
+            if target_pos is None or target_pos <= 0:
+                target_pos = 0
+                cursor.execute(
+                    "UPDATE tasks SET position = position + 1 WHERE column_id = ? AND id != ?",
+                    (target_col_id, task_id),
+                )
+            else:
+                cursor.execute(
+                    "UPDATE tasks SET position = position + 1 WHERE column_id = ? AND id != ? AND position >= ?",
+                    (target_col_id, task_id, target_pos),
+                )
 
             cursor.execute(
                 "UPDATE tasks SET column_id = ?, position = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (target_col_id, target_pos, task_id),
             )
 
-        audit_entry = f"[{self.client_name}]: Tarea desplazada a columna '{target_col['name']}'."
+        audit_entry = f"[{self.client_name}]: Tarea desplazada a columna '{target_col['name']}' (situada arriba, pos {target_pos})."
         database.add_task_log(task_id, audit_entry, db_path=self.db_path)
 
         get_mcp_event_bus().board_mutated.emit(self.board_id)
@@ -677,6 +684,7 @@ class McpProtocolHandler:
             f"# Contexto del Tablero Ekin Kanban: '{self.board['name']}'",
             f"- Columnas disponibles: {cols_str}",
             "- Regla Fundamental de Gobierno: NO intentes crear, editar o eliminar columnas. Solo el usuario humano puede alterar la estructura de columnas.",
+            "- Política de Orden y Posicionamiento: El orden visual de las tareas en cada columna es de más reciente a más antiguo (de arriba hacia abajo). Al mover o crear tareas, sitúalas en la parte superior (posición 0 por defecto) para que lo más reciente aparezca siempre arriba.",
             "- Puedes leer y mover tareas a lo largo de las columnas existentes, añadir notas en su diario y actualizar prioridades y etiquetas.",
         ]
         if prompt_custom:

@@ -76,6 +76,8 @@ def parse_version_tuple(v_str: str):
 
 class ReleaseCheckThread(QThread):
     update_available = Signal(str, str, str)  # (remote_version, download_url, notes)
+    no_update_available = Signal()
+    error = Signal(str)
 
     def run(self):
         try:
@@ -92,15 +94,18 @@ class ReleaseCheckThread(QThread):
             )
             with urllib.request.urlopen(req, timeout=6) as resp:
                 if resp.status != 200:
+                    self.error.emit(f"HTTP {resp.status}")
                     return
                 data = json.loads(resp.read().decode("utf-8"))
 
             tag_name = data.get("tag_name", "")
             remote_ver = tag_name.lstrip("vV").strip()
             if not remote_ver:
+                self.no_update_available.emit()
                 return
 
             if parse_version_tuple(remote_ver) <= parse_version_tuple(__version__):
+                self.no_update_available.emit()
                 return
 
             download_url = None
@@ -118,9 +123,12 @@ class ReleaseCheckThread(QThread):
 
             if download_url:
                 self.update_available.emit(remote_ver, download_url, data.get("body", "") or "")
+            else:
+                self.no_update_available.emit()
         except Exception as exc:
             import logging
             logging.getLogger("ekin.release_check").warning("Release check encountered error: %s", exc)
+            self.error.emit(str(exc))
 
 
 
@@ -484,10 +492,11 @@ class MainWindow(QMainWindow):
                 self.board_view.load_board(self.sidebar.active_board_id, notify=False)
 
     def show_settings(self):
-        """Abre la pantalla de Ajustes (tema, notificaciones, idioma)."""
+        """Abre la pantalla de Ajustes (tema, notificaciones, idioma, updates)."""
         dlg = SettingsDialog(database.DB_NAME, self)
         dlg.theme_changed.connect(lambda theme: self.apply_theme(theme, reload=True))
         dlg.language_changed.connect(self._on_language_changed)
+        dlg.check_updates_requested.connect(lambda: self.check_for_updates(manual=True))
         dlg.exec()
 
     def _on_language_changed(self, lang):
@@ -692,20 +701,35 @@ class MainWindow(QMainWindow):
         """Muestra u oculta la barra lateral."""
         self.sidebar.setVisible(not self.sidebar.isVisible())
 
-    def check_for_updates(self):
-        """Verifica de forma silenciosa si hay actualizaciones.
+    def check_for_updates(self, manual=False):
+        """Verifica de forma silenciosa (o con feedback si manual=True) si hay actualizaciones.
         - En modo standalone/frozen (PyInstaller): consulta la API pública de GitHub Releases.
         - En modo desarrollo (código fuente): actúa sobre el checkout de git.
         """
         if getattr(sys, "frozen", False):
-            self._check_release_updates()
+            self._check_release_updates(manual=manual)
         else:
-            self._check_git_updates()
+            self._check_git_updates(manual=manual)
 
-    def _check_release_updates(self):
+    def _check_release_updates(self, manual=False):
         """Inicia comprobación asíncrona de releases públicas en GitHub."""
         self._release_checker = ReleaseCheckThread(self)
         self._release_checker.update_available.connect(self._on_release_update_available)
+        if manual:
+            self._release_checker.no_update_available.connect(
+                lambda: QMessageBox.information(
+                    self,
+                    t("main.update.up_to_date_title"),
+                    t("main.update.up_to_date_body"),
+                )
+            )
+            self._release_checker.error.connect(
+                lambda err: QMessageBox.warning(
+                    self,
+                    t("main.update.failed_title"),
+                    t("main.update.check_error_body", error=err),
+                )
+            )
         self._release_checker.start()
 
     def _on_release_update_available(self, remote_version, download_url, release_notes):
@@ -765,8 +789,8 @@ class MainWindow(QMainWindow):
         self._installer_download_thread = download_thread
         download_thread.start()
 
-    def _check_git_updates(self):
-        """Verifica de forma silenciosa si hay actualizaciones en el repo de GitHub (modo git dev)."""
+    def _check_git_updates(self, manual=False):
+        """Verifica si hay actualizaciones en el repo de GitHub (modo git dev)."""
         try:
             startupinfo = None
             if os.name == 'nt':
@@ -786,15 +810,34 @@ class MainWindow(QMainWindow):
             # 0. Actuar solo si esto es realmente un checkout de git (no un ejecutable empaquetado).
             inside = _git(["rev-parse", "--is-inside-work-tree"], 5)
             if inside.returncode != 0 or inside.stdout.strip() != "true":
+                if manual:
+                    QMessageBox.information(
+                        self,
+                        t("main.update.up_to_date_title"),
+                        t("main.update.not_git_body"),
+                    )
                 return
 
             # 1. Actualizar referencias remotas de forma silenciosa.
-            if _git(["fetch", "origin"], 5).returncode != 0:
+            fetch_res = _git(["fetch", "origin"], 10)
+            if fetch_res.returncode != 0:
+                if manual:
+                    QMessageBox.warning(
+                        self,
+                        t("main.update.failed_title"),
+                        t("main.update.fetch_failed_body"),
+                    )
                 return
 
             # 2. Comprobar si el checkout local está por detrás del remoto.
             status = _git(["status", "-uno"], 5)
             if status.returncode != 0 or "behind" not in status.stdout:
+                if manual:
+                    QMessageBox.information(
+                        self,
+                        t("main.update.up_to_date_title"),
+                        t("main.update.up_to_date_body"),
+                    )
                 return
 
             # 3. Nunca hacer pull sobre un árbol de trabajo sucio: git pull abortaría y el
@@ -840,8 +883,10 @@ class MainWindow(QMainWindow):
             # Reiniciar solo tras un pull exitoso (execv reemplaza el proceso entero).
             os.execv(sys.executable, [sys.executable] + sys.argv)
         except Exception as e:
-            # Fallar en silencio si no hay conexión o no es una instalación Git
-            log.warning("Error al comprobar actualizaciones: %s", e)
+            if manual:
+                QMessageBox.warning(self, t("main.update.failed_title"), str(e))
+            else:
+                log.warning("Error al comprobar actualizaciones: %s", e)
 
     def check_onboarding(self):
         """Verifica si es la primera vez que se abre la app y crea datos de ejemplo."""
@@ -870,6 +915,21 @@ class MainWindow(QMainWindow):
 
             # Añadir una nota de diario inicial a la tarea
             database.create_log(task_id, t("main.onboarding.log_entry"))
+
+            # Disparar guía de bienvenida si procede
+            QTimer.singleShot(600, self._maybe_show_landing_tour)
+
+    def _maybe_show_landing_tour(self):
+        """Muestra el tour guiado de bienvenida en el primer uso si no se ha mostrado ya."""
+        shown = database.get_setting("onboarding_tour_shown", "0") == "1"
+        if not shown:
+            self.show_landing_tour()
+
+    def show_landing_tour(self):
+        """Abre la guía de bienvenida y recorrido inicial de Ekin."""
+        from onboarding_dialog import LandingTourDialog
+        dlg = LandingTourDialog(self, db_path=database.DB_NAME)
+        dlg.exec()
 
 
 def apply_win32_icon(window):

@@ -1988,3 +1988,76 @@ def test_color_circles_picker_selection_and_signal(qapp):
     picker.deleteLater()
 
 
+# --- SettingsDialog & LandingTourDialog (v1.0.3) ---
+
+def test_settings_dialog_check_updates_button_emits_signal(qapp, db_path):
+    """Verifica que el botón 'Buscar ahora' en ajustes emita check_updates_requested."""
+    from settings_dialog import SettingsDialog
+
+    dlg = SettingsDialog(db_path)
+    emitted = []
+    dlg.check_updates_requested.connect(lambda: emitted.append(True))
+
+    buttons = dlg.findChildren(QPushButton)
+    update_btn = next((b for b in buttons if t("settings.check_updates_btn").strip() in b.text()), None)
+    assert update_btn is not None
+    update_btn.click()
+    assert len(emitted) == 1
+    dlg.deleteLater()
+
+
+def test_landing_tour_dialog_navigation_and_persistence(qapp, db_path):
+    """Verifica la navegación paso a paso y la persistencia de LandingTourDialog."""
+    from onboarding_dialog import LandingTourDialog
+
+    database.set_setting("onboarding_tour_shown", "0", db_path)
+    dlg = LandingTourDialog(db_path=db_path)
+
+    # Estado inicial: primera diapositiva (índice 0)
+    assert dlg._current_index == 0
+    assert dlg.stack.currentIndex() == 0
+    assert dlg.prev_btn.isHidden() or not dlg.prev_btn.isEnabled()
+    assert t("landing.next_btn").strip() in dlg.next_btn.text()
+
+    # Avanzar a la diapositiva 1
+    dlg.next_btn.click()
+    assert dlg._current_index == 1
+    assert dlg.stack.currentIndex() == 1
+    assert dlg.prev_btn.isEnabled()
+
+    # Ir directamente a la última diapositiva (índice 3)
+    dlg._go_to_slide(3)
+    assert dlg._current_index == 3
+    assert t("landing.start_btn").strip() in dlg.next_btn.text()
+
+    # Retroceder una
+    dlg.prev_btn.click()
+    assert dlg._current_index == 2
+
+    # Avanzar a la última y pulsar Comenzar
+    dlg.next_btn.click()
+    assert dlg._current_index == 3
+    dlg.next_btn.click()
+    assert database.get_setting("onboarding_tour_shown", "0", db_path) == "1"
+
+    dlg.deleteLater()
+
+
+def test_landing_tour_dialog_dont_show_checkbox(qapp, db_path):
+    """Verifica que el checkbox 'No volver a mostrar' persista inmediatamente el ajuste."""
+    from onboarding_dialog import LandingTourDialog
+
+    database.set_setting("onboarding_tour_shown", "0", db_path)
+    dlg = LandingTourDialog(db_path=db_path)
+    assert not dlg.dont_show_chk.isChecked()
+
+    dlg.dont_show_chk.setChecked(True)
+    assert database.get_setting("onboarding_tour_shown", "0", db_path) == "1"
+
+    dlg.dont_show_chk.setChecked(False)
+    assert database.get_setting("onboarding_tour_shown", "0", db_path) == "0"
+
+    dlg.deleteLater()
+
+
+

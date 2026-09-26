@@ -7,7 +7,7 @@ Los controles visibles (segmentado / interruptor / stepper) son la cara del dise
 lógica de estado y persistencia sigue viviendo en tres widgets de respaldo ocultos
 (`theme_combo`, `notif_chk`, `timer_alert_spin`) que los controles visuales manejan.
 """
-from PySide6.QtCore import Qt, Signal, QRectF
+from PySide6.QtCore import Qt, Signal, QRectF, QSize
 from PySide6.QtGui import QPainter, QColor
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox, QPushButton,
@@ -46,6 +46,8 @@ class ToggleSwitch(QCheckBox):
 class SettingsDialog(QDialog):
     theme_changed = Signal(str)      # "dark" | "light"
     language_changed = Signal(str)   # "en" | "es"
+    check_updates_requested = Signal()
+    landing_tour_requested = Signal()
 
     def __init__(self, db_path, parent=None):
         super().__init__(parent)
@@ -168,6 +170,56 @@ class SettingsDialog(QDialog):
         self.digest_switch.toggled.connect(self.digest_chk.setChecked)
         layout.addWidget(self._row(
             t("settings.weekly_digest_label"), t("settings.weekly_digest_desc"), self.digest_switch
+        ))
+        layout.addWidget(self._divider())
+
+        # === Fila 6: Actualizaciones del sistema (botón manual) ===
+        check_update_btn = QPushButton(f" {t('settings.check_updates_btn')}")
+        check_update_btn.setIcon(lucide_icon("rotate-ccw", styles.COLORS["text_soft"], 14))
+        check_update_btn.setIconSize(QSize(14, 14))
+        check_update_btn.setCursor(Qt.PointingHandCursor)
+        check_update_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                border: 1px solid {styles.COLORS['border']};
+                border-radius: 8px;
+                padding: 6px 14px;
+                color: {styles.COLORS['text_main']};
+                font-size: 13px;
+            }}
+            QPushButton:hover {{
+                background-color: {styles.COLORS['bg_hover']};
+                border-color: {styles.COLORS['accent']};
+            }}
+        """)
+        check_update_btn.clicked.connect(self.check_updates_requested.emit)
+        layout.addWidget(self._row(
+            t("settings.check_updates_label"), t("settings.check_updates_desc"), check_update_btn
+        ))
+        layout.addWidget(self._divider())
+
+        # === Fila 7: Guía de bienvenida y recorrido inicial ===
+        landing_tour_btn = QPushButton(f" {t('settings.landing_tour_btn')}")
+        landing_tour_btn.setIcon(lucide_icon("sparkles", styles.COLORS["text_soft"], 14))
+        landing_tour_btn.setIconSize(QSize(14, 14))
+        landing_tour_btn.setCursor(Qt.PointingHandCursor)
+        landing_tour_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                border: 1px solid {styles.COLORS['border']};
+                border-radius: 8px;
+                padding: 6px 14px;
+                color: {styles.COLORS['text_main']};
+                font-size: 13px;
+            }}
+            QPushButton:hover {{
+                background-color: {styles.COLORS['bg_hover']};
+                border-color: {styles.COLORS['accent']};
+            }}
+        """)
+        landing_tour_btn.clicked.connect(self._on_landing_tour_clicked)
+        layout.addWidget(self._row(
+            t("settings.landing_tour_label"), t("settings.landing_tour_desc"), landing_tour_btn
         ))
 
         layout.addStretch()
@@ -348,4 +400,10 @@ class SettingsDialog(QDialog):
         database.set_setting("language", lang, self.db_path)
         strings.set_language(lang)
         self.language_changed.emit(lang)
+
+    def _on_landing_tour_clicked(self):
+        from onboarding_dialog import LandingTourDialog
+        self.landing_tour_requested.emit()
+        dlg = LandingTourDialog(self, db_path=self.db_path)
+        dlg.exec()
 

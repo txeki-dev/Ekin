@@ -28,6 +28,7 @@ def _make_window(monkeypatch):
     monkeypatch.setattr(main_module.MainWindow, "notify_due_today", lambda self: None)
     monkeypatch.setattr(main_module.MainWindow, "check_for_updates", lambda self: None)
     monkeypatch.setattr(main_module.MainWindow, "_maybe_show_weekly_digest", lambda self: None)
+    monkeypatch.setattr(main_module.MainWindow, "_maybe_show_landing_tour", lambda self: None)
     return main_module.MainWindow()
 
 
@@ -374,5 +375,68 @@ def test_installer_download_thread_cancelled_removes_incomplete_file(tmp_path, m
     # Neither finished nor file should exist after cancel
     assert finished_files == []
     assert not os.path.exists(dest_file)
+
+
+def test_release_check_thread_emits_no_update_when_same_or_older(monkeypatch):
+    """Verifica que ReleaseCheckThread emita no_update_available si está al día."""
+    import json
+    from main import ReleaseCheckThread
+
+    mock_release = {
+        "tag_name": "v0.1.0",
+        "assets": [{"name": "Ekin-Setup.exe", "browser_download_url": "http://test"}],
+    }
+    payload = json.dumps(mock_release).encode("utf-8")
+
+    class MockResponse:
+        status = 200
+        def read(self):
+            return payload
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr("urllib.request.urlopen", lambda req, timeout=6: MockResponse())
+
+    emitted_no_update = []
+    thread = ReleaseCheckThread()
+    thread.no_update_available.connect(lambda: emitted_no_update.append(True))
+    thread.run()
+
+    assert len(emitted_no_update) == 1
+
+
+def test_check_for_updates_manual_shows_up_to_date_when_not_behind(qapp, db_path, monkeypatch):
+    """Verifica que check_for_updates(manual=True) muestre diálogo informativo si ya está al día."""
+    import subprocess
+    from PySide6.QtWidgets import QMessageBox
+
+    info_messages = []
+    monkeypatch.setattr(QMessageBox, "information", lambda parent, title, body, *a: info_messages.append((title, body)))
+
+    window = _make_window(monkeypatch)
+
+    def fake_run(args, **kwargs):
+        class Res:
+            returncode = 0
+            stdout = ""
+        if args[1] == "rev-parse":
+            Res.stdout = "true\n"
+        elif args[1] == "fetch":
+            Res.stdout = ""
+        elif args[1] == "status":
+            Res.stdout = "On branch main\nYour branch is up to date with 'origin/main'.\n"
+        return Res()
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    window._check_git_updates(manual=True)
+
+    assert len(info_messages) == 1
+    assert "Al día" in info_messages[0][0] or "Up to date" in info_messages[0][0]
+
+    _close_window(qapp, window)
+
 
 

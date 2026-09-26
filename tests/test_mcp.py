@@ -4,6 +4,7 @@ seguridad de sandbox, bloqueo de columnas y herramientas de manipulación de tar
 """
 
 import json
+import socket
 import urllib.request
 
 import pytest
@@ -200,7 +201,9 @@ def test_mcp_prompts_synergy(db_path, mcp_board):
 def test_mcp_http_server_live(db_path, mcp_board):
     """Prueba el servidor HTTP embebido realizando peticiones directas."""
     manager = McpManager(db_path=db_path)
-    test_port = 8789
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        test_port = s.getsockname()[1]
     started = manager.start(port=test_port)
     assert started is True
 
