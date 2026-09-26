@@ -356,3 +356,90 @@ def test_description_and_journal_line_height(qapp, db_path):
     log_widget = LogEntryWidget(log_data, lambda *_: None, lambda *_: None)
     assert "line-height: 135%;" in log_widget.content_label.text()
 
+
+def test_task_detail_lazy_loading_windowed(qapp, db_path):
+    """Verifica que TaskDetailDialog cargue de forma diferida (windowed) las entradas del diario:
+    1. Si hay más de 15 entradas, carga las 15 más recientes y muestra el botón para cargar las restantes.
+    2. El contador refleja el formato '{total} entradas ({visible} visibles)'.
+    3. Al pulsar 'Cargar entradas anteriores', se cargan las entradas restantes y el botón desaparece.
+    """
+    board_id = database.create_board("Tablero Lazy Logs", db_path=db_path)
+    col_id = database.create_column(board_id, "Columna Logs", db_path=db_path)
+    tid = database.create_task(col_id, "Tarea con 25 logs", db_path=db_path)
+
+    # Crear 25 entradas en el diario
+    for i in range(25):
+        database.create_log(tid, f"<p>Entrada de diario número {i+1}</p>", db_path=db_path)
+
+    dlg = TaskDetailDialog(tid, db_path=db_path)
+
+    # Debe haber 15 LogEntryWidgets visibles inicialmente
+    rendered_logs = [
+        dlg.logs_layout.itemAt(i).widget()
+        for i in range(dlg.logs_layout.count())
+        if isinstance(dlg.logs_layout.itemAt(i).widget(), LogEntryWidget)
+    ]
+    assert len(rendered_logs) == 15
+    assert dlg._load_previous_btn is not None
+    assert "10" in dlg._load_previous_btn.text()
+    assert "25" in dlg.entries_count_label.text() and "15" in dlg.entries_count_label.text()
+
+    # Pulsar para cargar las 10 anteriores
+    dlg._load_previous_btn.click()
+    qapp.processEvents()
+
+    rendered_after = [
+        dlg.logs_layout.itemAt(i).widget()
+        for i in range(dlg.logs_layout.count())
+        if isinstance(dlg.logs_layout.itemAt(i).widget(), LogEntryWidget)
+    ]
+    assert len(rendered_after) == 25
+    assert dlg._load_previous_btn is None
+    assert dlg.entries_count_label.text().startswith("25") and "(" not in dlg.entries_count_label.text()
+
+    dlg.reject()
+
+
+def test_fit_html_images_cache():
+    """Verifica que fit_html_images utilice la caché en memoria para evitar reprocesar regex."""
+    from detail_dialog.html_utils import fit_html_images, clear_fit_html_cache, _FIT_HTML_CACHE
+
+    clear_fit_html_cache()
+    sample_html = '<p>Nota con imagen <img src="https://example.com/pic.png" width="800"></p>'
+    res1 = fit_html_images(sample_html, max_width=300)
+    assert 'width="300"' in res1
+    assert len(_FIT_HTML_CACHE) == 1
+
+    # Segunda llamada: debe provenir de la caché
+    res2 = fit_html_images(sample_html, max_width=300)
+    assert res1 == res2
+    assert len(_FIT_HTML_CACHE) == 1
+
+
+def test_pixmap_from_data_uri_cache(qapp):
+    """Verifica que pixmap_from_data_uri utilice QPixmapCache para data URIs base64."""
+    from detail_dialog.image_preview_dialog import pixmap_from_data_uri
+    from PySide6.QtGui import QImage
+    from PySide6.QtCore import QByteArray, QBuffer, QIODevice
+
+    # Generar un data URI PNG sintético
+    img = QImage(16, 16, QImage.Format.Format_RGB32)
+    img.fill(0xFF00FF)
+    buf = QByteArray()
+    buffer = QBuffer(buf)
+    buffer.open(QIODevice.OpenModeFlag.WriteOnly)
+    img.save(buffer, "PNG")
+    b64 = bytes(buf.toBase64()).decode("ascii")
+    data_uri = f"data:image/png;base64,{b64}"
+
+    pm1 = pixmap_from_data_uri(data_uri)
+    assert not pm1.isNull()
+    assert pm1.width() == 16
+    assert pm1.height() == 16
+
+    # Segunda llamada: debe recuperar la instancia desde la caché
+    pm2 = pixmap_from_data_uri(data_uri)
+    assert not pm2.isNull()
+    assert pm2.width() == 16
+
+

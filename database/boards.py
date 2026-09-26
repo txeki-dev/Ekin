@@ -10,6 +10,7 @@ __all__ = [
     "update_board",
     "delete_board",
     "set_board_mcp_config",
+    "get_board_mutation_fingerprint",
 ]
 
 # --- OPERACIONES DE TABLEROS (BOARDS) ---
@@ -103,3 +104,33 @@ def set_board_mcp_config(board_id, enabled, secret=None, ai_system_prompt=None, 
 def delete_board(board_id, db_path=None):
     with get_connection(db_path) as conn:
         conn.execute("DELETE FROM boards WHERE id = ?", (board_id,))
+
+
+def get_board_mutation_fingerprint(board_id, db_path=None) -> tuple:
+    """Calcula una huella digital determinista y ultrarrápida del estado de un tablero
+    (tareas, columnas, diario, temporizadores y metadatos) para detección en tiempo real
+    de mutaciones externas realizadas por agentes MCP o procesos paralelos.
+    """
+    if not board_id or board_id == -1:
+        return ()
+    with get_connection(db_path) as conn:
+        row = conn.execute(
+            """
+            SELECT 
+                COUNT(tasks.id), 
+                COALESCE(MAX(tasks.updated_at), ''), 
+                TOTAL(tasks.position), 
+                TOTAL(tasks.column_id),
+                TOTAL(tasks.timer_started_at IS NOT NULL),
+                (SELECT COUNT(*) FROM columns WHERE board_id = ?),
+                (SELECT TOTAL(position) FROM columns WHERE board_id = ?),
+                (SELECT TOTAL(collapsed) FROM columns WHERE board_id = ?),
+                (SELECT name || '|' || color FROM boards WHERE id = ?)
+            FROM tasks 
+            JOIN columns ON tasks.column_id = columns.id 
+            WHERE columns.board_id = ?
+            """,
+            (board_id, board_id, board_id, board_id, board_id)
+        ).fetchone()
+        return tuple(row) if row else ()
+

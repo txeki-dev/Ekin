@@ -44,6 +44,7 @@ def _close_top_level_widgets_after_each_test(qapp):
             except Exception:
                 pass
     qapp.processEvents()
+    database.close_cached_connections()
 
 
 @pytest.fixture
@@ -51,4 +52,5 @@ def db_path(tmp_path):
     """Ruta a una base de datos SQLite temporal, inicializada con el esquema de Ekin."""
     path = str(tmp_path / "ekin_test.db")
     database.init_db(path)
-    return path
+    yield path
+    database.close_cached_connections(path)

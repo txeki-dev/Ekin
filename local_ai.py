@@ -17,6 +17,7 @@ import sys
 import json
 import time
 import socket
+import threading
 import urllib.request
 import urllib.error
 import atexit
@@ -1056,6 +1057,83 @@ def format_daily_standup_markdown(standup_data: dict, board_name: str = "") -> s
     return "\n".join(lines)
 
 
+class LocalAiCircuitBreaker:
+    """Disyuntor (Circuit Breaker) para el servicio local de inferencia y embeddings.
+
+    Previene bloqueos de la UI y demoras acumuladas cuando Ollama o llama-server
+    no responden, caen o devuelven errores de socket de forma repetida.
+
+    Estados:
+    - CLOSED: Operación normal. Las peticiones se dirigen al modelo local.
+    - OPEN: El circuito ha saltado tras N fallos consecutivos. Las peticiones
+      se desvían inmediatamente al fallback determinista local sin esperar timeouts.
+    - HALF_OPEN: Tras el periodo de enfriamiento (cooldown), permite una petición
+      de prueba para verificar si el servicio local se ha recuperado.
+    """
+
+    STATE_CLOSED = "CLOSED"
+    STATE_OPEN = "OPEN"
+    STATE_HALF_OPEN = "HALF_OPEN"
+
+    def __init__(self, failure_threshold: int = 3, recovery_timeout: float = 30.0):
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self._state = self.STATE_CLOSED
+        self._consecutive_failures = 0
+        self._last_failure_time = 0.0
+        self._lock = threading.Lock()
+
+    @property
+    def state(self) -> str:
+        with self._lock:
+            if self._state == self.STATE_OPEN:
+                if (time.time() - self._last_failure_time) >= self.recovery_timeout:
+                    self._state = self.STATE_HALF_OPEN
+            return self._state
+
+    def allow_request(self) -> bool:
+        """Determina si se debe permitir el intento de llamada al servicio local de IA."""
+        with self._lock:
+            if self._state == self.STATE_CLOSED:
+                return True
+            if self._state == self.STATE_OPEN:
+                if (time.time() - self._last_failure_time) >= self.recovery_timeout:
+                    self._state = self.STATE_HALF_OPEN
+                    return True
+                return False
+            # HALF_OPEN permite la petición de prueba
+            return True
+
+    def record_success(self) -> None:
+        """Registra una respuesta satisfactoria del servicio local, cerrando el circuito."""
+        with self._lock:
+            self._state = self.STATE_CLOSED
+            self._consecutive_failures = 0
+
+    def record_failure(self) -> None:
+        """Registra un fallo o timeout del servicio local. Si supera el umbral, abre el circuito."""
+        with self._lock:
+            self._consecutive_failures += 1
+            self._last_failure_time = time.time()
+            if self._consecutive_failures >= self.failure_threshold or self._state == self.STATE_HALF_OPEN:
+                self._state = self.STATE_OPEN
+
+    def reset(self) -> None:
+        """Restablece manualmente el disyuntor al estado inicial CLOSED."""
+        with self._lock:
+            self._state = self.STATE_CLOSED
+            self._consecutive_failures = 0
+            self._last_failure_time = 0.0
+
+
+_LLM_CIRCUIT_BREAKER = LocalAiCircuitBreaker()
+
+
+def get_llm_circuit_breaker() -> LocalAiCircuitBreaker:
+    """Obtiene la instancia global del Circuit Breaker para el servicio local de IA."""
+    return _LLM_CIRCUIT_BREAKER
+
+
 def compute_fallback_embedding(text: str, dim: int = 128) -> list[float]:
     """Genera un vector denso determinista y normalizado a partir de n-gramas de caracteres y palabras."""
     clean = re.sub(r"[^\w\s]", " ", (text or "").lower())
@@ -1091,6 +1169,10 @@ def get_local_embedding(text: str, model_name: str = "nomic-embed-text", timeout
     if not clean_text:
         return compute_fallback_embedding("")
 
+    cb = get_llm_circuit_breaker()
+    if not cb.allow_request():
+        return compute_fallback_embedding(clean_text)
+
     if is_ollama_available():
         try:
             url = "http://127.0.0.1:11434/api/embeddings"
@@ -1103,10 +1185,11 @@ def get_local_embedding(text: str, model_name: str = "nomic-embed-text", timeout
                     data = json.loads(response.read().decode("utf-8"))
                     emb = data.get("embedding")
                     if emb and isinstance(emb, list) and len(emb) > 0:
+                        cb.record_success()
                         norm = math.sqrt(sum(x * x for x in emb))
                         return [x / norm for x in emb] if norm > 1e-9 else emb
         except Exception:
-            pass
+            cb.record_failure()
 
     return compute_fallback_embedding(clean_text)
 
@@ -1407,49 +1490,58 @@ class SpecGenerationThread(QThread):
             detection = detect_available_llm()
 
         fallback_warning = ""
+        cb = get_llm_circuit_breaker()
 
         if detection["status"] == "ready":
-            endpoint = detection["url"]
-            target_model = self.model_name
-            if not target_model:
-                target_model = "qwen2.5-coder"
-            accumulated = []
-            try:
-                def _store_resp(resp):
-                    self._active_response = resp
+            if not cb.allow_request():
+                fallback_warning = (
+                    "> ⚠️ **Aviso de Resiliencia (Circuit Breaker OPEN)**: El servicio local de IA no responde "
+                    "o ha acumulado fallos repetidos. Se recurre de inmediato al sintetizador estructural local.\n\n"
+                )
+            else:
+                endpoint = detection["url"]
+                target_model = self.model_name
+                if not target_model:
+                    target_model = "qwen2.5-coder"
+                accumulated = []
+                try:
+                    def _store_resp(resp):
+                        self._active_response = resp
 
-                for token in stream_openai_chat_completion(
-                    endpoint,
-                    system_prompt,
-                    user_prompt,
-                    model_name=target_model,
-                    cancel_check=lambda: self._is_cancelled,
-                    on_response=_store_resp,
-                ):
+                    for token in stream_openai_chat_completion(
+                        endpoint,
+                        system_prompt,
+                        user_prompt,
+                        model_name=target_model,
+                        cancel_check=lambda: self._is_cancelled,
+                        on_response=_store_resp,
+                    ):
+                        if self._is_cancelled:
+                            return
+                        accumulated.append(token)
+                        self.token_received.emit(token)
+
+                    full_text = "".join(accumulated)
+                    if full_text.strip():
+                        cb.record_success()
+                        self.generation_finished.emit(full_text)
+                        return
+                except Exception as exc:
+                    cb.record_failure()
                     if self._is_cancelled:
                         return
-                    accumulated.append(token)
-                    self.token_received.emit(token)
-
-                full_text = "".join(accumulated)
-                if full_text.strip():
-                    self.generation_finished.emit(full_text)
-                    return
-            except Exception as exc:
-                if self._is_cancelled:
-                    return
-                # Si ya se emitieron tokens a la interfaz, emitir error_occurred en lugar de
-                # concatenar el fallback estructural sobre una respuesta a medias.
-                if accumulated:
-                    self.error_occurred.emit(f"Error durante la inferencia con '{target_model}': {exc}")
-                    return
-                # Si falló antes de emitir ningún token, preparamos un aviso informativo visible
-                fallback_warning = (
-                    f"> ⚠️ **Aviso**: No se pudo generar con el modelo '{target_model}' ({exc}). "
-                    f"Se ha recurrido al sintetizador estructural local.\n\n"
-                )
-            finally:
-                self._active_response = None
+                    # Si ya se emitieron tokens a la interfaz, emitir error_occurred en lugar de
+                    # concatenar el fallback estructural sobre una respuesta a medias.
+                    if accumulated:
+                        self.error_occurred.emit(f"Error durante la inferencia con '{target_model}': {exc}")
+                        return
+                    # Si falló antes de emitir ningún token, preparamos un aviso informativo visible
+                    fallback_warning = (
+                        f"> ⚠️ **Aviso**: No se pudo generar con el modelo '{target_model}' ({exc}). "
+                        f"Se ha recurrido al sintetizador estructural local.\n\n"
+                    )
+                finally:
+                    self._active_response = None
 
         if self._is_cancelled:
             return

@@ -1,5 +1,6 @@
+import hashlib
 from PySide6.QtCore import Qt, QByteArray
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QPixmapCache
 from PySide6.QtWidgets import QApplication, QDialog, QLabel, QVBoxLayout
 
 import styles
@@ -52,17 +53,25 @@ class ImagePreviewDialog(QDialog):
 
 
 def pixmap_from_data_uri(data_uri):
-    """Decodifica 'data:image/xxx;base64,....' a un QPixmap. Devuelve un QPixmap nulo
-    (isNull()) si el URI no trae una coma separadora o el base64 no decodifica a una
+    """Decodifica 'data:image/xxx;base64,....' a un QPixmap con caché en memoria (QPixmapCache).
+    Devuelve un QPixmap nulo (isNull()) si el URI no trae una coma separadora o el base64 no decodifica a una
     imagen válida -- defensivo, nunca debería pasar con URIs generados por
     MarkdownTextEdit._insert_image, pero un click en contenido corrupto/antiguo no debe
     poder reventar la UI."""
-    if "," not in data_uri:
+    if not data_uri or "," not in data_uri:
         return QPixmap()
+
+    cache_key = "data_uri_" + hashlib.sha256(data_uri.encode("ascii", errors="replace")).hexdigest()
+    cached = QPixmapCache.find(cache_key)
+    if cached is not None and not cached.isNull():
+        return cached
+
     b64 = data_uri.split(",", 1)[1]
     raw = QByteArray.fromBase64(b64.encode("ascii"))
     pixmap = QPixmap()
     pixmap.loadFromData(raw)
+    if not pixmap.isNull():
+        QPixmapCache.insert(cache_key, pixmap)
     return pixmap
 
 

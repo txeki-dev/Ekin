@@ -1,4 +1,10 @@
-from .connection import DB_NAME, get_connection, get_default_db_path as get_default_db_path
+from .connection import (
+    DB_NAME,
+    get_connection,
+    close_cached_connections as close_cached_connections,
+    get_default_db_path as get_default_db_path,
+    get_db_data_version as get_db_data_version,
+)
 
 
 def init_db(db_path=None):
@@ -260,6 +266,79 @@ def init_db(db_path=None):
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_tags_task ON task_tags(task_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_tags_value ON task_tags(tag_value_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_links_task_pos ON task_links(task_id, position)")
+
+        # Motor de Búsqueda de Texto Completo FTS5 y Triggers de Sincronización Automática
+        try:
+            cursor.execute("""
+                CREATE VIRTUAL TABLE IF NOT EXISTS tasks_fts USING fts5(
+                    task_id UNINDEXED,
+                    title,
+                    description,
+                    log_content,
+                    tokenize = 'unicode61'
+                )
+            """)
+
+            # Triggers de tareas
+            cursor.execute("""
+                CREATE TRIGGER IF NOT EXISTS trg_tasks_ai AFTER INSERT ON tasks BEGIN
+                    INSERT INTO tasks_fts(task_id, title, description, log_content)
+                    VALUES (new.id, new.title, coalesce(new.description, ''), '');
+                END;
+            """)
+            cursor.execute("""
+                CREATE TRIGGER IF NOT EXISTS trg_tasks_ad AFTER DELETE ON tasks BEGIN
+                    DELETE FROM tasks_fts WHERE task_id = old.id;
+                END;
+            """)
+            cursor.execute("""
+                CREATE TRIGGER IF NOT EXISTS trg_tasks_au AFTER UPDATE ON tasks BEGIN
+                    DELETE FROM tasks_fts WHERE task_id = old.id;
+                    INSERT INTO tasks_fts(task_id, title, description, log_content)
+                    VALUES (
+                        new.id,
+                        new.title,
+                        coalesce(new.description, ''),
+                        coalesce((SELECT group_concat(content, ' ') FROM task_logs WHERE task_id = new.id), '')
+                    );
+                END;
+            """)
+
+            # Triggers de logs/diario
+            cursor.execute("""
+                CREATE TRIGGER IF NOT EXISTS trg_logs_ai AFTER INSERT ON task_logs BEGIN
+                    UPDATE tasks_fts
+                    SET log_content = (SELECT group_concat(content, ' ') FROM task_logs WHERE task_id = new.task_id)
+                    WHERE task_id = new.task_id;
+                END;
+            """)
+            cursor.execute("""
+                CREATE TRIGGER IF NOT EXISTS trg_logs_au AFTER UPDATE ON task_logs BEGIN
+                    UPDATE tasks_fts
+                    SET log_content = (SELECT group_concat(content, ' ') FROM task_logs WHERE task_id = new.task_id)
+                    WHERE task_id = new.task_id;
+                END;
+            """)
+            cursor.execute("""
+                CREATE TRIGGER IF NOT EXISTS trg_logs_ad AFTER DELETE ON task_logs BEGIN
+                    UPDATE tasks_fts
+                    SET log_content = coalesce((SELECT group_concat(content, ' ') FROM task_logs WHERE task_id = old.task_id), '')
+                    WHERE task_id = old.task_id;
+                END;
+            """)
+
+            # Población inicial si tasks_fts está vacía y tasks tiene datos
+            cursor.execute("SELECT count(*) FROM tasks_fts")
+            fts_count = cursor.fetchone()[0]
+            if fts_count == 0:
+                cursor.execute("""
+                    INSERT INTO tasks_fts(task_id, title, description, log_content)
+                    SELECT t.id, t.title, coalesce(t.description, ''),
+                           coalesce((SELECT group_concat(content, ' ') FROM task_logs WHERE task_id = t.id), '')
+                    FROM tasks t
+                """)
+        except Exception:
+            pass
 
 
 # Re-exportar el API público de cada módulo de dominio, para que

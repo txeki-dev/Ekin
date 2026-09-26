@@ -5,7 +5,7 @@ y la lógica de selección múltiple de tarjetas / generación de SPEC de IA.
 """
 
 import os
-from PySide6.QtCore import Qt, QSize, QUrl
+from PySide6.QtCore import Qt, QSize, QUrl, QTimer
 from PySide6.QtWidgets import QDialog, QMessageBox, QMenu, QFileDialog
 from PySide6.QtGui import QDesktopServices
 
@@ -234,6 +234,20 @@ class BoardSelectionMixin:
         self.selected_task_ids.clear()
         self._update_cards_selection_ui()
 
+    def get_selected_task_ids_ordered(self) -> list[int]:
+        """Devuelve los IDs de las tareas seleccionadas en el orden visual del tablero."""
+        if not self.selected_task_ids:
+            return []
+        ordered = []
+        for col_widget in self.column_widgets.values():
+            for card in col_widget.findChildren(TaskCard):
+                if card.task_id in self.selected_task_ids and card.task_id not in ordered:
+                    ordered.append(card.task_id)
+        for tid in self.selected_task_ids:
+            if tid not in ordered:
+                ordered.append(tid)
+        return ordered
+
     def open_ai_spec_dialog(self):
         """Abre el generador modal de especificaciones para agentes de IA."""
         if not self.selected_task_ids:
@@ -312,4 +326,27 @@ class BoardMcpUiMixin:
         dlg = McpSyncDialog(self.board_id, parent=self.window(), db_path=self.db_path)
         if dlg.exec() == QDialog.Accepted:
             self._update_mcp_btn_ui()
+
+    def _flash_mcp_activity_indicator(self):
+        """Muestra un indicador visual temporal en el botón MCP cuando la IA modifica el tablero."""
+        if not hasattr(self, "mcp_btn") or not self.mcp_btn.isVisible():
+            return
+
+        self.mcp_btn.setText(t("mcp.board_btn_updated"))
+        self.mcp_btn.setIcon(lucide_icon("sparkles", "#ffffff", 15))
+        self.mcp_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {styles.COLORS['accent']};
+                border: none;
+                border-radius: 999px;
+                color: #ffffff;
+                padding: 6px 14px;
+                font-size: 12px;
+                font-weight: 700;
+            }}
+        """)
+
+        # Revertir al estado estándar tras 1800ms
+        QTimer.singleShot(1800, self._update_mcp_btn_ui)
+
 

@@ -1,10 +1,11 @@
-from PySide6.QtCore import Qt, QMimeData, QPoint, Signal, QRect, QSize, QTimer
+import json
+from datetime import datetime
+from PySide6.QtCore import Qt, QMimeData, QPoint, Signal, QRect, QRectF, QSize, QTimer
 from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QWidget, QMenu, QApplication, QLayout, QGraphicsDropShadowEffect
 )
-from PySide6.QtGui import QDrag, QPixmap, QCursor, QPainter, QColor
-from datetime import datetime
+from PySide6.QtGui import QDrag, QPixmap, QCursor, QPainter, QColor, QBrush, QPen, QFont, QFontMetrics
 import styles
 from strings import t
 from icons import lucide_icon
@@ -91,14 +92,18 @@ class FlowLayout(QLayout):
 
 
 def compute_drop_index(cards_geom, drop_y, dragged_id):
-    """Índice de inserción para una tarjeta soltada en `drop_y`.
+    """Índice de inserción para una o varias tarjetas soltadas en `drop_y`.
 
     `cards_geom` es una lista de `(task_id, y, height)` en orden visual. Se EXCLUYE la
-    tarjeta arrastrada (`dragged_id`), que está oculta durante el arrastre: su hueco no
-    debe contar. El índice resultante vive en el mismo espacio (sin la tarjeta movida)
+    tarjeta o tarjetas arrastradas (`dragged_id`), que están ocultas durante el arrastre: su hueco no
+    debe contar. El índice resultante vive en el mismo espacio (sin las tarjetas movidas)
     que usa `BoardViewWidget.handle_task_drop`, evitando el off-by-one al soltar por
     debajo de la posición original dentro de la misma columna."""
-    cards = [(tid, y, h) for (tid, y, h) in cards_geom if tid != dragged_id]
+    if isinstance(dragged_id, (set, list, tuple)):
+        excluded = set(dragged_id)
+    else:
+        excluded = {dragged_id}
+    cards = [(tid, y, h) for (tid, y, h) in cards_geom if tid not in excluded]
     for idx, (tid, y, h) in enumerate(cards):
         if drop_y < y + h / 2:
             return idx
@@ -445,48 +450,146 @@ class TaskCard(QFrame):
             self.drag_start_position = event.position().toPoint()
         super().mousePressEvent(event)
 
+    def _create_drag_pixmap(self, count: int) -> QPixmap:
+        """Genera una vista previa del arrastre: si hay varias tarjetas seleccionadas,
+        renderiza un mazo apilado con efecto 3D y un badge con el recuento."""
+        dpr = self.devicePixelRatio()
+        base_w = self.width()
+        base_h = self.height()
+
+        if count <= 1:
+            pixmap = QPixmap(int(base_w * dpr), int(base_h * dpr))
+            pixmap.setDevicePixelRatio(dpr)
+            pixmap.fill(Qt.transparent)
+            self.render(pixmap)
+            return pixmap
+
+        extra_layers = min(count - 1, 2)
+        offset_step = 6
+        extra_w = extra_layers * offset_step
+        extra_h = extra_layers * offset_step
+
+        total_w = base_w + extra_w + 12
+        total_h = base_h + extra_h + 12
+
+        pixmap = QPixmap(int(total_w * dpr), int(total_h * dpr))
+        pixmap.setDevicePixelRatio(dpr)
+        pixmap.fill(Qt.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        card_radius = 16.0
+        bg_brush = QBrush(QColor(styles.COLORS.get("bg_card", "#ffffff")))
+        border_pen = QPen(QColor(styles.COLORS.get("border", "#e2e8f0")), 1.5)
+
+        # 1. Siluetas de las tarjetas apiladas en el fondo
+        for layer in range(extra_layers, 0, -1):
+            ox = layer * offset_step
+            oy = layer * offset_step
+            painter.setPen(border_pen)
+            painter.setBrush(bg_brush)
+            painter.drawRoundedRect(QRectF(ox, oy, base_w, base_h), card_radius, card_radius)
+
+        # 2. Renderizar la tarjeta frontal (self)
+        front_pixmap = QPixmap(int(base_w * dpr), int(base_h * dpr))
+        front_pixmap.setDevicePixelRatio(dpr)
+        front_pixmap.fill(Qt.transparent)
+        self.render(front_pixmap)
+        painter.drawPixmap(0, 0, front_pixmap)
+
+        # 3. Badge con el número de tareas (ej. "📦 3")
+        badge_text = f"📦 {count}"
+        badge_font = QFont()
+        badge_font.setPointSize(9)
+        badge_font.setBold(True)
+        painter.setFont(badge_font)
+
+        fm = QFontMetrics(badge_font)
+        text_w = fm.horizontalAdvance(badge_text)
+        text_h = fm.height()
+
+        badge_pad_h = 10
+        badge_pad_v = 4
+        badge_w = text_w + badge_pad_h * 2
+        badge_h = text_h + badge_pad_v * 2
+
+        badge_x = base_w - badge_w + extra_w
+        badge_y = 2
+
+        badge_rect = QRectF(badge_x, badge_y, badge_w, badge_h)
+        badge_bg = QColor(styles.COLORS.get("accent", "#2563eb"))
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QBrush(badge_bg))
+        painter.drawRoundedRect(badge_rect, badge_h / 2, badge_h / 2)
+
+        painter.setPen(QColor("#ffffff"))
+        painter.drawText(badge_rect, Qt.AlignCenter, badge_text)
+
+        painter.end()
+        return pixmap
+
     def mouseMoveEvent(self, event):
         if not (event.buttons() & Qt.LeftButton):
             return
         if (event.position().toPoint() - self.drag_start_position).manhattanLength() < QApplication.startDragDistance():
             return
 
+        # Determinar si esta tarjeta forma parte de una selección múltiple activa
+        board = self.parent()
+        while board is not None and not hasattr(board, "selected_task_ids"):
+            board = board.parent()
+
+        if board and hasattr(board, "selected_task_ids") and self.task_id in board.selected_task_ids:
+            if hasattr(board, "get_selected_task_ids_ordered"):
+                batch_task_ids = board.get_selected_task_ids_ordered()
+            else:
+                batch_task_ids = list(board.selected_task_ids)
+            if self.task_id not in batch_task_ids:
+                batch_task_ids.append(self.task_id)
+        else:
+            batch_task_ids = [self.task_id]
+            if board and hasattr(board, "clear_task_selection") and getattr(board, "selected_task_ids", None):
+                board.clear_task_selection()
+
         # Iniciamos el arrastre (Drag)
         drag = QDrag(self)
         mime_data = QMimeData()
-        
-        # Codificamos el ID de la tarea en formato binario
+
+        # Codificamos el ID de la tarea principal (compatibilidad previa)
         mime_data.setData("application/x-ekin-task-id", str(self.task_id).encode("utf-8"))
+        # Codificamos la lista completa de tareas en formato JSON para transferencias en lote
+        mime_data.setData("application/x-ekin-tasks-json", json.dumps(batch_task_ids).encode("utf-8"))
         # Guardamos el ID de la columna origen
         mime_data.setData("application/x-ekin-source-column-id", str(self.task_data["column_id"]).encode("utf-8"))
-        
+
         drag.setMimeData(mime_data)
 
-        # Generamos una vista preliminar (pixmap) de la tarjeta a escala real para mostrarla nítida y completa
-        dpr = self.devicePixelRatio()
-        pixmap = QPixmap(self.size() * dpr)
-        pixmap.setDevicePixelRatio(dpr)
-        pixmap.fill(Qt.transparent)
-        
-        # Renderizar directamente sobre el pixmap (es un QPaintDevice)
-        self.render(pixmap)
-        
+        # Generamos la vista preliminar (con mazo apilado y badge si es un lote)
+        pixmap = self._create_drag_pixmap(len(batch_task_ids))
         drag.setPixmap(pixmap)
         drag.setHotSpot(event.position().toPoint())
 
-        # Ocultar la tarjeta original mientras arrastramos
-        self.hide()
-        
+        # Ocultar todas las tarjetas que se están arrastrando
+        cards_to_hide = [self]
+        if len(batch_task_ids) > 1 and board and hasattr(board, "column_widgets"):
+            for col_w in board.column_widgets.values():
+                for card in col_w.findChildren(TaskCard):
+                    if card.task_id in batch_task_ids and card is not self:
+                        cards_to_hide.append(card)
+
+        for c in cards_to_hide:
+            c.hide()
+
         # Ejecutar la acción drag-and-drop
         drop_action = drag.exec(Qt.MoveAction)
-        
-        # Si la tarea no se colocó en ningún lado (fue cancelada), volvemos a mostrarla
-        if drop_action == Qt.IgnoreAction:
-            self.show()
 
-        # QDrag.exec() ha devuelto el control: el arrastre ha terminado del todo
-        # (soltada en cualquier sitio, o cancelada). Único punto fiable para que
-        # BoardViewWidget sepa que debe cerrar una posible expansión por hover.
+        # Si el arrastre fue cancelado, volver a mostrar todas las tarjetas
+        if drop_action == Qt.IgnoreAction:
+            for c in cards_to_hide:
+                c.show()
+
+        # QDrag.exec() ha devuelto el control
         self.drag_ended.emit()
 
     def mouseReleaseEvent(self, event):
@@ -502,9 +605,12 @@ class TaskCard(QFrame):
 
 
 class TaskListArea(QWidget):
-    # Se emite cuando se completa el drop de una tarea
+    # Se emite cuando se completa el drop de una sola tarea
     # Parámetros: (task_id, target_column_id, position)
     task_dropped = Signal(int, int, int)
+    # Se emite cuando se completa el drop de múltiples tareas en lote
+    # Parámetros: (task_ids, target_column_id, position)
+    batch_tasks_dropped = Signal(list, int, int)
     # Se emite cuando una tarea arrastrada entra en esta área
     drag_entered = Signal()
     # Se emite cuando el arrastre sale del área
@@ -543,14 +649,28 @@ class TaskListArea(QWidget):
             self._drop_indicator.setParent(None)
             self._drop_indicator.hide()
 
-    def _get_dragged_task_id(self, event):
-        try:
-            return int(event.mimeData().data("application/x-ekin-task-id").data().decode("utf-8"))
-        except Exception:
-            return -1
+    def _get_dragged_task_ids(self, event) -> list:
+        mime = event.mimeData()
+        if mime.hasFormat("application/x-ekin-tasks-json"):
+            try:
+                data = json.loads(mime.data("application/x-ekin-tasks-json").data().decode("utf-8"))
+                if isinstance(data, list):
+                    return [int(x) for x in data]
+            except Exception:
+                pass
+        if mime.hasFormat("application/x-ekin-task-id"):
+            try:
+                return [int(mime.data("application/x-ekin-task-id").data().decode("utf-8"))]
+            except Exception:
+                pass
+        return []
+
+    def _get_dragged_task_id(self, event) -> int:
+        ids = self._get_dragged_task_ids(event)
+        return ids[0] if ids else -1
 
     def _update_drop_indicator(self, event):
-        task_id = self._get_dragged_task_id(event)
+        task_ids = self._get_dragged_task_ids(event)
         drop_y = event.position().y()
         cards_geom = []
         for i in range(self.list_layout.count()):
@@ -558,7 +678,7 @@ class TaskListArea(QWidget):
             if isinstance(w, TaskCard) and w is not self._drop_indicator and w.isVisible():
                 cards_geom.append((w.task_id, w.y(), w.height()))
 
-        target_idx = compute_drop_index(cards_geom, drop_y, task_id)
+        target_idx = compute_drop_index(cards_geom, drop_y, task_ids)
         indicator = self._ensure_drop_indicator()
         current_idx = self.list_layout.indexOf(indicator)
         if current_idx != target_idx:
@@ -568,7 +688,8 @@ class TaskListArea(QWidget):
             indicator.show()
 
     def dragEnterEvent(self, event):
-        if event.mimeData().hasFormat("application/x-ekin-task-id"):
+        mime = event.mimeData()
+        if mime.hasFormat("application/x-ekin-task-id") or mime.hasFormat("application/x-ekin-tasks-json"):
             event.acceptProposedAction()
             self.drag_entered.emit()
             self._update_drop_indicator(event)
@@ -576,7 +697,8 @@ class TaskListArea(QWidget):
             event.ignore()
 
     def dragMoveEvent(self, event):
-        if event.mimeData().hasFormat("application/x-ekin-task-id"):
+        mime = event.mimeData()
+        if mime.hasFormat("application/x-ekin-task-id") or mime.hasFormat("application/x-ekin-tasks-json"):
             event.acceptProposedAction()
             self._update_drop_indicator(event)
         else:
@@ -588,9 +710,8 @@ class TaskListArea(QWidget):
         super().dragLeaveEvent(event)
 
     def dropEvent(self, event):
-        mime = event.mimeData()
-        if mime.hasFormat("application/x-ekin-task-id"):
-            task_id = int(mime.data("application/x-ekin-task-id").data().decode("utf-8"))
+        task_ids = self._get_dragged_task_ids(event)
+        if task_ids:
             event.acceptProposedAction()
 
             drop_y = event.position().y()
@@ -600,10 +721,13 @@ class TaskListArea(QWidget):
                 if isinstance(w, TaskCard) and w is not self._drop_indicator:
                     cards_geom.append((w.task_id, w.y(), w.height()))
 
-            target_pos = compute_drop_index(cards_geom, drop_y, task_id)
+            target_pos = compute_drop_index(cards_geom, drop_y, task_ids)
             self._remove_drop_indicator()
             self.drag_left.emit()
-            self.task_dropped.emit(task_id, self.column_id, target_pos)
+            if len(task_ids) > 1:
+                self.batch_tasks_dropped.emit(task_ids, self.column_id, target_pos)
+            else:
+                self.task_dropped.emit(task_ids[0], self.column_id, target_pos)
         else:
             event.ignore()
 
@@ -678,12 +802,14 @@ class VerticalLabel(QLabel):
 class ColumnWidget(QFrame):
     # Señales reenviadas
     task_dropped = Signal(int, int, int) # task_id, column_id, position
+    batch_tasks_dropped = Signal(list, int, int) # task_ids, column_id, position
     add_task_requested = Signal(int)     # column_id
     edit_column_requested = Signal(int) # column_id
     delete_column_requested = Signal(int) # column_id
     copy_column_requested = Signal(int)  # column_id
     collapse_toggle_requested = Signal(int)  # column_id (plegar/desplegar)
     collapsed_card_drop = Signal(int, int)   # task_id, column_id (soltar tarjeta en columna plegada)
+    collapsed_batch_cards_drop = Signal(list, int) # task_ids, column_id
     hover_expand_requested = Signal(int)     # column_id (hover sostenido sobre columna plegada)
     column_activated = Signal(int)           # column_id (clic en cualquier parte "en blanco" de la columna)
 
@@ -858,6 +984,7 @@ class ColumnWidget(QFrame):
         self.list_area.setAttribute(Qt.WA_StyledBackground, True)
         self.list_area.setStyleSheet(f"background-color: {styles.COLORS['bg_column']};")
         self.list_area.task_dropped.connect(self.task_dropped.emit)
+        self.list_area.batch_tasks_dropped.connect(self.batch_tasks_dropped.emit)
 
         # Aplicar el estilo dinámico inicial a la columna
         self.set_column_style(dragging=False)
@@ -896,7 +1023,8 @@ class ColumnWidget(QFrame):
 
     # --- Soltar una tarjeta sobre una columna PLEGADA (solo activo si collapsed) ---
     def dragEnterEvent(self, event):
-        if self.collapsed and event.mimeData().hasFormat("application/x-ekin-task-id"):
+        mime = event.mimeData()
+        if self.collapsed and (mime.hasFormat("application/x-ekin-task-id") or mime.hasFormat("application/x-ekin-tasks-json")):
             event.acceptProposedAction()
             self.set_column_style(dragging=True)
             self._hover_timer.start()
@@ -904,7 +1032,8 @@ class ColumnWidget(QFrame):
             event.ignore()
 
     def dragMoveEvent(self, event):
-        if self.collapsed and event.mimeData().hasFormat("application/x-ekin-task-id"):
+        mime = event.mimeData()
+        if self.collapsed and (mime.hasFormat("application/x-ekin-task-id") or mime.hasFormat("application/x-ekin-tasks-json")):
             event.acceptProposedAction()
         else:
             event.ignore()
@@ -917,12 +1046,28 @@ class ColumnWidget(QFrame):
 
     def dropEvent(self, event):
         mime = event.mimeData()
-        if self.collapsed and mime.hasFormat("application/x-ekin-task-id"):
+        task_ids = []
+        if mime.hasFormat("application/x-ekin-tasks-json"):
+            try:
+                data = json.loads(mime.data("application/x-ekin-tasks-json").data().decode("utf-8"))
+                if isinstance(data, list):
+                    task_ids = [int(x) for x in data]
+            except Exception:
+                pass
+        if not task_ids and mime.hasFormat("application/x-ekin-task-id"):
+            try:
+                task_ids = [int(mime.data("application/x-ekin-task-id").data().decode("utf-8"))]
+            except Exception:
+                pass
+
+        if self.collapsed and task_ids:
             self._hover_timer.stop()
-            task_id = int(mime.data("application/x-ekin-task-id").data().decode("utf-8"))
             event.acceptProposedAction()
             self.set_column_style(dragging=False)
-            self.collapsed_card_drop.emit(task_id, self.column_id)
+            if len(task_ids) > 1:
+                self.collapsed_batch_cards_drop.emit(task_ids, self.column_id)
+            else:
+                self.collapsed_card_drop.emit(task_ids[0], self.column_id)
         else:
             event.ignore()
 

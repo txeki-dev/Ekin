@@ -1,7 +1,7 @@
 from PySide6.QtCore import Qt, Signal, QSize, QTimer
 from PySide6.QtWidgets import (
     QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QInputDialog, QMessageBox, QDialog
+    QScrollArea, QInputDialog, QMessageBox, QDialog, QApplication
 )
 import database
 import board_sync  # noqa: F401 - keeps import order to prevent circular import with controller
@@ -53,6 +53,9 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         self._timer_badge_refresh_timer = QTimer(self)
         self._timer_badge_refresh_timer.timeout.connect(self.refresh_timer_badges)
         self._timer_badge_refresh_timer.start(60_000)  # refresca las insignias cada 60s
+
+        self._last_db_data_version = None
+        self._last_board_fingerprint = None
 
         self.init_ui()
         self.data_changed.connect(self._trigger_auto_sync_export)
@@ -306,9 +309,96 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         from mcp_server import get_mcp_event_bus
         get_mcp_event_bus().board_mutated.connect(self._on_mcp_board_mutated)
 
+        # Monitoreo reactivo de mutaciones externas en base de datos vía PRAGMA data_version (CLI stdio o procesos paralelos)
+        self._mcp_poll_timer = QTimer(self)
+        self._mcp_poll_timer.setInterval(400)
+        self._mcp_poll_timer.timeout.connect(self._check_external_mcp_mutations)
+        self._mcp_poll_timer.start()
+
+        # Temporizador de debounce para recarga suave del tablero (evita parpadeos en ráfagas de herramientas MCP)
+        self._mcp_reload_debounce_timer = QTimer(self)
+        self._mcp_reload_debounce_timer.setSingleShot(True)
+        self._mcp_reload_debounce_timer.setInterval(150)
+        self._mcp_reload_debounce_timer.timeout.connect(self._perform_safe_mcp_board_reload)
+
     def _on_mcp_board_mutated(self, mutated_board_id: int):
         if self.board_id == mutated_board_id:
-            self.load_board(self.board_id, notify=False)
+            self._trigger_debounced_mcp_reload()
+
+    def _check_external_mcp_mutations(self):
+        """Monitorea mutaciones en la base de datos realizadas por agentes de IA vía MCP
+        (procesos CLI stdio o instancias externas) mediante PRAGMA data_version."""
+        if not self.board_id or self.board_id == -1:
+            return
+
+        # Si el usuario está interactuando activamente con el ratón (arrastrando o pulsando), posponer
+        if QApplication.mouseButtons() != Qt.NoButton:
+            return
+
+        try:
+            current_data_ver = database.get_db_data_version(self.db_path)
+            if self._last_db_data_version is None:
+                self._last_db_data_version = current_data_ver
+                self._last_board_fingerprint = database.get_board_mutation_fingerprint(self.board_id, self.db_path)
+                return
+
+            if current_data_ver == self._last_db_data_version:
+                return
+
+            self._last_db_data_version = current_data_ver
+            current_fingerprint = database.get_board_mutation_fingerprint(self.board_id, self.db_path)
+            if current_fingerprint != self._last_board_fingerprint:
+                self._last_board_fingerprint = current_fingerprint
+                from mcp_server import get_mcp_event_bus
+                get_mcp_event_bus().board_mutated.emit(self.board_id)
+                self._trigger_debounced_mcp_reload()
+        except Exception:
+            pass
+
+    def _trigger_debounced_mcp_reload(self):
+        """Inicia o reinicia el temporizador de debounce para recargar el tablero de forma suave."""
+        if self._mcp_reload_debounce_timer.isActive():
+            self._mcp_reload_debounce_timer.stop()
+        self._mcp_reload_debounce_timer.start()
+
+    def _perform_safe_mcp_board_reload(self):
+        """Ejecuta una recarga suave y segura del tablero cuando el agente de IA realiza cambios vía MCP,
+        preservando scrolls y actualizando el feedback visual del botón MCP."""
+        if not self.board_id or self.board_id == -1:
+            return
+
+        if QApplication.mouseButtons() != Qt.NoButton:
+            self._mcp_reload_debounce_timer.start(200)
+            return
+
+        # 1. Guardar scroll horizontal del tablero
+        h_scroll = self.board_scroll_area.horizontalScrollBar().value()
+
+        # 2. Guardar scroll vertical de cada columna
+        col_scrolls = {}
+        for cid, col_w in self.column_widgets.items():
+            scroll_area = col_w.findChild(QScrollArea)
+            if scroll_area:
+                col_scrolls[cid] = scroll_area.verticalScrollBar().value()
+
+        # 3. Recargar el tablero sin emitir data_changed redundante
+        self.load_board(self.board_id, notify=False)
+
+        # 4. Restaurar scrolls
+        self.board_scroll_area.horizontalScrollBar().setValue(h_scroll)
+        for cid, col_w in self.column_widgets.items():
+            if cid in col_scrolls:
+                scroll_area = col_w.findChild(QScrollArea)
+                if scroll_area:
+                    scroll_area.verticalScrollBar().setValue(col_scrolls[cid])
+
+        # 5. Feedback visual de microinteracción: destello sutil en el botón MCP
+        if hasattr(self, "_flash_mcp_activity_indicator"):
+            self._flash_mcp_activity_indicator()
+
+        # 6. Actualizar seguimiento de huella y versión de datos
+        self._last_board_fingerprint = database.get_board_mutation_fingerprint(self.board_id, self.db_path)
+        self._last_db_data_version = database.get_db_data_version(self.db_path)
 
     def _build_column_widget(self, col_data, tasks, board_info, timer_alert_hours):
         """Construye un ColumnWidget completo (señales conectadas y, si está desplegada,
@@ -320,12 +410,14 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         col_widget = ColumnWidget(col_data, self)
 
         col_widget.task_dropped.connect(self.handle_task_drop)
+        col_widget.batch_tasks_dropped.connect(self.handle_batch_tasks_drop)
         col_widget.add_task_requested.connect(self.add_task)
         col_widget.edit_column_requested.connect(self.edit_column)
         col_widget.delete_column_requested.connect(self.delete_column)
         col_widget.copy_column_requested.connect(self.copy_column)
         col_widget.collapse_toggle_requested.connect(self.handle_column_collapse)
         col_widget.collapsed_card_drop.connect(self.handle_collapsed_card_drop)
+        col_widget.collapsed_batch_cards_drop.connect(self.handle_collapsed_batch_cards_drop)
         col_widget.hover_expand_requested.connect(self.handle_hover_expand_requested)
         col_widget.column_activated.connect(self._set_last_active_column)
 
@@ -507,6 +599,10 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
 
         # Actualizar visibilidad de selección múltiple
         self._update_cards_selection_ui()
+
+        # Actualizar huella y versión de datos tras carga exitosa
+        self._last_board_fingerprint = database.get_board_mutation_fingerprint(self.board_id, self.db_path)
+        self._last_db_data_version = database.get_db_data_version(self.db_path)
 
         if notify:
             self.data_changed.emit()
@@ -832,70 +928,110 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
 
     # --- DRAG & DROP DE TAREAS ---
 
+    def handle_batch_tasks_drop(self, task_ids, target_column_id, target_position):
+        """Maneja la recolocación en lote de múltiples tareas tras arrastrarlas."""
+        self.handle_task_drop(task_ids, target_column_id, target_position)
+
+    def handle_collapsed_batch_cards_drop(self, task_ids, column_id):
+        """Soltar un lote de tarjetas sobre una columna plegada: la despliega y coloca las tarjetas al final."""
+        database.set_column_collapsed(column_id, False, self.db_path)
+        self.handle_task_drop(task_ids, column_id, 10 ** 9)
+
+    def _push_move_undo(self, label, old_positions, new_positions, affected_cols):
+        """Registra una acción deshacer/rehacer para el movimiento (individual o en lote) de tareas."""
+        if self.undo_manager is None:
+            return
+
+        def do_undo():
+            database.update_task_positions(old_positions, self.db_path)
+            for cid in affected_cols:
+                self._rebuild_single_column(cid)
+            self._update_board_counts()
+            self.data_changed.emit()
+            self._trigger_auto_sync_export()
+
+        def do_redo():
+            database.update_task_positions(new_positions, self.db_path)
+            for cid in affected_cols:
+                self._rebuild_single_column(cid)
+            self._update_board_counts()
+            self.data_changed.emit()
+            self._trigger_auto_sync_export()
+
+        self.undo_manager.push(UndoAction(label, do_undo, do_redo))
+
     def handle_task_drop(self, task_id, target_column_id, target_position):
-        """Maneja la lógica de recolocación de tareas tras arrastrarlas."""
-        task_data = database.get_task(task_id, self.db_path)
-        if not task_data:
+        """Maneja la lógica de recolocación de tareas (individual o por lote) tras arrastrarlas."""
+        if isinstance(task_id, (list, tuple, set)):
+            task_ids = [int(x) for x in task_id]
+        else:
+            task_ids = [int(task_id)]
+
+        if not task_ids:
             return
 
-        source_column_id = task_data["column_id"]
+        # 1. Obtener datos de todas las tareas a mover
+        tasks_data = []
+        for tid in task_ids:
+            t_data = database.get_task(tid, self.db_path)
+            if t_data:
+                tasks_data.append(t_data)
 
-        # 1. Obtener todas las tareas de la columna origen
-        source_tasks = database.get_tasks(source_column_id, self.db_path)
-        
-        # 2. Obtener todas las tareas de la columna destino (si es distinta)
-        if source_column_id != target_column_id:
-            target_tasks = database.get_tasks(target_column_id, self.db_path)
-        else:
-            target_tasks = source_tasks
-
-        # Remover la tarea que se está moviendo de la lista de origen
-        moved_task = None
-        for task in source_tasks:
-            if task["id"] == task_id:
-                moved_task = task
-                source_tasks.remove(task)
-                break
-        
-        if not moved_task:
+        if not tasks_data:
             return
 
-        # Insertar la tarea en la nueva posición de la columna de destino
-        # Asegurar que el índice no exceda los límites
-        insert_idx = min(max(0, target_position), len(target_tasks))
-        
-        if source_column_id == target_column_id:
-            # Reinsertar en la misma lista
-            source_tasks.insert(insert_idx, moved_task)
-            
-            # Generar updates para escribir en DB
-            updates = []
-            for i, task in enumerate(source_tasks):
-                updates.append((task["id"], source_column_id, i))
-        else:
-            # Insertar en la lista destino
-            target_tasks.insert(insert_idx, moved_task)
-            
-            updates = []
-            # Updates para origen
-            for i, task in enumerate(source_tasks):
-                updates.append((task["id"], source_column_id, i))
-            # Updates para destino
-            for i, task in enumerate(target_tasks):
-                updates.append((task["id"], target_column_id, i))
+        # 2. Identificar columnas origen y afectadas
+        source_column_ids = list(dict.fromkeys(task_item["column_id"] for task_item in tasks_data))
+        affected_cols = set(source_column_ids) | {target_column_id}
 
-        # 3. Guardar las nuevas posiciones en la base de datos
-        database.update_task_positions(updates, self.db_path)
+        # 3. Leer tareas actuales de todas las columnas afectadas para snapshot de undo y cálculo
+        current_col_tasks = {}
+        old_positions = []
+        for cid in affected_cols:
+            col_tasks = database.get_tasks(cid, self.db_path)
+            current_col_tasks[cid] = col_tasks
+            for task_item in col_tasks:
+                old_positions.append((task_item["id"], task_item["column_id"], task_item["position"]))
 
-        # 4. Actualización incremental: reconstruir únicamente las columnas afectadas
-        if source_column_id == target_column_id:
-            self._rebuild_single_column(source_column_id)
-        else:
-            self._rebuild_single_column(source_column_id)
-            self._rebuild_single_column(target_column_id)
+        # 4. Remover las tareas movidas de sus respectivas columnas
+        task_id_set = {task_item["id"] for task_item in tasks_data}
+        remaining_col_tasks = {}
+        for cid in affected_cols:
+            remaining_col_tasks[cid] = [task_item for task_item in current_col_tasks[cid] if task_item["id"] not in task_id_set]
+
+        # 5. Insertar tareas movidas en la columna destino
+        target_list = remaining_col_tasks[target_column_id]
+        insert_idx = min(max(0, target_position), len(target_list))
+        for offset, task_item in enumerate(tasks_data):
+            target_list.insert(insert_idx + offset, task_item)
+
+        # 6. Generar nuevas posiciones para DB
+        new_positions = []
+        for cid in affected_cols:
+            for idx, task_item in enumerate(remaining_col_tasks[cid]):
+                new_positions.append((task_item["id"], cid, idx))
+
+        # 7. Actualizar en base de datos
+        database.update_task_positions(new_positions, self.db_path)
+
+        # 8. Registrar acción de deshacer / rehacer
+        if old_positions != new_positions:
+            if len(tasks_data) > 1:
+                label = t("board_view.move_batch_tasks.undo_label", count=len(tasks_data))
+            else:
+                label = t("board_view.move_task.undo_label")
+            self._push_move_undo(label, old_positions, new_positions, affected_cols)
+
+        # 9. Actualización incremental: reconstruir únicamente las columnas afectadas
+        for cid in affected_cols:
+            self._rebuild_single_column(cid)
+
         self._update_board_counts()
         self.data_changed.emit()
         self._trigger_auto_sync_export()
+
+        if hasattr(self, "_update_cards_selection_ui"):
+            self._update_cards_selection_ui()
 
     # --- LANDING TOUR INTERACTIVO IN-SITU ---
 

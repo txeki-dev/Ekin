@@ -24,6 +24,7 @@ import queue
 import re
 import secrets
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qs, urlparse
@@ -276,6 +277,64 @@ def get_mcp_tools_schema() -> List[Dict[str, Any]]:
                 "required": ["text"],
             },
         },
+        {
+            "name": "search_tasks_semantic",
+            "description": "Realiza una búsqueda semántica basada en embeddings sobre las tareas del tablero para encontrar tareas conceptualmente afines a una consulta en lenguaje natural.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Consulta en lenguaje natural o concepto a buscar."},
+                    "top_k": {"type": "integer", "description": "Número máximo de tareas a retornar (por defecto 5)."},
+                    "mask_sensitive": {
+                        "type": "boolean",
+                        "description": "Si es True, aplica sanitización local de datos sensibles y PII (claves API, tokens, emails).",
+                    },
+                },
+                "required": ["query"],
+            },
+        },
+        {
+            "name": "create_tasks_batch",
+            "description": "Crea múltiples tarjetas de tareas de forma atómica en una columna dentro de una única transacción.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "column_id": {"type": "integer", "description": "ID de la columna donde se crearán las tareas."},
+                    "tasks": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "title": {"type": "string", "description": "Título de la tarea."},
+                                "description": {"type": "string", "description": "Descripción en Markdown."},
+                                "priority": {"type": "string", "description": "Prioridad sugerida (ej. 'High', 'Medium', 'P0-Critical')."},
+                                "due_date": {"type": "string", "description": "Fecha de vencimiento en formato ISO (YYYY-MM-DD)."},
+                                "tags": {"type": "array", "items": {"type": "string"}, "description": "Lista de etiquetas."},
+                            },
+                            "required": ["title"],
+                        },
+                        "description": "Lista de tareas a crear.",
+                    },
+                },
+                "required": ["column_id", "tasks"],
+            },
+        },
+        {
+            "name": "control_task_timer",
+            "description": "Controla el temporizador de ejecución de una tarea (iniciar, detener o consultar estado) para rastrear el tiempo dedicado por el agente.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "integer", "description": "ID de la tarea."},
+                    "action": {
+                        "type": "string",
+                        "enum": ["start", "stop", "status"],
+                        "description": "Acción a realizar sobre el temporizador: 'start' para iniciarlo, 'stop' para detenerlo, 'status' para consultar tiempo transcurrido.",
+                    },
+                },
+                "required": ["task_id", "action"],
+            },
+        },
     ]
 
 
@@ -494,6 +553,13 @@ class McpToolExecutor:
         audit_entry = f"[{safe_client}]: Tarea creada a través de integración MCP."
         database.add_task_log(task_id, audit_entry, db_path=self.db_path)
 
+        # Auto-indexar embedding para búsquedas semánticas inmediatas
+        try:
+            import local_ai
+            local_ai.index_task_embedding(task_id, title, desc, db_path=self.db_path)
+        except Exception:
+            pass
+
         # Notificar a la UI
         get_mcp_event_bus().board_mutated.emit(self.board_id)
 
@@ -683,6 +749,163 @@ class McpToolExecutor:
             "redactions": redactions,
         }
 
+    def _tool_search_tasks_semantic(self, args: Dict[str, Any]) -> List[Dict[str, Any]]:
+        query = str(args.get("query", "")).strip()
+        top_k = int(args.get("top_k", 5))
+        mask_sensitive = bool(args.get("mask_sensitive", False))
+        if not query:
+            return []
+
+        import local_ai
+        results = local_ai.semantic_search_tasks(
+            query=query,
+            board_id=self.board_id,
+            top_k=top_k,
+            db_path=self.db_path,
+        )
+
+        formatted = []
+        for item in results:
+            desc = item.get("description", "") or ""
+            if mask_sensitive and desc:
+                import privacy_shield
+                desc, _ = privacy_shield.sanitize_text(desc)
+
+            formatted.append({
+                "id": item["id"],
+                "title": item["title"],
+                "column_id": item["column_id"],
+                "column_name": item.get("column_name", ""),
+                "description": desc,
+                "due_date": item.get("due_date"),
+                "similarity": round(float(item.get("similarity", 0.0)), 3),
+            })
+        return formatted
+
+    def _tool_create_tasks_batch(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        col_id = args["column_id"]
+        tasks_list = args.get("tasks", [])
+        if not tasks_list:
+            return {"success": True, "created_count": 0, "tasks": []}
+
+        self._verify_column_belongs_to_board(col_id)
+
+        tasks_data = []
+        for t in tasks_list:
+            title = str(t.get("title", "")).strip()
+            desc = t.get("description", "") or ""
+            due = t.get("due_date")
+            tasks_data.append({
+                "column_id": col_id,
+                "title": title,
+                "description": desc,
+                "due_date": due,
+            })
+
+        created_ids = database.create_tasks_batch(tasks_data, db_path=self.db_path)
+
+        safe_client = html.escape(self.client_name)
+        audit_entry = f"[{safe_client}]: Tarea creada en lote (batch) a través de integración MCP."
+
+        created_summary = []
+        import local_ai
+        for idx, tid in enumerate(created_ids):
+            t_orig = tasks_list[idx]
+            tag_names = t_orig.get("tags", [])
+            priority = t_orig.get("priority")
+            tag_ids = []
+            if priority:
+                prio_id = database.get_or_create_tag_value("Priority", priority, "#f59e0b", db_path=self.db_path)
+                tag_ids.append(prio_id)
+            for tname in tag_names:
+                t_id = database.get_or_create_tag_value("General", tname, "#6b7280", db_path=self.db_path)
+                if t_id not in tag_ids:
+                    tag_ids.append(t_id)
+            if tag_ids:
+                database.set_task_tags(tid, tag_ids, db_path=self.db_path)
+
+            database.add_task_log(tid, audit_entry, db_path=self.db_path)
+
+            try:
+                local_ai.index_task_embedding(tid, t_orig.get("title", ""), t_orig.get("description", ""), db_path=self.db_path)
+            except Exception:
+                pass
+
+            created_summary.append({
+                "task_id": tid,
+                "title": t_orig.get("title", ""),
+                "column_id": col_id,
+            })
+
+        get_mcp_event_bus().board_mutated.emit(self.board_id)
+
+        return {
+            "success": True,
+            "created_count": len(created_ids),
+            "tasks": created_summary,
+            "message": f"Se crearon {len(created_ids)} tareas con éxito en la columna ID {col_id}."
+        }
+
+    def _tool_control_task_timer(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        from datetime import datetime
+        task_id = args["task_id"]
+        action = str(args.get("action", "")).lower().strip()
+        task = self._verify_task_belongs_to_board(task_id)
+
+        now_dt = datetime.now()
+        timer_started_at = task.get("timer_started_at")
+
+        def _calc_elapsed(raw_val: Any) -> float:
+            if not raw_val:
+                return 0.0
+            try:
+                if isinstance(raw_val, (int, float)):
+                    return max(0.0, now_dt.timestamp() - raw_val)
+                st = datetime.fromisoformat(str(raw_val))
+                return max(0.0, (now_dt - st).total_seconds())
+            except Exception:
+                return 0.0
+
+        if action == "start":
+            if not timer_started_at:
+                iso_now = now_dt.isoformat()
+                database.set_task_timer_started(task_id, iso_now, db_path=self.db_path)
+                safe_client = html.escape(self.client_name)
+                database.add_task_log(task_id, f"[{safe_client}]: Temporizador iniciado.", db_path=self.db_path)
+                get_mcp_event_bus().board_mutated.emit(self.board_id)
+                timer_started_at = iso_now
+            return {
+                "task_id": task_id,
+                "timer_running": True,
+                "started_at": timer_started_at,
+                "message": f"Temporizador en marcha para tarea {task_id}.",
+            }
+        elif action == "stop":
+            elapsed = _calc_elapsed(timer_started_at)
+            if timer_started_at:
+                database.set_task_timer_started(task_id, None, db_path=self.db_path)
+                safe_client = html.escape(self.client_name)
+                hrs = elapsed / 3600.0
+                database.add_task_log(task_id, f"[{safe_client}]: Temporizador detenido ({hrs:.2f}h dedicadas).", db_path=self.db_path)
+                get_mcp_event_bus().board_mutated.emit(self.board_id)
+            return {
+                "task_id": task_id,
+                "timer_running": False,
+                "elapsed_seconds": round(elapsed, 1),
+                "message": f"Temporizador detenido para tarea {task_id}.",
+            }
+        elif action == "status":
+            is_running = bool(timer_started_at)
+            elapsed = _calc_elapsed(timer_started_at) if is_running else 0.0
+            return {
+                "task_id": task_id,
+                "timer_running": is_running,
+                "started_at": timer_started_at,
+                "elapsed_seconds": round(elapsed, 1),
+            }
+        else:
+            raise ValueError(f"Acción de temporizador no reconocida: '{action}'. Debe ser 'start', 'stop' o 'status'.")
+
 
 # --- PROCESADOR JSON-RPC DE PROTOCOLO MCP ---
 
@@ -821,7 +1044,10 @@ class _SseClientSession:
     def __init__(self, session_id: str, board_uuid: str):
         self.session_id = session_id
         self.board_uuid = board_uuid
-        self.message_queue: queue.Queue = queue.Queue()
+        self.message_queue: queue.Queue = queue.Queue(maxsize=100)
+        self.created_at: float = time.time()
+        self.last_active_at: float = time.time()
+        self.is_closed: bool = False
 
 
 class McpHttpHandler(BaseHTTPRequestHandler):
@@ -910,7 +1136,7 @@ class McpHttpHandler(BaseHTTPRequestHandler):
             self.wfile.flush()
 
             try:
-                while self.server.is_running:
+                while self.server.is_running and not session.is_closed:
                     try:
                         msg = session.message_queue.get(timeout=1.0)
                         if msg is None:
@@ -918,13 +1144,16 @@ class McpHttpHandler(BaseHTTPRequestHandler):
                         event_payload = f"event: message\ndata: {json.dumps(msg)}\n\n"
                         self.wfile.write(event_payload.encode("utf-8"))
                         self.wfile.flush()
+                        session.last_active_at = time.time()
                     except queue.Empty:
                         # Enviar comentario keepalive para evitar desconexiones de timeout
                         self.wfile.write(b": keepalive\n\n")
                         self.wfile.flush()
-            except (ConnectionError, BrokenPipeError):
+                        session.last_active_at = time.time()
+            except (ConnectionError, BrokenPipeError, ConnectionResetError, OSError):
                 pass
             finally:
+                session.is_closed = True
                 self.server.unregister_session(session_id)
             return
 
@@ -1008,6 +1237,40 @@ class McpHttpServer(ThreadingHTTPServer):
         self.is_running = True
         self._sessions: Dict[str, _SseClientSession] = {}
         self._lock = threading.Lock()
+        self._scavenger_thread: Optional[threading.Thread] = None
+
+    def start_scavenger(self, interval_seconds: float = 10.0, max_idle_seconds: float = 120.0):
+        """Inicia un hilo en segundo plano que limpia sesiones SSE inactivas o zombies."""
+        def _scavenger_loop():
+            while self.is_running:
+                time.sleep(interval_seconds)
+                if not self.is_running:
+                    break
+                try:
+                    self.scavenge_stale_sessions(max_idle_seconds=max_idle_seconds)
+                except Exception:
+                    pass
+
+        self._scavenger_thread = threading.Thread(target=_scavenger_loop, daemon=True, name="EkinMcpScavenger")
+        self._scavenger_thread.start()
+
+    def scavenge_stale_sessions(self, max_idle_seconds: float = 120.0) -> int:
+        """Detecta y purga sesiones inactivas o cerradas para evitar fugas de memoria."""
+        now = time.time()
+        stale_ids = []
+        with self._lock:
+            for sid, sess in list(self._sessions.items()):
+                if sess.is_closed or (now - sess.last_active_at > max_idle_seconds):
+                    stale_ids.append(sid)
+            for sid in stale_ids:
+                sess = self._sessions.pop(sid, None)
+                if sess:
+                    sess.is_closed = True
+                    try:
+                        sess.message_queue.put_nowait(None)
+                    except Exception:
+                        pass
+        return len(stale_ids)
 
     def register_session(self, session: _SseClientSession):
         with self._lock:
@@ -1015,19 +1278,34 @@ class McpHttpServer(ThreadingHTTPServer):
 
     def unregister_session(self, session_id: str):
         with self._lock:
-            self._sessions.pop(session_id, None)
+            sess = self._sessions.pop(session_id, None)
+            if sess:
+                sess.is_closed = True
 
-    def send_to_session(self, session_id: str, data: Any):
+    def send_to_session(self, session_id: str, data: Any) -> bool:
         with self._lock:
             session = self._sessions.get(session_id)
-            if session:
-                session.message_queue.put(data)
+            if not session or session.is_closed:
+                return False
+            try:
+                # Si la cola excede 100 mensajes, el cliente no está consumiendo (zombie)
+                if session.message_queue.qsize() >= 100:
+                    session.is_closed = True
+                    self._sessions.pop(session_id, None)
+                    return False
+                session.message_queue.put_nowait(data)
+                return True
+            except Exception:
+                session.is_closed = True
+                self._sessions.pop(session_id, None)
+                return False
 
     def close_all_sessions(self):
         with self._lock:
             for session in list(self._sessions.values()):
+                session.is_closed = True
                 try:
-                    session.message_queue.put(None)
+                    session.message_queue.put_nowait(None)
                 except Exception:
                     pass
             self._sessions.clear()
@@ -1057,6 +1335,7 @@ class McpManager:
         self.port = port
         try:
             self.server = McpHttpServer(("127.0.0.1", self.port), McpHttpHandler, db_path=self.db_path)
+            self.server.start_scavenger()
             self.thread = threading.Thread(target=self.server.serve_forever, daemon=True, name="EkinMcpServer")
             self.thread.start()
             logger.info("Servidor MCP de Ekin iniciado en http://127.0.0.1:%s", self.port)

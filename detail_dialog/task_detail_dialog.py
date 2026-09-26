@@ -29,6 +29,8 @@ __all__ = [
     "_is_local_link", "confirm_open_untrusted_link", "open_link_safely"
 ]
 
+DEFAULT_LOGS_PAGE_SIZE = 15
+
 
 class _ClickOutsideFilter(QObject):
     """Filtro de eventos que detecta clics fuera del diálogo dentro de la ventana
@@ -73,6 +75,10 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         self.modified = False      # Indica si hubo algún cambio real (título, tags, diario, enlaces...)
         self._timer_started_at = None  # Timestamp ISO del temporizador en marcha, o None
         self._click_outside_filter = None
+        self._all_logs = []
+        self._visible_log_count = DEFAULT_LOGS_PAGE_SIZE
+        self._load_previous_btn = None
+        self._last_adjusted_content_w = None
 
         self.setWindowTitle(t("task_detail.window_title"))
         self.resize(1300, 780)
@@ -91,6 +97,25 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         # nada lo destruye por sí solo cuando se cierra -- sin esto, cada tarea abierta deja un
         # TaskDetailDialog zombi con su _timer_refresh_timer disparando para siempre.
         self.finished.connect(self.deleteLater)
+
+        # Escuchar mutaciones MCP en tiempo real para refrescar diario y datos si la tarea cambia externamente
+        try:
+            from mcp_server import get_mcp_event_bus
+            get_mcp_event_bus().board_mutated.connect(self._on_mcp_board_mutated)
+        except Exception:
+            pass
+
+    def _on_mcp_board_mutated(self, board_id: int):
+        """Refresca los datos y el diario en vivo si un agente de IA modifica la tarea vía MCP."""
+        try:
+            fresh = database.get_task(self.task_id, self.db_path)
+            if fresh:
+                if hasattr(self, "title_edit") and not self.title_edit.hasFocus():
+                    self.title_edit.setText(fresh["title"])
+                self.task_data = fresh
+                self.reload_logs()
+        except Exception:
+            pass
 
     def exec(self):
         """Abre el diálogo de forma síncrona sin bloquear la ventana padre, permitiendo
@@ -559,8 +584,9 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         self._update_notes_last_edited_label(updated_at)
 
         # Cargar enlaces y logs
+        self._visible_log_count = DEFAULT_LOGS_PAGE_SIZE
         self.reload_links()
-        self.reload_logs()
+        self.reload_logs(preserve_scroll=False)
 
     def render_tags(self):
         """Dibuja las etiquetas asignadas como pastillas (excluyendo Prioridad, que tiene su
@@ -933,8 +959,8 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         self.modified = True
         self.reload_links()
 
-    def reload_logs(self):
-        """Limpia y vuelve a cargar todos los logs/entradas del diario."""
+    def reload_logs(self, preserve_scroll: bool = False):
+        """Limpia y vuelve a cargar los logs/entradas del diario con carga diferida (lazy loading)."""
         # Limpiar contenedor de logs
         while self.logs_layout.count():
             item = self.logs_layout.takeAt(0)
@@ -943,17 +969,78 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
                 widget.deleteLater()
 
         # Consultar y agregar los logs
-        logs = database.get_logs(self.task_id, self.db_path)
-        for log in logs:
+        self._all_logs = database.get_logs(self.task_id, self.db_path)
+        total_logs = len(self._all_logs)
+
+        if total_logs > self._visible_log_count:
+            visible_logs = self._all_logs[-self._visible_log_count:]
+            remaining_logs = total_logs - self._visible_log_count
+        else:
+            visible_logs = self._all_logs
+            remaining_logs = 0
+
+        # Botón para cargar entradas anteriores si hay más en el historial
+        if remaining_logs > 0:
+            self._load_previous_btn = QPushButton(
+                t("task_detail.load_previous_logs", remaining=remaining_logs)
+            )
+            self._load_previous_btn.setObjectName("LoadPreviousLogsBtn")
+            self._load_previous_btn.setCursor(Qt.PointingHandCursor)
+            self._load_previous_btn.setIcon(lucide_icon("rotate-ccw", styles.COLORS['accent'], 13))
+            self._load_previous_btn.setIconSize(QSize(13, 13))
+            self._load_previous_btn.setStyleSheet(
+                f"QPushButton {{ background-color: {styles.COLORS['bg_card']}; "
+                f"border: 1px solid {styles.COLORS['border']}; border-radius: 6px; "
+                f"color: {styles.COLORS['accent']}; font-weight: 500; font-size: 12px; padding: 6px 12px; }}"
+                f"QPushButton:hover {{ background-color: {styles.COLORS['bg_hover']}; "
+                f"border-color: {styles.COLORS['accent']}; }}"
+            )
+            self._load_previous_btn.clicked.connect(self._load_previous_logs)
+            self.logs_layout.addWidget(self._load_previous_btn)
+        else:
+            self._load_previous_btn = None
+
+        for log in visible_logs:
             log_widget = LogEntryWidget(log, self.delete_log_entry, self.edit_log_entry, self)
             self.logs_layout.addWidget(log_widget)
         self.logs_layout.addStretch()
 
         if hasattr(self, "entries_count_label"):
-            self.entries_count_label.setText(t("task_detail.entries_count", count=len(logs)))
+            if remaining_logs > 0:
+                self.entries_count_label.setText(
+                    t("task_detail.entries_count_windowed", total=total_logs, visible=len(visible_logs))
+                )
+            else:
+                self.entries_count_label.setText(
+                    t("task_detail.entries_count", count=total_logs)
+                )
 
-        # Pequeño retardo para dar tiempo a Qt a renderizar antes de bajar el scroll
-        self.scroll_to_bottom()
+        if not preserve_scroll:
+            # Pequeño retardo para dar tiempo a Qt a renderizar antes de bajar el scroll
+            self.scroll_to_bottom()
+
+    def _load_previous_logs(self):
+        """Carga el siguiente lote de entradas anteriores del diario preservando la posición de lectura."""
+        total = len(self._all_logs)
+        if self._visible_log_count >= total:
+            return
+        scrollbar = self.scroll_area.verticalScrollBar()
+        prev_max = scrollbar.maximum()
+        prev_val = scrollbar.value()
+
+        self._visible_log_count = min(total, self._visible_log_count + DEFAULT_LOGS_PAGE_SIZE)
+        self.reload_logs(preserve_scroll=True)
+
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+
+        def _restore_scroll():
+            new_max = scrollbar.maximum()
+            diff = new_max - prev_max
+            scrollbar.setValue(prev_val + diff)
+
+        timer.timeout.connect(_restore_scroll)
+        timer.start(50)
 
     def edit_log_entry(self, log_id, new_html, widget=None):
         """Guarda la edición de un comentario (o cancela si new_html es None) in-place sin parpadeos."""
@@ -965,7 +1052,7 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
                 return
         elif widget is not None:
             return
-        self.reload_logs()
+        self.reload_logs(preserve_scroll=True)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -984,6 +1071,9 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         if w <= 0:
             return
         content_w = max(150, min(500, w - 48))
+        if hasattr(self, "_last_adjusted_content_w") and self._last_adjusted_content_w == content_w:
+            return
+        self._last_adjusted_content_w = content_w
         for i in range(self.logs_layout.count()):
             item = self.logs_layout.itemAt(i)
             if item and item.widget() and isinstance(item.widget(), LogEntryWidget):
@@ -1023,8 +1113,9 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         self.log_input.clear()
         self.modified = True
 
-        # En vez de recargar todo, recargamos para asegurar sincronización limpia
-        self.reload_logs()
+        # Incrementar el contador visible para incluir la nueva entrada y recargar
+        self._visible_log_count += 1
+        self.reload_logs(preserve_scroll=False)
 
     def delete_log_entry(self, log_id, widget):
         """Elimina una entrada de diario tras confirmación."""
@@ -1038,10 +1129,9 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         if confirm == QMessageBox.Yes:
             database.delete_log(log_id, self.db_path)
             self.modified = True
-            widget.deleteLater()
-            if hasattr(self, "entries_count_label"):
-                remaining_count = len(database.get_logs(self.task_id, self.db_path))
-                self.entries_count_label.setText(t("task_detail.entries_count", count=remaining_count))
+            if self._visible_log_count > 1:
+                self._visible_log_count -= 1
+            self.reload_logs(preserve_scroll=True)
 
     def scroll_to_bottom(self):
         """Mueve la barra de desplazamiento del diario hasta abajo."""

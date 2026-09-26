@@ -5,10 +5,48 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 
 ## 🎯 Prioritized Backlog
 
-_Added 2026-09-13 from an RDi exploration session (`<rdi_exploration_protocol>`), grounded in
-graphify AST analysis and cross-referenced against this backlog. Listed simplest → hardest by
-estimated complexity. (WAL/`busy_timeout`/`foreign_keys`, EN/ES i18n + live switcher, and Lucide
-icon `@lru_cache` were screened out as already shipped.)_
+_Added 2026-09-26 from an RDi exploration session (`<rdi_exploration_protocol>`), grounded in
+graphify AST analysis and cross-referenced against this backlog._
+
+- [x] **DONE (2026-09-26) — MCP Protocol Expansion: Semantic Vector Search & Batch Task Mutations** `[ARCH]`
+  · Impact: High · Complexity: S · `mcp_server.py` (`search_tasks_semantic`, `create_tasks_batch`, `control_task_timer`).
+    3 new tests in `tests/test_mcp.py` (436/436 green, 100% test suite passing, ruff clean).
+  - **Problem:** Ekin v1.1.0 introduced deterministic local embeddings and semantic task retrieval (`local_ai.semantic_search_tasks`), but the MCP server (`mcp_server.py`) did not expose this to connected AI agents (Claude Code, Antigravity, Cursor). Agents had to call `list_tasks` and ingest entire task lists, consuming excessive token budgets. Furthermore, decomposing epics into subtasks required repetitive single-task RPC invocations.
+  - **Solution:** Exposed `search_tasks_semantic` in `mcp_server.py` for natural language querying with cosine similarity, top-k ranking, and privacy shielding; exposed `create_tasks_batch` in the MCP schema to persist multiple cards atomically in a single JSON-RPC round-trip; exposed `control_task_timer` (start/stop/status) so agents can log and track execution duration with ISO compatibility.
+
+- [x] **DONE (2026-09-26) — MCP Server SSE Stale-Session Scavenger & Local AI Circuit Breaker** `[RESILIENCE]`
+  · Impact: Med–High · Complexity: S–M · `mcp_server.py` (`McpHttpServer`, `_SseClientSession`), `local_ai.py` (`LocalAiCircuitBreaker`, `SpecGenerationThread`, `get_local_embedding`)
+    4 new tests in `tests/test_mcp.py` and `tests/test_local_ai_rdi.py` (440/440 green, 100% test suite passing, ruff clean).
+  - **Problem:** `McpHttpServer` manages persistent SSE connections; abrupt client disconnects leave orphaned sessions in memory causing socket write errors on broadcast. Furthermore, if a local AI runner (`llama-server.exe` or Ollama) becomes unresponsive or crashes under VRAM pressure, threads block on socket timeouts, freezing workers or UI dialogs.
+  - **Solution:** Implemented background scavenger (`scavenge_stale_sessions`, daemon `EkinMcpScavenger` thread running every 10s) with 120s idle threshold and bounded queues (100 messages) for backpressure mitigation. Implemented `LocalAiCircuitBreaker` (`CLOSED` → `OPEN` → `HALF_OPEN`) in `local_ai.py` protecting embeddings and LLM streaming, fast-failing to instant offline structural specs when the runner is unresponsive.
+
+- [x] **DONE (2026-09-26) — Task Detail Modal Virtualized Lazy-Loading & Thumbnail Caching** `[PERF]`
+  · Impact: Med · Complexity: S–M · `detail_dialog/task_detail_dialog.py` (`reload_logs`, `_load_previous_logs`), `detail_dialog/html_utils.py` (`fit_html_images`), `detail_dialog/image_preview_dialog.py` (`pixmap_from_data_uri`).
+    3 new tests in `tests/test_ux_enhancements.py` (443/443 green, 100% test suite passing, ruff clean).
+  - **Problem:** `TaskDetailDialog.reload_logs()` instantiates a full `LogEntryWidget` for every historical entry in `task_logs`. For tasks with long discussion histories or pasted base64 screenshots (`fit_html_images`), opening the dialog causes noticeable frame drops due to constructing dozens of heavy widgets and layout recalculations.
+  - **Solution:** Implemented windowed lazy-loading in `TaskDetailDialog.reload_logs()`: renders the 15 most recent entries immediately with a dynamic *Load previous entries (N remaining)* button and relative scroll offset preservation. Integrated in-memory transformation caching in `html_utils.fit_html_images` and Qt `QPixmapCache` keyed by SHA-256 in `image_preview_dialog.pixmap_from_data_uri` to eliminate redundant base64 decoding and regex scans on modal open and resize events.
+
+- [x] **DONE (2026-09-26) — SQLite Full-Text Search (FTS5) & Connection Lifecycle Pooling** `[PERF]`
+  · Impact: High · Complexity: M · `database/connection.py` (`get_connection`, `close_cached_connections`), `database/__init__.py` (`tasks_fts`, triggers), `database/search.py` (`search_tasks`, `_search_tasks_fts`, `_search_tasks_like`).
+    3 new tests in `tests/test_database.py` (446/446 green, 100% test suite passing, ruff clean).
+  - **Problem:** `get_connection()` connects to disk and resets 3 PRAGMAs on every single query (99+ call sites across 12 modules), causing file-handle thrashing during bursts. `search_tasks()` uses unindexed SQL `LIKE '%query%'` across title and description, causing repeated full table scans on every keystroke in `CommandPalette`, and does not search rich journal entries in `task_logs`.
+  - **Solution:** Implemented thread-local connection pooling in `database/connection.py` (`threading.local()`, recursion depth tracking, `close_cached_connections` cleanup). Introduced an SQLite `FTS5` virtual table (`tasks_fts`) with unicode61 tokenizer indexing `task_id`, `title`, `description`, and aggregated `task_logs` kept in real-time sync via 6 SQLite triggers (`AFTER INSERT/UPDATE/DELETE` on `tasks` and `task_logs`). Upgraded `search_tasks()` with BM25 relevance ranking and prefix wildcard matching, with seamless fallback to `LIKE`.
+
+- [x] **DONE (2026-09-26) — Multi-Card Batch Drag-and-Drop for Bulk Column Transitions** `[FEAT]`
+  · Impact: High · Complexity: M · `widgets.py` (`TaskCard`, `TaskListArea`, `ColumnWidget`, `compute_drop_index`), `board_view.py` (`handle_task_drop`, `_push_move_undo`), `board_mixins.py` (`get_selected_task_ids_ordered`).
+    7 new tests in `tests/test_batch_drag_drop.py` (453/453 green, 100% test suite passing, ruff clean).
+  - **Problem:** Users can multi-select cards via `Ctrl + Click` (handled by `BoardSelectionMixin`), but dragging one of the selected cards currently moves only that individual card. Moving multiple tasks to another column requires repetitive drag operations or opening individual dialogs.
+  - **Solution:** Enhanced `TaskCard.mouseMoveEvent` to detect multi-card selection via `BoardSelectionMixin`, collecting selected task IDs in visual board order. Rendered stacked 3D preview pixmap with layered card silhouettes and an accent pill badge with task count (`📦 {count}`) in `TaskCard._create_drag_pixmap()`. Bundled full batch into `application/x-ekin-tasks-json` MIME payload while retaining `application/x-ekin-task-id` for backwards compatibility. Updated `TaskListArea` and `ColumnWidget` with `batch_tasks_dropped` signals and updated `compute_drop_index()` to exclude all batch task IDs from drop slot calculations to eliminate off-by-one errors. Upgraded `BoardViewWidget.handle_task_drop()` to execute atomic multi-task column transfers, recompacting source columns, preserving incremental column rebuilds, and recording full atomic Undo/Redo transactions (`_push_move_undo`). Added support for batch drops onto collapsed columns with automatic column expansion and tail positioning.
+
+- [x] **DONE (2026-09-26) — Live Cross-Process MCP Board Auto-Refresh & Visual Mutation Indicator (#53)** `[RESILIENCE/UX]`
+  · Impact: High · Complexity: S–M · `database/connection.py` (`get_db_data_version`), `database/boards.py` (`get_board_mutation_fingerprint`), `board_view.py` (`_check_external_mcp_mutations`, `_perform_safe_mcp_board_reload`), `board_mixins.py` (`_flash_mcp_activity_indicator`), `detail_dialog/task_detail_dialog.py` (`_on_mcp_board_mutated`).
+    4 new tests in `tests/test_mcp_live_refresh.py` (457/457 green, 100% test suite passing, ruff clean).
+  - **Problem:** When an AI agent modifies the board via the headless MCP CLI or server (`ekin_mcp`, Claude Code, Cursor, Antigravity), users running the Ekin Qt GUI had no automatic indication or reactive refresh. They had to manually restart the app or switch boards to see card movements, new tasks, or status changes. Additionally, if the task detail dialog was open while an AI agent appended comments or logs, those logs were invisible until reopened.
+  - **Solution:** Integrated ultra-lightweight SQLite `PRAGMA data_version` polling (~3.8 microseconds per check) combined with a deterministic board mutation fingerprint (`get_board_mutation_fingerprint`) running on a 400ms background Qt timer (`_check_external_mcp_mutations`) in `BoardViewWidget`. Applied a debounced 150ms reload cycle (`_perform_safe_mcp_board_reload`) that preserves both horizontal and per-column vertical scroll positions and defers updates if the user is actively clicking or dragging cards. Connected `McpEventBus.board_mutated` to `TaskDetailDialog` to hot-reload logs live, and flashed an accent badge (`✨ Updated by AI` / `✨ Actualizado por IA`) on the header MCP button upon external mutations.
+
+---
+
+_Historical Prioritized Backlog (Completed):_
 
 - [x] **DONE (2026-09-13) — Post-sync outcome summary** `[FEAT]` (sync observability)
   · Impact: Med · Complexity: S · `board_view.format_sync_summary` — concise result shown after any

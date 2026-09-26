@@ -331,3 +331,77 @@ def test_mcp_new_tools_and_mask_sensitive(db_path):
     # 5. list_tasks con mask_sensitive=True
     res_list = executor.execute("list_tasks", {"mask_sensitive": True})
     assert "[REDACTED_OPENAI_API_KEY]" in res_list["content"][0]["text"]
+
+
+# =====================================================================
+# FASE 4: RESILIENCIA - CIRCUIT BREAKER LOCAL AI
+# =====================================================================
+
+def test_local_ai_circuit_breaker_lifecycle():
+    import time
+
+    cb = local_ai.LocalAiCircuitBreaker(failure_threshold=2, recovery_timeout=0.1)
+    assert cb.state == local_ai.LocalAiCircuitBreaker.STATE_CLOSED
+    assert cb.allow_request() is True
+
+    # 1. Primer fallo: sigue CLOSED
+    cb.record_failure()
+    assert cb.state == local_ai.LocalAiCircuitBreaker.STATE_CLOSED
+    assert cb.allow_request() is True
+
+    # 2. Segundo fallo: supera el umbral y pasa a OPEN
+    cb.record_failure()
+    assert cb.state == local_ai.LocalAiCircuitBreaker.STATE_OPEN
+    assert cb.allow_request() is False
+
+    # 3. Esperar cooldown para pasar a HALF_OPEN
+    time.sleep(0.12)
+    assert cb.state == local_ai.LocalAiCircuitBreaker.STATE_HALF_OPEN
+    assert cb.allow_request() is True
+
+    # 4. Fallo en HALF_OPEN: vuelve inmediatamente a OPEN
+    cb.record_failure()
+    assert cb.state == local_ai.LocalAiCircuitBreaker.STATE_OPEN
+    assert cb.allow_request() is False
+
+    # 5. Esperar cooldown y éxito en HALF_OPEN -> vuelve a CLOSED
+    time.sleep(0.12)
+    assert cb.state == local_ai.LocalAiCircuitBreaker.STATE_HALF_OPEN
+    cb.record_success()
+    assert cb.state == local_ai.LocalAiCircuitBreaker.STATE_CLOSED
+    assert cb.allow_request() is True
+
+    # 6. Reset manual
+    cb.record_failure()
+    cb.record_failure()
+    assert cb.state == local_ai.LocalAiCircuitBreaker.STATE_OPEN
+    cb.reset()
+    assert cb.state == local_ai.LocalAiCircuitBreaker.STATE_CLOSED
+    assert cb.allow_request() is True
+
+
+def test_circuit_breaker_embedding_fast_fail(monkeypatch):
+    cb = local_ai.get_llm_circuit_breaker()
+    cb.reset()
+
+    # Forzar estado OPEN en el circuit breaker global
+    cb.record_failure()
+    cb.record_failure()
+    cb.record_failure()
+    assert cb.state == local_ai.LocalAiCircuitBreaker.STATE_OPEN
+
+    # Mockear is_ollama_available para asegurar que NO se llama al estar OPEN
+    called = []
+    def fake_ollama():
+        called.append(True)
+        return True
+
+    monkeypatch.setattr(local_ai, "is_ollama_available", fake_ollama)
+
+    # get_local_embedding debe derivar inmediatamente al fallback sin acceder a la red
+    vec = local_ai.get_local_embedding("Texto de prueba de resiliencia")
+    assert len(vec) == 128
+    assert len(called) == 0
+
+    cb.reset()
+

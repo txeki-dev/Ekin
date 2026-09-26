@@ -1374,3 +1374,99 @@ def test_database_sync_helpers_lifecycle(db_path):
     assert unlinked_info["last_synced_at"] is None
     assert database.get_synced_boards(db_path=db_path) == []
 
+
+# =====================================================================
+# PRUEBAS DE OPTIMIZACIÓN: CONNECTION POOLING & FTS5 FULL-TEXT SEARCH
+# =====================================================================
+
+def test_connection_pooling_and_lifecycle(db_path):
+    """Verifica que el pool de conexiones reutilice la conexión en el mismo hilo,
+    soporte anidamiento y permita purgar el caché limpiamente."""
+    # 1. Reutilización de conexión en llamadas consecutivas del mismo hilo
+    with database.get_connection(db_path) as c1:
+        id1 = id(c1)
+        c1.execute("SELECT 1;")
+
+    with database.get_connection(db_path) as c2:
+        id2 = id(c2)
+        assert id1 == id2  # Misma conexión en memoria reutilizada
+
+    # 2. Transacciones anidadas en el mismo hilo
+    with database.get_connection(db_path) as outer_conn:
+        b_id = database.create_board("Tablero Transacción", db_path=db_path)
+        with database.get_connection(db_path) as inner_conn:
+            assert outer_conn is inner_conn
+            col_id = database.create_column(b_id, "Col Transacción", db_path=db_path)
+            assert col_id > 0
+
+    # 3. Purga manual del caché de conexiones
+    database.close_cached_connections(db_path)
+    with database.get_connection(db_path) as c3:
+        id3 = id(c3)
+        assert id3 != id1  # Nueva conexión instanciada tras la purga
+
+
+def test_fts5_search_and_triggers(db_path):
+    """Verifica la indexación en tiempo real de FTS5 con triggers y ranking BM25:
+    1. Búsqueda por título y descripción.
+    2. Búsqueda profunda por contenido del diario (task_logs).
+    3. Actualización de tarea manteniendo logs en FTS5.
+    4. Eliminación de logs y tareas sincronizada con FTS5.
+    """
+    board_id = database.create_board("Tablero FTS5", db_path=db_path)
+    col_id = database.create_column(board_id, "Desarrollo", db_path=db_path)
+
+    # 1. Crear tarea y buscar por título con prefijo
+    t1 = database.create_task(col_id, "Implementar autenticación OAuth2", description="Flujo PKCE seguro", db_path=db_path)
+    t2 = database.create_task(col_id, "Diseño de interfaz gráfica", description="Componentes CSS", db_path=db_path)
+
+    res_auth = database.search_tasks("autentic", db_path=db_path)
+    assert len(res_auth) == 1
+    assert res_auth[0]["id"] == t1
+
+    res_pkce = database.search_tasks("PKCE", db_path=db_path)
+    assert len(res_pkce) == 1
+    assert res_pkce[0]["id"] == t1
+
+    # 2. Búsqueda por contenido del diario / task_logs
+    # 'diagnóstico' no aparece en el título ni descripción de ninguna tarea
+    database.create_log(t2, "<p>Registro de diagnóstico del rendimiento en UI</p>", db_path=db_path)
+    res_diag = database.search_tasks("diagnostico", db_path=db_path)
+    assert len(res_diag) == 1
+    assert res_diag[0]["id"] == t2
+
+    # 3. Actualizar título de la tarea: FTS5 debe reflejar el nuevo título y conservar logs
+    database.update_task(t2, "Rediseño completo de interfaz", description="Componentes CSS", db_path=db_path)
+    assert len(database.search_tasks("Rediseño", db_path=db_path)) == 1
+    assert len(database.search_tasks("diagnostico", db_path=db_path)) == 1
+
+    # 4. Borrar log y verificar que ya no coincide
+    logs = database.get_logs(t2, db_path=db_path)
+    assert len(logs) == 1
+    database.delete_log(logs[0]["id"], db_path=db_path)
+    assert len(database.search_tasks("diagnostico", db_path=db_path)) == 0
+    # Pero sigue encontrándose por su título
+    assert len(database.search_tasks("Rediseño", db_path=db_path)) == 1
+
+    # 5. Borrar tarea y verificar que se purga de FTS5
+    database.delete_task(t1, db_path=db_path)
+    assert len(database.search_tasks("autentic", db_path=db_path)) == 0
+
+
+def test_fts5_search_fallback_on_error(db_path):
+    """Verifica que si la tabla FTS5 no está disponible, search_tasks recurra
+    de forma transparente y segura a la búsqueda SQL LIKE."""
+    board_id = database.create_board("Tablero Fallback", db_path=db_path)
+    col_id = database.create_column(board_id, "Col Fallback", db_path=db_path)
+    t_id = database.create_task(col_id, "Tarea de Respaldo", description="Descripción de prueba", db_path=db_path)
+
+    # Forzar eliminación de la tabla virtual tasks_fts para simular entorno sin FTS5
+    with database.get_connection(db_path) as conn:
+        conn.execute("DROP TABLE IF EXISTS tasks_fts;")
+
+    # search_tasks debe atrapar OperationalError y usar _search_tasks_like
+    res = database.search_tasks("Respaldo", db_path=db_path)
+    assert len(res) == 1
+    assert res[0]["id"] == t_id
+
+

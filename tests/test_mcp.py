@@ -308,3 +308,273 @@ def test_ekin_mcp_cli_auth_failure(db_path, mcp_board, monkeypatch):
     with pytest.raises(SystemExit) as exc_info:
         ekin_mcp.main(argv)
     assert exc_info.value.code == 1
+
+
+def test_mcp_search_tasks_semantic(db_path, mcp_board):
+    """Prueba la búsqueda semántica basada en embeddings a través de la herramienta MCP."""
+    handler = McpProtocolHandler(mcp_board, db_path=db_path, client_name="SemanticAgent")
+    columns = database.get_columns(mcp_board["id"], db_path=db_path)
+    col_id = columns[0]["id"]
+
+    # Crear tareas con conceptos diferenciados
+    handler.handle({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": "create_task",
+            "arguments": {
+                "column_id": col_id,
+                "title": "Optimizar consultas SQL e índices de base de datos",
+                "description": "Configurar PRAGMAs WAL y pool de conexiones SQLite.",
+            },
+        },
+    })
+    handler.handle({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/call",
+        "params": {
+            "name": "create_task",
+            "arguments": {
+                "column_id": col_id,
+                "title": "Diseño visual de componentes y paleta de colores",
+                "description": "Tokens de estilo Orgánico y tema oscuro. Contacto: dev@example.com sk-proj-123456789012345678901234567890",
+            },
+        },
+    })
+
+    # 1. Búsqueda semántica sobre base de datos
+    search_req = {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "tools/call",
+        "params": {
+            "name": "search_tasks_semantic",
+            "arguments": {
+                "query": "persistencia sqlite y backend relacional",
+                "top_k": 3,
+            },
+        },
+    }
+    res = handler.handle(search_req)
+    results = json.loads(res["result"]["content"][0]["text"])
+    assert len(results) >= 1
+    assert "Optimizar consultas SQL" in results[0]["title"]
+    assert "similarity" in results[0]
+    assert results[0]["similarity"] > 0
+
+    # 2. Búsqueda semántica con sanitización de privacidad (Privacy Shield)
+    search_shield_req = {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "tools/call",
+        "params": {
+            "name": "search_tasks_semantic",
+            "arguments": {
+                "query": "interfaz de usuario colores y estilos",
+                "top_k": 3,
+                "mask_sensitive": True,
+            },
+        },
+    }
+    res_shield = handler.handle(search_shield_req)
+    results_shield = json.loads(res_shield["result"]["content"][0]["text"])
+    assert len(results_shield) >= 1
+    ui_task = next(r for r in results_shield if "Diseño visual" in r["title"])
+    assert "[REDACTED_EMAIL]" in ui_task["description"]
+    assert "dev@example.com" not in ui_task["description"]
+
+
+def test_mcp_create_tasks_batch(db_path, mcp_board):
+    """Prueba la creación atómica de múltiples tareas en lote (batch) vía MCP."""
+    handler = McpProtocolHandler(mcp_board, db_path=db_path, client_name="BatchAgent")
+    columns = database.get_columns(mcp_board["id"], db_path=db_path)
+    col_id = columns[1]["id"]
+
+    tasks_payload = [
+        {"title": "Subtarea 1: Migración", "description": "Detalles migración", "priority": "P0-Critical", "tags": ["db", "v1.2"]},
+        {"title": "Subtarea 2: API Endpoints", "description": "Endpoints REST/RPC", "priority": "P1-High", "tags": ["api"]},
+        {"title": "Subtarea 3: Tests unitarios", "description": "Cobertura 100%", "priority": "P2-Medium", "tags": ["qa"]},
+    ]
+
+    batch_req = {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "method": "tools/call",
+        "params": {
+            "name": "create_tasks_batch",
+            "arguments": {
+                "column_id": col_id,
+                "tasks": tasks_payload,
+            },
+        },
+    }
+    res = handler.handle(batch_req)
+    data = json.loads(res["result"]["content"][0]["text"])
+    assert data["success"] is True
+    assert data["created_count"] == 3
+    assert len(data["tasks"]) == 3
+
+    # Verificar existencia en BD
+    tasks_db = database.get_tasks(col_id, db_path=db_path)
+    titles = [t["title"] for t in tasks_db]
+    assert "Subtarea 1: Migración" in titles
+    assert "Subtarea 2: API Endpoints" in titles
+    assert "Subtarea 3: Tests unitarios" in titles
+
+    # Verificar aislamiento Sandbox: columna perteneciente a otro tablero
+    other_bid = database.create_board("Tablero Foráneo", db_path=db_path)
+    foreign_cid = database.create_column(other_bid, "Columna Foránea", db_path=db_path)
+    invalid_req = {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "method": "tools/call",
+        "params": {
+            "name": "create_tasks_batch",
+            "arguments": {
+                "column_id": foreign_cid,
+                "tasks": [{"title": "Intruso"}],
+            },
+        },
+    }
+    err_res = handler.handle(invalid_req)
+    assert err_res["error"]["code"] == -32000
+    assert "no pertenece al tablero" in err_res["error"]["message"]
+
+
+def test_mcp_control_task_timer(db_path, mcp_board):
+    """Prueba el control de temporizadores de tareas (start, status, stop) vía MCP."""
+    handler = McpProtocolHandler(mcp_board, db_path=db_path, client_name="TimerAgent")
+    columns = database.get_columns(mcp_board["id"], db_path=db_path)
+    col_id = columns[0]["id"]
+
+    # Crear una tarea
+    create_res = handler.handle({
+        "jsonrpc": "2.0",
+        "id": 20,
+        "method": "tools/call",
+        "params": {
+            "name": "create_task",
+            "arguments": {"column_id": col_id, "title": "Tarea con temporizador"},
+        },
+    })
+    task_id = json.loads(create_res["result"]["content"][0]["text"])["task_id"]
+
+    # 1. Iniciar temporizador
+    start_res = handler.handle({
+        "jsonrpc": "2.0",
+        "id": 21,
+        "method": "tools/call",
+        "params": {
+            "name": "control_task_timer",
+            "arguments": {"task_id": task_id, "action": "start"},
+        },
+    })
+    start_data = json.loads(start_res["result"]["content"][0]["text"])
+    assert start_data["timer_running"] is True
+    assert isinstance(start_data["started_at"], str)
+
+    # 2. Consultar estado
+    status_res = handler.handle({
+        "jsonrpc": "2.0",
+        "id": 22,
+        "method": "tools/call",
+        "params": {
+            "name": "control_task_timer",
+            "arguments": {"task_id": task_id, "action": "status"},
+        },
+    })
+    status_data = json.loads(status_res["result"]["content"][0]["text"])
+    assert status_data["timer_running"] is True
+    assert status_data["elapsed_seconds"] >= 0
+
+    # 3. Detener temporizador
+    stop_res = handler.handle({
+        "jsonrpc": "2.0",
+        "id": 23,
+        "method": "tools/call",
+        "params": {
+            "name": "control_task_timer",
+            "arguments": {"task_id": task_id, "action": "stop"},
+        },
+    })
+    stop_data = json.loads(stop_res["result"]["content"][0]["text"])
+    assert stop_data["timer_running"] is False
+    assert "elapsed_seconds" in stop_data
+
+    # Verificar que el diario de la tarea registre los eventos del temporizador
+    logs = database.get_task_logs(task_id, db_path=db_path)
+    log_texts = [lg["content"] for lg in logs]
+    assert any("Temporizador iniciado" in text for text in log_texts)
+    assert any("Temporizador detenido" in text for text in log_texts)
+
+    # 4. Acción inválida
+    inv_res = handler.handle({
+        "jsonrpc": "2.0",
+        "id": 24,
+        "method": "tools/call",
+        "params": {
+            "name": "control_task_timer",
+            "arguments": {"task_id": task_id, "action": "pause"},
+        },
+    })
+    assert inv_res["error"]["code"] == -32603
+    assert "no reconocida" in inv_res["error"]["message"]
+
+
+def test_mcp_sse_session_scavenger():
+    """Verifica que el recolector de sesiones SSE elimine sesiones inactivas o cerradas."""
+    import time
+    import threading
+    from mcp_server import McpHttpServer, _SseClientSession
+
+    server = McpHttpServer.__new__(McpHttpServer)
+    server._sessions = {}
+    server._lock = threading.Lock()
+    server.is_running = True
+
+    # 1. Sesión activa reciente
+    s_active = _SseClientSession(session_id="active-1", board_uuid="uuid-1")
+    s_active.last_active_at = time.time()
+
+    # 2. Sesión cerrada
+    s_closed = _SseClientSession(session_id="closed-2", board_uuid="uuid-1")
+    s_closed.is_closed = True
+
+    # 3. Sesión zombie/inactiva antigua
+    s_idle = _SseClientSession(session_id="idle-3", board_uuid="uuid-1")
+    s_idle.last_active_at = time.time() - 3600.0  # Hace 1 hora
+
+    server._sessions["active-1"] = s_active
+    server._sessions["closed-2"] = s_closed
+    server._sessions["idle-3"] = s_idle
+
+    # Ejecutamos la recolección con timeout de 300 segundos
+    purged = server.scavenge_stale_sessions(max_idle_seconds=300.0)
+    assert purged == 2
+    assert "active-1" in server._sessions
+    assert "closed-2" not in server._sessions
+    assert "idle-3" not in server._sessions
+
+
+def test_mcp_sse_send_to_session_queue_limit():
+    """Verifica el control de contrapresión y límite de cola en sesiones SSE."""
+    import threading
+    from mcp_server import McpHttpServer, _SseClientSession
+
+    server = McpHttpServer.__new__(McpHttpServer)
+    server._sessions = {}
+    server._lock = threading.Lock()
+
+    session = _SseClientSession(session_id="queue-test", board_uuid="uuid-1")
+    server._sessions["queue-test"] = session
+
+    # Llenamos la cola de 100 mensajes
+    for i in range(100):
+        assert server.send_to_session("queue-test", {"count": i}) is True
+
+    # El mensaje 101 supera la capacidad -> debe descartarse y marcar sesión como cerrada
+    assert server.send_to_session("queue-test", {"count": 101}) is False
+    assert session.is_closed is True
+

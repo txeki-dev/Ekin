@@ -18,16 +18,32 @@ def sanitize_chat_html(html: str) -> str:
     return cleaned
 
 
+_FIT_HTML_CACHE: dict[tuple[int, int], str] = {}
+_FIT_HTML_KEYS: list[tuple[int, int]] = []
+_MAX_FIT_CACHE_SIZE = 512
+
+
+def clear_fit_html_cache():
+    """Limpia la caché en memoria de transformaciones de imágenes y tablas HTML."""
+    _FIT_HTML_CACHE.clear()
+    _FIT_HTML_KEYS.clear()
+
+
 def fit_html_images(html: str, max_width: int = None) -> str:
     """Ajusta o añade el atributo width a las etiquetas <img> y <table> para que nunca
     desborden el ancho del contenedor de chat o descripción, y asegura que las imágenes queden
     envueltas en un enlace clicable para abrir la vista previa ampliada."""
     if not html:
         return html
-    html = sanitize_chat_html(html)
     if max_width is None:
         max_width = 280
     max_w_int = int(max_width)
+
+    cache_key = (hash(html), max_w_int)
+    if cache_key in _FIT_HTML_CACHE:
+        return _FIT_HTML_CACHE[cache_key]
+
+    html = sanitize_chat_html(html)
 
     # Ajustar etiquetas <img>
     if "<img" in html.lower():
@@ -74,6 +90,12 @@ def fit_html_images(html: str, max_width: int = None) -> str:
             return f'<table width="{target_w}" {attrs_clean}>'
 
         html = re.sub(r'<table\s+([^>]*?)>', _repl_tbl, html, flags=re.IGNORECASE)
+
+    if len(_FIT_HTML_KEYS) >= _MAX_FIT_CACHE_SIZE:
+        oldest = _FIT_HTML_KEYS.pop(0)
+        _FIT_HTML_CACHE.pop(oldest, None)
+    _FIT_HTML_CACHE[cache_key] = html
+    _FIT_HTML_KEYS.append(cache_key)
 
     return html
 
