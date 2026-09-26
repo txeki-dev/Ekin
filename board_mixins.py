@@ -252,3 +252,64 @@ class BoardSelectionMixin:
             event.accept()
             return
         super().keyPressEvent(event)
+
+
+class BoardMcpUiMixin:
+    """Manejo de la interfaz del botón de integración MCP en la cabecera del tablero."""
+
+    def _update_mcp_btn_ui(self):
+        """Actualiza el estado visual del botón MCP en la cabecera del tablero."""
+        if not hasattr(self, "mcp_btn"):
+            return
+        if not self.board_id or self.board_id == -1:
+            self.mcp_btn.hide()
+            return
+        self.mcp_btn.show()
+
+        board_info = database.get_board(self.board_id, self.db_path)
+        is_mcp_active = bool(board_info and board_info.get("mcp_enabled", 0))
+
+        if is_mcp_active:
+            self.mcp_btn.setText(t("mcp.board_btn_active"))
+            self.mcp_btn.setToolTip(t("mcp.board_btn_tooltip_active"))
+            self.mcp_btn.setIcon(lucide_icon("sparkles", styles.COLORS['accent'], 15))
+            self.mcp_btn.setIconSize(QSize(15, 15))
+            self.mcp_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {styles.COLORS['accent_tint']};
+                    border: none;
+                    border-radius: 999px;
+                    color: {styles.COLORS['accent_ink']};
+                    padding: 6px 14px;
+                    font-size: 12px;
+                    font-weight: 600;
+                }}
+                QPushButton:hover {{ background-color: {styles.COLORS['bg_hover']}; }}
+            """)
+        else:
+            self.mcp_btn.setText(t("mcp.board_btn_inactive"))
+            self.mcp_btn.setToolTip(t("mcp.board_btn_tooltip_inactive"))
+            self.mcp_btn.setIcon(lucide_icon("sparkles", styles.COLORS['text_muted'], 15))
+            self.mcp_btn.setIconSize(QSize(15, 15))
+            self.mcp_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: transparent;
+                    border: 1px solid {styles.COLORS['border']};
+                    border-radius: 999px;
+                    color: {styles.COLORS['text_muted']};
+                    padding: 6px 14px;
+                    font-size: 12px;
+                    font-weight: 600;
+                }}
+                QPushButton:hover {{ background-color: {styles.COLORS['bg_hover']}; }}
+            """)
+
+    def _open_mcp_sync_dialog(self):
+        """Abre el diálogo modal de configuración MCP para el tablero actual."""
+        if not self.board_id or self.board_id == -1:
+            return
+        from mcp_sync_dialog import McpSyncDialog
+        dlg = McpSyncDialog(self.board_id, parent=self.window(), db_path=self.db_path)
+        if dlg.exec() == QDialog.Accepted:
+            self._update_mcp_btn_ui()
+

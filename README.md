@@ -43,6 +43,8 @@ Ekin Kanban is a sleek, resource-friendly, and offline-first personal Kanban boa
 - **Per-Column WIP Limits**: Set Work-in-Progress thresholds on columns via the column editor; displays a live counter badge (`count / limit`) that turns terracotta when limits are exceeded to keep workflows healthy.
 - **Post-Sync Outcome Summaries & Decoupled Architecture**: Real-time outcome transparency for two-way cloud merges ("Synced · 2 tasks updated · 1 conflict auto-archived") backed by an isolated background synchronization controller and reactive file watcher.
 - **Application Diagnostic Logging & Crash Guard**: File logging with rotation under `~/.ekin/logs/ekin.log` and non-fatal crash handlers intercepting unexpected exceptions to safeguard user data.
+- **Board Templates & Custom Presets**: Quickly bootstrap new workspaces using factory-designed presets (`Software Agile` with Scrum stages & WIP limits, `Opositor` with spaced repetition & study blocks, `GTD / Personal` with Getting Things Done contexts, or Blank), or save any configured board as a reusable custom template with starter seed tasks.
+- **AI Agent Integration via Model Context Protocol (MCP)**: Connect external AI coding assistants (Google Antigravity / AGY CLI, Claude Code, Cursor, Claude Desktop) directly to specific boards via a sandboxed local MCP server (HTTP/SSE or STDIO). Allows AI agents to read, create, update, comment on, and move tasks in real time while strictly protecting board isolation and enforcing human governance (column structures cannot be modified by AI). Includes one-click setup snippets and template-specific persona prompt injection.
 - **"Warm Shell" Organic Design**: A calm, modern interface built on a single warm accent (terracotta) over a cream ground, with Caprasimo display type and Lucide icons. Ships with a **light "Warm Shell"** theme (the default) and a warm-espresso **"Night Lanes"** dark theme, both switchable live from Settings, plus customizable colors for columns, boards, and tags.
 
 ---
@@ -193,6 +195,17 @@ Press **Ctrl+/** anywhere, or click the **❔** button in the sidebar utility ba
 * **Ctrl+F** — global search dialog. **Ctrl+,** — open Settings. **Ctrl+Shift+C** — open the Calendar.
 * **Ctrl+Z / Ctrl+Y** (or **Ctrl+Shift+Z**) — undo/redo. **Esc** — close the open dialog.
 * Inside the description/diary editor: **bold** (Ctrl+B or Ctrl+N), *italic* (Ctrl+K or Ctrl+I), ~~strikethrough~~ (Ctrl+Shift+X), **Tab** to nest a bullet, typing `-->` for **→**, and **Ctrl+Enter** to post a diary note.
+ 
+### 6. Board Templates & Custom Presets
+* **Create from Template**: Click **➕ Nuevo Tablero** to open the template browser. Pick from factory presets (`Software Agile`, `Opositor`, `GTD / Personal`, `En blanco`) or your saved custom templates. Preview columns, WIP limits, and tags directly in responsive chips.
+* **Save Board as Template**: Click the active board header options and select **Guardar como plantilla...** to snapshot your column workflow, tag categories, and (optionally) existing tasks as starter seeds for future boards. Saved templates can be managed, filtered, and reused anytime.
+
+### 7. Connecting AI Agents via MCP (Model Context Protocol)
+* **Sandboxed AI Collaboration**: Click the **🤖 Agente IA (MCP)** button in any board header (or board options menu) to connect external AI agents (Google Antigravity / AGY CLI, Claude Code, Cursor, Claude Desktop).
+* **1-Click Setup**: Toggle **Activar Servidor MCP** to spin up the local server (`127.0.0.1:8765` or stdio transport via `python -m ekin_mcp`). Copy the tailored configuration snippet:
+  - **Claude Code**: `claude mcp add ekin -- python -m ekin_mcp --board-uuid <UUID> --token <TOKEN>`
+  - **Cursor / AGY CLI / Claude Desktop**: Stdio or HTTP/SSE configuration JSON provided directly in the dialog.
+* **Secure Governance**: The AI agent operates in a strict sandbox restricted only to that board. The agent can list, create, update, move, and comment on tasks (tagged as `[Agente IA: {client}]`), while column creation and structural alterations remain strictly reserved for the human user. All agent mutations reflect live in Ekin in real time.
 
 ---
 

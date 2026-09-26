@@ -18,12 +18,15 @@ dev = [
 
 [tool.setuptools]
 py-modules = [
-    "main", "board_view", "sidebar", "styles", "widgets", "version",
-    "calendar_view", "ics_export", "backups", "search_dialog",
-    "exporter", "importer", "export_dialog", "settings_dialog",
-    "shortcuts_dialog", "undo", "strings", "board_sync", "local_ai",
-    "ai_spec_dialog", "bulk_add_dialog", "cloud_sync_dialog",
-    "color_picker", "icons"
+    "ai_assist_dialog", "ai_spec_dialog", "analytics", "backups",
+    "board_dialogs", "board_mixins", "board_sync", "board_sync_controller",
+    "board_template_dialogs", "board_view", "bulk_add_dialog", "calendar_view",
+    "cloud_sync_dialog", "color_picker", "command_palette", "dashboard_view",
+    "ekin_mcp", "export_dialog", "exporter", "html_utils", "icons",
+    "ics_export", "importer", "local_ai", "logging_setup", "main",
+    "mcp_server", "mcp_sync_dialog", "my_work_view", "reminders",
+    "search_dialog", "settings_dialog", "shortcuts_dialog", "sidebar",
+    "strings", "styles", "templates", "undo", "version", "widgets"
 ]
 packages = ["database", "detail_dialog"]
 

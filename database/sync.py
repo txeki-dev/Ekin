@@ -6,7 +6,6 @@ __all__ = [
     "update_board_sync_state",
     "unlink_board_sync",
     "get_synced_boards",
-    "get_board_by_uuid",
     "get_board_last_local_modified",
     "mark_board_tasks_synced",
 ]
@@ -65,20 +64,6 @@ def get_synced_boards(db_path=None):
             "SELECT id, name, color, sync_path, last_synced_at, sync_hash, board_uuid FROM boards WHERE sync_path IS NOT NULL AND sync_path != ''"
         )
         return [dict(row) for row in cursor.fetchall()]
-
-
-def get_board_by_uuid(board_uuid, db_path=None):
-    """Busca un tablero local por su UUID."""
-    if not board_uuid:
-        return None
-    with get_connection(db_path) as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id, name, color, archived, sync_path, last_synced_at, sync_hash, board_uuid FROM boards WHERE board_uuid = ?",
-            (board_uuid,)
-        )
-        row = cursor.fetchone()
-        return dict(row) if row else None
 
 
 def get_board_last_local_modified(board_id, db_path=None):

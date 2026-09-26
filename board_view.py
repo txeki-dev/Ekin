@@ -14,12 +14,12 @@ from icons import lucide_icon, lucide_pixmap
 from detail_dialog import TaskDetailDialog
 from undo import UndoAction
 from board_dialogs import BoardColumnsArea, ColumnEditDialog, BoardSelectionDialog
-from board_mixins import BoardSyncUiMixin, BoardSelectionMixin
+from board_mixins import BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin
 
 __all__ = ["BoardViewWidget", "BoardColumnsArea", "ColumnEditDialog", "BoardSelectionDialog"]
 
 
-class BoardViewWidget(BoardSyncUiMixin, BoardSelectionMixin, QFrame):
+class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QFrame):
     toggle_sidebar_requested = Signal()
     data_changed = Signal()  # Emitida tras (re)cargar el tablero, para refrescar campana/calendario
     board_link_activated = Signal(int)  # board_id: pulsada la pastilla de tablero enlazado de una tarjeta
@@ -169,6 +169,12 @@ class BoardViewWidget(BoardSyncUiMixin, BoardSelectionMixin, QFrame):
         self.bulk_add_btn.clicked.connect(self._open_bulk_add_dialog)
         header_layout.addWidget(self.bulk_add_btn)
 
+        # Botón MCP (Agente IA)
+        self.mcp_btn = QPushButton(t("mcp.board_btn_inactive"))
+        self.mcp_btn.setCursor(Qt.PointingHandCursor)
+        self.mcp_btn.clicked.connect(self._open_mcp_sync_dialog)
+        header_layout.addWidget(self.mcp_btn)
+
         # Botón de Sincronización OneDrive / Carpeta compartida
         self.sync_btn = QPushButton(t("sync.link_btn"))
         self.sync_btn.setCursor(Qt.PointingHandCursor)
@@ -276,6 +282,14 @@ class BoardViewWidget(BoardSyncUiMixin, BoardSelectionMixin, QFrame):
         # Por defecto ocultamos la zona del tablero hasta cargar uno
         self.board_scroll_area.hide()
 
+        # Conectar el bus de eventos MCP para refrescar en tiempo real cuando el agente IA modifique datos
+        from mcp_server import get_mcp_event_bus
+        get_mcp_event_bus().board_mutated.connect(self._on_mcp_board_mutated)
+
+    def _on_mcp_board_mutated(self, mutated_board_id: int):
+        if self.board_id == mutated_board_id:
+            self.load_board(self.board_id, notify=False)
+
     def _build_column_widget(self, col_data, tasks, board_info, timer_alert_hours):
         """Construye un ColumnWidget completo (señales conectadas y, si está desplegada,
         sus TaskCard) para una columna dada. No lo añade a ningún layout ni a
@@ -369,6 +383,7 @@ class BoardViewWidget(BoardSyncUiMixin, BoardSelectionMixin, QFrame):
             self.welcome_widget.show()
             self.clear_columns_layout()
             self.setStyleSheet("")
+            self._update_mcp_btn_ui()
             if notify:
                 self.data_changed.emit()
             return
@@ -452,6 +467,7 @@ class BoardViewWidget(BoardSyncUiMixin, BoardSelectionMixin, QFrame):
 
         # Actualizar botón de sincronización y file watcher reactivo vía controller
         self.sync_controller.set_board(board_id, self.db_path)
+        self._update_mcp_btn_ui()
 
         # Actualizar visibilidad de selección múltiple
         self._update_cards_selection_ui()

@@ -37,6 +37,12 @@ def init_db(db_path=None):
             import uuid
             for r in cursor.fetchall():
                 cursor.execute("UPDATE boards SET board_uuid = ? WHERE id = ?", (str(uuid.uuid4()), r[0]))
+        if "mcp_enabled" not in columns_info:
+            cursor.execute("ALTER TABLE boards ADD COLUMN mcp_enabled INTEGER NOT NULL DEFAULT 0")
+        if "mcp_secret" not in columns_info:
+            cursor.execute("ALTER TABLE boards ADD COLUMN mcp_secret TEXT DEFAULT NULL")
+        if "ai_system_prompt" not in columns_info:
+            cursor.execute("ALTER TABLE boards ADD COLUMN ai_system_prompt TEXT DEFAULT NULL")
 
         # Tabla de columnas (columns)
         cursor.execute("""

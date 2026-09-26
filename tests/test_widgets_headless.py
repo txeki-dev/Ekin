@@ -1943,3 +1943,48 @@ def test_task_list_area_drop_indicator(qapp):
     assert dropped[0][1] == 10
     assert area._drop_indicator.parent() is None
 
+
+def test_search_dialog_filters_and_activation(qapp, db_path):
+    """Verifica que SearchDialog liste tareas, filtre por texto/tablero y emita task_activated."""
+    from search_dialog import SearchDialog
+
+    board_id = database.create_board("Tablero Busqueda", "#2563eb", db_path=db_path)
+    col_id = database.create_column(board_id, "Col", db_path=db_path)
+    database.create_task(col_id, "Comprar leche", description="Desnatada", db_path=db_path)
+    t2 = database.create_task(col_id, "Llamar al dentista", description="Cita anual", db_path=db_path)
+
+    dlg = SearchDialog(db_path=db_path)
+    dlg.refresh_results()
+    assert dlg.results_layout.count() >= 2
+
+    # Filtrar por texto
+    dlg.text_input.setText("dentista")
+    assert dlg.results_layout.count() == 1
+
+    # Verificar emisión de señal task_activated al hacer clic
+    activated = []
+    dlg.task_activated.connect(lambda tid, bid: activated.append((tid, bid)))
+    item = dlg.results_layout.itemAt(0)
+    assert item is not None and item.widget() is not None
+    item.widget().click()
+    assert len(activated) == 1
+    assert activated[0] == (t2, board_id)
+    dlg.deleteLater()
+
+
+def test_color_circles_picker_selection_and_signal(qapp):
+    """Verifica que ColorCirclesPicker seleccione colores y emita color_changed."""
+    from color_picker import ColorCirclesPicker
+
+    picker = ColorCirclesPicker(current="#ef4444")
+    assert picker.get_color() == "#ef4444"
+
+    emitted = []
+    picker.color_changed.connect(lambda c: emitted.append(c))
+
+    picker.set_color("#10b981")
+    assert picker.get_color() == "#10b981"
+    assert "#10b981" in emitted
+    picker.deleteLater()
+
+

@@ -138,7 +138,7 @@ def set_task_timer_started(task_id, started_at, db_path=None):
     with get_connection(db_path) as conn:
         conn.execute("UPDATE tasks SET timer_started_at = ? WHERE id = ?", (started_at, task_id))
 
-def update_task(task_id, title, description, tag_text, tag_color, due_date, db_path=None):
+def update_task(task_id, title, description="", tag_text="", tag_color="#6b7280", due_date=None, db_path=None):
     with get_connection(db_path) as conn:
         conn.execute(
             """UPDATE tasks

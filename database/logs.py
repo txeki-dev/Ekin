@@ -1,6 +1,6 @@
 from .connection import get_connection
 
-__all__ = ["create_log", "get_logs", "get_logs_bulk", "update_log", "delete_log"]
+__all__ = ["create_log", "add_task_log", "get_logs", "get_task_logs", "get_logs_bulk", "update_log", "delete_log"]
 
 # --- OPERACIONES DE LOGS/DIARIO (TASK_LOGS) ---
 
@@ -76,3 +76,6 @@ def delete_log(log_id, db_path=None):
                 "UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (task_id,)
             )
+
+add_task_log = create_log
+get_task_logs = get_logs

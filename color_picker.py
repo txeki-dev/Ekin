@@ -114,5 +114,19 @@ class ColorCirclesPicker(QWidget):
                 self._dots.insert(0, dot)
             self._select(name)
 
+    def set_color(self, color):
+        """Fija el color activo (añadiendo el círculo si no existía)."""
+        if not color:
+            return
+        if color.lower() not in [d.color.lower() for d in self._dots]:
+            dot = _ColorDot(color)
+            dot.clicked.connect(lambda _=False, c=color: self._select(c))
+            self.layout().insertWidget(0, dot)
+            self._dots.insert(0, dot)
+        self._select(color)
+
+    def get_color(self):
+        return self._color
+
     def color(self):
         return self._color

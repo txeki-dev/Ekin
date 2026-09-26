@@ -6,7 +6,7 @@ Pruebas exhaustivas para las 4 mejoras de UX:
 4. Experiencia de usuario y navegación en Diario / Chat (edición in-place, atajos, scroll fluido).
 """
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QPointF, QEvent
 from PySide6.QtGui import QKeyEvent, QMouseEvent
 from PySide6.QtWidgets import QApplication
 import database
@@ -101,19 +101,21 @@ def test_quote_placeholder_clearing_on_click(qapp):
     # Simular evento de clic de ratón (press + release) en el centro de la celda de cita
     pt = edit.cursorRect(cell_cursor).center()
     press_event = QMouseEvent(
-        QMouseEvent.MouseButtonPress,
-        pt,
-        Qt.LeftButton,
-        Qt.LeftButton,
-        Qt.NoModifier
+        QEvent.Type.MouseButtonPress,
+        QPointF(pt),
+        QPointF(pt),
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
     )
     edit.mousePressEvent(press_event)
     mouse_event = QMouseEvent(
-        QMouseEvent.MouseButtonRelease,
-        pt,
-        Qt.LeftButton,
-        Qt.LeftButton,
-        Qt.NoModifier
+        QEvent.Type.MouseButtonRelease,
+        QPointF(pt),
+        QPointF(pt),
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
     )
     edit.mouseReleaseEvent(mouse_event)
 

@@ -19,6 +19,8 @@ from color_picker import ColorCirclesPicker
 from strings import t
 from version import __version__
 from undo import UndoAction
+import templates
+from board_template_dialogs import CreateBoardDialog, SaveAsTemplateDialog
 
 if getattr(sys, "frozen", False):
     _APP_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(sys.executable)))
@@ -375,6 +377,8 @@ class BoardConfigDialog(QDialog):
             ("archive", "archive",
              t("sidebar.board_button.menu_unarchive") if archived else t("sidebar.board_button.menu_archive"), False),
             ("connect_cloud", "cloud", t("sync.menu_open_shared"), False),
+            ("save_template", "sparkles", t("sidebar.save_template_btn"), False),
+            ("mcp_sync", "sparkles", t("sidebar.mcp_sync_btn"), False),
             ("import", "upload", t("sidebar.import_btn"), False),
             ("export", "download", t("sidebar.export_btn"), False),
             ("delete", "trash-2", t("sidebar.delete_board_btn"), True),
@@ -748,6 +752,13 @@ class SidebarWidget(QFrame):
             self.handle_archive_toggle(board_id, not archived)
         elif action == "connect_cloud":
             self.connect_shared_board()
+        elif action == "save_template":
+            dlg = SaveAsTemplateDialog(board_id, parent=self.window(), db_path=self.db_path)
+            dlg.exec()
+        elif action == "mcp_sync":
+            from mcp_sync_dialog import McpSyncDialog
+            dlg = McpSyncDialog(board_id, parent=self.window(), db_path=self.db_path)
+            dlg.exec()
         elif action == "import":
             self.show_import_dialog()
         elif action == "export":
@@ -911,14 +922,14 @@ class SidebarWidget(QFrame):
             self.select_board(board_ids[index])
 
     def add_board(self):
-        """Abre el diálogo para crear un nuevo tablero con nombre y color."""
-        dialog = BoardEditDialog(t("sidebar.board_edit.new_title"), name="", color="#3b82f6", parent=self)
+        """Abre el diálogo para crear un nuevo tablero a partir de una plantilla o en blanco."""
+        dialog = CreateBoardDialog(parent=self, db_path=self.db_path)
         if dialog.exec() == QDialog.Accepted:
             if getattr(dialog, "connect_requested", False):
                 self.connect_shared_board()
                 return
-            name, color = dialog.get_data()
-            board_id = database.create_board(name, color, self.db_path)
+            name, color, template = dialog.get_data()
+            board_id = templates.create_board_from_template(name, color, template, db_path=self.db_path)
             self.reload_boards(select_board_id=board_id)
             self.board_changed.emit()
 
