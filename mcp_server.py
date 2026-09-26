@@ -237,6 +237,45 @@ def get_mcp_tools_schema() -> List[Dict[str, Any]]:
                 "required": ["task_id", "link_id"],
             },
         },
+        {
+            "name": "get_board_executive_summary",
+            "description": "Obtiene un resumen ejecutivo de alto nivel del estado del tablero, flujo Kanban, métricas WIP y cuellos de botella (ahorra miles de tokens de contexto al agente).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "mask_sensitive": {
+                        "type": "boolean",
+                        "description": "Si es True, aplica sanitización local de datos sensibles y PII (API keys, emails, credenciales).",
+                    },
+                },
+            },
+        },
+        {
+            "name": "get_task_condensed_context",
+            "description": "Obtiene el contexto condensado y sintetizado de una tarea (título, descripción limpia y resumen ejecutivo del diario) optimizado para minimizar el consumo de tokens del agente.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "integer", "description": "ID de la tarea."},
+                    "mask_sensitive": {
+                        "type": "boolean",
+                        "description": "Si es True, aplica sanitización local de datos sensibles y PII.",
+                    },
+                },
+                "required": ["task_id"],
+            },
+        },
+        {
+            "name": "sanitize_text",
+            "description": "Filtra y sanitiza cadenas de texto en local, enmascarando claves de API, tokens privados, credenciales y correos electrónicos.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "Texto a sanitizar."},
+                },
+                "required": ["text"],
+            },
+        },
     ]
 
 
@@ -355,12 +394,31 @@ class McpToolExecutor:
                 if tag_filter and not any(tag_filter in tv.lower() for tv in tag_values):
                     continue
 
+        mask_sensitive = bool(args.get("mask_sensitive", False))
+        result = []
+        for col_id in cols_to_query:
+            tasks = database.get_tasks(col_id, db_path=self.db_path)
+            task_ids = [t["id"] for t in tasks]
+            tags_by_task = database.get_task_tags_bulk(task_ids, db_path=self.db_path)
+
+            for t_item in tasks:
+                t_tags = tags_by_task.get(t_item["id"], [])
+                tag_values = [tg["value"] for tg in t_tags]
+
+                if tag_filter and not any(tag_filter in tv.lower() for tv in tag_values):
+                    continue
+
+                desc = t_item.get("description", "") or ""
+                if mask_sensitive and desc:
+                    import privacy_shield
+                    desc, _ = privacy_shield.sanitize_text(desc)
+
                 result.append({
                     "id": t_item["id"],
                     "column_id": col_id,
                     "column_name": columns_map.get(col_id, ""),
                     "title": t_item["title"],
-                    "description": t_item.get("description", "") or "",
+                    "description": desc,
                     "due_date": t_item.get("due_date"),
                     "position": t_item["position"],
                     "tags": tag_values,
@@ -370,6 +428,7 @@ class McpToolExecutor:
 
     def _tool_get_task(self, args: Dict[str, Any]) -> Dict[str, Any]:
         task_id = args["task_id"]
+        mask_sensitive = bool(args.get("mask_sensitive", False))
         task = self._verify_task_belongs_to_board(task_id)
 
         columns = database.get_columns(self.board_id, db_path=self.db_path)
@@ -379,12 +438,17 @@ class McpToolExecutor:
         links = database.get_task_links(task_id, db_path=self.db_path)
         logs = database.get_task_logs(task_id, db_path=self.db_path)
 
+        desc = task.get("description", "") or ""
+        if mask_sensitive and desc:
+            import privacy_shield
+            desc, _ = privacy_shield.sanitize_text(desc)
+
         return {
             "id": task["id"],
             "column_id": task["column_id"],
             "column_name": col_name,
             "title": task["title"],
-            "description": task.get("description", "") or "",
+            "description": desc,
             "due_date": task.get("due_date"),
             "due_time": task.get("due_time"),
             "recurrence": task.get("recurrence", "none"),
@@ -560,6 +624,64 @@ class McpToolExecutor:
         database.delete_task_link(link_id, db_path=self.db_path)
         get_mcp_event_bus().board_mutated.emit(self.board_id)
         return {"success": True, "link_id": link_id}
+
+    def _tool_get_board_executive_summary(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        mask_sensitive = bool(args.get("mask_sensitive", False))
+        import local_ai
+        import privacy_shield
+        data = local_ai.generate_daily_standup_data(self.board_id, db_path=self.db_path)
+        markdown = local_ai.format_daily_standup_markdown(data, self.board["name"])
+        if mask_sensitive:
+            markdown, _ = privacy_shield.sanitize_text(markdown)
+
+        return {
+            "board_id": self.board_id,
+            "board_name": self.board["name"],
+            "total_tasks": data["total_tasks"],
+            "in_progress_count": len(data["in_progress"]),
+            "stagnant_count": len(data["stagnant"]),
+            "completed_recently_count": len(data["completed_recently"]),
+            "wip_violations": data["wip_violations"],
+            "executive_markdown": markdown,
+        }
+
+    def _tool_get_task_condensed_context(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        task_id = args["task_id"]
+        mask_sensitive = bool(args.get("mask_sensitive", False))
+        task = self._verify_task_belongs_to_board(task_id)
+
+        columns = database.get_columns(self.board_id, db_path=self.db_path)
+        col_name = next((c["name"] for c in columns if c["id"] == task["column_id"]), "")
+        logs = database.get_task_logs(task_id, db_path=self.db_path)
+
+        import local_ai
+        import privacy_shield
+        diary_summary = local_ai.summarize_diary_offline(logs, task["title"])
+        clean_desc = local_ai.clean_html_description(task.get("description", "") or "")
+
+        if mask_sensitive:
+            clean_desc, _ = privacy_shield.sanitize_text(clean_desc)
+            diary_summary, _ = privacy_shield.sanitize_text(diary_summary)
+
+        return {
+            "task_id": task["id"],
+            "title": task["title"],
+            "column_name": col_name,
+            "due_date": task.get("due_date"),
+            "description": clean_desc,
+            "journal_summary": diary_summary,
+            "total_logs_count": len(logs),
+        }
+
+    def _tool_sanitize_text(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        import privacy_shield
+        text = args.get("text", "")
+        sanitized, redactions = privacy_shield.sanitize_text(text)
+        return {
+            "sanitized_text": sanitized,
+            "redactions_count": len(redactions),
+            "redactions": redactions,
+        }
 
 
 # --- PROCESADOR JSON-RPC DE PROTOCOLO MCP ---

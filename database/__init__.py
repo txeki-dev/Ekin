@@ -239,6 +239,18 @@ def init_db(db_path=None):
             )
         """)
 
+        # Persistencia de embeddings vectoriales para búsqueda semántica y duplicados
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS task_embeddings (
+                task_id INTEGER PRIMARY KEY,
+                embedding BLOB NOT NULL,
+                model_name TEXT NOT NULL,
+                dim INTEGER NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+            )
+        """)
+
         # Índices de alto rendimiento para claves foráneas, ordenación y resolución UUID
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_columns_board_pos ON columns(board_id, position)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_columns_column_uuid ON columns(column_uuid)")
@@ -265,3 +277,5 @@ from .ics_sync import *  # noqa: E402,F401,F403
 from .board_ops import *  # noqa: E402,F401,F403
 from .snapshots import *  # noqa: E402,F401,F403
 from .sync import *  # noqa: E402,F401,F403
+from .embeddings import *  # noqa: E402,F401,F403
+

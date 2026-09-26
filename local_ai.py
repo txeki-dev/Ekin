@@ -22,8 +22,12 @@ import urllib.error
 import atexit
 import subprocess
 import zipfile
+import math
+import hashlib
+from datetime import datetime
 from typing import Optional, Generator, Callable
 from PySide6.QtCore import QThread, Signal
+import database
 from html_utils import clean_html_description
 from strings import t as _t  # alias: `t` se usa como variable de bucle en este módulo
 
@@ -83,6 +87,11 @@ def check_http_endpoint(url: str, timeout: float = 1.0) -> bool:
             return response.status in (200, 204, 404)
     except Exception:
         return False
+
+
+def is_ollama_available(timeout: float = 0.1) -> bool:
+    """Comprueba rápidamente si Ollama está respondiendo en localhost."""
+    return check_http_endpoint("http://127.0.0.1:11434/api/tags", timeout=timeout)
 
 
 def get_ollama_models(timeout: float = 1.0) -> list[str]:
@@ -467,6 +476,36 @@ Estructura el documento en Markdown con:
 
 {f"Instrucciones adicionales del usuario: {custom_instructions}" if custom_instructions else ""}"""
 
+    elif mode == "extract_checklist":
+        system_prompt = (
+            "Eres un analista de requerimientos y product owner. Tu objetivo es convertir las notas "
+            "o descripción de una tarea en una checklist de criterios de aceptación claros, concisos y verificables.\n"
+            "Devuelve EXCLUSIVAMENTE una lista markdown con casillas de verificación (- [ ] Criterio), "
+            "un criterio por línea, sin texto introductorio ni de cierre."
+        )
+        user_prompt = f"""Extrae los criterios de aceptación en formato '- [ ] Criterio' para esta tarea:
+
+```json
+{tasks_json}
+```
+
+{f"Instrucciones adicionales del usuario: {custom_instructions}" if custom_instructions else ""}"""
+
+    elif mode == "daily_standup":
+        system_prompt = (
+            "Eres un Agile Coach y asistente de productividad. Tu objetivo es redactar un Daily Standup "
+            "ejecutivo, motivador y claro en formato Markdown basándote en las tareas del tablero.\n"
+            "Organízalo en tres secciones: '## 🟢 Completado recientemente', '## 🟡 En curso / Próximo foco' "
+            "y '## 🔴 Bloqueos / Tareas estancadas', seguido de un resumen en 1 línea."
+        )
+        user_prompt = f"""Redacta el Daily Standup a partir de las siguientes tareas y métricas del tablero:
+
+```json
+{tasks_json}
+```
+
+{f"Instrucciones adicionales del usuario: {custom_instructions}" if custom_instructions else ""}"""
+
     else:  # action_breakdown fallback
         system_prompt = (
             "Eres un Director de Proyectos Senior (PMP / Agile Coach) enfocado en ejecución operativa impecable.\n"
@@ -651,6 +690,29 @@ def generate_structural_spec(tasks: list[dict], mode: str = "sw_feature_plan", c
         lines += [f"- {p[:200]}" for p in paras[-6:]] or [f"- {_t('ai.summary.empty')}"]
         lines += ["", f"## {_t('ai.summary.next_step')}", f"- {paras[-1][:200] if paras else ''}"]
 
+    elif mode == "extract_checklist":
+        desc = clean_html_description(tasks[0].get("description", "")) if tasks else ""
+        items = extract_checklist_offline(desc)
+        lines = [f"- [ ] {item}" for item in items]
+
+    elif mode == "daily_standup":
+        first_desc = tasks[0].get("description", "") if tasks else ""
+        if "daily standup" in first_desc.lower():
+            lines = [line for line in first_desc.splitlines() if line]
+        else:
+            lines = [
+                f"# Daily Standup: {initiative_title}",
+                "",
+                "## 🟢 Completado recientemente",
+                "- Sin tareas completadas registradas.",
+                "",
+                "## 🟡 En curso / Próximo foco",
+                "- Tareas activas del tablero.",
+                "",
+                "## 🔴 Bloqueos / Tareas estancadas",
+                "- Ningún bloqueo reportado."
+            ]
+
     else:  # action_breakdown / user_stories / qa_tests
         lines = [
             f"# PLAN DE ACCIÓN & DESGLOSE OPERATIVO: {initiative_title}",
@@ -748,6 +810,421 @@ def summarize_diary_offline(logs: list[dict], task_title: str = "") -> str:
     lines.append(f"## {_t('ai.summary.next_step')}")
     lines.append(f"- {recent[-1][1].splitlines()[0][:200]}")
     return "\n".join(lines)
+
+
+def extract_checklist_offline(text: str) -> list[str]:
+    """Extrae o sintetiza una lista de criterios de aceptación / checklist a partir de texto o descripción.
+    Funciona 100% determinista y offline sin modelo."""
+    raw = clean_html_description(text or "").strip()
+    if not raw:
+        return [
+            "Definir requisitos y alcance de la tarea",
+            "Implementar la solución técnica correspondiente",
+            "Verificar funcionamiento y cobertura de pruebas"
+        ]
+
+    items = []
+    lines = raw.splitlines()
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+
+        chk_match = re.match(r"^[-*•]\s*\[[\sxX]\]\s*(.+)$", stripped)
+        if chk_match:
+            items.append(chk_match.group(1).strip())
+            continue
+
+        bullet_match = re.match(r"^[-*•]\s+(.+)$", stripped) or re.match(r"^\d+[.)]\s*(.+)$", stripped)
+        if bullet_match:
+            cand = bullet_match.group(1).strip()
+            if len(cand) >= 4:
+                items.append(cand)
+                continue
+
+    if not items:
+        sentences = re.split(r"(?<=[.!?])\s+|\n+", raw)
+        for s in sentences:
+            clean_s = s.strip().rstrip(".!?:")
+            if 8 <= len(clean_s) <= 180:
+                items.append(clean_s)
+            if len(items) >= 6:
+                break
+
+    if not items:
+        items = [
+            f"Implementar {raw[:60]}...",
+            "Validar casos límite y compatibilidad",
+            "Comprobar verificación de calidad"
+        ]
+
+    return items[:10]
+
+
+def suggest_tags_offline(title: str, description: str = "", available_tags: Optional[list[str]] = None) -> list[str]:
+    """Sugiere etiquetas pertinentes para una tarea basándose en su título y descripción.
+    Cruza el contenido con las etiquetas existentes del tablero y una taxonomía estándar."""
+    combined = f"{title} {description}".lower()
+    suggested: list[str] = []
+
+    if available_tags:
+        for tag in available_tags:
+            tag_clean = tag.strip().lstrip("#").lower()
+            if len(tag_clean) >= 3 and tag_clean in combined:
+                if tag not in suggested:
+                    suggested.append(tag)
+
+    taxonomy_rules = [
+        ("bug", ("bug", "error", "fallo", "crash", "issue", "fix", "excepción", "exception", "roto")),
+        ("feature", ("feat", "nueva", "soporte", "añadir", "support", "create", "crear", "incorporar")),
+        ("ui", ("ui", "interfaz", "frontend", "dialog", "botón", "boton", "estilo", "css", "color", "widget", "vista", "pantalla")),
+        ("api", ("api", "endpoint", "rest", "http", "mcp", "url", "json", "request", "webhook")),
+        ("docs", ("doc", "readme", "guia", "manual", "documentar", "especificación", "spec")),
+        ("security", ("auth", "login", "sesión", "sesion", "token", "password", "seguridad", "cifrado", "jwt", "credencial", "permiso", "secret")),
+        ("refactor", ("refactor", "optimizar", "limpiar", "deuda técnica", "modular", "reorganizar")),
+        ("qa", ("test", "prueba", "assert", "mock", "validar", "cobertura", "qa")),
+    ]
+
+    for tag_name, keywords in taxonomy_rules:
+        if any(kw in combined for kw in keywords):
+            if tag_name not in [s.lower().lstrip("#") for s in suggested]:
+                suggested.append(tag_name)
+
+    return suggested[:6]
+
+
+def suggest_conventional_title(title: str, description: str = "") -> str:
+    """Normaliza y sugiere un título conciso con estilo Conventional Commits (feat, fix, docs, etc.)."""
+    raw_title = (title or "").strip()
+    combined = f"{title} {description}".lower()
+
+    match = re.match(r"^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\(([^)]+)\))?:\s*(.+)$", raw_title, re.IGNORECASE)
+    if match:
+        prefix, scope, rest = match.groups()
+        scope_part = f"({scope.strip().lower()})" if scope else ""
+        return f"{prefix.lower()}{scope_part}: {rest[0].lower() + rest[1:] if len(rest) > 1 else rest}"
+
+    prefix = "feat"
+    if any(k in combined for k in ("bug", "error", "fallo", "fix", "corregir", "arreglar", "crash", "exception")):
+        prefix = "fix"
+    elif any(k in combined for k in ("test", "prueba", "qa", "assert", "cobertura")):
+        prefix = "test"
+    elif any(k in combined for k in ("doc", "documentar", "readme", "guia", "manual")):
+        prefix = "docs"
+    elif any(k in combined for k in ("refactor", "limpiar", "optimizar", "modularizar")):
+        prefix = "refactor"
+
+    scope = ""
+    if any(k in combined for k in ("ui", "dialog", "botón", "boton", "pantalla", "interfaz")):
+        scope = "ui"
+    elif any(k in combined for k in ("api", "mcp", "endpoint", "http", "network")):
+        scope = "mcp" if "mcp" in combined else "api"
+    elif any(k in combined for k in ("db", "sqlite", "persistencia", "bd", "tabla")):
+        scope = "db"
+    elif any(k in combined for k in ("auth", "token", "seguridad", "cifrado")):
+        scope = "auth"
+
+    scope_part = f"({scope})" if scope else ""
+    clean_title = re.sub(r"^[A-Z]+-\d+\s*[-:]*\s*", "", raw_title).strip()
+    if clean_title:
+        first_char = clean_title[0].lower()
+        rest_title = first_char + clean_title[1:] if len(clean_title) > 1 else clean_title.lower()
+    else:
+        rest_title = "actualización de tarea"
+
+    return f"{prefix}{scope_part}: {rest_title}"
+
+
+def generate_daily_standup_data(board_id: int, db_path: Optional[str] = None) -> dict:
+    """Extrae métricas y estado del flujo del tablero para generar el informe Daily Standup."""
+    board = database.get_board(board_id, db_path)
+    board_name = board["name"] if board else "Tablero"
+    columns = database.get_columns(board_id, db_path)
+
+    completed_recently = []
+    in_progress = []
+    stagnant = []
+    wip_violations = []
+    total_tasks = 0
+
+    now = datetime.now()
+
+    for col in columns:
+        col_id = col["id"]
+        col_name = col["name"]
+        wip_limit = col.get("wip_limit")
+        tasks = database.get_tasks(col_id, db_path)
+        total_tasks += len(tasks)
+
+        col_lower = col_name.lower()
+        is_done = any(k in col_lower for k in ("done", "hecho", "shipped", "completad", "terminad", "cerrad", "resuelto", "finaliz"))
+        is_in_progress = any(k in col_lower for k in ("progress", "curso", "doing", "haciendo", "wip", "activo", "desarrollo"))
+
+        if wip_limit and len(tasks) > wip_limit:
+            wip_violations.append({
+                "column_id": col_id,
+                "column_name": col_name,
+                "count": len(tasks),
+                "limit": wip_limit
+            })
+
+        for t in tasks:
+            t_data = dict(t)
+            t_data["column_name"] = col_name
+
+            updated_str = t_data.get("updated_at") or t_data.get("created_at") or ""
+            days_inactive = 0
+            if updated_str:
+                try:
+                    clean_dt = updated_str.replace("T", " ").split(".")[0]
+                    dt = datetime.strptime(clean_dt, "%Y-%m-%d %H:%M:%S")
+                    days_inactive = max(0, (now - dt).days)
+                except Exception:
+                    days_inactive = 0
+
+            t_data["days_inactive"] = days_inactive
+
+            if is_done:
+                if days_inactive <= 3 or len(completed_recently) < 5:
+                    completed_recently.append(t_data)
+            elif is_in_progress:
+                in_progress.append(t_data)
+                if days_inactive >= 3:
+                    stagnant.append(t_data)
+
+    return {
+        "board_id": board_id,
+        "board_name": board_name,
+        "total_tasks": total_tasks,
+        "completed_recently": completed_recently,
+        "in_progress": in_progress,
+        "stagnant": stagnant,
+        "wip_violations": wip_violations,
+        "columns_count": len(columns),
+    }
+
+
+def format_daily_standup_markdown(standup_data: dict, board_name: str = "") -> str:
+    """Formatea la estructura de standup_data en un reporte Markdown elegante."""
+    b_name = board_name or standup_data.get("board_name") or "Tablero"
+    completed = standup_data.get("completed_recently", [])
+    in_prog = standup_data.get("in_progress", [])
+    stagnant = standup_data.get("stagnant", [])
+    wip_warns = standup_data.get("wip_violations", [])
+    total = standup_data.get("total_tasks", 0)
+
+    lines = [
+        f"# 📋 Daily Standup — {b_name}",
+        "*Resumen ejecutivo de flujo y salud del tablero*",
+        "",
+        "## 🟢 Completado recientemente",
+    ]
+    if completed:
+        for t in completed[:8]:
+            lines.append(f"- **{t.get('title')}** `[#{t.get('id')}]` ({t.get('column_name')})")
+    else:
+        lines.append("- *(Ninguna tarea completada recientemente)*")
+
+    lines.append("")
+    lines.append("## 🟡 En curso / Próximo foco")
+    if in_prog:
+        for t in in_prog[:10]:
+            days = t.get("days_inactive", 0)
+            inact_str = f" — *inactiva {days}d*" if days > 0 else ""
+            lines.append(f"- **{t.get('title')}** `[#{t.get('id')}]` ({t.get('column_name')}){inact_str}")
+    else:
+        lines.append("- *(No hay tareas activas actualmente en curso)*")
+
+    lines.append("")
+    lines.append("## 🔴 Bloqueos / Tareas estancadas")
+    if stagnant:
+        for t in stagnant:
+            lines.append(f"- ⚠️ **{t.get('title')}** `[#{t.get('id')}]` lleva **{t.get('days_inactive')} días** sin actividad en *{t.get('column_name')}*.")
+    elif wip_warns:
+        for w in wip_warns:
+            lines.append(f"- ⚠️ Límite WIP superado en columna **{w['column_name']}** ({w['count']}/{w['limit']} tareas).")
+    else:
+        lines.append("- ✨ *¡Flujo limpio! Sin bloqueos ni tareas estancadas detectadas.*")
+
+    lines.append("")
+    lines.append("## 📊 Métricas de Salud del Tablero")
+    wip_status = f"⚠️ {len(wip_warns)} columnas con exceso WIP" if wip_warns else "✅ Óptimo (WIP respetado)"
+    lines.append(f"- **Total de tareas**: {total} | **En curso**: {len(in_prog)} | **Hechas**: {len(completed)}")
+    lines.append(f"- **Estado de límites WIP**: {wip_status}")
+
+    return "\n".join(lines)
+
+
+def compute_fallback_embedding(text: str, dim: int = 128) -> list[float]:
+    """Genera un vector denso determinista y normalizado a partir de n-gramas de caracteres y palabras."""
+    clean = re.sub(r"[^\w\s]", " ", (text or "").lower())
+    tokens = clean.split()
+    if not tokens and not clean.strip():
+        return [0.0] * dim
+
+    vector = [0.0] * dim
+    features = list(tokens)
+    for word in tokens:
+        if len(word) >= 3:
+            for i in range(len(word) - 2):
+                features.append(word[i:i+3])
+
+    for feat in features:
+        h = hashlib.sha256(feat.encode("utf-8")).digest()
+        idx = int.from_bytes(h[:4], "little") % dim
+        sign = 1.0 if (h[4] % 2 == 0) else -1.0
+        weight = 2.0 if len(feat) > 3 else 1.0
+        vector[idx] += sign * weight
+
+    norm = math.sqrt(sum(x * x for x in vector))
+    if norm > 1e-9:
+        return [x / norm for x in vector]
+    return vector
+
+
+def get_local_embedding(text: str, model_name: str = "nomic-embed-text", timeout: float = 3.0) -> list[float]:
+    """Obtiene el embedding vectorial usando Ollama (puerto 11434).
+    Si Ollama no está disponible o el modelo no está cargado, recae de forma transparente
+    y determinista en `compute_fallback_embedding`."""
+    clean_text = (text or "").strip()
+    if not clean_text:
+        return compute_fallback_embedding("")
+
+    if is_ollama_available():
+        try:
+            url = "http://127.0.0.1:11434/api/embeddings"
+            payload = json.dumps({"model": model_name, "prompt": clean_text[:2000]}).encode("utf-8")
+            req = urllib.request.Request(
+                url, data=payload, headers={"Content-Type": "application/json", "User-Agent": "Ekin-AI"}
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode("utf-8"))
+                    emb = data.get("embedding")
+                    if emb and isinstance(emb, list) and len(emb) > 0:
+                        norm = math.sqrt(sum(x * x for x in emb))
+                        return [x / norm for x in emb] if norm > 1e-9 else emb
+        except Exception:
+            pass
+
+    return compute_fallback_embedding(clean_text)
+
+
+def cosine_similarity(v1: list[float], v2: list[float]) -> float:
+    """Calcula la similitud coseno entre dos vectores (entre 0.0 y 1.0)."""
+    if not v1 or not v2 or len(v1) != len(v2):
+        return 0.0
+    dot = sum(a * b for a, b in zip(v1, v2))
+    norm1 = math.sqrt(sum(a * a for a in v1))
+    norm2 = math.sqrt(sum(b * b for b in v2))
+    if norm1 < 1e-9 or norm2 < 1e-9:
+        return 0.0
+    val = dot / (norm1 * norm2)
+    return max(0.0, min(1.0, float(val)))
+
+
+def index_task_embedding(task_id: int, title: str, description: str = "", model_name: str = "local_embedding", db_path: Optional[str] = None) -> bool:
+    """Genera e indexa en SQLite el vector de embedding para una tarea."""
+    content = f"{title}\n{clean_html_description(description or '')}".strip()
+    vec = get_local_embedding(content)
+    try:
+        database.save_task_embedding(task_id, vec, model_name=model_name, db_path=db_path)
+        return True
+    except Exception:
+        return False
+
+
+def semantic_search_tasks(query: str, board_id: Optional[int] = None, top_k: int = 10, db_path: Optional[str] = None) -> list[dict]:
+    """Realiza una búsqueda semántica de tareas ordenadas por similitud conceptual con la consulta."""
+    clean_q = (query or "").strip()
+    if not clean_q:
+        return []
+
+    q_vec = get_local_embedding(clean_q)
+
+    if board_id is not None:
+        board_ids = [board_id]
+    else:
+        boards = database.get_boards(db_path)
+        board_ids = [b["id"] for b in boards if not b.get("archived")]
+
+    scores = []
+    for bid in board_ids:
+        board_info = database.get_board(bid, db_path)
+        board_name = board_info["name"] if board_info else ""
+        board_color = board_info["color"] if board_info else "#3b82f6"
+
+        stored = database.get_board_embeddings(bid, db_path)
+        stored_dict = dict(stored)
+
+        columns = database.get_columns(bid, db_path)
+        for col in columns:
+            tasks = database.get_tasks(col["id"], db_path)
+            for t in tasks:
+                tid = t["id"]
+                t_vec = stored_dict.get(tid)
+                if not t_vec:
+                    t_content = f"{t.get('title', '')}\n{clean_html_description(t.get('description', '') or '')}"
+                    t_vec = get_local_embedding(t_content)
+                    try:
+                        database.save_task_embedding(tid, t_vec, db_path=db_path)
+                    except Exception:
+                        pass
+
+                sim = cosine_similarity(q_vec, t_vec)
+                if sim > 0.05:
+                    t_row = dict(t)
+                    t_row["board_id"] = bid
+                    t_row["board_name"] = board_name
+                    t_row["board_color"] = board_color
+                    t_row["column_name"] = col["name"]
+                    t_row["similarity"] = sim
+                    scores.append((sim, t_row))
+
+    scores.sort(key=lambda x: x[0], reverse=True)
+    return [item[1] for item in scores[:top_k]]
+
+
+def find_duplicate_tasks(title: str, description: str = "", board_id: Optional[int] = None, threshold: float = 0.70, exclude_task_id: Optional[int] = None, db_path: Optional[str] = None) -> list[dict]:
+    """Detecta posibles tareas duplicadas en un tablero basándose en alta similitud semántica."""
+    text = f"{title}\n{clean_html_description(description or '')}".strip()
+    if not text or board_id is None:
+        return []
+
+    q_vec = get_local_embedding(text)
+    stored = database.get_board_embeddings(board_id, db_path)
+    stored_dict = dict(stored)
+
+    columns = database.get_columns(board_id, db_path)
+    duplicates = []
+
+    for col in columns:
+        tasks = database.get_tasks(col["id"], db_path)
+        for t in tasks:
+            tid = t["id"]
+            if exclude_task_id is not None and tid == exclude_task_id:
+                continue
+
+            t_vec = stored_dict.get(tid)
+            if not t_vec:
+                t_content = f"{t.get('title', '')}\n{clean_html_description(t.get('description', '') or '')}"
+                t_vec = get_local_embedding(t_content)
+                try:
+                    database.save_task_embedding(tid, t_vec, db_path=db_path)
+                except Exception:
+                    pass
+
+            sim = cosine_similarity(q_vec, t_vec)
+            if sim >= threshold:
+                dup_item = dict(t)
+                dup_item["similarity"] = sim
+                dup_item["column_name"] = col["name"]
+                duplicates.append(dup_item)
+
+    duplicates.sort(key=lambda x: x["similarity"], reverse=True)
+    return duplicates
+
 
 
 def stream_openai_chat_completion(

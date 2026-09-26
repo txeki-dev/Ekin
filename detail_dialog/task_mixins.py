@@ -113,3 +113,128 @@ class TaskAiMixin:
         database.create_log(self.task_id, html_body, self.db_path)
         self.modified = True
         self.reload_logs()
+
+    def _open_extract_checklist(self):
+        """Extrae criterios de aceptación de la descripción/notas y los presenta en un diálogo editable."""
+        desc_text = self.desc_input.toPlainText().strip()
+        task = database.get_task(self.task_id, self.db_path)
+        title = task["title"] if task else self.title_input.text()
+
+        items = local_ai.extract_checklist_offline(desc_text)
+        formatted_items = "\n".join(f"- [ ] {item}" if not item.startswith("- [") else item for item in items)
+
+        ai_tasks = [{"title": title, "description": desc_text or title, "links": []}]
+        dlg = AiAssistDialog(
+            t("ai.checklist.title"),
+            formatted_items,
+            t("ai.checklist.confirm_btn"),
+            t("ai.checklist.hint"),
+            mode="extract_checklist",
+            ai_tasks=ai_tasks,
+            parent=self,
+        )
+        dlg.confirmed.connect(self._apply_checklist)
+        dlg.exec()
+
+    def _apply_checklist(self, text: str):
+        """Inserta la checklist confirmada en las notas/descripción de la tarea."""
+        checklist_str = (text or "").strip()
+        if not checklist_str:
+            return
+
+        current_desc = self.desc_input.toPlainText().strip()
+        if not current_desc:
+            new_desc = f"### Criterios de Aceptación\n{checklist_str}"
+        else:
+            new_desc = f"{current_desc}\n\n### Criterios de Aceptación\n{checklist_str}"
+
+        self.desc_input.setPlainText(new_desc)
+        self.modified = True
+
+    def _suggest_title_action(self):
+        """Sugiere un título en formato Conventional Commits basándose en el título actual y notas."""
+        curr_title = self.title_input.text().strip()
+        curr_desc = self.desc_input.toPlainText().strip()
+        suggested = local_ai.suggest_conventional_title(curr_title, curr_desc)
+        if suggested and suggested != curr_title:
+            self.title_input.setText(suggested)
+            self.modified = True
+
+    def _suggest_tags_action(self):
+        """Sugiere etiquetas aplicables a la tarea basándose en su contenido."""
+        curr_title = self.title_input.text().strip()
+        curr_desc = self.desc_input.toPlainText().strip()
+
+        # Recopilar todos los tag_values existentes en la base de datos
+        db_values = []
+        categories = database.get_tag_categories(self.db_path)
+        for cat in categories:
+            for val in database.get_tag_values(cat["id"], self.db_path):
+                db_values.append(val)
+
+        available_names = [v["value"] for v in db_values]
+        suggested_names = local_ai.suggest_tags_offline(curr_title, curr_desc, available_names)
+
+        added = 0
+        for name in suggested_names:
+            # Buscar si coincide con algún valor existente en la BD
+            match = next((v for v in db_values if v["value"].lower() == name.lower()), None)
+            if match:
+                # Comprobar que no esté ya asignado
+                if not any(t.get("tag_value_id") == match["id"] for t in self.current_tags):
+                    self._set_category_value(match)
+                    added += 1
+
+        if added > 0:
+            self.modified = True
+            QMessageBox.information(
+                self,
+                t("task_detail.suggest_tags_btn"),
+                t("task_detail.suggest_tags_added", count=added)
+            )
+        else:
+            QMessageBox.information(
+                self,
+                t("task_detail.suggest_tags_btn"),
+                t("task_detail.suggest_tags_none")
+            )
+
+    def _check_duplicates_action(self):
+        """Comprueba si existen tareas similares o duplicadas en este tablero."""
+        curr_title = self.title_input.text().strip()
+        curr_desc = self.desc_input.toPlainText().strip()
+        task = database.get_task(self.task_id, self.db_path)
+        if not task:
+            return
+
+        col = database.get_column(task["column_id"], self.db_path)
+        board_id = col["board_id"] if col else None
+        if not board_id:
+            return
+
+        duplicates = local_ai.find_duplicate_tasks(
+            curr_title,
+            curr_desc,
+            board_id=board_id,
+            threshold=0.65,
+            exclude_task_id=self.task_id,
+            db_path=self.db_path
+        )
+
+        if duplicates:
+            items_str = "\n".join(
+                f"• #{d['id']} - {d['title']} ({d['column_name']}) — {int(d['similarity'] * 100)}%"
+                for d in duplicates[:5]
+            )
+            QMessageBox.warning(
+                self,
+                t("task_detail.check_dups_btn"),
+                t("task_detail.dups_found", count=len(duplicates), items=items_str)
+            )
+        else:
+            QMessageBox.information(
+                self,
+                t("task_detail.check_dups_btn"),
+                t("task_detail.dups_none")
+            )
+

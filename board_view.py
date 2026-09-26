@@ -171,6 +171,15 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         self.bulk_add_btn.clicked.connect(self._open_bulk_add_dialog)
         header_layout.addWidget(self.bulk_add_btn)
 
+        # Botón de Daily Standup & Salud del Tablero
+        self.standup_btn = QPushButton(f" {t('board_view.standup_btn')}")
+        self.standup_btn.setCursor(Qt.PointingHandCursor)
+        self.standup_btn.setToolTip(t("board_view.standup_tooltip"))
+        self.standup_btn.setIcon(lucide_icon("check", styles.COLORS['text_soft'], 15))
+        self.standup_btn.setIconSize(QSize(15, 15))
+        self.standup_btn.clicked.connect(self._open_daily_standup_dialog)
+        header_layout.addWidget(self.standup_btn)
+
         # Botón MCP (Agente IA)
         self.mcp_btn = QPushButton(t("mcp.board_btn_inactive"))
         self.mcp_btn.setCursor(Qt.PointingHandCursor)
@@ -550,6 +559,16 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         if dlg.exec() == QDialog.Accepted:
             self.load_board(self.board_id)
             self.data_changed.emit()
+
+    def _open_daily_standup_dialog(self):
+        """Abre el diálogo modal de Daily Standup & Salud del Tablero."""
+        if not self.board_id or self.board_id == -1:
+            return
+        from daily_standup_dialog import DailyStandupDialog
+        board_info = database.get_board(self.board_id, self.db_path)
+        board_name = board_info["name"] if board_info else "Tablero"
+        dlg = DailyStandupDialog(self.board_id, board_name, db_path=self.db_path, parent=self.window())
+        dlg.exec()
 
     def clear_columns_layout(self):
         """Limpia todos los widgets del layout de columnas."""
