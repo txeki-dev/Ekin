@@ -481,9 +481,11 @@ class AiSpecDialog(QDialog):
         self.generate_btn.setEnabled(False)
         self.generate_btn.setText(t("ai_spec.status_generating"))
 
+        self._cleanup_gen_thread()
         self._gen_thread = local_ai.SpecGenerationThread(
             self.tasks_data, mode, custom, model_name=selected_model, parent=self
         )
+        self._gen_thread.finished.connect(self._gen_thread.deleteLater)
         self._gen_thread.token_received.connect(self._on_token)
         self._gen_thread.generation_finished.connect(self._on_finished)
         self._gen_thread.error_occurred.connect(self._on_error)
@@ -512,16 +514,35 @@ class AiSpecDialog(QDialog):
                 f"Check that the model is downloaded in Ollama, or use the local structural engine."
             )
 
+    def _cleanup_gen_thread(self):
+        """Desconecta señales y detiene el hilo en segundo plano con seguridad."""
+        if hasattr(self, "_gen_thread") and self._gen_thread:
+            thread = self._gen_thread
+            try:
+                thread.token_received.disconnect(self._on_token)
+            except (RuntimeError, TypeError):
+                pass
+            try:
+                thread.generation_finished.disconnect(self._on_finished)
+            except (RuntimeError, TypeError):
+                pass
+            try:
+                thread.error_occurred.disconnect(self._on_error)
+            except (RuntimeError, TypeError):
+                pass
+            if thread.isRunning():
+                thread.cancel()
+                if not thread.wait(1000):
+                    thread.terminate()
+                    thread.wait(300)
+            self._gen_thread = None
+
     def reject(self):
-        if hasattr(self, "_gen_thread") and self._gen_thread and self._gen_thread.isRunning():
-            self._gen_thread.cancel()
-            self._gen_thread.wait(400)
+        self._cleanup_gen_thread()
         super().reject()
 
     def closeEvent(self, event):
-        if hasattr(self, "_gen_thread") and self._gen_thread and self._gen_thread.isRunning():
-            self._gen_thread.cancel()
-            self._gen_thread.wait(400)
+        self._cleanup_gen_thread()
         super().closeEvent(event)
 
     def get_master_prompt(self) -> str:

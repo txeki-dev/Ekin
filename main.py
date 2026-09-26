@@ -137,10 +137,11 @@ class InstallerDownloadThread(QThread):
     finished = Signal(str)       # file_path
     error = Signal(str)
 
-    def __init__(self, download_url, dest_path, parent=None):
+    def __init__(self, download_url, dest_path, parent=None, expected_sha256=None):
         super().__init__(parent)
         self.download_url = download_url
         self.dest_path = dest_path
+        self.expected_sha256 = expected_sha256.lower().strip() if expected_sha256 else None
         self._cancelled = False
 
     def cancel(self):
@@ -149,6 +150,8 @@ class InstallerDownloadThread(QThread):
     def run(self):
         try:
             import urllib.request
+            import hashlib
+            hasher = hashlib.sha256()
             req = urllib.request.Request(
                 self.download_url,
                 headers={"User-Agent": f"Ekin-Kanban/{__version__}"}
@@ -165,6 +168,7 @@ class InstallerDownloadThread(QThread):
                         if not chunk:
                             break
                         f.write(chunk)
+                        hasher.update(chunk)
                         downloaded += len(chunk)
                         self.progress.emit(downloaded, total)
 
@@ -175,6 +179,17 @@ class InstallerDownloadThread(QThread):
                     except Exception:
                         pass
                 return
+
+            if self.expected_sha256:
+                actual_hash = hasher.hexdigest().lower()
+                if actual_hash != self.expected_sha256:
+                    if os.path.exists(self.dest_path):
+                        try:
+                            os.remove(self.dest_path)
+                        except Exception:
+                            pass
+                    self.error.emit(f"Integrity check failed: expected SHA-256 {self.expected_sha256}, got {actual_hash}")
+                    return
 
             self.finished.emit(self.dest_path)
         except Exception as exc:
@@ -278,10 +293,11 @@ class MainWindow(QMainWindow):
         # Ctrl+Shift+N: nueva columna en el tablero activo
         QShortcut(QKeySequence("Ctrl+Shift+N"), self).activated.connect(self.board_view.add_column)
 
-        # Ctrl+,: abrir Ajustes; Ctrl+Shift+C: abrir el Calendario; Ctrl+0: "Mi trabajo"
+        # Ctrl+,: abrir Ajustes; Ctrl+Shift+C: abrir el Calendario; Ctrl+0 / Ctrl+O: "Mi trabajo"
         QShortcut(QKeySequence("Ctrl+,"), self).activated.connect(self.show_settings)
         QShortcut(QKeySequence("Ctrl+Shift+C"), self).activated.connect(self.show_calendar_view)
         QShortcut(QKeySequence("Ctrl+0"), self).activated.connect(self.show_my_work_view)
+        QShortcut(QKeySequence("Ctrl+O"), self).activated.connect(self.show_my_work_view)
 
         # Ctrl+/: ventana de referencia de atajos de teclado
         QShortcut(QKeySequence("Ctrl+/"), self).activated.connect(self.show_shortcuts)
@@ -349,6 +365,8 @@ class MainWindow(QMainWindow):
 
         # Conectar señal de colapso de la barra lateral
         self.board_view.toggle_sidebar_requested.connect(self.toggle_sidebar)
+        self.board_view.command_palette_requested.connect(self.show_command_palette)
+        self.board_view.settings_requested.connect(self.show_settings)
 
         # Campana de vencimientos y vista de calendario
         self.sidebar.open_calendar_requested.connect(self.show_calendar_view)
@@ -424,6 +442,10 @@ class MainWindow(QMainWindow):
             ("my_work", t("palette.cmd_my_work")),
             ("dashboard", t("palette.cmd_dashboard")),
             ("calendar", t("palette.cmd_calendar")),
+            ("calendar_settings", t("palette.cmd_calendar_settings")),
+            ("sync_board", t("palette.cmd_sync_board")),
+            ("link_cloud", t("palette.cmd_link_cloud")),
+            ("connect_cloud", t("palette.cmd_connect_cloud")),
             ("search", t("palette.cmd_search")),
             ("settings", t("palette.cmd_settings")),
             ("shortcuts", t("palette.cmd_shortcuts")),
@@ -455,6 +477,10 @@ class MainWindow(QMainWindow):
             "my_work": self.show_my_work_view,
             "dashboard": self.show_dashboard_view,
             "calendar": self.show_calendar_view,
+            "calendar_settings": self.show_calendar_settings,
+            "sync_board": self._sync_active_board_now,
+            "link_cloud": self._link_active_board_cloud,
+            "connect_cloud": self.sidebar.connect_shared_board,
             "search": self.show_search,
             "settings": self.show_settings,
             "shortcuts": self.show_shortcuts,
@@ -464,6 +490,21 @@ class MainWindow(QMainWindow):
         fn = dispatch.get(command_id)
         if fn:
             fn()
+
+    def _sync_active_board_now(self):
+        """Sincroniza inmediatamente el tablero activo con su archivo en la nube."""
+        if hasattr(self, "board_view") and getattr(self.board_view, "board_id", None):
+            self.board_view.sync_current_board_now()
+
+    def _link_active_board_cloud(self):
+        """Abre el diálogo para vincular el tablero activo a un nuevo archivo .ekboard."""
+        if hasattr(self, "board_view") and getattr(self.board_view, "board_id", None):
+            self.board_view._link_board_new_file()
+
+    def show_calendar_settings(self):
+        """Abre directamente los ajustes de sincronización del calendario (.ics)."""
+        from calendar_view import CalendarSettingsDialog
+        CalendarSettingsDialog(database.DB_NAME, self).exec()
 
     def _open_logs_folder(self):
         """Abre la carpeta de logs de diagnóstico en el explorador de archivos."""
@@ -492,12 +533,36 @@ class MainWindow(QMainWindow):
                 self.board_view.load_board(self.sidebar.active_board_id, notify=False)
 
     def show_settings(self):
-        """Abre la pantalla de Ajustes (tema, notificaciones, idioma, updates)."""
+        """Abre la pantalla de Ajustes (tema, notificaciones, idioma, updates, tour)."""
         dlg = SettingsDialog(database.DB_NAME, self)
         dlg.theme_changed.connect(lambda theme: self.apply_theme(theme, reload=True))
         dlg.language_changed.connect(self._on_language_changed)
         dlg.check_updates_requested.connect(lambda: self.check_for_updates(manual=True))
+        dlg.interactive_tour_requested.connect(self.start_interactive_tour)
         dlg.exec()
+
+    def start_interactive_tour(self):
+        """Inicia o reanuda el tour interactivo in-situ en el tablero demo '🚀 Primeros Pasos'."""
+        self.show_board_view()
+        boards = database.get_boards(database.DB_NAME)
+        onboarding_name = t("main.onboarding.board_name")
+        target_board_id = None
+        for b in boards:
+            if b.get("name") in (onboarding_name, "🚀 Primeros Pasos", "🚀 Getting Started"):
+                target_board_id = b["id"]
+                break
+
+        if not target_board_id:
+            from templates import create_getting_started_board
+            target_board_id = create_getting_started_board(database.DB_NAME)
+            self.sidebar.reload_boards(select_board_id=target_board_id)
+        else:
+            self.sidebar.select_board(target_board_id)
+            self.board_view.load_board(target_board_id, notify=False)
+
+        database.set_setting("interactive_tour_dismissed", "0", database.DB_NAME)
+        database.set_setting("interactive_tour_completed", "0", database.DB_NAME)
+        self.board_view.show_interactive_tour(step=0)
 
     def _on_language_changed(self, lang):
         """Aplica el cambio de idioma a toda la interfaz y sus elementos persistentes."""
@@ -759,7 +824,17 @@ class MainWindow(QMainWindow):
         progress_dlg.setMinimumDuration(0)
         progress_dlg.setValue(0)
 
-        download_thread = InstallerDownloadThread(download_url, dest_path, self)
+        # Extraer hash SHA-256 si viene documentado en las notas de la versión
+        expected_sha256 = None
+        if release_notes:
+            import re
+            m = re.search(r'\b([a-fA-F0-9]{64})\b', release_notes)
+            if m:
+                expected_sha256 = m.group(1).lower()
+
+        download_thread = InstallerDownloadThread(download_url, dest_path, self, expected_sha256=expected_sha256)
+        download_thread.finished.connect(download_thread.deleteLater)
+        download_thread.error.connect(download_thread.deleteLater)
 
         def on_progress(downloaded, total):
             if total > 0:
@@ -769,6 +844,8 @@ class MainWindow(QMainWindow):
         def on_finished(installer_path):
             progress_dlg.close()
             try:
+                if not os.path.isfile(installer_path) or not installer_path.lower().endswith(".exe"):
+                    raise ValueError(f"Fichero de instalación inválido: {installer_path}")
                 subprocess.Popen([installer_path])
                 QApplication.quit()
             except Exception as exc:
@@ -779,7 +856,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 t("main.update.failed_title"),
-                t("main.update.download_failed"),
+                f"{t('main.update.download_failed')}\n{err_msg}",
             )
 
         progress_dlg.canceled.connect(download_thread.cancel)
@@ -889,44 +966,37 @@ class MainWindow(QMainWindow):
                 log.warning("Error al comprobar actualizaciones: %s", e)
 
     def check_onboarding(self):
-        """Verifica si es la primera vez que se abre la app y crea datos de ejemplo."""
-        boards = database.get_boards()
+        """Verifica si es la primera vez que se abre la app y crea datos de ejemplo interactivos."""
+        boards = database.get_boards(database.DB_NAME)
         if not boards:
-            # Crear tablero inicial de ejemplo
-            board_id = database.create_board(t("main.onboarding.board_name"))
+            # Crear tablero demo tutorial "🚀 Primeros Pasos" desde la plantilla declarativa
+            from templates import create_getting_started_board
+            board_id = create_getting_started_board(database.DB_NAME)
+            database.set_setting("active_board_id", str(board_id), database.DB_NAME)
 
-            # Crear columnas de ejemplo
-            todo_id = database.create_column(board_id, t("main.onboarding.col_todo"), "#60a5fa")  # Azul claro
-            database.create_column(board_id, t("main.onboarding.col_doing"), "#fbbf24")  # Amarillo/Ambar
-            database.create_column(board_id, t("main.onboarding.col_done"), "#34d399")   # Verde esmeralda
+            # Si la UI ya fue construida, recargar barra lateral y seleccionar el nuevo tablero
+            if hasattr(self, "sidebar"):
+                self.sidebar.reload_boards(select_board_id=board_id)
+            if hasattr(self, "board_view"):
+                self.board_view.load_board(board_id, notify=False)
 
-            # Crear una tarea de ejemplo
-            task_id = database.create_task(
-                todo_id,
-                t("main.onboarding.task_title"),
-                t("main.onboarding.task_description")
-            )
+            # Activar el tour interactivo in-situ
+            database.set_setting("interactive_tour_dismissed", "0", database.DB_NAME)
+            database.set_setting("interactive_tour_completed", "0", database.DB_NAME)
+            database.set_setting("onboarding_tour_shown", "1", database.DB_NAME)
 
-            # Asignar una etiqueta de ejemplo (Categoría: Valor)
-            priority_tag_id = database.get_or_create_tag_value(
-                t("main.onboarding.tag_category"), t("main.onboarding.tag_value"), "#ef4444"
-            )
-            database.set_task_tags(task_id, [priority_tag_id])
-
-            # Añadir una nota de diario inicial a la tarea
-            database.create_log(task_id, t("main.onboarding.log_entry"))
-
-            # Disparar guía de bienvenida si procede
-            QTimer.singleShot(600, self._maybe_show_landing_tour)
+            # Disparar tour in-situ en el tablero
+            QTimer.singleShot(400, self._maybe_show_landing_tour)
 
     def _maybe_show_landing_tour(self):
-        """Muestra el tour guiado de bienvenida en el primer uso si no se ha mostrado ya."""
-        shown = database.get_setting("onboarding_tour_shown", "0") == "1"
-        if not shown:
-            self.show_landing_tour()
+        """Muestra el tour interactivo in-situ en el primer inicio si no se ha descartado."""
+        if not self.isVisible():
+            return
+        if hasattr(self, "board_view") and self.board_view and self.board_view.isVisible():
+            self.board_view.show_interactive_tour(step=0)
 
     def show_landing_tour(self):
-        """Abre la guía de bienvenida y recorrido inicial de Ekin."""
+        """Abre la guía de bienvenida y recorrido inicial de Ekin (modal de diapositivas)."""
         from onboarding_dialog import LandingTourDialog
         dlg = LandingTourDialog(self, db_path=database.DB_NAME)
         dlg.exec()

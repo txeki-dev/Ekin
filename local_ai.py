@@ -48,8 +48,6 @@ def get_runner_download_url() -> str:
         return "https://github.com/ggerganov/llama.cpp/releases/download/b3900/llama-b3900-bin-ubuntu-x64.zip"
 
 
-RUNNER_DOWNLOAD_URL = get_runner_download_url()
-
 MANAGED_SERVER_PORT = 28192
 
 # Proceso global del runner autónomo gestionado
@@ -65,12 +63,6 @@ DEFAULT_OLLAMA_MODELS = [
     "llama3.2:3b",
     "mistral:7b",
 ]
-
-
-def ensure_directories():
-    """Asegura que los directorios ~/.ekin/models y ~/.ekin/bin existan."""
-    os.makedirs(DEFAULT_MODEL_DIR, exist_ok=True)
-    os.makedirs(DEFAULT_RUNNER_DIR, exist_ok=True)
 
 
 def is_model_downloaded() -> bool:

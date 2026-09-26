@@ -38,6 +38,16 @@ def get_connection(db_path=None):
     if db_path is None:
         import database
         db_path = getattr(database, "DB_NAME", DB_NAME)
+    # Si el archivo aún no existe, asegurar permisos restrictivos de lectura/escritura (0o600)
+    if not os.path.exists(db_path):
+        try:
+            with open(db_path, "a"):
+                pass
+            if os.name != "nt":
+                os.chmod(db_path, 0o600)
+        except Exception:
+            pass
+
     conn = sqlite3.connect(db_path, timeout=15.0)
     conn.execute("PRAGMA foreign_keys = ON;")
     conn.execute("PRAGMA busy_timeout = 15000;")

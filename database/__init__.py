@@ -1,4 +1,4 @@
-from .connection import DB_NAME, get_connection
+from .connection import DB_NAME, get_connection, get_default_db_path as get_default_db_path
 
 
 def init_db(db_path=None):

@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt, Signal, QRectF, QSize
 from PySide6.QtGui import QPainter, QColor
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox, QPushButton,
-    QFrame, QSpinBox, QButtonGroup, QSizePolicy
+    QFrame, QSpinBox, QButtonGroup, QSizePolicy, QWidget
 )
 
 import database
@@ -48,6 +48,7 @@ class SettingsDialog(QDialog):
     language_changed = Signal(str)   # "en" | "es"
     check_updates_requested = Signal()
     landing_tour_requested = Signal()
+    interactive_tour_requested = Signal()
 
     def __init__(self, db_path, parent=None):
         super().__init__(parent)
@@ -199,11 +200,17 @@ class SettingsDialog(QDialog):
         layout.addWidget(self._divider())
 
         # === Fila 7: Guía de bienvenida y recorrido inicial ===
-        landing_tour_btn = QPushButton(f" {t('settings.landing_tour_btn')}")
-        landing_tour_btn.setIcon(lucide_icon("sparkles", styles.COLORS["text_soft"], 14))
-        landing_tour_btn.setIconSize(QSize(14, 14))
-        landing_tour_btn.setCursor(Qt.PointingHandCursor)
-        landing_tour_btn.setStyleSheet(f"""
+        tour_buttons_frame = QWidget()
+        tour_buttons_layout = QHBoxLayout(tour_buttons_frame)
+        tour_buttons_layout.setContentsMargins(0, 0, 0, 0)
+        tour_buttons_layout.setSpacing(8)
+
+        # Botón 1: Iniciar Tour Interactivo ("Primeros Pasos")
+        interactive_tour_btn = QPushButton(f" {t('settings.landing_interactive_tour_btn')}")
+        interactive_tour_btn.setIcon(lucide_icon("sparkles", styles.COLORS["text_main"], 14))
+        interactive_tour_btn.setIconSize(QSize(14, 14))
+        interactive_tour_btn.setCursor(Qt.PointingHandCursor)
+        interactive_tour_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: transparent;
                 border: 1px solid {styles.COLORS['border']};
@@ -211,15 +218,40 @@ class SettingsDialog(QDialog):
                 padding: 6px 14px;
                 color: {styles.COLORS['text_main']};
                 font-size: 13px;
+                font-weight: 500;
             }}
             QPushButton:hover {{
                 background-color: {styles.COLORS['bg_hover']};
                 border-color: {styles.COLORS['accent']};
             }}
         """)
+        interactive_tour_btn.clicked.connect(self._on_interactive_tour_clicked)
+        tour_buttons_layout.addWidget(interactive_tour_btn)
+
+        # Botón 2: Ver Guía Visual (Diapositivas)
+        landing_tour_btn = QPushButton(f" {t('settings.landing_visual_tour_btn')}")
+        landing_tour_btn.setIcon(lucide_icon("list", styles.COLORS["text_soft"], 14))
+        landing_tour_btn.setIconSize(QSize(14, 14))
+        landing_tour_btn.setCursor(Qt.PointingHandCursor)
+        landing_tour_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                border: 1px solid {styles.COLORS['border']};
+                border-radius: 8px;
+                padding: 6px 12px;
+                color: {styles.COLORS['text_soft']};
+                font-size: 12px;
+            }}
+            QPushButton:hover {{
+                background-color: {styles.COLORS['bg_hover']};
+                border-color: {styles.COLORS['border']};
+            }}
+        """)
         landing_tour_btn.clicked.connect(self._on_landing_tour_clicked)
+        tour_buttons_layout.addWidget(landing_tour_btn)
+
         layout.addWidget(self._row(
-            t("settings.landing_tour_label"), t("settings.landing_tour_desc"), landing_tour_btn
+            t("settings.landing_tour_label"), t("settings.landing_tour_desc"), tour_buttons_frame
         ))
 
         layout.addStretch()
@@ -406,4 +438,8 @@ class SettingsDialog(QDialog):
         self.landing_tour_requested.emit()
         dlg = LandingTourDialog(self, db_path=self.db_path)
         dlg.exec()
+
+    def _on_interactive_tour_clicked(self):
+        self.interactive_tour_requested.emit()
+        self.accept()
 

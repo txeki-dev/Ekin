@@ -354,7 +354,7 @@ class BoardEditDialog(QDialog):
 class BoardConfigDialog(QDialog):
     """Modal de opciones del tablero activo: Edit, Copy, Archive, Import, Export, Delete.
     Cada botón fija una acción y cierra; el llamador la ejecuta al volver de exec_action()."""
-    def __init__(self, archived=False, parent=None):
+    def __init__(self, archived=False, parent=None, is_synced=False):
         super().__init__(parent)
         self.setWindowTitle(t("sidebar.board_config.title"))
         self.setMinimumWidth(320)
@@ -376,13 +376,22 @@ class BoardConfigDialog(QDialog):
             ("copy", "copy", t("sidebar.copy_board_btn"), False),
             ("archive", "archive",
              t("sidebar.board_button.menu_unarchive") if archived else t("sidebar.board_button.menu_archive"), False),
-            ("connect_cloud", "cloud", t("sync.menu_open_shared"), False),
+        ]
+        if is_synced:
+            rows.append(("sync", "rotate-ccw", t("sync.menu_sync_now"), False))
+            rows.append(("open_location", "download", t("sync.menu_open_location"), False))
+            rows.append(("unlink", "x", t("sync.menu_unlink"), False))
+        else:
+            rows.append(("link_cloud", "cloud", t("sync.link_btn"), False))
+            rows.append(("connect_cloud", "cloud", t("sync.menu_open_shared"), False))
+
+        rows.extend([
             ("save_template", "sparkles", t("sidebar.save_template_btn"), False),
             ("mcp_sync", "sparkles", t("sidebar.mcp_sync_btn"), False),
             ("import", "upload", t("sidebar.import_btn"), False),
             ("export", "download", t("sidebar.export_btn"), False),
             ("delete", "trash-2", t("sidebar.delete_board_btn"), True),
-        ]
+        ])
         for action, icon, text, danger in rows:
             b = QPushButton("  " + text)
             if danger:
@@ -741,7 +750,8 @@ class SidebarWidget(QFrame):
         """Abre el modal de opciones del tablero activo y ejecuta la acción elegida."""
         btn = self.board_buttons.get(board_id)
         archived = btn.archived if btn else False
-        action = BoardConfigDialog(archived, parent=self).exec_action()
+        is_synced = bool(btn.sync_path) if btn else False
+        action = BoardConfigDialog(archived, parent=self, is_synced=is_synced).exec_action()
         if action == "edit":
             self.edit_board()
         elif action == "copy":
@@ -750,8 +760,22 @@ class SidebarWidget(QFrame):
             self.delete_board()
         elif action == "archive":
             self.handle_archive_toggle(board_id, not archived)
+        elif action == "link_cloud":
+            self.handle_sync_action(board_id, "link")
         elif action == "connect_cloud":
             self.connect_shared_board()
+        elif action == "sync":
+            self.handle_sync_action(board_id, "sync")
+        elif action == "unlink":
+            self.handle_sync_action(board_id, "unlink")
+        elif action == "open_location":
+            if btn and btn.sync_path:
+                import os
+                folder = os.path.dirname(os.path.abspath(btn.sync_path))
+                if os.path.exists(folder):
+                    from PySide6.QtGui import QDesktopServices
+                    from PySide6.QtCore import QUrl
+                    QDesktopServices.openUrl(QUrl.fromLocalFile(folder))
         elif action == "save_template":
             dlg = SaveAsTemplateDialog(board_id, parent=self.window(), db_path=self.db_path)
             dlg.exec()

@@ -155,6 +155,7 @@ class BoardSyncController(QObject):
             db_path=self.db_path,
             parent=self
         )
+        self._sync_worker.finished.connect(self._sync_worker.deleteLater)
         self._sync_worker.sync_finished.connect(
             lambda res: self._handle_sync_finished(res, user_initiated=user_initiated)
         )

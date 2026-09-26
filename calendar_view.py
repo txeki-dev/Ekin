@@ -292,13 +292,25 @@ class CalendarViewWidget(QWidget):
         cell.task_rescheduled.connect(self._on_task_rescheduled)
         return cell
 
+    def _get_weekdays(self):
+        """Devuelve los nombres cortos de los días de la semana según el idioma activo."""
+        return [t(f"calendar.weekday_{i}") for i in range(7)]
+
+    def _get_month_name(self, month: int) -> str:
+        """Devuelve el nombre del mes (1..12) según el idioma activo."""
+        return t(f"calendar.month_{month}")
+
+    def _get_weekday_name(self, weekday: int) -> str:
+        """Devuelve el nombre del día de la semana (0..6) según el idioma activo."""
+        return t(f"calendar.weekday_{weekday}")
+
     def _rebuild_grid(self):
         """Reconstruye la rejilla de celdas según el modo de vista."""
         while self.grid.count():
             item = self.grid.takeAt(0)
-            w = item.widget()
-            if w:
-                w.deleteLater()
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
         self.cells = []
         for c in range(7):
             self.grid.setColumnStretch(c, 0)
@@ -313,7 +325,7 @@ class CalendarViewWidget(QWidget):
             self.grid.setRowStretch(0, 1)
             return
 
-        for col, name in enumerate(_WEEKDAYS):
+        for col, name in enumerate(self._get_weekdays()):
             lbl = QLabel(name)
             lbl.setObjectName("WeekdayHeader")
             lbl.setAlignment(Qt.AlignCenter)
@@ -368,7 +380,7 @@ class CalendarViewWidget(QWidget):
         today = date.today()
 
         if self.view_mode == "month":
-            self.period_label.setText(f"{_MONTHS[self.anchor.month - 1]} {self.anchor.year}")
+            self.period_label.setText(f"{self._get_month_name(self.anchor.month)} {self.anchor.year}")
             first_weekday, num_days = _cal.monthrange(self.anchor.year, self.anchor.month)
             start = date(self.anchor.year, self.anchor.month, 1)
             end = date(self.anchor.year, self.anchor.month, num_days)
@@ -397,7 +409,7 @@ class CalendarViewWidget(QWidget):
                              is_today=(cd == today), cell_date=cd, max_show=8)
 
         else:  # day
-            self.period_label.setText(f"{_WEEKDAYS[self.anchor.weekday()]} {self.anchor.strftime('%d/%m/%Y')}")
+            self.period_label.setText(f"{self._get_weekday_name(self.anchor.weekday())} {self.anchor.strftime('%d/%m/%Y')}")
             tasks = database.get_scheduled_tasks(
                 self.anchor.isoformat(), self.anchor.isoformat(), board_id=board_id, db_path=self.db_path)
             self.cells[0].set_day(self.anchor.day, tasks, is_today=(self.anchor == today),

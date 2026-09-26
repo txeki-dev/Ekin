@@ -34,6 +34,8 @@ class CodeBlockDialog(QDialog):
 
     def __init__(self, initial_code="", initial_lang="python", parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.finished.connect(self.deleteLater)
         self.setWindowTitle(t("markdown_edit.code_dialog_title"))
         self.setMinimumSize(480, 360)
         self.resize(520, 400)
@@ -93,6 +95,8 @@ class LinkDialog(QDialog):
     """Diálogo modal para insertar un enlace (URL)."""
     def __init__(self, initial_url="", initial_text="", parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.finished.connect(self.deleteLater)
         self.setWindowTitle(t("markdown_edit.link_dialog_title"))
         self.setMinimumWidth(380)
         if isinstance(initial_url, bool) or initial_url is None:
@@ -144,6 +148,8 @@ class TableInsertDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.finished.connect(self.deleteLater)
         self.setWindowTitle(t("markdown_edit.table_dialog_title"))
         self.setFixedWidth(320)
         self.selected_rows = 3

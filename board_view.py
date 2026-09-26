@@ -23,6 +23,8 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
     toggle_sidebar_requested = Signal()
     data_changed = Signal()  # Emitida tras (re)cargar el tablero, para refrescar campana/calendario
     board_link_activated = Signal(int)  # board_id: pulsada la pastilla de tablero enlazado de una tarjeta
+    command_palette_requested = Signal()
+    settings_requested = Signal()
 
     def __init__(self, db_path=database.DB_NAME, parent=None):
         super().__init__(parent)
@@ -183,6 +185,15 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
 
         self.main_layout.addWidget(self.board_header)
         self.board_header.hide()
+
+        # Banner del tour interactivo in-situ
+        from onboarding_dialog import InteractiveTourBanner
+        self.tour_banner = InteractiveTourBanner(self, db_path=self.db_path)
+        self.tour_banner.action_triggered.connect(self._on_tour_action)
+        self.tour_banner.tour_completed.connect(self._on_tour_completed)
+        self.tour_banner.tour_dismissed.connect(self._on_tour_dismissed)
+        self.main_layout.addWidget(self.tour_banner)
+        self.tour_banner.hide()
 
         # 1. Contenedor de bienvenida (se muestra si no hay tableros)
         self.welcome_widget = QWidget()
@@ -380,6 +391,8 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
             self.board_scroll_area.hide()
             self.board_header.hide()
             self.selection_bar.hide()
+            if hasattr(self, "tour_banner"):
+                self.tour_banner.hide()
             self.welcome_widget.show()
             self.clear_columns_layout()
             self.setStyleSheet("")
@@ -424,6 +437,20 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
             """)
         else:
             self.setStyleSheet("")
+
+        # Manejo de visibilidad del banner del tour interactivo
+        if hasattr(self, "tour_banner"):
+            self.tour_banner.update_style()
+            bname = board_info.get("name") if board_info else ""
+            is_onboarding_board = (
+                bname == t("main.onboarding.board_name") or
+                bname in ("🚀 Primeros Pasos", "🚀 Getting Started")
+            )
+            is_tour_dismissed = database.get_setting("interactive_tour_dismissed", "0", self.db_path) == "1"
+            if is_onboarding_board and not is_tour_dismissed:
+                self.tour_banner.show()
+            else:
+                self.tour_banner.hide()
 
         # Obtener columnas de la DB
         columns = database.get_columns(board_id, self.db_path)
@@ -850,3 +877,50 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         self._update_board_counts()
         self.data_changed.emit()
         self._trigger_auto_sync_export()
+
+    # --- LANDING TOUR INTERACTIVO IN-SITU ---
+
+    def show_interactive_tour(self, step: int = 0):
+        """Muestra la barra del tour interactivo in-situ y navega al paso especificado."""
+        if not self.isVisible() or self.isHidden():
+            return
+        if hasattr(self, "tour_banner") and self.tour_banner:
+            self.tour_banner.go_to_step(step)
+            self.tour_banner.show()
+
+    def hide_interactive_tour(self):
+        """Oculta la barra del tour interactivo in-situ."""
+        if hasattr(self, "tour_banner"):
+            self.tour_banner.hide()
+
+    def _on_tour_action(self, step: int):
+        """Maneja las acciones interactivas directas asociadas a cada paso del tour."""
+        if step == 0:
+            # Paso 1: Abrir la guía visual ilustrada (LandingTourDialog)
+            from onboarding_dialog import LandingTourDialog
+            dlg = LandingTourDialog(self, db_path=self.db_path)
+            dlg.exec()
+        elif step == 1:
+            # Paso 2: Personalizar columna (abrir diálogo de edición de la columna activa o primera)
+            if self.column_widgets:
+                target_col_id = self._last_active_column_id
+                if target_col_id not in self.column_widgets:
+                    target_col_id = next(iter(self.column_widgets.keys()))
+                self.edit_column(target_col_id)
+        elif step == 2:
+            # Paso 3: Abrir la Paleta de Comandos (Ctrl+K)
+            self.command_palette_requested.emit()
+        elif step == 3:
+            # Paso 4: Abrir la pantalla de Ajustes (⚙️)
+            self.settings_requested.emit()
+
+    def _on_tour_completed(self):
+        """Muestra celebración tras completar los 4 pasos del tour interactivo."""
+        QMessageBox.information(
+            self,
+            t("tour.banner.finish_btn").replace("✓", "").strip(),
+            t("tour.banner.completed_toast"),
+        )
+
+    def _on_tour_dismissed(self):
+        pass

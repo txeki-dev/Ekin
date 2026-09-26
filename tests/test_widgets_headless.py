@@ -2060,4 +2060,221 @@ def test_landing_tour_dialog_dont_show_checkbox(qapp, db_path):
     dlg.deleteLater()
 
 
+def test_interactive_tour_banner_navigation_and_actions(qapp, db_path):
+    """Verifica la navegación paso a paso, emisión de señales y finalización de InteractiveTourBanner."""
+    from onboarding_dialog import InteractiveTourBanner
 
+    database.set_setting("interactive_tour_dismissed", "0", db_path)
+    database.set_setting("interactive_tour_completed", "0", db_path)
+
+    banner = InteractiveTourBanner(db_path=db_path)
+    banner.show()
+
+    # Estado inicial: Paso 0
+    assert banner._current_step == 0
+    assert not banner.prev_btn.isEnabled()
+    assert t("tour.banner.next_btn").strip() in banner.next_btn.text()
+    assert t("tour.banner.step1_title") in banner.step_title.text()
+
+    # Probar señal de acción en paso 0
+    actions_emitted = []
+    banner.action_triggered.connect(lambda s: actions_emitted.append(s))
+    banner.action_btn.click()
+    assert actions_emitted == [0]
+
+    # Avanzar a paso 1
+    steps_emitted = []
+    banner.step_changed.connect(lambda s: steps_emitted.append(s))
+    banner.next_btn.click()
+    assert banner._current_step == 1
+    assert steps_emitted == [1]
+    assert banner.prev_btn.isEnabled()
+    assert t("tour.banner.step2_title") in banner.step_title.text()
+
+    # Probar navegación directa mediante los dots interactivos
+    banner._dots[2].click()
+    assert banner._current_step == 2
+    assert t("tour.banner.step3_title") in banner.step_title.text()
+
+    # Probar botón anterior
+    banner.prev_btn.click()
+    assert banner._current_step == 1
+
+    # Ir a paso 3 (último)
+    banner.go_to_step(3)
+    assert banner._current_step == 3
+    assert t("tour.banner.finish_btn").replace("✓", "").strip() in banner.next_btn.text()
+
+    # Finalizar tour pulsando el botón final
+    completed_emitted = []
+    banner.tour_completed.connect(lambda: completed_emitted.append(True))
+    banner.next_btn.click()
+    assert len(completed_emitted) == 1
+    assert banner.isHidden()
+    assert database.get_setting("interactive_tour_completed", "0", db_path) == "1"
+    assert database.get_setting("interactive_tour_dismissed", "0", db_path) == "1"
+
+    banner.deleteLater()
+
+
+def test_interactive_tour_banner_dismiss(qapp, db_path):
+    """Verifica que el botón cerrar descarte el tour y persista interactive_tour_dismissed."""
+    from onboarding_dialog import InteractiveTourBanner
+
+    database.set_setting("interactive_tour_dismissed", "0", db_path)
+    banner = InteractiveTourBanner(db_path=db_path)
+    banner.show()
+
+    dismissed = []
+    banner.tour_dismissed.connect(lambda: dismissed.append(True))
+    banner.close_btn.click()
+
+    assert len(dismissed) == 1
+    assert banner.isHidden()
+    assert database.get_setting("interactive_tour_dismissed", "0", db_path) == "1"
+
+    banner.deleteLater()
+
+
+def test_board_view_interactive_tour_lifecycle(qapp, db_path):
+    """Verifica que BoardViewWidget muestre y oculte el banner del tour según el tablero y su estado."""
+    from board_view import BoardViewWidget
+    from templates import create_getting_started_board
+
+    database.set_setting("interactive_tour_dismissed", "0", db_path)
+    getting_started_id = create_getting_started_board(db_path=db_path)
+    blank_board_id = database.create_board("Tablero Usuario", "#10b981", db_path=db_path)
+
+    bv = BoardViewWidget(db_path=db_path)
+    bv.show()
+
+    # 1. Al cargar el tablero demo Primeros Pasos, el banner debe mostrarse
+    bv.load_board(getting_started_id, notify=False)
+    assert hasattr(bv, "tour_banner")
+    assert not bv.tour_banner.isHidden()
+
+    # 2. Al conmutar a otro tablero, el banner se oculta automáticamente
+    bv.load_board(blank_board_id, notify=False)
+    assert bv.tour_banner.isHidden()
+
+    # 3. Forzar show_interactive_tour / hide_interactive_tour
+    bv.show_interactive_tour(step=2)
+    assert bv.tour_banner.isVisible()
+    assert bv.tour_banner._current_step == 2
+
+    bv.hide_interactive_tour()
+    assert bv.tour_banner.isHidden()
+
+    bv.deleteLater()
+
+
+def test_settings_dialog_interactive_tour_button(qapp, db_path):
+    """Verifica que el botón de Tour Interactivo en Ajustes emita interactive_tour_requested."""
+    from settings_dialog import SettingsDialog
+
+    dlg = SettingsDialog(db_path)
+    emitted = []
+    dlg.interactive_tour_requested.connect(lambda: emitted.append(True))
+
+    buttons = dlg.findChildren(QPushButton)
+    interactive_btn = next((b for b in buttons if t("settings.landing_interactive_tour_btn").strip() in b.text()), None)
+    assert interactive_btn is not None
+    interactive_btn.click()
+    assert len(emitted) == 1
+
+    dlg.deleteLater()
+
+
+def test_calendar_view_weekdays_and_months_localization(qapp, db_path):
+    """Verifica que CalendarViewWidget obtenga nombres de meses y días de la semana dinámicos según el idioma."""
+    from calendar_view import CalendarViewWidget
+    from strings import set_language
+
+    cal = CalendarViewWidget(db_path=db_path)
+
+    # En Español
+    set_language("es")
+    assert cal._get_weekdays() == ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"]
+    assert cal._get_month_name(1) == "Enero"
+    assert cal._get_month_name(12) == "Diciembre"
+    assert cal._get_weekday_name(0) == "LUN"
+
+    # En Inglés
+    set_language("en")
+    assert cal._get_weekdays() == ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+    assert cal._get_month_name(1) == "January"
+    assert cal._get_month_name(12) == "December"
+    assert cal._get_weekday_name(0) == "MON"
+
+    # Restaurar
+    set_language("es")
+    cal.deleteLater()
+
+
+def test_calendar_view_on_task_rescheduled_and_drag_drop(qapp, db_path):
+    """Verifica que _on_task_rescheduled actualice la fecha en la BD y emita data_changed."""
+    from calendar_view import CalendarViewWidget, DayCell, _CAL_TASK_MIME
+    from PySide6.QtCore import QMimeData, QByteArray, QPointF, Qt
+    from PySide6.QtGui import QDropEvent
+    from datetime import date
+
+    # 1. Crear tarea con fecha inicial
+    b_id = database.create_board("Cal Test Board", db_path=db_path)
+    col_id = database.create_column(b_id, "Todo", db_path=db_path)
+    t_id = database.create_task(col_id, "Tarea a Reprogramar", due_date="2026-09-01", db_path=db_path)
+
+    cal = CalendarViewWidget(db_path=db_path)
+    emitted = []
+    cal.data_changed.connect(lambda: emitted.append(True))
+
+    # 2. Invocar _on_task_rescheduled directamente
+    cal._on_task_rescheduled(t_id, "2026-09-20")
+
+    task = database.get_task(t_id, db_path=db_path)
+    assert task["due_date"] == "2026-09-20"
+    assert len(emitted) == 1
+
+    # 3. Probar DayCell.dropEvent con QMimeData simulado
+    cell = DayCell()
+    cell.cell_date = date(2026, 9, 25)
+    cell_emitted = []
+    cell.task_rescheduled.connect(lambda tid, d: cell_emitted.append((tid, d)))
+
+    mime = QMimeData()
+    mime.setData(_CAL_TASK_MIME, QByteArray(str(t_id).encode("utf-8")))
+
+    # Simular evento de soltado (drop)
+    drop_ev = QDropEvent(
+        QPointF(10, 10),
+        Qt.DropAction.MoveAction,
+        mime,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    cell.dropEvent(drop_ev)
+
+    assert cell_emitted == [(t_id, "2026-09-25")]
+
+    cal.deleteLater()
+    cell.deleteLater()
+
+
+def test_board_config_dialog_cloud_options(qapp):
+    """Verifica que BoardConfigDialog muestre las opciones adecuadas según si el tablero está o no sincronizado."""
+    from sidebar import BoardConfigDialog
+
+    # No sincronizado
+    dlg_unsynced = BoardConfigDialog(archived=False, is_synced=False)
+    actions_unsynced = [btn.text().strip() for btn in dlg_unsynced.findChildren(QPushButton)]
+    assert any(t("sync.link_btn").strip() in a for a in actions_unsynced)
+    assert any(t("sync.menu_open_shared").strip() in a for a in actions_unsynced)
+    assert not any(t("sync.menu_sync_now").strip() in a for a in actions_unsynced)
+    dlg_unsynced.deleteLater()
+
+    # Sincronizado
+    dlg_synced = BoardConfigDialog(archived=False, is_synced=True)
+    actions_synced = [btn.text().strip() for btn in dlg_synced.findChildren(QPushButton)]
+    assert any(t("sync.menu_sync_now").strip() in a for a in actions_synced)
+    assert any(t("sync.menu_unlink").strip() in a for a in actions_synced)
+    assert not any(t("sync.link_btn").strip() in a for a in actions_synced)
+    dlg_synced.deleteLater()

@@ -14,6 +14,7 @@ from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
 import database
+from strings import t
 
 
 @dataclass
@@ -38,6 +39,7 @@ class SeedTaskTemplate:
     priority: Optional[str] = None
     tags: List[str] = field(default_factory=list)  # Lista de tag values
     due_days_offset: Optional[int] = None
+    initial_log: Optional[str] = None
 
 
 @dataclass
@@ -87,6 +89,168 @@ class BoardTemplate:
 
 
 # --- PLANTILLAS DE FÁBRICA (BUILT-IN) ---
+
+TEMPLATE_GETTING_STARTED = BoardTemplate(
+    id="getting_started",
+    name="🚀 Primeros Pasos",
+    description="Tablero interactivo tutorial in-situ con misiones guiadas para dominar las tarjetas, columnas, atajos e integraciones.",
+    category="Tutorial & Onboarding",
+    color="#2563eb",
+    icon="sparkles",
+    columns=[
+        ColumnTemplate("👋 ¡Empieza aquí!", "#3b82f6", None),
+        ColumnTemplate("⚡ En Progreso & Edición", "#0ea5e9", 3),
+        ColumnTemplate("🛠️ Productividad & Atajos", "#f59e0b", None),
+        ColumnTemplate("🎉 ¡Completado!", "#10b981", None),
+    ],
+    default_tags=[
+        TagTemplate("Tipo", "Tutorial", "#3b82f6"),
+        TagTemplate("Tipo", "Diario", "#8b5cf6"),
+        TagTemplate("Tipo", "Interacción", "#0ea5e9"),
+        TagTemplate("Tipo", "Columnas", "#10b981"),
+        TagTemplate("Tipo", "Productividad", "#f59e0b"),
+        TagTemplate("Tipo", "IA", "#6366f1"),
+        TagTemplate("Tipo", "Listo", "#059669"),
+        TagTemplate("Priority", "Alta", "#ef4444"),
+        TagTemplate("Priority", "Media", "#f59e0b"),
+        TagTemplate("Priority", "Baja", "#6b7280"),
+    ],
+    seed_tasks=[
+        SeedTaskTemplate(
+            title="1. Haz clic aquí para ver el Diario y Editor",
+            column_index=0,
+            description=(
+                "¡Te damos la bienvenida a **Ekin Kanban**! 🎉\n\n"
+                "Esta tarjeta es un ejemplo vivo de las capacidades del editor enriquecido:\n"
+                "- [x] **Markdown completo**: negritas, cursivas, listas interactivas y citas.\n"
+                "- [x] **Bloques de código**: con sintaxis coloreada (`</>`) y botón de copiado rápido.\n"
+                "- [x] **Diario personal integrado**: mira la pestaña inferior con registros cronológicos y horas trabajadas.\n"
+                "- [x] **Temporizador Pomodoro**: pulsa el cronómetro arriba a la derecha para contabilizar tu sesión.\n\n"
+                "```python\n"
+                "# Script de ejemplo en Ekin\n"
+                "def welcome_to_ekin():\n"
+                "    print('¡Productividad fluida y control total!')\n"
+                "```\n\n"
+                "> 💡 **Siguiente paso del tour**: Cierra este diálogo y arrastra la siguiente tarjeta hacia la derecha."
+            ),
+            priority="Alta",
+            tags=["Tutorial", "Diario"],
+            initial_log="He abierto Ekin Kanban por primera vez. ¡Todo listo para empezar a trabajar con el diario personal!",
+        ),
+        SeedTaskTemplate(
+            title="2. Arrástrame a la columna '⚡ En Progreso'",
+            column_index=0,
+            description=(
+                "### 🎯 Misión Drag & Drop\n"
+                "1. Haz clic sobre esta tarjeta y mantenla pulsada con el ratón.\n"
+                "2. Arrástrala hacia la columna **'⚡ En Progreso & Edición'**.\n"
+                "3. Observa la miniatura en alta resolución y la **ranura de inserción interactiva** que separa las tarjetas en tiempo real para indicar exactamente dónde quedará colocada.\n"
+                "4. Suelta el ratón para completar el movimiento."
+            ),
+            priority="Media",
+            tags=["Interacción"],
+        ),
+        SeedTaskTemplate(
+            title="3. Prueba a editar o personalizar esta columna",
+            column_index=1,
+            description=(
+                "### 🛠️ Personalización de Columnas\n"
+                "Cada columna de Ekin se adapta totalmente a tu flujo de trabajo:\n"
+                "1. Haz **doble clic en el encabezado** de esta columna (o clic en el menú `⋮`).\n"
+                "2. Puedes cambiar su **nombre**, asignar un **color temático** o fijar un **Límite WIP (Work In Progress)**.\n"
+                "3. Esta columna tiene configurado un límite de **3 tareas** para evitar cuellos de botella y mantener el foco."
+            ),
+            priority="Media",
+            tags=["Columnas"],
+        ),
+        SeedTaskTemplate(
+            title="4. Crea una nueva tarea con '+' o Ctrl+N",
+            column_index=1,
+            description=(
+                "### ✍️ Creación Rápida\n"
+                "- Haz clic en el botón **`+`** al pie de cualquier columna.\n"
+                "- O simplemente presiona el atajo de teclado global **`Ctrl+N`** para abrir la creación en tu columna activa.\n"
+                "- Podrás asignar fechas de vencimiento, etiquetas personalizadas, prioridades independientes y adjuntar archivos locales."
+            ),
+            priority="Baja",
+            tags=["Atajos"],
+        ),
+        SeedTaskTemplate(
+            title="5. Pulsa Ctrl+K para la Paleta o Ctrl+0 / Ctrl+O para 'Mi Trabajo'",
+            column_index=2,
+            description=(
+                "### ⚡ Navegación y Atajos de Teclado\n"
+                "Ekin está diseñado para que no tengas que despegar las manos del teclado:\n"
+                "- **`Ctrl+K`**: Paleta de comandos universal estilo Spotlight. Escribe cualquier comando, busca tareas al vuelo o escribe `+ Título` para captura rápida.\n"
+                "- **`Ctrl+0` / `Ctrl+O`**: Vista transversal **Mi Trabajo**, que reúne tus tareas pendientes de todos los tableros organizadas por fechas (Hoy, Mañana, Esta Semana, Atrasadas).\n"
+                "- **`Ctrl+Shift+C`**: Vista de calendario interactiva.\n"
+                "- **`Ctrl+D`**: Panel de analíticas de productividad con métricas de flujo y exportación a PDF.\n"
+                "- **`Ctrl+F`**: Búsqueda global en el tablero."
+            ),
+            priority="Media",
+            tags=["Productividad"],
+        ),
+        SeedTaskTemplate(
+            title="6. Sincroniza y comparte con Cloud (.ekboard)",
+            column_index=2,
+            description=(
+                "### ☁️ Sincronización en la Nube y Carpetas Compartidas\n"
+                "Ekin te permite colaborar y mantener tus tableros respaldados de forma offline-first:\n"
+                "- **Vincular a la Nube**: Haz clic en el botón de la nube en la cabecera del tablero o en las opciones del tablero (`...` o clic derecho en la barra lateral).\n"
+                "- **Archivo único `.ekboard`**: Se genera un archivo portátil que puedes guardar en **Google Drive, Dropbox, OneDrive** o una carpeta compartida en red local (LAN).\n"
+                "- **Sincronización Reactiva**: Ekin detecta cambios automáticamente en segundo plano. Si otro usuario o tú editáis a la vez, el motor *No-Data-Loss* fusiona los cambios y archiva cualquier versión concurrente en el diario de la tarea.\n"
+                "- **Atajo rápido**: Usa `Ctrl+K` y escribe *Sincronizar* para forzar una sincronización manual al instante."
+            ),
+            priority="Alta",
+            tags=["Cloud", "Sync"],
+        ),
+        SeedTaskTemplate(
+            title="7. Organiza entregas en el Calendario (Ctrl+Shift+C) y feed .ics",
+            column_index=2,
+            description=(
+                "### 📅 Calendario Integrado y Sincronización Externa\n"
+                "Gestiona todas tus fechas de vencimiento con visión global:\n"
+                "- **Abrir Calendario**: Pulsa **`Ctrl+Shift+C`** o el icono de calendario en la barra lateral.\n"
+                "- **Vistas flexibles**: Alterna entre vistas de **Mes, Semana o Día** y filtra por tablero o visualiza todos a la vez.\n"
+                "- **Reprogramar con Drag & Drop**: Arrastra el chip de cualquier tarea a otro día del calendario para cambiar su fecha de entrega automáticamente.\n"
+                "- **Feed iCalendar (.ics)**: En los Ajustes del Calendario puedes exportar un archivo `.ics` con actualización automática y suscribirte desde **Google Calendar, Outlook o Apple Calendar** para ver tus tareas en el móvil o reloj."
+            ),
+            priority="Media",
+            tags=["Calendario"],
+        ),
+        SeedTaskTemplate(
+            title="8. Conecta agentes IA con MCP o abre Ajustes (⚙️)",
+            column_index=2,
+            description=(
+                "### 🤖 Ecosistema Local MCP (Model Context Protocol)\n"
+                "- Pulsa el botón **`🤖 MCP`** en la cabecera superior del tablero para conectar asistentes IA (**Claude Code, Cursor, AGY CLI y Claude Desktop**).\n"
+                "- Cada tablero opera con un sandbox aislado y token secreto.\n"
+                "- Abre **Ajustes (⚙️)** en la barra lateral para alternar entre tema Claro y Oscuro, configurar avisos por anticipación o comprobar actualizaciones."
+            ),
+            priority="Alta",
+            tags=["IA"],
+        ),
+        SeedTaskTemplate(
+            title="9. ¡Enhorabuena! Listo para crear tus propios tableros",
+            column_index=3,
+            description=(
+                "### 🚀 ¡Has dominado los aspectos fundamentales de Ekin!\n"
+                "Ahora tienes todo el control:\n"
+                "- Haz clic en el botón **`+`** de la barra lateral izquierda para crear un nuevo tablero.\n"
+                "- Elige empezar con un lienzo en blanco o con una de las plantillas especializadas (**Desarrollo Software Agile**, **Opositor**, **GTD / Personal**).\n"
+                "- Puedes volver a consultar este tutorial o abrir la guía gráfica en cualquier momento desde **Ajustes (⚙️) > Tour y Bienvenida**."
+            ),
+            priority="Alta",
+            tags=["Listo"],
+        ),
+    ],
+    ai_system_prompt=(
+        "Actúas como un mentor y guía interactivo para nuevos usuarios de Ekin Kanban. "
+        "Ayuda al usuario a entender los conceptos de tarjetas, columnas con límites WIP, "
+        "diario personal de desarrollo y atajos de teclado para maximizar su flujo de trabajo."
+    ),
+    is_builtin=True,
+)
 
 TEMPLATE_BLANK = BoardTemplate(
     id="blank",
@@ -243,6 +407,7 @@ TEMPLATE_GTD_PERSONAL = BoardTemplate(
 )
 
 BUILTIN_TEMPLATES = [
+    TEMPLATE_GETTING_STARTED,
     TEMPLATE_BLANK,
     TEMPLATE_SOFTWARE_AGILE,
     TEMPLATE_OPOSITOR,
@@ -411,6 +576,10 @@ def apply_template_to_board(board_id: int, template: BoardTemplate, db_path: Opt
         if assigned_tag_ids:
             database.set_task_tags(task_id, assigned_tag_ids, db_path=db_path)
 
+        # Si tiene nota de diario inicial, registrarla
+        if st.initial_log:
+            database.create_log(task_id, st.initial_log, db_path=db_path)
+
 
 def create_board_from_template(
     name: str,
@@ -427,6 +596,16 @@ def create_board_from_template(
     )
     apply_template_to_board(board_id=board_id, template=template, db_path=db_path)
     return board_id
+
+
+def create_getting_started_board(db_path: Optional[str] = None) -> int:
+    """Crea el tablero tutorial interactivo '🚀 Primeros Pasos' a partir de su plantilla."""
+    return create_board_from_template(
+        name=t("main.onboarding.board_name"),
+        color="#2563eb",
+        template=TEMPLATE_GETTING_STARTED,
+        db_path=db_path,
+    )
 
 
 def export_board_to_template(

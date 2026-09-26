@@ -13,6 +13,7 @@ from templates import (
 def test_builtin_templates_exist():
     builtins = templates.get_builtin_templates()
     ids = [t.id for t in builtins]
+    assert "getting_started" in ids
     assert "blank" in ids
     assert "software_agile" in ids
     assert "opositor_study" in ids
@@ -212,4 +213,45 @@ def test_extract_template_preserves_ai_system_prompt(db_path):
         db_path=db_path,
     )
     assert tmpl.ai_system_prompt == "Eres un Agile Coach experto."
+
+
+def test_create_getting_started_board(db_path):
+    """Verifica que la plantilla de Primeros Pasos instancie las 4 columnas pedagógicas, 7 tareas y diario inicial."""
+    board_id = templates.create_getting_started_board(db_path=db_path)
+    assert board_id is not None
+
+    board = database.get_board(board_id, db_path=db_path)
+    assert "Primeros Pasos" in board["name"] or "Getting Started" in board["name"]
+
+    columns = database.get_columns(board_id, db_path=db_path)
+    assert len(columns) == 4
+
+    col_names = [c["name"] for c in columns]
+    assert "👋 ¡Empieza aquí!" in col_names
+    assert "⚡ En Progreso & Edición" in col_names
+    assert "🛠️ Productividad & Atajos" in col_names
+    assert "🎉 ¡Completado!" in col_names
+
+    # Verificar límite WIP en columna 1
+    wip_map = {c["name"]: c["wip_limit"] for c in columns}
+    assert wip_map["⚡ En Progreso & Edición"] == 3
+
+    # Verificar que se hayan creado las 9 tareas semilla (incluyendo Cloud y Calendario)
+    all_tasks = []
+    for c in columns:
+        all_tasks.extend(database.get_tasks(c["id"], db_path=db_path))
+    assert len(all_tasks) == 9
+
+    # Verificar presencia de tareas de Cloud y Calendario
+    cloud_task = next((t for t in all_tasks if "Cloud" in t["title"] or ".ekboard" in t["title"]), None)
+    assert cloud_task is not None
+    cal_task = next((t for t in all_tasks if "Calendario" in t["title"] or "Calendar" in t["title"]), None)
+    assert cal_task is not None
+
+    # Verificar que la tarea 1 tenga un registro en su diario personal
+    task_1 = next((t for t in all_tasks if "Diario y Editor" in t["title"] or "Journal & Rich Editor" in t["title"] or "Abre esta tarjeta" in t["title"]), None)
+    assert task_1 is not None
+    logs = database.get_logs(task_1["id"], db_path=db_path)
+    assert len(logs) == 1
+    assert "diario" in logs[0]["content"].lower() or "developer diary" in logs[0]["content"].lower()
 

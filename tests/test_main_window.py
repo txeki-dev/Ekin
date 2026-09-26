@@ -205,7 +205,7 @@ def test_parse_version_tuple():
 
 
 def test_get_default_db_path_behavior(monkeypatch, tmp_path):
-    from database.connection import get_default_db_path
+    from database import get_default_db_path
     import sys
 
     # Dev mode: returns ekin_board.db
@@ -437,6 +437,97 @@ def test_check_for_updates_manual_shows_up_to_date_when_not_behind(qapp, db_path
     assert "Al día" in info_messages[0][0] or "Up to date" in info_messages[0][0]
 
     _close_window(qapp, window)
+
+
+def test_ctrl_o_and_ctrl_0_shortcuts_trigger_my_work(qapp, db_path, monkeypatch):
+    """Verifica que tanto Ctrl+0 como Ctrl+O estén registrados como atajos para abrir 'Mi Trabajo'."""
+    from PySide6.QtGui import QShortcut
+
+    monkeypatch.setattr(database, "DB_NAME", db_path)
+    window = _make_window(monkeypatch)
+
+    shortcuts = window.findChildren(QShortcut)
+    key_strings = [s.key().toString() for s in shortcuts]
+    assert "Ctrl+0" in key_strings
+    assert "Ctrl+O" in key_strings
+
+    calls = []
+    monkeypatch.setattr(window, "show_my_work_view", lambda: calls.append("my_work"))
+
+    # Activar atajo Ctrl+O
+    shortcut_o = next(s for s in shortcuts if s.key().toString() == "Ctrl+O")
+    shortcut_o.activated.emit()
+    assert calls == ["my_work"]
+
+    # Activar atajo Ctrl+0
+    shortcut_0 = next(s for s in shortcuts if s.key().toString() == "Ctrl+0")
+    shortcut_0.activated.emit()
+    assert calls == ["my_work", "my_work"]
+
+    _close_window(qapp, window)
+
+
+def test_command_palette_cloud_and_calendar_dispatch(qapp, db_path, monkeypatch):
+    """Verifica que la paleta de comandos dispare las acciones de sincronización Cloud y Calendario."""
+    monkeypatch.setattr(database, "DB_NAME", db_path)
+    window = _make_window(monkeypatch)
+
+    dispatched = []
+    monkeypatch.setattr(window, "_sync_active_board_now", lambda: dispatched.append("sync_board"))
+    monkeypatch.setattr(window, "_link_active_board_cloud", lambda: dispatched.append("link_cloud"))
+    monkeypatch.setattr(window.sidebar, "connect_shared_board", lambda: dispatched.append("connect_cloud"))
+    monkeypatch.setattr(window, "show_calendar_settings", lambda: dispatched.append("calendar_settings"))
+
+    for cmd in ("sync_board", "link_cloud", "connect_cloud", "calendar_settings"):
+        window._run_command(cmd)
+
+    assert dispatched == ["sync_board", "link_cloud", "connect_cloud", "calendar_settings"]
+    _close_window(qapp, window)
+
+
+def test_installer_download_thread_sha256_verification(tmp_path, monkeypatch):
+    import io
+    import hashlib
+    import os
+    from main import InstallerDownloadThread
+
+    content = b"MZ\x90\x00ValidPayloadForIntegrityCheck"
+    expected_hash = hashlib.sha256(content).hexdigest()
+
+    class MockDownloadResponse:
+        headers = {"Content-Length": str(len(content))}
+
+        def __init__(self):
+            self.buf = io.BytesIO(content)
+
+        def read(self, size=65536):
+            return self.buf.read(size)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr("urllib.request.urlopen", lambda req, timeout=30: MockDownloadResponse())
+
+    # 1. Success matching hash
+    dest_file = str(tmp_path / "Valid-Setup.exe")
+    thread = InstallerDownloadThread("https://example.com/valid.exe", dest_file, expected_sha256=expected_hash)
+    finished = []
+    thread.finished.connect(lambda p: finished.append(p))
+    thread.run()
+    assert finished == [dest_file]
+
+    # 2. Mismatch hash should emit error and delete file
+    bad_dest = str(tmp_path / "Bad-Setup.exe")
+    thread_bad = InstallerDownloadThread("https://example.com/bad.exe", bad_dest, expected_sha256="0" * 64)
+    errors = []
+    thread_bad.error.connect(lambda err: errors.append(err))
+    thread_bad.run()
+    assert len(errors) == 1
+    assert "Integrity check failed" in errors[0]
+    assert not os.path.exists(bad_dest)
 
 
 

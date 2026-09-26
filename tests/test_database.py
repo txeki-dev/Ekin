@@ -1318,3 +1318,59 @@ def test_tag_category_and_value_crud_lifecycle(db_path):
     assert database.get_tag_values(cat_id1, db_path=db_path) == []
     assert database.get_task_tags(t, db_path=db_path) == []
 
+
+def test_database_sync_helpers_lifecycle(db_path):
+    """Verifica el ciclo de vida completo de las funciones auxiliares de sincronización en database/sync.py."""
+    # 1. Crear tablero y tareas de prueba
+    b1 = database.create_board("Sync Test Board 1", db_path=db_path)
+    col1 = database.create_column(b1, "Col 1", db_path=db_path)
+    database.create_task(col1, "Task 1", db_path=db_path)
+    database.create_task(col1, "Task 2", db_path=db_path)
+
+    # 2. get_synced_boards vacío inicialmente
+    assert database.get_synced_boards(db_path=db_path) == []
+
+    # 3. set_board_sync_path y get_board_sync_info
+    sync_file = "C:/fake/path/board1.ekboard"
+    database.set_board_sync_path(b1, sync_file, db_path=db_path)
+    info = database.get_board_sync_info(b1, db_path=db_path)
+    assert info is not None
+    assert info["sync_path"] == sync_file
+    assert info["board_uuid"] is not None
+    assert info["last_synced_at"] is None
+
+    # 4. get_synced_boards reporta b1
+    synced = database.get_synced_boards(db_path=db_path)
+    assert len(synced) == 1
+    assert synced[0]["id"] == b1
+
+    # 5. update_board_sync_state
+    now_ts = "2026-09-26 12:00:00"
+    test_hash = "abcdef1234567890"
+    database.update_board_sync_state(b1, now_ts, test_hash, db_path=db_path)
+    info2 = database.get_board_sync_info(b1, db_path=db_path)
+    assert info2["last_synced_at"] == now_ts
+    assert info2["sync_hash"] == test_hash
+
+    # 6. get_board_last_local_modified
+    last_mod = database.get_board_last_local_modified(b1, db_path=db_path)
+    assert last_mod is not None
+
+    # 7. mark_board_tasks_synced
+    # Simular versión avanzada
+    with database.get_connection(db_path) as conn:
+        conn.execute("UPDATE tasks SET version = 5, synced_version = 2 WHERE column_id = ?", (col1,))
+    database.mark_board_tasks_synced(b1, db_path=db_path)
+    with database.get_connection(db_path) as conn:
+        rows = conn.execute("SELECT version, synced_version FROM tasks WHERE column_id = ?", (col1,)).fetchall()
+        for r in rows:
+            assert r["version"] == 5
+            assert r["synced_version"] == 5
+
+    # 8. unlink_board_sync
+    database.unlink_board_sync(b1, db_path=db_path)
+    unlinked_info = database.get_board_sync_info(b1, db_path=db_path)
+    assert unlinked_info["sync_path"] is None
+    assert unlinked_info["last_synced_at"] is None
+    assert database.get_synced_boards(db_path=db_path) == []
+

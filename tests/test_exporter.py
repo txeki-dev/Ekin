@@ -96,3 +96,35 @@ def test_exporter_plain_strips_rich_text_css():
     assert "content:" not in plain
     assert plain == "Contenido limpio"
 
+
+def test_export_dialog_ui_options_and_mode_toggles(qapp, db_path):
+    """Verifica que ExportDialog inicialice y actualice sus subopciones según el formato y alcance."""
+    from export_dialog import ExportDialog
+
+    b = database.create_board("Export Board", db_path=db_path)
+
+    # 1. Diálogo con tablero activo
+    dlg = ExportDialog(db_path=db_path, active_board_id=b)
+    assert dlg.radio_current.isChecked() is True
+    assert dlg.radio_json.isChecked() is True
+    assert dlg.check_json_tasks.isEnabled() is True
+    assert dlg.check_md_details.isEnabled() is False
+
+    # 2. Conmutar a CSV
+    dlg.radio_csv.setChecked(True)
+    assert dlg.check_json_tasks.isEnabled() is False
+    assert dlg.check_md_details.isEnabled() is False
+
+    # 3. Conmutar a Markdown
+    dlg.radio_md.setChecked(True)
+    assert dlg.check_json_tasks.isEnabled() is False
+    assert dlg.check_md_details.isEnabled() is True
+
+    dlg.deleteLater()
+
+    # 4. Diálogo sin tablero activo (alcance global obligatorio)
+    dlg_global = ExportDialog(db_path=db_path, active_board_id=None)
+    assert dlg_global.radio_current.isEnabled() is False
+    assert dlg_global.radio_all.isChecked() is True
+    dlg_global.deleteLater()
+

@@ -715,8 +715,8 @@ class McpHttpHandler(BaseHTTPRequestHandler):
         """Envía cabeceras CORS restrictivas para evitar que sitios web maliciosos lean datos locales."""
         origin = self.headers.get("Origin")
         if not origin:
-            # Clientes no basados en navegador (Claude Code, Cursor, AGY CLI) no envían Origin
-            self.send_header("Access-Control-Allow-Origin", "*")
+            # Clientes locales no basados en navegador (Claude Code, Cursor, AGY CLI) no envían Origin.
+            # No se emite comodín '*' para evitar concesiones indebidas a clientes no autenticados.
             return
 
         # Para clientes web locales o de extensiones de IDE (vscode-webview, localhost, 127.0.0.1)
