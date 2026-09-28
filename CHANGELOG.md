@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 - **Underline in Description and Journal (`detail_dialog/markdown_edit.py`, #68)**: New «U» button in the formatting toolbar, plus `Ctrl+U` / `Ctrl+S` (Spanish Word's *Subrayado*); listed in the keyboard shortcuts dialog.
+- **Numbered-list button in Description and Journal (`detail_dialog/markdown_edit.py`, #62)**: New «1.» toolbar button turns the current or selected lines into a numbered list (typing `1. ` / `1) ` keeps working).
 
 ### Fixed
 - **Long column titles cut mid-character (`widgets.py`, #59)**: The column title now shrinks to the free header space and elides with "…", keeping the WIP counter and header buttons inside the column; the full name is shown in the tooltip.

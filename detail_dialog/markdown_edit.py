@@ -1417,6 +1417,18 @@ class RichTextToolbar(QWidget):
         self.bullet_btn.clicked.connect(self.toggle_bullets)
         layout.addWidget(self.bullet_btn)
 
+        self.numbered_btn = QPushButton("1.")
+        self.numbered_btn.setObjectName("FormatButton")
+        self.numbered_btn.setToolTip(t("markdown_edit.numbered_tooltip"))
+        self.numbered_btn.setCursor(Qt.PointingHandCursor)
+        self.numbered_btn.setFixedSize(26, 24)
+        numbered_font = self.numbered_btn.font()
+        numbered_font.setBold(True)
+        numbered_font.setPointSize(9)
+        self.numbered_btn.setFont(numbered_font)
+        self.numbered_btn.clicked.connect(self.toggle_numbering)
+        layout.addWidget(self.numbered_btn)
+
         self.hr_btn = QPushButton("―")
         self.hr_btn.setObjectName("FormatButton")
         self.hr_btn.setToolTip(t("markdown_edit.hr_tooltip"))
@@ -1508,6 +1520,13 @@ class RichTextToolbar(QWidget):
         cursor = self.text_edit.textCursor()
         list_format = QTextListFormat()
         list_format.setStyle(QTextListFormat.ListDisc)
+        cursor.createList(list_format)
+        self.text_edit.setFocus()
+
+    def toggle_numbering(self):
+        cursor = self.text_edit.textCursor()
+        list_format = QTextListFormat()
+        list_format.setStyle(QTextListFormat.ListDecimal)
         cursor.createList(list_format)
         self.text_edit.setFocus()
 

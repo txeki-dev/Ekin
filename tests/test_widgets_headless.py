@@ -9,7 +9,7 @@ import pytest
 from PySide6.QtCore import Qt, QPoint, QPointF, QMimeData, QEvent
 from PySide6.QtGui import (
     QDragEnterEvent, QDragLeaveEvent, QDropEvent, QImage, QMouseEvent,
-    QTextCursor, QKeyEvent
+    QTextCursor, QKeyEvent, QTextListFormat
 )
 from PySide6.QtWidgets import QLabel, QPushButton, QWidget
 
@@ -1125,6 +1125,23 @@ def test_underline_button_and_shortcuts_toggle_underline(qapp):
     editor.keyPressEvent(QKeyEvent(QEvent.KeyPress, Qt.Key_S, Qt.ControlModifier))
     assert editor.textCursor().charFormat().fontUnderline()
     assert tb.underline_btn.isChecked()
+
+
+def test_numbering_button_turns_selected_lines_into_numbered_list(qapp):
+    """#62: el botón «1.» convierte las líneas seleccionadas en una lista numerada."""
+    editor, tb = _editor_with_all_selected("uno\ndos\ntres")
+
+    tb.numbered_btn.click()
+
+    block = editor.document().firstBlock()
+    lists = set()
+    while block.isValid():
+        assert block.textList() is not None
+        assert block.textList().format().style() == QTextListFormat.ListDecimal
+        lists.add(block.textList())
+        block = block.next()
+    assert len(lists) == 1
+    assert "<ol" in editor.toHtml()
 
 
 def test_ctrl_shift_u_still_uppercases_not_underlines(qapp):
