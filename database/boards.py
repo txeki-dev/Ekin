@@ -4,6 +4,7 @@ from .connection import get_connection
 __all__ = [
     "create_board",
     "get_boards",
+    "move_board",
     "get_board",
     "get_board_by_uuid",
     "set_board_archived",
@@ -36,9 +37,27 @@ def get_boards(db_path=None, include_archived=False):
         )
         if not include_archived:
             query += " WHERE archived = 0"
-        query += " ORDER BY id ASC"
+        query += f" ORDER BY {_BOARD_ORDER}"
         cursor.execute(query)
         return [dict(row) for row in cursor.fetchall()]
+
+# Orden de la barra lateral: primero los reordenados a mano (position), luego el resto
+# por antigüedad (así cualquier alta -crear, copiar, importar, deshacer- va al final).
+_BOARD_ORDER = "position IS NULL, position ASC, id ASC"
+
+def move_board(board_id, target_board_id, after=False, db_path=None):
+    """Coloca `board_id` justo antes (o después, si `after`) de `target_board_id` y renumera
+    la posición de todos los tableros, archivados incluidos, para que conserven su sitio."""
+    if board_id == target_board_id:
+        return
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT id FROM boards ORDER BY {_BOARD_ORDER}")
+        order = [row[0] for row in cursor.fetchall() if row[0] != board_id]
+        if target_board_id not in order:
+            return
+        order.insert(order.index(target_board_id) + (1 if after else 0), board_id)
+        cursor.executemany("UPDATE boards SET position = ? WHERE id = ?", list(enumerate(order)))
 
 def get_board(board_id, db_path=None):
     with get_connection(db_path) as conn:

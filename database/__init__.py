@@ -49,6 +49,9 @@ def init_db(db_path=None):
             cursor.execute("ALTER TABLE boards ADD COLUMN mcp_secret TEXT DEFAULT NULL")
         if "ai_system_prompt" not in columns_info:
             cursor.execute("ALTER TABLE boards ADD COLUMN ai_system_prompt TEXT DEFAULT NULL")
+        # Orden manual de la barra lateral. NULL = sin reordenar aún: va al final, por id.
+        if "position" not in columns_info:
+            cursor.execute("ALTER TABLE boards ADD COLUMN position INTEGER DEFAULT NULL")
 
         # Tabla de columnas (columns)
         cursor.execute("""

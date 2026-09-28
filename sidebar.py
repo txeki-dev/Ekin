@@ -1,12 +1,12 @@
 import os
 import sys
-from PySide6.QtCore import Qt, Signal, QTimer, QPoint, QSize
+from PySide6.QtCore import Qt, Signal, QTimer, QPoint, QSize, QMimeData
 from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QWidget, QMessageBox, QDialog, QLineEdit,
-    QMenu, QFileDialog
+    QMenu, QFileDialog, QApplication
 )
-from PySide6.QtGui import QColor, QPixmap, QIcon
+from PySide6.QtGui import QColor, QPixmap, QIcon, QDrag
 from datetime import date, datetime, timedelta
 import database
 import board_sync
@@ -124,6 +124,9 @@ class BoardButton(QFrame):
     archive_toggle_requested = Signal(int, bool)  # board_id, nuevo estado archivado
     sync_action_requested = Signal(int, str)  # board_id, acción ("sync", "link", "unlink")
     config_requested = Signal(int)  # board_id (abrir el modal de opciones del tablero)
+    board_reorder_requested = Signal(int, int, bool)  # board_id arrastrado, board_id destino, soltar después
+
+    BOARD_MIME = "application/x-ekin-board-id"
 
     def __init__(self, board_id, name, color, active=False, archived=False, sync_path=None, parent=None):
         super().__init__(parent)
@@ -249,11 +252,49 @@ class BoardButton(QFrame):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
+            self._drag_start = event.position().toPoint()
             self.clicked.emit(self.board_id)
         super().mousePressEvent(event)
 
+    def mouseMoveEvent(self, event):
+        """Arrastrar el tablero por la barra lateral para cambiar su orden."""
+        start = getattr(self, "_drag_start", None)
+        if not (event.buttons() & Qt.LeftButton) or start is None:
+            return
+        if (event.position().toPoint() - start).manhattanLength() < QApplication.startDragDistance():
+            return
+        self._drag_start = None
+        drag = QDrag(self)
+        mime = QMimeData()
+        mime.setData(self.BOARD_MIME, str(self.board_id).encode("utf-8"))
+        drag.setMimeData(mime)
+        drag.setPixmap(self.grab())
+        drag.setHotSpot(start)
+        drag.exec(Qt.MoveAction)
+
+    def _dragged_board_id(self, mime):
+        if not mime.hasFormat(self.BOARD_MIME):
+            return None
+        board_id = int(mime.data(self.BOARD_MIME).data().decode("utf-8"))
+        return None if board_id == self.board_id else board_id
+
+    def _show_reorder_indicator(self, after):
+        """Línea de acento en el borde (superior o inferior) donde caerá el tablero."""
+        edge = "bottom" if after else "top"
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {styles.COLORS['accent_tint']};
+                border: none;
+                border-{edge}: 3px solid {styles.COLORS['accent']};
+                border-radius: 0px;
+            }}
+        """)
+
     def dragEnterEvent(self, event):
-        if event.mimeData().hasFormat("application/x-ekin-column-id"):
+        if self._dragged_board_id(event.mimeData()) is not None:
+            event.acceptProposedAction()
+            self._show_reorder_indicator(event.position().y() > self.height() / 2)
+        elif event.mimeData().hasFormat("application/x-ekin-column-id"):
             event.acceptProposedAction()
             self.setStyleSheet(f"""
                 QFrame {{
@@ -265,13 +306,25 @@ class BoardButton(QFrame):
         else:
             event.ignore()
 
+    def dragMoveEvent(self, event):
+        if self._dragged_board_id(event.mimeData()) is not None:
+            event.acceptProposedAction()
+            self._show_reorder_indicator(event.position().y() > self.height() / 2)
+        else:
+            super().dragMoveEvent(event)
+
     def dragLeaveEvent(self, event):
         self.update_style()
         super().dragLeaveEvent(event)
 
     def dropEvent(self, event):
         mime = event.mimeData()
-        if mime.hasFormat("application/x-ekin-column-id"):
+        dragged_id = self._dragged_board_id(mime)
+        if dragged_id is not None:
+            event.acceptProposedAction()
+            self.update_style()
+            self.board_reorder_requested.emit(dragged_id, self.board_id, event.position().y() > self.height() / 2)
+        elif mime.hasFormat("application/x-ekin-column-id"):
             column_id = int(mime.data("application/x-ekin-column-id").data().decode("utf-8"))
             event.acceptProposedAction()
             self.update_style()
@@ -726,12 +779,23 @@ class SidebarWidget(QFrame):
             btn.archive_toggle_requested.connect(self.handle_archive_toggle)
             btn.sync_action_requested.connect(self.handle_sync_action)
             btn.config_requested.connect(self.open_board_config)
+            btn.board_reorder_requested.connect(self.handle_board_reorder)
             self.boards_layout.addWidget(btn)
             self.board_buttons[board_id] = btn
 
         # Emitir la selección del tablero activo para que la vista del tablero se cargue
         self.board_selected.emit(self.active_board_id)
         self.refresh_notifications()
+
+    def handle_board_reorder(self, board_id, target_board_id, after):
+        """Persiste el nuevo orden y recoloca los botones sin recargar el tablero activo."""
+        database.move_board(board_id, target_board_id, after, self.db_path)
+        order = [b["id"] for b in database.get_boards(self.db_path, include_archived=self.show_archived)]
+        self.board_buttons = {bid: self.board_buttons[bid] for bid in order if bid in self.board_buttons}
+        for btn in self.board_buttons.values():
+            self.boards_layout.removeWidget(btn)
+        for btn in self.board_buttons.values():
+            self.boards_layout.addWidget(btn)
 
     def toggle_show_archived(self, checked):
         self.show_archived = checked
