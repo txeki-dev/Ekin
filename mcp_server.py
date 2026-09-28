@@ -441,19 +441,6 @@ class McpToolExecutor:
         else:
             cols_to_query = list(columns_map.keys())
 
-        result = []
-        for col_id in cols_to_query:
-            tasks = database.get_tasks(col_id, db_path=self.db_path)
-            task_ids = [t["id"] for t in tasks]
-            tags_by_task = database.get_task_tags_bulk(task_ids, db_path=self.db_path)
-
-            for t_item in tasks:
-                t_tags = tags_by_task.get(t_item["id"], [])
-                tag_values = [tg["value"] for tg in t_tags]
-
-                if tag_filter and not any(tag_filter in tv.lower() for tv in tag_values):
-                    continue
-
         mask_sensitive = bool(args.get("mask_sensitive", False))
         result = []
         for col_id in cols_to_query:

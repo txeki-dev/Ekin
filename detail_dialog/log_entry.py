@@ -129,15 +129,15 @@ class LogEntryWidget(QFrame):
 
         self._editor = MarkdownTextEdit()
         target_w = None
-        parent = self.parent()
-        if parent and hasattr(parent, "_chat_image_width"):
-            self._editor.image_width_provider = parent._chat_image_width
-            target_w = parent._chat_image_width()
+        # El diálogo de la tarea es la ventana: el padre directo es el contenedor del chat
+        dialog = self.window()
+        if hasattr(dialog, "_chat_image_width"):
+            self._editor.image_width_provider = dialog._chat_image_width
+            target_w = dialog._chat_image_width()
         # Reajustar imágenes en el contenido cargado al ancho actual de la caja de edición
         content = fit_html_images(self.log_data["content"], target_w)
         self._editor.setHtml(content)
         # Archivos pegados/insertados al editar también van a Enlaces / Adjuntos de la tarea
-        dialog = self.window()
         if hasattr(dialog, "_on_local_link_pasted"):
             self._editor.local_link_pasted.connect(dialog._on_local_link_pasted)
             self._editor.mention_provider = dialog._task_links_for_mentions

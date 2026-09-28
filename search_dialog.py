@@ -64,14 +64,10 @@ class SearchDialog(QDialog):
 
         layout.addLayout(filters)
 
-        chk_layout = QHBoxLayout()
         self.due_chk = QCheckBox(t("search.only_due_checkbox"))
         self.due_chk.setCursor(Qt.PointingHandCursor)
         self.due_chk.stateChanged.connect(self.refresh_results)
-        chk_layout.addWidget(self.due_chk)
-
-        chk_layout.addStretch()
-        layout.addLayout(chk_layout)
+        layout.addWidget(self.due_chk)
 
         self.count_label = QLabel("")
         self.count_label.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 11px;")
@@ -109,19 +105,13 @@ class SearchDialog(QDialog):
             if w:
                 w.deleteLater()
 
-        query_text = self.text_input.text().strip()
-        board_id = self.board_combo.currentData()
-        tag_val_id = self.tag_combo.currentData()
-        only_due = self.due_chk.isChecked()
-
         results = database.search_tasks(
-            text=query_text,
-            board_id=board_id,
-            tag_value_id=tag_val_id,
-            only_due=only_due,
+            text=self.text_input.text().strip(),
+            board_id=self.board_combo.currentData(),
+            tag_value_id=self.tag_combo.currentData(),
+            only_due=self.due_chk.isChecked(),
             db_path=self.db_path,
         )
-
         self.count_label.setText(t("search.result_count", count=len(results)))
 
         if not results:
@@ -142,8 +132,7 @@ class SearchDialog(QDialog):
             due = f"   📅 {due_str}"
         else:
             due = ""
-        sim_str = f"  ({int(row['similarity'] * 100)}%)" if "similarity" in row else ""
-        btn = QPushButton(f"{title}{due}{sim_str}")
+        btn = QPushButton(f"{title}{due}")
         btn.setObjectName("NotificationItem")
         btn.setCursor(Qt.PointingHandCursor)
         btn.setIcon(_swatch_icon(row["board_color"]))

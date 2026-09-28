@@ -198,6 +198,18 @@ def test_mcp_list_tasks_returns_clean_description(db_path, mcp_board):
     assert task["description"] == "No funciona en el front & sí en la tabla"
 
 
+def test_mcp_list_tasks_queries_each_column_once(db_path, mcp_board, monkeypatch):
+    """list_tasks tenía un primer bucle muerto que repetía las consultas de cada columna."""
+    calls = []
+    real_get_tasks = database.get_tasks
+    monkeypatch.setattr(database, "get_tasks", lambda *a, **k: calls.append(a) or real_get_tasks(*a, **k))
+
+    handler = McpProtocolHandler(mcp_board, db_path=db_path, client_name="ClaudeCode")
+    handler.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "list_tasks"}})
+
+    assert len(calls) == len(database.get_columns(mcp_board["id"], db_path=db_path))
+
+
 def test_mcp_prompts_synergy(db_path, mcp_board):
     """Verifica que el prompt contextual del tablero (Scrum Master / Opositor) se expone al agente."""
     handler = McpProtocolHandler(mcp_board, db_path=db_path)

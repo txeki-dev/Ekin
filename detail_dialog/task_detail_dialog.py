@@ -82,7 +82,7 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
 
         self.setWindowTitle(t("task_detail.window_title"))
         self.resize(1300, 780)
-        self.setMinimumSize(1160, 640)
+        self.setMinimumSize(1240, 640)
 
         self.init_ui()
         self.load_task_data()
@@ -388,7 +388,8 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
 
         # --- Panel derecho: Journal ---
         self.right_panel = QWidget()
-        self.right_panel.setMinimumWidth(480)
+        # Ancho para que la barra de formato del Diario (20 botones) quepa en una fila
+        self.right_panel.setMinimumWidth(560)
         right_layout = QVBoxLayout(self.right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(10)

@@ -1876,6 +1876,37 @@ def test_task_detail_editors_mention_current_task_links(qapp, db_path):
     _cleanup_dialog(qapp, dlg)
 
 
+def test_format_toolbars_fit_in_one_row_at_minimum_dialog_width(qapp, db_path):
+    """Con los botones de subrayado, numeración y adjuntar, la barra del Diario partía en dos
+    líneas: el panel derecho debe tener sitio para toda la barra incluso al ancho mínimo."""
+    dlg = TaskDetailDialog(_make_task(db_path), db_path)
+    dlg.setAttribute(Qt.WA_DontShowOnScreen, True)
+    dlg.show()
+    dlg.resize(dlg.minimumWidth(), dlg.minimumHeight())
+    qapp.processEvents()
+    toolbars = dlg.findChildren(markdown_edit_module.RichTextToolbar)
+    assert {tb.text_edit for tb in toolbars} >= {dlg.desc_input, dlg.log_input}
+    for tb in toolbars:
+        assert len({b.y() for b in tb.findChildren(QPushButton)}) == 1
+    _cleanup_dialog(qapp, dlg)
+
+
+def test_journal_inline_editor_uses_chat_image_width(qapp, db_path):
+    """El editor en línea de una entrada ya publicada debe escalar las imágenes pegadas al
+    ancho del chat (como el input del Diario), no al del propio editor."""
+    task_id = _make_task(db_path)
+    database.create_log(task_id, "<p>entrada</p>", db_path=db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+    entry = next(
+        dlg.logs_layout.itemAt(i).widget() for i in range(dlg.logs_layout.count())
+        if isinstance(dlg.logs_layout.itemAt(i).widget(), LogEntryWidget)
+    )
+    entry._enter_edit_mode()
+    assert entry._editor.image_width_provider is not None
+    assert entry._editor.image_width_provider() == dlg._chat_image_width()
+    _cleanup_dialog(qapp, dlg)
+
+
 def test_markdown_edit_image_resize_methods(qapp):
     """Verifica que el método _resize_image calcula y aplica las dimensiones escaladas."""
     from detail_dialog.markdown_edit import MarkdownTextEdit

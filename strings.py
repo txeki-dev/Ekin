@@ -740,9 +740,6 @@ STRINGS_EN = {
     'task_detail.check_dups_tooltip': 'Check for potential duplicate tasks in this board',
     'task_detail.dups_none': 'No potential duplicates found.',
     'task_detail.dups_found': 'Found {count} potential duplicate(s):\n{items}',
-    'daily_standup.wip_ok': 'WIP limits respected',
-    'daily_standup.wip_violation': '⚠️ WIP limit exceeded in {column} ({count}/{limit})',
-    'daily_standup.stagnant_warning': '⚠️ {count} stagnant task(s) in progress (>3 days)',
     'task_detail.load_error_title': 'Error',
     'task_detail.load_error_body': 'Could not load the task.',
     'task_detail.no_tags_hint': 'No tags. Click «Assign tag».',
@@ -829,18 +826,6 @@ STRINGS_EN = {
     'sync.summary_conflicts': '{count} conflict(s) auto-archived',
     'ai_spec.selection_count': '{count} task(s) selected',
     'ai_spec.clear_selection_btn': 'Clear',
-    'ai_spec.mode_coding_agent': 'Architecture & code plan (Antigravity / Claude Code / Cursor)',
-    'ai_spec.mode_user_stories': 'User stories & acceptance criteria (Gherkin)',
-    'ai_spec.mode_qa_plan': 'Test plan & QA matrix',
-    'ai_spec.view_spec_btn': 'View Generated SPEC',
-    'ai_spec.model_status_label': 'AI engine:',
-    'ai_spec.status_ready': 'Ready to generate',
-    'ai_spec.download_model_title': 'Download autonomous local AI model',
-    'ai_spec.download_model_prompt': (
-        'Ekin can run an autonomous local AI model (Qwen 2.5 Coder 1.5B, ~980 MB) with no extra software and without sending your data to the cloud.\n'
-        '\n'
-        'Download the model now?'
-    ),
     'settings.language_label': 'Language',
     'settings.language_desc': 'Display language · Changes apply immediately.',
     'settings.language_en': 'English',
@@ -1575,9 +1560,6 @@ STRINGS_ES = {
     'task_detail.check_dups_tooltip': 'Comprobar posibles tareas duplicadas en este tablero',
     'task_detail.dups_none': 'No se encontraron posibles duplicadas.',
     'task_detail.dups_found': 'Se encontraron {count} posible(s) duplicada(s):\n{items}',
-    'daily_standup.wip_ok': 'Límites WIP respetados',
-    'daily_standup.wip_violation': '⚠️ Límite WIP excedido en {column} ({count}/{limit})',
-    'daily_standup.stagnant_warning': '⚠️ {count} tarea(s) estancadas en curso (>3 días)',
     'task_detail.load_error_title': 'Error',
     'task_detail.load_error_body': 'No se pudo cargar la tarea.',
     'task_detail.no_tags_hint': 'Sin etiquetas. Pulsa «Asignar Etiqueta».',
@@ -1664,18 +1646,6 @@ STRINGS_ES = {
     'sync.summary_conflicts': '{count} conflicto(s) autoarchivado(s)',
     'ai_spec.selection_count': '✨ {count} tarea(s) seleccionada(s)',
     'ai_spec.clear_selection_btn': 'Deseleccionar',
-    'ai_spec.mode_coding_agent': 'Arquitectura y Plan de Código (Antigravity / Claude Code / Cursor)',
-    'ai_spec.mode_user_stories': 'Historias de Usuario & Criterios de Aceptación (Gherkin)',
-    'ai_spec.mode_qa_plan': 'Plan de Pruebas & Matriz de QA',
-    'ai_spec.view_spec_btn': 'Ver SPEC Generada',
-    'ai_spec.model_status_label': 'Motor de IA:',
-    'ai_spec.status_ready': 'Listo para generar',
-    'ai_spec.download_model_title': 'Descargar Modelo de IA Local Autónomo',
-    'ai_spec.download_model_prompt': (
-        'Ekin puede ejecutar un modelo de IA local autónomo (Qwen 2.5 Coder 1.5B, ~980 MB) sin requerir software adicional ni enviar tus datos a la nube.\n'
-        '\n'
-        '¿Deseas descargar el modelo ahora?'
-    ),
     'settings.language_label': 'Idioma',
     'settings.language_desc': 'Idioma de la interfaz · Se aplica de inmediato.',
     'settings.language_en': 'English',
