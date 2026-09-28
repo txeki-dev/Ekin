@@ -52,6 +52,9 @@ def init_db(db_path=None):
         # Orden manual de la barra lateral. NULL = sin reordenar aún: va al final, por id.
         if "position" not in columns_info:
             cursor.execute("ALTER TABLE boards ADD COLUMN position INTEGER DEFAULT NULL")
+        # Pack del AI Prompt Clipboard del tablero. NULL = pack por defecto (DEV).
+        if "prompt_pack" not in columns_info:
+            cursor.execute("ALTER TABLE boards ADD COLUMN prompt_pack TEXT DEFAULT NULL")
 
         # Tabla de columnas (columns)
         cursor.execute("""

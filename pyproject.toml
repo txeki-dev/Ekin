@@ -25,6 +25,7 @@ py-modules = [
     "ekin_mcp", "export_dialog", "exporter", "html_utils", "icons",
     "ics_export", "importer", "local_ai", "logging_setup", "main",
     "mcp_server", "mcp_sync_dialog", "my_work_view", "onboarding_dialog",
+    "prompt_clipboard_dialog", "prompt_packs",
     "reminders", "search_dialog", "settings_dialog", "shortcuts_dialog",
     "sidebar", "strings", "styles", "templates", "undo", "version", "widgets"
 ]

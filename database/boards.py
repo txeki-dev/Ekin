@@ -11,6 +11,7 @@ __all__ = [
     "update_board",
     "delete_board",
     "set_board_mcp_config",
+    "set_board_prompt_pack",
     "get_board_mutation_fingerprint",
 ]
 
@@ -64,7 +65,7 @@ def get_board(board_id, db_path=None):
         cursor = conn.cursor()
         cursor.execute(
             """SELECT id, name, color, archived, created_at, sync_path, last_synced_at,
-                      sync_hash, board_uuid, mcp_enabled, mcp_secret, ai_system_prompt
+                      sync_hash, board_uuid, mcp_enabled, mcp_secret, ai_system_prompt, prompt_pack
                FROM boards WHERE id = ?""",
             (board_id,),
         )
@@ -94,6 +95,12 @@ def set_board_archived(board_id, archived, db_path=None):
 def update_board(board_id, name, color, db_path=None):
     with get_connection(db_path) as conn:
         conn.execute("UPDATE boards SET name = ?, color = ? WHERE id = ?", (name, color, board_id))
+
+def set_board_prompt_pack(board_id, pack_id, db_path=None):
+    """Recuerda el pack del AI Prompt Clipboard elegido para el tablero."""
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE boards SET prompt_pack = ? WHERE id = ?", (pack_id, board_id))
 
 def set_board_mcp_config(board_id, enabled, secret=None, ai_system_prompt=None, db_path=None):
     """Configura el estado de activación, token secreto y prompt de IA para el tablero."""

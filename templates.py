@@ -55,6 +55,7 @@ class BoardTemplate:
     seed_tasks: List[SeedTaskTemplate] = field(default_factory=list)
     ai_system_prompt: str = ""
     is_builtin: bool = True
+    prompt_pack: str = ""  # pack del AI Prompt Clipboard ("" = el de por defecto)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -85,6 +86,7 @@ class BoardTemplate:
             seed_tasks=seed_tasks,
             ai_system_prompt=data.get("ai_system_prompt", ""),
             is_builtin=data.get("is_builtin", False),
+            prompt_pack=data.get("prompt_pack", ""),
         )
 
 
@@ -316,6 +318,7 @@ TEMPLATE_SOFTWARE_AGILE = BoardTemplate(
         "Ayuda a desglosar tareas complejas y a mantener los límites WIP de desarrollo respetados."
     ),
     is_builtin=True,
+    prompt_pack="dev",
 )
 
 TEMPLATE_OPOSITOR = BoardTemplate(
@@ -365,6 +368,7 @@ TEMPLATE_OPOSITOR = BoardTemplate(
         "asociadas al tema, y detecta trampas de examen habituales de la legislación aplicable."
     ),
     is_builtin=True,
+    prompt_pack="opositor",
 )
 
 TEMPLATE_GTD_PERSONAL = BoardTemplate(
@@ -404,6 +408,7 @@ TEMPLATE_GTD_PERSONAL = BoardTemplate(
         "hazla ya; si no, clasifícala en @Next con su contexto (@ordenador, @llamadas, etc.) o en @Waiting."
     ),
     is_builtin=True,
+    prompt_pack="gtd",
 )
 
 BUILTIN_TEMPLATES = [
@@ -594,6 +599,8 @@ def create_board_from_template(
         db_path=db_path,
         ai_system_prompt=template.ai_system_prompt or None,
     )
+    if template.prompt_pack:
+        database.set_board_prompt_pack(board_id, template.prompt_pack, db_path)
     apply_template_to_board(board_id=board_id, template=template, db_path=db_path)
     return board_id
 
@@ -676,4 +683,5 @@ def export_board_to_template(
         seed_tasks=seed_tasks,
         ai_system_prompt=prompt_val,
         is_builtin=False,
+        prompt_pack=(board.get("prompt_pack") or "") if board else "",
     )

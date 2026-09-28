@@ -174,6 +174,15 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         self.bulk_add_btn.clicked.connect(self._open_bulk_add_dialog)
         header_layout.addWidget(self.bulk_add_btn)
 
+        # Botón del AI Prompt Clipboard del tablero
+        self.prompts_btn = QPushButton(f" {t('board_view.prompts_btn')}")
+        self.prompts_btn.setCursor(Qt.PointingHandCursor)
+        self.prompts_btn.setToolTip(t("board_view.prompts_tooltip"))
+        self.prompts_btn.setIcon(lucide_icon("clipboard-list", styles.COLORS['text_soft'], 15))
+        self.prompts_btn.setIconSize(QSize(15, 15))
+        self.prompts_btn.clicked.connect(self._open_prompt_clipboard_dialog)
+        header_layout.addWidget(self.prompts_btn)
+
         # Botón MCP (Agente IA)
         self.mcp_btn = QPushButton(t("mcp.board_btn_inactive"))
         self.mcp_btn.setCursor(Qt.PointingHandCursor)
@@ -638,6 +647,13 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         if dlg.exec() == QDialog.Accepted:
             self.load_board(self.board_id)
             self.data_changed.emit()
+
+    def _open_prompt_clipboard_dialog(self):
+        """Abre el AI Prompt Clipboard con el pack de prompts del tablero activo."""
+        if not self.board_id or self.board_id == -1:
+            return
+        from prompt_clipboard_dialog import PromptClipboardDialog
+        PromptClipboardDialog(self.board_id, db_path=self.db_path, parent=self.window()).exec()
 
     def clear_columns_layout(self):
         """Limpia todos los widgets del layout de columnas."""

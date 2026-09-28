@@ -1314,6 +1314,12 @@ class McpHttpServer(ThreadingHTTPServer):
 
 # --- GESTOR GLOBAL DE SERVIDOR MCP (SINGLETON) ---
 
+def claude_code_server_name(board_name: str) -> str:
+    """Nombre del servidor MCP del tablero en el comando `claude mcp add` (p. ej. 'ekin-sw_-_ekin')."""
+    safe_name = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in board_name.lower())
+    return f"ekin-{safe_name}"
+
+
 class McpManager:
     """Controla el ciclo de vida del servidor MCP embebido en Ekin Kanban."""
 
@@ -1364,8 +1370,7 @@ class McpManager:
 
     def get_claude_code_command(self, board_name: str, board_uuid: str, token: Optional[str] = None) -> str:
         sse_url = self.get_board_sse_url(board_uuid, token)
-        safe_name = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in board_name.lower())
-        return f'claude mcp add --transport sse ekin-{safe_name} "{sse_url}"'
+        return f'claude mcp add --transport sse {claude_code_server_name(board_name)} "{sse_url}"'
 
     def get_claude_desktop_config(self, board_name: str, board_uuid: str, token: Optional[str] = None) -> Dict[str, Any]:
         sse_url = self.get_board_sse_url(board_uuid, token)
