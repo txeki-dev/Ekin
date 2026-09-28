@@ -836,6 +836,13 @@ class MarkdownTextEdit(QTextEdit):
             self.mergeCurrentCharFormat(fmt)
             event.accept()
             return
+        # --- Subrayado: Ctrl+U o Ctrl+S (Subrayado en Word en español) ---
+        if ctrl and not shift and event.key() in (Qt.Key_U, Qt.Key_S):
+            fmt = QTextCharFormat()
+            fmt.setFontUnderline(not self.currentCharFormat().fontUnderline())
+            self.mergeCurrentCharFormat(fmt)
+            event.accept()
+            return
 
         # --- Alineaciones de texto: Ctrl+L (izq), Ctrl+E (centro), Ctrl+R (der), Ctrl+J (justificado) ---
         if ctrl and not shift and event.key() == Qt.Key_L:
@@ -1307,6 +1314,18 @@ class RichTextToolbar(QWidget):
         self.strike_btn.clicked.connect(self.toggle_strikethrough)
         layout.addWidget(self.strike_btn)
 
+        self.underline_btn = QPushButton("U")
+        self.underline_btn.setObjectName("FormatButton")
+        self.underline_btn.setToolTip(t("markdown_edit.underline_tooltip"))
+        self.underline_btn.setCheckable(True)
+        self.underline_btn.setCursor(Qt.PointingHandCursor)
+        self.underline_btn.setFixedSize(26, 24)
+        underline_font = self.underline_btn.font()
+        underline_font.setUnderline(True)
+        self.underline_btn.setFont(underline_font)
+        self.underline_btn.clicked.connect(self.toggle_underline)
+        layout.addWidget(self.underline_btn)
+
         self.color_btn = QPushButton("A")
         self.color_btn.setObjectName("FormatButton")
         self.color_btn.setToolTip(t("markdown_edit.color_tooltip"))
@@ -1479,6 +1498,12 @@ class RichTextToolbar(QWidget):
         self.text_edit.mergeCurrentCharFormat(fmt)
         self.text_edit.setFocus()
 
+    def toggle_underline(self):
+        fmt = QTextCharFormat()
+        fmt.setFontUnderline(self.underline_btn.isChecked())
+        self.text_edit.mergeCurrentCharFormat(fmt)
+        self.text_edit.setFocus()
+
     def toggle_bullets(self):
         cursor = self.text_edit.textCursor()
         list_format = QTextListFormat()
@@ -1556,6 +1581,7 @@ class RichTextToolbar(QWidget):
         self.bold_btn.setChecked(fmt.fontWeight() >= QFont.Bold or self.text_edit.fontWeight() >= QFont.Bold)
         self.italic_btn.setChecked(fmt.fontItalic() or self.text_edit.fontItalic())
         self.strike_btn.setChecked(fmt.fontStrikeOut())
+        self.underline_btn.setChecked(fmt.fontUnderline())
         fg = fmt.foreground().color()
         if fg.isValid() and fg.name() != "#000000":
             self._update_color_btn_indicator(fg.name())

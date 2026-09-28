@@ -1099,6 +1099,41 @@ def test_rich_text_toolbar_all_buttons_exist(qapp):
     assert hasattr(tb, "arrow_btn")
 
 
+def _editor_with_all_selected(text="hola mundo"):
+    editor = markdown_edit_module.MarkdownTextEdit()
+    tb = markdown_edit_module.RichTextToolbar(editor)
+    editor.setPlainText(text)
+    cursor = editor.textCursor()
+    cursor.select(QTextCursor.Document)
+    editor.setTextCursor(cursor)
+    return editor, tb
+
+
+def test_underline_button_and_shortcuts_toggle_underline(qapp):
+    """#68: subrayado desde el botón «U» y con Ctrl+U / Ctrl+S (Subrayado en Word en español)."""
+    editor, tb = _editor_with_all_selected()
+
+    tb.underline_btn.click()
+    assert editor.textCursor().charFormat().fontUnderline()
+    assert "text-decoration: underline" in editor.toHtml()
+    assert tb.underline_btn.isChecked()
+
+    editor.keyPressEvent(QKeyEvent(QEvent.KeyPress, Qt.Key_U, Qt.ControlModifier))
+    assert not editor.textCursor().charFormat().fontUnderline()
+    assert not tb.underline_btn.isChecked()
+
+    editor.keyPressEvent(QKeyEvent(QEvent.KeyPress, Qt.Key_S, Qt.ControlModifier))
+    assert editor.textCursor().charFormat().fontUnderline()
+    assert tb.underline_btn.isChecked()
+
+
+def test_ctrl_shift_u_still_uppercases_not_underlines(qapp):
+    editor, _ = _editor_with_all_selected("hola")
+    editor.keyPressEvent(QKeyEvent(QEvent.KeyPress, Qt.Key_U, Qt.ControlModifier | Qt.ShiftModifier))
+    assert editor.toPlainText() == "HOLA"
+    assert not editor.textCursor().charFormat().fontUnderline()
+
+
 def test_log_entry_widget_routes_image_link_to_preview(qapp, monkeypatch):
     calls = []
     monkeypatch.setattr(log_entry_module, "show_image_preview", lambda uri, parent=None: calls.append(uri))
