@@ -70,10 +70,6 @@ class SearchDialog(QDialog):
         self.due_chk.stateChanged.connect(self.refresh_results)
         chk_layout.addWidget(self.due_chk)
 
-        self.semantic_chk = QCheckBox(t("search.semantic_checkbox"))
-        self.semantic_chk.setCursor(Qt.PointingHandCursor)
-        self.semantic_chk.stateChanged.connect(self.refresh_results)
-        chk_layout.addWidget(self.semantic_chk)
         chk_layout.addStretch()
         layout.addLayout(chk_layout)
 
@@ -118,32 +114,13 @@ class SearchDialog(QDialog):
         tag_val_id = self.tag_combo.currentData()
         only_due = self.due_chk.isChecked()
 
-        if self.semantic_chk.isChecked() and query_text:
-            import local_ai
-            results = local_ai.semantic_search_tasks(
-                query=query_text,
-                board_id=board_id,
-                top_k=25,
-                db_path=self.db_path
-            )
-            if tag_val_id:
-                filtered = []
-                for r in results:
-                    task_info = database.get_task(r["id"], self.db_path)
-                    task_tags = task_info.get("tags", []) if task_info else []
-                    if any(t.get("tag_value_id") == tag_val_id for t in task_tags):
-                        filtered.append(r)
-                results = filtered
-            if only_due:
-                results = [r for r in results if r.get("due_date")]
-        else:
-            results = database.search_tasks(
-                text=query_text,
-                board_id=board_id,
-                tag_value_id=tag_val_id,
-                only_due=only_due,
-                db_path=self.db_path,
-            )
+        results = database.search_tasks(
+            text=query_text,
+            board_id=board_id,
+            tag_value_id=tag_val_id,
+            only_due=only_due,
+            db_path=self.db_path,
+        )
 
         self.count_label.setText(t("search.result_count", count=len(results)))
 

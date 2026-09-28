@@ -8,14 +8,12 @@ Pruebas exhaustivas para las 4 mejoras de UX:
 
 from PySide6.QtCore import Qt, QPointF, QEvent
 from PySide6.QtGui import QKeyEvent, QMouseEvent
-from PySide6.QtWidgets import QApplication
 import database
 from detail_dialog.markdown_edit import MarkdownTextEdit
 from detail_dialog.task_detail_dialog import TaskDetailDialog
 from detail_dialog.log_entry import LogEntryWidget
 from detail_dialog.html_utils import format_table_all_cells
 import local_ai
-from ai_spec_dialog import AiSpecDialog
 
 
 def test_table_insert_and_manipulation(qapp):
@@ -124,69 +122,6 @@ def test_quote_placeholder_clearing_on_click(qapp):
     assert "Type a quote" not in edit.toPlainText()
 
 
-def test_ai_prompts_and_master_prompt_copy(monkeypatch, qapp, db_path):
-    """Verifica que el prompt maestro contenga solo title, description, links en JSON
-    y que los botones de visualización y copia funcionen."""
-    board_id = database.create_board("AI Board", db_path=db_path)
-    col_id = database.create_column(board_id, "Backlog", db_path=db_path)
-    t1 = database.create_task(
-        col_id,
-        "Diseñar API de Pagos",
-        description="Integración con Stripe",
-        tag_text="P1:URGENT",
-        due_date="2026-12-31",
-        db_path=db_path
-    )
-    database.add_task_link(t1, "https://stripe.com/docs/api", "Stripe Docs", db_path=db_path)
-    database.add_task_link(t1, "C:/configs/stripe.json", "Local Config", db_path=db_path)
-    database.create_log(t1, "Nota privada que NO debe enviarse al LLM", db_path=db_path)
-
-    # 1. Comprobar formateador JSON
-    t_data = database.get_task(t1, db_path)
-    t_data["links"] = database.get_task_links(t1, db_path)
-    t_data["tags"] = database.get_task_tags(t1, db_path)
-    t_data["logs"] = database.get_logs(t1, db_path)
-
-    json_output = local_ai.format_tasks_for_prompt([t_data])
-    assert "Diseñar API de Pagos" in json_output
-    assert "Integración con Stripe" in json_output
-    assert "https://stripe.com/docs/api" in json_output
-    assert "web_link" in json_output
-    assert "local_file" in json_output
-    # Exclusión explícita de tags, fechas y diario
-    assert "URGENT" not in json_output
-    assert "2026-12-31" not in json_output
-    assert "Nota privada" not in json_output
-
-    # 2. Comprobar los 4 objetivos de prompt
-    modes = ["sw_feature_plan", "study_socratic", "analyst_business", "action_breakdown"]
-    for m in modes:
-        sys_p, user_p = local_ai.build_spec_prompts([t_data], mode=m)
-        assert len(sys_p) > 20
-        assert len(user_p) > 20
-        assert "Diseñar API de Pagos" in user_p
-
-    # 3. Comprobar diálogo AiSpecDialog, sus botones y copia de prompt maestro
-    dlg = AiSpecDialog([t1], board_id, db_path)
-    assert hasattr(dlg, "view_prompt_btn")
-    assert hasattr(dlg, "copy_prompt_btn")
-
-    master_prompt = dlg.get_master_prompt()
-    assert "# SYSTEM INSTRUCTIONS" in master_prompt
-    assert "# CONTEXT & REQUEST" in master_prompt
-    assert "Diseñar API de Pagos" in master_prompt
-
-    copied_bucket = []
-    monkeypatch.setattr(QApplication.clipboard(), "setText", lambda txt: copied_bucket.append(txt))
-
-    # Ejecutar acción de copiar
-    dlg.copy_master_prompt()
-    assert len(copied_bucket) == 1
-    assert copied_bucket[0] == master_prompt
-
-    dlg.reject()
-
-
 def test_journal_chat_ux_and_inplace_editing(qapp, db_path):
     """Verifica las proporciones, márgenes simétricos, scroll fluido y edición in-place en el diario."""
     board_id = database.create_board("UX Board", db_path=db_path)
@@ -265,8 +200,8 @@ def test_table_dialog_insert_dimensions(qapp):
     assert "<table" in edit.toHtml()
 
 
-def test_html_description_clean_and_domain_analysis():
-    """Verifica la eliminación total de CSS (<style>) residual de Qt y el análisis de dominio arquitectónico."""
+def test_html_description_clean():
+    """Verifica la eliminación total de CSS (<style>) residual de Qt."""
     raw_html = (
         '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd">\n'
         '<html><head><meta name="qrichtext" content="1" /><style type="text/css">\n'
@@ -284,26 +219,6 @@ def test_html_description_clean_and_domain_analysis():
     assert "border-width" not in clean_text
     assert "marker" not in clean_text
     assert "Necesito integrar el OMIE y OMIP" in clean_text
-
-    task_sample = {
-        "title": "Integración API REE",
-        "description": raw_html,
-        "links": [{"label": "Documentación OMIE", "url": "https://www.omie.es"}]
-    }
-
-    # Comprobar análisis
-    analysis = local_ai._analyze_task_for_spec(task_sample)
-    assert "Integración de Red & APIs Externas" in analysis["domain"]
-    assert "white-space" not in analysis["clean_desc"]
-
-    # Comprobar generación estructural enriquecida
-    spec = local_ai.generate_structural_spec([task_sample], mode="sw_feature_plan")
-    assert "## 2. Desglose de Requisitos & Mapeo de Tareas" in spec
-    assert "### 2.1. Integración API REE" in spec
-    assert "Capa / Dominio Arquitectónico" in spec
-    assert "Desglose Técnico & Pasos Operativos" in spec
-    assert "Criterios de Aceptación & DoD Específico" in spec
-    assert "white-space" not in spec
 
 
 def test_task_detail_meta_card_4_rows(qapp, db_path):

@@ -18,7 +18,7 @@ dev = [
 
 [tool.setuptools]
 py-modules = [
-    "ai_assist_dialog", "ai_spec_dialog", "analytics", "backups",
+    "analytics", "backups",
     "board_dialogs", "board_mixins", "board_sync", "board_sync_controller",
     "board_template_dialogs", "board_view", "bulk_add_dialog", "calendar_view",
     "cloud_sync_dialog", "color_picker", "command_palette", "dashboard_view",

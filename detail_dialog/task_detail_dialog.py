@@ -162,26 +162,13 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         self.kicker_label = QLabel("")
         self.kicker_label.setObjectName("TaskDetailKicker")
         header_left.addWidget(self.kicker_label)
-        # Título editable en sitio con botones rápidos de sugerencia y duplicados
+        # Título editable en sitio con botón rápido de duplicados
         title_row = QHBoxLayout()
         title_row.setSpacing(6)
         self.title_input = QLineEdit()
         self.title_input.setObjectName("TaskDetailTitle")
         self.title_input.setPlaceholderText(t("task_detail.title_placeholder"))
         title_row.addWidget(self.title_input, 1)
-
-        self.suggest_title_btn = QPushButton()
-        self.suggest_title_btn.setFixedSize(28, 28)
-        self.suggest_title_btn.setCursor(Qt.PointingHandCursor)
-        self.suggest_title_btn.setIcon(lucide_icon("sparkles", styles.COLORS['text_soft'], 14))
-        self.suggest_title_btn.setIconSize(QSize(14, 14))
-        self.suggest_title_btn.setToolTip(t("task_detail.suggest_title_tooltip"))
-        self.suggest_title_btn.setStyleSheet(
-            f"QPushButton {{ background: transparent; border: 1px solid {styles.COLORS['border']}; border-radius: 6px; }}"
-            f"QPushButton:hover {{ background-color: {styles.COLORS['bg_hover']}; }}"
-        )
-        self.suggest_title_btn.clicked.connect(self._suggest_title_action)
-        title_row.addWidget(self.suggest_title_btn)
 
         self.check_dups_btn = QPushButton()
         self.check_dups_btn.setFixedSize(28, 28)
@@ -301,13 +288,6 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         self.manage_tags_btn.setCursor(Qt.PointingHandCursor)
         self.manage_tags_btn.clicked.connect(self.open_tag_manager)
         row_3.addWidget(self.manage_tags_btn)
-        self.suggest_tags_btn = QPushButton(t("task_detail.suggest_tags_btn"))
-        self.suggest_tags_btn.setToolTip(t("task_detail.suggest_tags_tooltip"))
-        self.suggest_tags_btn.setCursor(Qt.PointingHandCursor)
-        self.suggest_tags_btn.setIcon(lucide_icon("sparkles", styles.COLORS['text_soft'], 13))
-        self.suggest_tags_btn.setIconSize(QSize(13, 13))
-        self.suggest_tags_btn.clicked.connect(self._suggest_tags_action)
-        row_3.addWidget(self.suggest_tags_btn)
         row_3.addStretch()
         meta_l.addLayout(row_3)
 
@@ -368,24 +348,6 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         left_layout.addWidget(RichTextToolbar(self.desc_input))
         left_layout.addWidget(self.desc_input, 1)
 
-        breakdown_row = QHBoxLayout()
-        breakdown_row.addStretch()
-        self.checklist_btn = QPushButton(t("task_detail.checklist_btn"))
-        self.checklist_btn.setCursor(Qt.PointingHandCursor)
-        self.checklist_btn.setIcon(lucide_icon("check", styles.COLORS['text_soft'], 14))
-        self.checklist_btn.setIconSize(QSize(14, 14))
-        self.checklist_btn.setToolTip(t("task_detail.checklist_tooltip"))
-        self.checklist_btn.clicked.connect(self._open_extract_checklist)
-        breakdown_row.addWidget(self.checklist_btn)
-
-        self.breakdown_btn = QPushButton(t("task_detail.breakdown_btn"))
-        self.breakdown_btn.setCursor(Qt.PointingHandCursor)
-        self.breakdown_btn.setIcon(lucide_icon("sparkles", styles.COLORS['text_soft'], 14))
-        self.breakdown_btn.setIconSize(QSize(14, 14))
-        self.breakdown_btn.clicked.connect(self._open_breakdown)
-        breakdown_row.addWidget(self.breakdown_btn)
-        left_layout.addLayout(breakdown_row)
-
         # Adjuntos
         links_kicker = QLabel(t("task_detail.links_label"))
         left_layout.addWidget(links_kicker)
@@ -436,12 +398,6 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         journal_title.setObjectName("JournalHeader")
         journal_head.addWidget(journal_title)
         journal_head.addStretch()
-        self.summarize_btn = QPushButton(t("task_detail.summarize_btn"))
-        self.summarize_btn.setCursor(Qt.PointingHandCursor)
-        self.summarize_btn.setIcon(lucide_icon("sparkles", styles.COLORS['text_soft'], 14))
-        self.summarize_btn.setIconSize(QSize(14, 14))
-        self.summarize_btn.clicked.connect(self._open_summary)
-        journal_head.addWidget(self.summarize_btn)
         self.entries_count_label = QLabel("")
         self.entries_count_label.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 12px;")
         journal_head.addWidget(self.entries_count_label)

@@ -1564,33 +1564,6 @@ def test_board_view_multi_selection_bar_and_escape(qapp, db_path):
     assert view.selection_bar.isHidden() is True
 
 
-def test_ai_spec_dialog_loads_and_generates(qapp, db_path):
-    """Verifica la carga del diálogo de SPEC y la generación de especificación técnica."""
-    from ai_spec_dialog import AiSpecDialog
-    import database
-
-    board_id = database.create_board("Tablero IA", db_path=db_path)
-    col_id = database.create_column(board_id, "Backlog", db_path=db_path)
-    t1 = database.create_task(col_id, "Autenticación OAuth2", description="Flujo PKCE", db_path=db_path)
-    t2 = database.create_task(col_id, "Tokens en SQLite", description="Almacenar cifrado", db_path=db_path)
-
-    dlg = AiSpecDialog([t1, t2], board_id, db_path)
-    assert len(dlg.tasks_data) == 2
-
-    # Ejecutar generación (usará el generador estructural integrado si no hay LLM externo corriendo)
-    dlg.start_generation()
-    if dlg._gen_thread:
-        dlg._gen_thread.wait(5000)
-    qapp.processEvents()
-
-    spec_text = dlg.spec_edit.toPlainText()
-    assert "# FEATURE PLAN:" in spec_text or "# SPEC:" in spec_text
-    assert "Autenticación OAuth2" in spec_text
-    assert "Tokens en SQLite" in spec_text
-
-    dlg.reject()
-
-
 def test_cloud_sync_info_dialog_constructs_and_accepts(qapp):
     """Verifica que CloudSyncInfoDialog se construye con las instrucciones de los proveedores y emite accept."""
     from cloud_sync_dialog import CloudSyncInfoDialog
@@ -1698,24 +1671,6 @@ def test_task_detail_dialog_width_and_toolbar_single_line(qapp, db_path):
     dlg = TaskDetailDialog(t_id, db_path=db_path)
     assert dlg.width() >= 1200
     assert dlg.right_panel.minimumWidth() >= 480
-    dlg.close()
-
-
-def test_ai_spec_dialog_expanded_widths(qapp, db_path):
-    """Verifica que AiSpecDialog tenga suficiente anchura y que mode_combo y model_combo no se trunquen."""
-    import database
-    from ai_spec_dialog import AiSpecDialog
-
-    board_id = database.create_board("B2", db_path=db_path)
-    col_id = database.create_column(board_id, "C2", db_path=db_path)
-    t_id = database.create_task(col_id, "T2", db_path=db_path)
-
-    dlg = AiSpecDialog([t_id], board_id, db_path=db_path)
-    assert dlg.width() >= 1000
-    assert dlg.minimumWidth() >= 980
-    assert dlg.model_combo.minimumWidth() >= 240
-    if dlg.model_combo.lineEdit():
-        assert dlg.model_combo.lineEdit().cursorPosition() == 0
     dlg.close()
 
 

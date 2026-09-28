@@ -1,6 +1,6 @@
 """
 Pruebas exhaustivas para la Nueva Suite de IA Local Autónoma & RDi:
-- Fase 1: Ergonomía de Tarjetas & Standup (Pilares 1 y 2).
+- Fase 1: Datos de Standup que alimentan el resumen ejecutivo del MCP.
 - Fase 2: Motor de Embeddings & Búsqueda Semántica (Pilar 3).
 - Fase 3: Escudo de Privacidad & Condensador MCP (Pilar 4).
 """
@@ -15,95 +15,8 @@ import mcp_server
 
 
 # =====================================================================
-# FASE 1: ERGONOMÍA DE TARJETAS & STANDUP (PILARES 1 Y 2)
+# FASE 1: DATOS DE STANDUP (RESUMEN EJECUTIVO MCP)
 # =====================================================================
-
-def test_extract_checklist_offline_various_inputs():
-    # 1. Fallback vacío
-    empty_items = local_ai.extract_checklist_offline("")
-    assert len(empty_items) >= 2
-    assert any("Requisitos" in it or "requisitos" in it.lower() for it in empty_items)
-
-    # 2. Texto con checkboxes existentes
-    chk_text = "- [ ] Configurar auth\n- [x] Crear endpoints\n* [ ] Escribir tests"
-    chk_items = local_ai.extract_checklist_offline(chk_text)
-    assert chk_items == ["Configurar auth", "Crear endpoints", "Escribir tests"]
-
-    # 3. Texto con viñetas estándar
-    bullet_text = "- Instalar dependencias\n* Configurar base de datos\n1. Validar esquema"
-    bullet_items = local_ai.extract_checklist_offline(bullet_text)
-    assert bullet_items == ["Instalar dependencias", "Configurar base de datos", "Validar esquema"]
-
-    # 4. Párrafo de texto libre
-    para_text = (
-        "Es necesario implementar la autenticación mediante token JWT. "
-        "Se debe verificar la caducidad del token en cada petición. "
-        "Finalmente, añadir pruebas unitarias exhaustivas."
-    )
-    para_items = local_ai.extract_checklist_offline(para_text)
-    assert len(para_items) >= 2
-    assert any("autenticación" in it.lower() for it in para_items)
-
-
-def test_build_spec_prompts_and_structural_spec_new_modes():
-    tasks = [{"title": "Tarea A", "description": "- [ ] Sub A1\n- [ ] Sub A2", "links": []}]
-
-    # Modo extract_checklist
-    sys_p, usr_p = local_ai.build_spec_prompts(tasks, mode="extract_checklist")
-    assert "criterios de aceptación" in sys_p.lower()
-    assert "- [ ]" in usr_p
-
-    spec_chk = local_ai.generate_structural_spec(tasks, mode="extract_checklist")
-    assert "- [ ] Sub A1" in spec_chk
-    assert "- [ ] Sub A2" in spec_chk
-
-    # Modo daily_standup
-    sys_stand, usr_stand = local_ai.build_spec_prompts(tasks, mode="daily_standup")
-    assert "daily standup" in sys_stand.lower()
-    spec_stand = local_ai.generate_structural_spec(tasks, mode="daily_standup")
-    assert "Daily Standup" in spec_stand
-
-
-def test_suggest_tags_offline():
-    # Coincidencia con taxonomía estándar
-    tags_bug = local_ai.suggest_tags_offline("Error al iniciar sesión", "Ocurre un crash al recibir null")
-    assert "bug" in tags_bug
-    assert "security" in tags_bug or "auth" in tags_bug
-
-    tags_ui = local_ai.suggest_tags_offline("Rediseño del diálogo", "Cambiar color del botón y layout")
-    assert "ui" in tags_ui
-
-    tags_api = local_ai.suggest_tags_offline("Nuevo endpoint REST", "Crear ruta HTTP para sincronización")
-    assert "api" in tags_api
-
-    # Coincidencia con etiquetas del tablero existentes
-    available = ["Sprint-24", "Billing", "Frontend"]
-    custom_suggested = local_ai.suggest_tags_offline("Ajustes de Billing en el sprint", "Trabajo en Frontend", available_tags=available)
-    assert "Billing" in custom_suggested
-    assert "Frontend" in custom_suggested
-
-
-def test_suggest_conventional_title():
-    # Título ya formateado
-    assert local_ai.suggest_conventional_title("fix(ui): botón roto") == "fix(ui): botón roto"
-    assert local_ai.suggest_conventional_title("FEAT: nueva vista") == "feat: nueva vista"
-
-    # Detección de bug
-    t_bug = local_ai.suggest_conventional_title("Error en el login al conectar")
-    assert t_bug.startswith("fix")
-
-    # Detección de pruebas
-    t_test = local_ai.suggest_conventional_title("Añadir tests para la base de datos")
-    assert t_test.startswith("test")
-
-    # Detección de documentación
-    t_doc = local_ai.suggest_conventional_title("Actualizar el readme y manual de usuario")
-    assert t_doc.startswith("docs")
-
-    # Detección de refactor
-    t_ref = local_ai.suggest_conventional_title("Limpiar y refactorizar código de sync")
-    assert t_ref.startswith("refactor")
-
 
 def test_generate_daily_standup_data_and_markdown(db_path):
     board_id = database.create_board("Proyecto Alpha", color="#10b981", db_path=db_path)
@@ -138,23 +51,6 @@ def test_generate_daily_standup_data_and_markdown(db_path):
     assert "En curso / Próximo foco" in md
     assert "Bloqueos / Tareas estancadas" in md
     assert "exceso WIP" in md or "límite WIP" in md.lower()
-
-
-def test_daily_standup_dialog_ui(qapp, db_path):
-    from daily_standup_dialog import DailyStandupDialog
-    board_id = database.create_board("Tablero Standup", db_path=db_path)
-    col_id = database.create_column(board_id, "In Progress", db_path=db_path)
-    database.create_task(col_id, "Desarrollar feature", db_path=db_path)
-
-    dlg = DailyStandupDialog(board_id, "Tablero Standup", db_path=db_path)
-    assert dlg.editor.toPlainText() != ""
-    assert "Daily Standup — Tablero Standup" in dlg.editor.toPlainText()
-
-    # Copiado al portapapeles
-    dlg._copy_to_clipboard()
-    # Cancelación segura de hilo
-    dlg._cancel_thread()
-    dlg.close()
 
 
 # =====================================================================
@@ -230,23 +126,6 @@ def test_semantic_search_tasks_and_find_duplicates(db_path):
     assert len(dups) >= 1
     assert dups[0]["id"] == t1
     assert dups[0]["id"] != t2
-
-
-def test_search_dialog_with_semantic_toggle(qapp, db_path):
-    from search_dialog import SearchDialog
-    board_id = database.create_board("Board Search Dialog", db_path=db_path)
-    col_id = database.create_column(board_id, "Col", db_path=db_path)
-    database.create_task(col_id, "Gestión de memoria y caché", db_path=db_path)
-
-    dlg = SearchDialog(db_path=db_path)
-    assert hasattr(dlg, "semantic_chk")
-
-    dlg.text_input.setText("memoria")
-    dlg.semantic_chk.setChecked(True)
-    dlg.refresh_results()
-    assert dlg.results_layout.count() >= 1
-
-    dlg.close()
 
 
 # =====================================================================

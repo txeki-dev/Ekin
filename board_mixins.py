@@ -1,7 +1,7 @@
 """board_mixins.py - Mixins modulares para BoardViewWidget.
 
 Separa la gestión de UI de sincronización (OneDrive / archivos compartidos)
-y la lógica de selección múltiple de tarjetas / generación de SPEC de IA.
+y la lógica de selección múltiple de tarjetas.
 """
 
 import os
@@ -205,7 +205,7 @@ class BoardSyncUiMixin:
 
 
 class BoardSelectionMixin:
-    """Manejo de selección múltiple de tarjetas para operaciones grupales y especificaciones IA."""
+    """Manejo de selección múltiple de tarjetas para operaciones grupales (p. ej. arrastre en lote)."""
 
     def _handle_task_ctrl_clicked(self, task_id, column_id):
         """Alterna el estado de selección múltiple de una tarjeta mediante Ctrl+Clic."""
@@ -247,17 +247,6 @@ class BoardSelectionMixin:
             if tid not in ordered:
                 ordered.append(tid)
         return ordered
-
-    def open_ai_spec_dialog(self):
-        """Abre el generador modal de especificaciones para agentes de IA."""
-        if not self.selected_task_ids:
-            return
-        from ai_spec_dialog import AiSpecDialog
-        dlg = AiSpecDialog(list(self.selected_task_ids), self.board_id, self.db_path, parent=self)
-        if dlg.exec():
-            # Si el diálogo creó una tarjeta con la SPEC generada, recargar el tablero
-            self.load_board(self.board_id)
-            self.clear_task_selection()
 
     def keyPressEvent(self, event):
         """Escape deselecciona tarjetas múltiples."""
