@@ -1794,6 +1794,54 @@ def test_markdown_edit_quote_and_local_link(qapp):
     assert received[0][1] == "documento.pdf"
 
 
+def test_attach_button_inserts_file_links_and_emits_for_attachments(qapp, monkeypatch):
+    """#61: el clip de la barra inserta cada archivo elegido como enlace «📄 nombre»
+    y lo emite por local_link_pasted (para que la tarea lo añada a Enlaces / Adjuntos)."""
+    import os
+    from PySide6.QtCore import QUrl
+    paths = [os.path.abspath("informe.pdf"), os.path.abspath("datos.xlsx")]
+    monkeypatch.setattr(
+        markdown_edit_module.QFileDialog, "getOpenFileNames",
+        staticmethod(lambda *a, **k: (paths, "")),
+    )
+    editor = markdown_edit_module.MarkdownTextEdit()
+    tb = markdown_edit_module.RichTextToolbar(editor)
+    received = []
+    editor.local_link_pasted.connect(lambda url, label: received.append((url, label)))
+
+    tb.attach_btn.click()
+
+    assert received == [(paths[0], "informe.pdf"), (paths[1], "datos.xlsx")]
+    body = editor.toHtml()
+    for p in paths:
+        assert f'href="{QUrl.fromLocalFile(p).toString()}"' in body
+    assert "📄 informe.pdf" in editor.toPlainText()
+
+
+def test_files_inserted_in_description_and_journal_edit_reach_task_links(qapp, db_path):
+    """#61: archivos insertados en la Descripción o al editar una entrada ya publicada
+    del Diario acaban en Enlaces / Adjuntos (sin duplicados)."""
+    import os
+    task_id = _make_task(db_path)
+    database.create_log(task_id, "<p>entrada</p>", db_path=db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+
+    desc_file = os.path.abspath("spec.docx")
+    dlg.desc_input.insert_local_files([desc_file, desc_file])
+
+    entry = next(
+        dlg.logs_layout.itemAt(i).widget() for i in range(dlg.logs_layout.count())
+        if isinstance(dlg.logs_layout.itemAt(i).widget(), LogEntryWidget)
+    )
+    entry._enter_edit_mode()
+    journal_file = os.path.abspath("captura.png")
+    entry._editor.insert_local_files([journal_file])
+
+    urls = [lnk["url"] for lnk in database.get_task_links(task_id, db_path)]
+    assert urls == [desc_file, journal_file]
+    _cleanup_dialog(qapp, dlg)
+
+
 def test_markdown_edit_image_resize_methods(qapp):
     """Verifica que el método _resize_image calcula y aplica las dimensiones escaladas."""
     from detail_dialog.markdown_edit import MarkdownTextEdit

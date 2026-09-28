@@ -136,6 +136,10 @@ class LogEntryWidget(QFrame):
         # Reajustar imágenes en el contenido cargado al ancho actual de la caja de edición
         content = fit_html_images(self.log_data["content"], target_w)
         self._editor.setHtml(content)
+        # Archivos pegados/insertados al editar también van a Enlaces / Adjuntos de la tarea
+        dialog = self.window()
+        if hasattr(dialog, "_on_local_link_pasted"):
+            self._editor.local_link_pasted.connect(dialog._on_local_link_pasted)
         self._editor.setMinimumHeight(110)
         self._editor.setMaximumHeight(260)
 

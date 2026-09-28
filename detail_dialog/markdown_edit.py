@@ -2,7 +2,7 @@ from PySide6.QtCore import Qt, QBuffer, QIODevice, QUrl, QPointF, QSize, Signal
 from PySide6.QtWidgets import (
     QTextEdit, QPushButton, QWidget,
     QInputDialog, QDialog,
-    QColorDialog, QMenu, QApplication
+    QColorDialog, QMenu, QApplication, QFileDialog
 )
 from PySide6.QtGui import (
     QFont, QTextCharFormat, QTextListFormat, QTextCursor, QImage,
@@ -1008,18 +1008,7 @@ class MarkdownTextEdit(QTextEdit):
             urls = source.urls()
             local_urls = [u for u in urls if u.isLocalFile() or u.scheme() == "file"]
             if local_urls:
-                cursor = self.textCursor()
-                cursor.beginEditBlock()
-                for u in local_urls:
-                    local_path = u.toLocalFile() or u.path()
-                    norm_path = local_path.replace("\\", "/")
-                    filename = os.path.basename(norm_path.rstrip("/")) or local_path
-                    file_href = u.toString() if u.toString().startswith("file:") else QUrl.fromLocalFile(local_path).toString()
-                    link_html = f'<a href="{file_href}">📄 {html.escape(filename)}</a>&nbsp;'
-                    cursor.insertHtml(link_html)
-                    self.local_link_pasted.emit(local_path, filename)
-                cursor.endEditBlock()
-                self.setTextCursor(cursor)
+                self.insert_local_files([u.toLocalFile() or u.path() for u in local_urls])
                 return
 
         # 2. Si es imagen en portapapeles
@@ -1082,6 +1071,20 @@ class MarkdownTextEdit(QTextEdit):
             self.insertPlainText(raw_text)
             return
         super().insertFromMimeData(source)
+
+    def insert_local_files(self, paths):
+        """Inserta cada archivo local como enlace «📄 nombre» y emite local_link_pasted para
+        que la tarea lo añada también a Enlaces / Adjuntos."""
+        cursor = self.textCursor()
+        cursor.beginEditBlock()
+        for local_path in paths:
+            norm_path = local_path.replace("\\", "/")
+            filename = os.path.basename(norm_path.rstrip("/")) or local_path
+            file_href = QUrl.fromLocalFile(local_path).toString()
+            cursor.insertHtml(f'<a href="{file_href}">📄 {html.escape(filename)}</a>&nbsp;')
+            self.local_link_pasted.emit(local_path, filename)
+        cursor.endEditBlock()
+        self.setTextCursor(cursor)
 
     @staticmethod
     def _grid_from_plain_text(text):
@@ -1479,6 +1482,16 @@ class RichTextToolbar(QWidget):
         self.link_btn.clicked.connect(lambda: self.text_edit.open_link_dialog())
         layout.addWidget(self.link_btn)
 
+        self.attach_btn = QPushButton()
+        self.attach_btn.setObjectName("FormatButton")
+        self.attach_btn.setToolTip(t("markdown_edit.attach_tooltip"))
+        self.attach_btn.setIcon(lucide_icon("paperclip", styles.COLORS['text_soft'], 15))
+        self.attach_btn.setIconSize(QSize(15, 15))
+        self.attach_btn.setCursor(Qt.PointingHandCursor)
+        self.attach_btn.setFixedSize(26, 24)
+        self.attach_btn.clicked.connect(self.insert_files_dialog)
+        layout.addWidget(self.attach_btn)
+
         self.arrow_btn = QPushButton("→")
         self.arrow_btn.setObjectName("FormatButton")
         self.arrow_btn.setToolTip(t("markdown_edit.arrow_tooltip"))
@@ -1533,6 +1546,12 @@ class RichTextToolbar(QWidget):
     def insert_arrow(self):
         cursor = self.text_edit.textCursor()
         cursor.insertText("→")
+        self.text_edit.setFocus()
+
+    def insert_files_dialog(self):
+        paths, _ = QFileDialog.getOpenFileNames(self.window(), t("markdown_edit.attach_dialog_title"))
+        if paths:
+            self.text_edit.insert_local_files(paths)
         self.text_edit.setFocus()
 
     def insert_table_dialog(self):
