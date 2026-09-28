@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qs, urlparse
 
 import database
+from html_utils import clean_html_description
 
 logger = logging.getLogger("ekin.mcp")
 
@@ -467,7 +468,7 @@ class McpToolExecutor:
                 if tag_filter and not any(tag_filter in tv.lower() for tv in tag_values):
                     continue
 
-                desc = t_item.get("description", "") or ""
+                desc = clean_html_description(t_item.get("description", "") or "")
                 if mask_sensitive and desc:
                     import privacy_shield
                     desc, _ = privacy_shield.sanitize_text(desc)

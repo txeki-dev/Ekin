@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **MCP `list_tasks` leaked raw Qt HTML (`mcp_server.py`)**: Task descriptions are now passed through `clean_html_description()` before being returned (and before PII masking), so agents no longer receive DOCTYPE/`<style>` boilerplate that wasted tokens.
+
 ## [1.0.1] - 2026-09-11
 
 ### Added

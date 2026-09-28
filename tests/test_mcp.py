@@ -181,6 +181,23 @@ def test_mcp_tools_execution(db_path, mcp_board):
     assert any("feature/auth" in c["content"] for c in comments)
 
 
+def test_mcp_list_tasks_returns_clean_description(db_path, mcp_board):
+    """list_tasks no debe filtrar al agente el HTML/CSS de Qt (DOCTYPE, <style>, etc.)."""
+    col_id = database.get_columns(mcp_board["id"], db_path=db_path)[0]["id"]
+    qt_html = (
+        '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd">\n'
+        '<html><head><meta name="qrichtext" content="1" /><style type="text/css">\n'
+        "p, li { white-space: pre-wrap; }\n</style></head>"
+        '<body style=" font-family:\'Figtree\';"><p>No funciona en el front &amp; sí en la tabla</p></body></html>'
+    )
+    database.create_task(col_id, "Registrar DIV", description=qt_html, db_path=db_path)
+
+    handler = McpProtocolHandler(mcp_board, db_path=db_path, client_name="ClaudeCode")
+    res = handler.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "list_tasks"}})
+    task = next(t for t in json.loads(res["result"]["content"][0]["text"]) if t["title"] == "Registrar DIV")
+    assert task["description"] == "No funciona en el front & sí en la tabla"
+
+
 def test_mcp_prompts_synergy(db_path, mcp_board):
     """Verifica que el prompt contextual del tablero (Scrum Master / Opositor) se expone al agente."""
     handler = McpProtocolHandler(mcp_board, db_path=db_path)
