@@ -140,6 +140,7 @@ class LogEntryWidget(QFrame):
         dialog = self.window()
         if hasattr(dialog, "_on_local_link_pasted"):
             self._editor.local_link_pasted.connect(dialog._on_local_link_pasted)
+            self._editor.mention_provider = dialog._task_links_for_mentions
         self._editor.setMinimumHeight(110)
         self._editor.setMaximumHeight(260)
 

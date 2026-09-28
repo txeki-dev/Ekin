@@ -1,13 +1,13 @@
-from PySide6.QtCore import Qt, QBuffer, QIODevice, QUrl, QPointF, QSize, Signal
+from PySide6.QtCore import Qt, QBuffer, QIODevice, QUrl, QPointF, QSize, Signal, QModelIndex
 from PySide6.QtWidgets import (
     QTextEdit, QPushButton, QWidget,
     QInputDialog, QDialog,
-    QColorDialog, QMenu, QApplication, QFileDialog
+    QColorDialog, QMenu, QApplication, QFileDialog, QCompleter
 )
 from PySide6.QtGui import (
     QFont, QTextCharFormat, QTextListFormat, QTextCursor, QImage,
     QTextTableFormat, QColor, QTextDocument, QTextBlockFormat,
-    QPixmap, QPainter, QPen, QIcon
+    QPixmap, QPainter, QPen, QIcon, QStandardItemModel, QStandardItem
 )
 import os
 import html
@@ -24,6 +24,7 @@ from .html_utils import (
     apply_word_style_to_qt_table,
 )
 from .markdown_dialogs import CodeBlockDialog, LinkDialog, TableInsertDialog
+from .security_utils import _is_local_link
 
 
 _WARM_STYLE_CACHE = None
@@ -194,6 +195,10 @@ class MarkdownTextEdit(QTextEdit):
         # Si se define, devuelve el ancho máximo (px) para imágenes pegadas. Sirve para
         # que las imágenes del chat quepan en el histórico (más estrecho que el editor).
         self.image_width_provider = None
+        # Si se define, devuelve los Enlaces / Adjuntos de la tarea ([{url, label}]) que se
+        # ofrecen al escribir «@» (menciones). El desplegable se crea al primer uso.
+        self.mention_provider = None
+        self._mention_completer = None
         # Necesario para que mouseMoveEvent reciba eventos sin botón pulsado (cursor de
         # mano al pasar sobre una imagen pegada).
         self.setMouseTracking(True)
@@ -777,7 +782,90 @@ class MarkdownTextEdit(QTextEdit):
         )
         super().mouseMoveEvent(event)
 
+    def _mention_prefix(self):
+        """Texto escrito tras un «@» que abre una mención (a inicio de línea o tras un espacio,
+        para no saltar con emails), hasta el cursor. None si no hay mención en curso."""
+        cursor = self.textCursor()
+        if cursor.hasSelection():
+            return None
+        text_before = cursor.block().text()[:cursor.positionInBlock()]
+        at = text_before.rfind("@")
+        if at < 0 or (at > 0 and not text_before[at - 1].isspace()):
+            return None
+        prefix = text_before[at + 1:]
+        return None if any(ch.isspace() for ch in prefix) else prefix
+
+    def _ensure_mention_completer(self):
+        if self._mention_completer is None:
+            self._mention_completer = QCompleter(QStandardItemModel(self), self)
+            self._mention_completer.setWidget(self)
+            self._mention_completer.setCaseSensitivity(Qt.CaseInsensitive)
+            self._mention_completer.setFilterMode(Qt.MatchContains)
+            self._mention_completer.activated[QModelIndex].connect(self._insert_mention)
+        return self._mention_completer
+
+    def _update_mention_popup(self):
+        """Muestra, filtra u oculta el desplegable de menciones según el texto tras «@»."""
+        prefix = self._mention_prefix() if self.mention_provider else None
+        items = self.mention_provider() if prefix is not None else []
+        if not items:
+            if self._mention_completer:
+                self._mention_completer.popup().hide()
+            return
+        completer = self._ensure_mention_completer()
+        model = completer.model()
+        model.clear()
+        for link in items:
+            local = _is_local_link(link["url"])
+            label = link["label"] or os.path.basename(link["url"].replace("\\", "/").rstrip("/")) or link["url"]
+            item = QStandardItem(lucide_icon("paperclip" if local else "link-2", styles.COLORS["text_soft"], 14), label)
+            item.setData(link["url"], Qt.UserRole)
+            item.setToolTip(link["url"])
+            model.appendRow(item)
+        completer.setCompletionPrefix(prefix)
+        if completer.completionCount() == 0:
+            completer.popup().hide()
+            return
+        c = styles.COLORS  # se fija al mostrar para seguir el tema activo
+        completer.popup().setStyleSheet(
+            f"QAbstractItemView {{ background-color: {c['bg_card']}; border: 1px solid {c['border']};"
+            f" color: {c['text_main']}; selection-background-color: {c['accent']};"
+            f" selection-color: {c['on_accent']}; outline: none; padding: 2px; }}"
+        )
+        completer.popup().setCurrentIndex(completer.completionModel().index(0, 0))
+        rect = self.cursorRect()
+        rect.setWidth(completer.popup().sizeHintForColumn(0) + completer.popup().verticalScrollBar().sizeHint().width() + 24)
+        completer.complete(rect)
+
+    def _insert_mention(self, index):
+        """Sustituye «@texto» por un enlace al adjunto elegido («📄 nombre» o «🔗 nombre»)."""
+        url = index.data(Qt.UserRole)
+        label = index.data(Qt.DisplayRole)
+        prefix = self._mention_prefix()
+        if url is None or prefix is None:
+            return
+        local = _is_local_link(url)
+        href = QUrl.fromLocalFile(url).toString() if local else url
+        cursor = self.textCursor()
+        cursor.beginEditBlock()
+        cursor.movePosition(QTextCursor.Left, QTextCursor.KeepAnchor, len(prefix) + 1)
+        cursor.insertHtml(
+            f'<a href="{html.escape(href, quote=True)}">{"📄" if local else "🔗"} {html.escape(label)}</a>&nbsp;'
+        )
+        cursor.endEditBlock()
+        self.setTextCursor(cursor)
+        self._mention_completer.popup().hide()
+
     def keyPressEvent(self, event):
+        # Con el desplegable de menciones abierto, Enter/Tab/Esc los gestiona el QCompleter.
+        if (self._mention_completer and self._mention_completer.popup().isVisible()
+                and event.key() in (Qt.Key_Enter, Qt.Key_Return, Qt.Key_Escape, Qt.Key_Tab, Qt.Key_Backtab)):
+            event.ignore()
+            return
+        self._handle_key_press(event)
+        self._update_mention_popup()
+
+    def _handle_key_press(self, event):
         cursor = self.textCursor()
         ctrl = bool(event.modifiers() & Qt.ControlModifier)
         shift = bool(event.modifiers() & Qt.ShiftModifier)

@@ -6,7 +6,7 @@ import re
 from datetime import date, datetime, timedelta
 
 import pytest
-from PySide6.QtCore import Qt, QPoint, QPointF, QMimeData, QEvent
+from PySide6.QtCore import Qt, QPoint, QPointF, QMimeData, QEvent, QModelIndex
 from PySide6.QtGui import (
     QDragEnterEvent, QDragLeaveEvent, QDropEvent, QImage, QMouseEvent,
     QTextCursor, QKeyEvent, QTextListFormat
@@ -1839,6 +1839,85 @@ def test_files_inserted_in_description_and_journal_edit_reach_task_links(qapp, d
 
     urls = [lnk["url"] for lnk in database.get_task_links(task_id, db_path)]
     assert urls == [desc_file, journal_file]
+    _cleanup_dialog(qapp, dlg)
+
+
+_MENTION_ITEMS = [
+    {"url": "C:/docs/Spec Final.pdf", "label": "Spec Final.pdf"},
+    {"url": "https://example.com/board", "label": "Tablero web"},
+    {"url": "C:/docs/notas.txt", "label": None},
+]
+
+
+def _mention_editor(qapp, items=_MENTION_ITEMS):
+    editor = markdown_edit_module.MarkdownTextEdit()
+    editor.mention_provider = lambda: items
+    editor.setAttribute(Qt.WA_DontShowOnScreen, True)
+    editor.show()
+    qapp.processEvents()
+    return editor
+
+
+def test_at_mention_popup_filters_task_attachments(qapp):
+    """#63: «@» muestra los Enlaces / Adjuntos de la tarea y filtra con lo que se escribe."""
+    from PySide6.QtTest import QTest
+    editor = _mention_editor(qapp)
+
+    QTest.keyClicks(editor, "Ver @")
+    completer = editor._mention_completer
+    assert completer.popup().isVisible()
+    assert completer.completionCount() == 3
+
+    QTest.keyClicks(editor, "spe")
+    assert completer.completionCount() == 1
+    assert completer.currentCompletion() == "Spec Final.pdf"
+
+    QTest.keyClicks(editor, "zzz")
+    assert not completer.popup().isVisible()
+    editor.close()
+
+
+def test_at_mention_inserts_link_replacing_the_typed_mention(qapp):
+    from PySide6.QtCore import QUrl
+    from PySide6.QtTest import QTest
+    editor = _mention_editor(qapp)
+
+    QTest.keyClicks(editor, "Ver @spe")
+    editor._mention_completer.activated[QModelIndex].emit(editor._mention_completer.currentIndex())
+
+    assert editor.toPlainText().startswith("Ver 📄 Spec Final.pdf")
+    assert "@" not in editor.toPlainText()
+    assert f'href="{QUrl.fromLocalFile("C:/docs/Spec Final.pdf").toString()}"' in editor.toHtml()
+    assert not editor._mention_completer.popup().isVisible()
+
+    QTest.keyClicks(editor, " y @tab")
+    editor._mention_completer.activated[QModelIndex].emit(editor._mention_completer.currentIndex())
+    assert "🔗 Tablero web" in editor.toPlainText()
+    assert 'href="https://example.com/board"' in editor.toHtml()
+    editor.close()
+
+
+def test_at_mention_ignores_emails_and_editors_without_provider(qapp):
+    from PySide6.QtTest import QTest
+    editor = _mention_editor(qapp)
+    QTest.keyClicks(editor, "correo@spe")
+    assert editor._mention_completer is None or not editor._mention_completer.popup().isVisible()
+    editor.close()
+
+    plain = markdown_edit_module.MarkdownTextEdit()
+    QTest.keyClicks(plain, "@spe")
+    assert plain._mention_completer is None
+
+
+def test_task_detail_editors_mention_current_task_links(qapp, db_path):
+    task_id = _make_task(db_path)
+    database.add_task_link(task_id, "C:/docs/plano.dwg", "Plano", db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+
+    for editor in (dlg.desc_input, dlg.log_input):
+        assert [i["label"] for i in editor.mention_provider()] == ["Plano"]
+    database.add_task_link(task_id, "https://x.dev", "X", db_path)
+    assert len(dlg.desc_input.mention_provider()) == 2
     _cleanup_dialog(qapp, dlg)
 
 

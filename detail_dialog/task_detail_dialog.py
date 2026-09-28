@@ -363,6 +363,7 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         self.desc_input = MarkdownTextEdit()
         self.desc_input.image_width_provider = self._notes_image_width
         self.desc_input.local_link_pasted.connect(self._on_local_link_pasted)
+        self.desc_input.mention_provider = self._task_links_for_mentions
         self.desc_input.setPlaceholderText(t("task_detail.description_placeholder"))
         left_layout.addWidget(RichTextToolbar(self.desc_input))
         left_layout.addWidget(self.desc_input, 1)
@@ -468,6 +469,7 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         self.log_input.setMaximumHeight(260)
         self.log_input.image_width_provider = self._chat_image_width
         self.log_input.local_link_pasted.connect(self._on_local_link_pasted)
+        self.log_input.mention_provider = self._task_links_for_mentions
         input_layout.addWidget(RichTextToolbar(self.log_input))
         input_layout.addWidget(self.log_input)
         log_btn_layout = QHBoxLayout()
@@ -1103,6 +1105,10 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
             database.add_task_link(self.task_id, url, label, self.db_path)
             self.modified = True
             self.reload_links()
+
+    def _task_links_for_mentions(self):
+        """Enlaces / Adjuntos actuales de la tarea que se ofrecen al escribir «@»."""
+        return database.get_task_links(self.task_id, self.db_path)
 
     def add_log_entry(self):
         """Crea una nueva entrada de diario con el texto del input."""
