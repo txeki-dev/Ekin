@@ -135,6 +135,38 @@ def _collapsed_column_widget(column_id=1):
     return ColumnWidget(col_data)
 
 
+def _shown_expanded_column(qapp, name, wip_limit=None):
+    col = ColumnWidget({
+        "id": 1, "board_id": 1, "name": name, "color": "#3b82f6",
+        "position": 0, "collapsed": 0, "task_count": 2, "wip_limit": wip_limit,
+    })
+    col.setAttribute(Qt.WA_DontShowOnScreen, True)
+    col.show()
+    qapp.processEvents()
+    return col
+
+
+def test_column_title_elides_long_name_to_fit_header(qapp):
+    """#59: un nombre largo no debe cortarse a mitad de carácter ni empujar los botones
+    fuera de la cabecera: se recorta con «…» y el nombre completo queda en el tooltip."""
+    long_name = "Una columna con un nombre larguísimo que no cabe en la cabecera"
+    col = _shown_expanded_column(qapp, long_name, wip_limit=5)
+    title = col.title_label
+
+    assert title.text().endswith("…")
+    assert title.fontMetrics().horizontalAdvance(title.text()) <= title.contentsRect().width()
+    assert long_name in title.toolTip()
+    header = col.menu_btn.parentWidget()
+    assert col.menu_btn.geometry().right() <= header.width()
+    col.close()
+
+
+def test_column_title_short_name_is_not_elided(qapp):
+    col = _shown_expanded_column(qapp, "Backlog")
+    assert col.title_label.text() == "Backlog"
+    col.close()
+
+
 def test_hover_timer_starts_on_drag_enter(qapp):
     col = _collapsed_column_widget()
     assert not col._hover_timer.isActive()

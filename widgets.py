@@ -733,12 +733,31 @@ class TaskListArea(QWidget):
 
 
 class DraggableColumnTitle(QLabel):
-    """QLabel del título de columna que permite iniciar un arrastre para reordenarla o moverla a otro tablero."""
+    """QLabel del título de columna que permite iniciar un arrastre para reordenarla o moverla a otro tablero.
+    Si el nombre no cabe en la cabecera, se encoge hasta el espacio libre y se recorta con «…»."""
     def __init__(self, text, column_widget, parent=None):
         super().__init__(text, parent)
+        self._full_text = text
         self.column_widget = column_widget
         self.drag_start_position = QPoint()
         self.setCursor(Qt.OpenHandCursor)
+
+    def sizeHint(self):
+        # Ancho natural = nombre completo (no el recortado), para que el layout lo
+        # deje entero siempre que quepa.
+        base = super().sizeHint()
+        fm = self.fontMetrics()
+        extra = base.width() - fm.horizontalAdvance(self.text())
+        return QSize(fm.horizontalAdvance(self._full_text) + extra, base.height())
+
+    def minimumSizeHint(self):
+        return QSize(self.fontMetrics().horizontalAdvance("…"), super().minimumSizeHint().height())
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        elided = self.fontMetrics().elidedText(self._full_text, Qt.ElideRight, self.contentsRect().width())
+        if elided != self.text():
+            self.setText(elided)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -937,7 +956,7 @@ class ColumnWidget(QFrame):
         # Nombre de la columna (arrastrable para reordenar o mover a otro tablero)
         self.title_label = DraggableColumnTitle(self.column_data["name"], self)
         self.title_label.setObjectName("ColumnTitle")
-        self.title_label.setToolTip(t("widgets.column.title_drag_tooltip"))
+        self.title_label.setToolTip(f"{self.column_data['name']}\n{t('widgets.column.title_drag_tooltip')}")
         # Fondo explícito: un QLabel sobre un padre con fondo estilado pinta el color de la
         # ventana (caja oscura) si no se le fija; se iguala al de la columna.
         self.title_label.setStyleSheet(f"background-color: {styles.COLORS['bg_column']};")
