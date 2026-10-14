@@ -675,3 +675,63 @@ def test_mcp_move_task_to_done_without_due_date_logs_no_date(db_path, mcp_board)
 
     assert res["due_date_cleared"] is False
     assert not any("Fecha de vencimiento" in log["content"] for log in database.get_task_logs(task_id, db_path=db_path))
+
+
+def _task_with_every_field(db_path, board_id):
+    col = database.get_columns(board_id, db_path=db_path)[0]["id"]
+    linked = database.create_board("Enlazado", db_path=db_path)
+    task_id = database.create_task(col, "Original", db_path=db_path)
+    tag_id = database.get_or_create_tag_value("General", "backend", "#6b7280", db_path=db_path)
+    database.save_task_full(
+        task_id, "Original", description="desc", due_date="2026-10-20", due_time="09:00",
+        tag_value_ids=[tag_id], recurrence="weekly", linked_board_id=linked,
+        tag_text="legacy", tag_color="#ff0000", db_path=db_path,
+    )
+    return task_id, linked
+
+
+def test_mcp_update_task_preserves_fields_it_does_not_receive(db_path, mcp_board):
+    """#98: update_task usaba el database.update_task legado, que pisaba tag_text/tag_color y
+    no conocía due_time. Ahora solo cambia lo que recibe, en una transacción y una versión."""
+    task_id, linked = _task_with_every_field(db_path, mcp_board["id"])
+    version = database.get_task(task_id, db_path)["version"]
+
+    executor = McpProtocolHandler(mcp_board, db_path=db_path).executor
+    executor._tool_update_task({"task_id": task_id, "title": "Renombrada"})
+
+    task = database.get_task(task_id, db_path)
+    assert task["title"] == "Renombrada"
+    assert (task["description"], task["due_date"], task["due_time"]) == ("desc", "2026-10-20", "09:00")
+    assert (task["recurrence"], task["linked_board_id"]) == ("weekly", linked)
+    assert (task["tag_text"], task["tag_color"]) == ("legacy", "#ff0000")
+    assert [tg["value"] for tg in task["tags"]] == ["backend"]
+    assert task["version"] == version + 1
+
+
+def test_mcp_update_task_sets_due_time_and_clears_date_and_time(db_path, mcp_board):
+    task_id, _ = _task_with_every_field(db_path, mcp_board["id"])
+    executor = McpProtocolHandler(mcp_board, db_path=db_path).executor
+
+    executor._tool_update_task({"task_id": task_id, "due_date": "2026-11-02", "due_time": "18:15"})
+    task = database.get_task(task_id, db_path)
+    assert (task["due_date"], task["due_time"]) == ("2026-11-02", "18:15")
+
+    executor._tool_update_task({"task_id": task_id, "due_date": ""})
+    task = database.get_task(task_id, db_path)
+    assert (task["due_date"], task["due_time"]) == (None, None)
+
+    schema = next(tool for tool in __import__("mcp_server").get_mcp_tools_schema() if tool["name"] == "update_task")
+    assert "due_time" in schema["inputSchema"]["properties"]
+
+
+def test_mcp_update_task_replaces_tags_and_priority_like_before(db_path, mcp_board):
+    task_id, _ = _task_with_every_field(db_path, mcp_board["id"])
+    executor = McpProtocolHandler(mcp_board, db_path=db_path).executor
+
+    executor._tool_update_task({"task_id": task_id, "priority": "P1-High"})
+    values = {(tg["category"], tg["value"]) for tg in database.get_task_tags(task_id, db_path=db_path)}
+    assert values == {("Priority", "P1-High"), ("General", "backend")}
+
+    executor._tool_update_task({"task_id": task_id, "tags": ["frontend"]})
+    values = {(tg["category"], tg["value"]) for tg in database.get_task_tags(task_id, db_path=db_path)}
+    assert values == {("Priority", "P1-High"), ("General", "frontend")}

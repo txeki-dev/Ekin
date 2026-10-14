@@ -22,6 +22,13 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
   - **Solution:** any board; same UPDATE as the move (one `version` bump); old date logged in the journal.
     Done needs to be named as such (no last-column fallback) so a custom board never loses dates by surprise.
 
+- [x] **DONE (2026-10-14) — #98 MCP `update_task` rebuilt on `save_task_full`** `[BUG]`
+  · `mcp_server._tool_update_task` + `update_task` schema (`due_time`). 3 tests (`test_mcp.py`).
+  - **Problem:** it was the only production caller of the legacy `database.update_task` (overwrote
+    `tag_text`/`tag_color`, no `due_time`, `""` instead of NULL, non-atomic task + tags).
+  - **Solution:** one transaction / one version, untouched fields preserved. `database.update_task` is kept:
+    5 tests use it as a helper.
+
 _Added 2026-09-26 from an RDi exploration session (`<rdi_exploration_protocol>`), grounded in
 graphify AST analysis and cross-referenced against this backlog._
 

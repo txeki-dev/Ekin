@@ -172,7 +172,8 @@ def get_mcp_tools_schema() -> List[Dict[str, Any]]:
                     "task_id": {"type": "integer", "description": "ID de la tarea a actualizar."},
                     "title": {"type": "string", "description": "Nuevo título."},
                     "description": {"type": "string", "description": "Nueva descripción en Markdown."},
-                    "due_date": {"type": "string", "description": "Nueva fecha de vencimiento (YYYY-MM-DD o vacío para quitar)."},
+                    "due_date": {"type": "string", "description": "Nueva fecha de vencimiento (YYYY-MM-DD o vacío para quitar; quitarla también quita la hora)."},
+                    "due_time": {"type": "string", "description": "Nueva hora de vencimiento (HH:MM o vacío para quitar). Requiere fecha."},
                     "priority": {"type": "string", "description": "Nueva prioridad."},
                     "tags": {"type": "array", "items": {"type": "string"}, "description": "Nueva lista de etiquetas."},
                 },
@@ -558,20 +559,13 @@ class McpToolExecutor:
         task_id = args["task_id"]
         task = self._verify_task_belongs_to_board(task_id)
 
-        new_title = args.get("title", task["title"])
-        new_desc = args.get("description", task.get("description", ""))
-        new_due = args.get("due_date", task.get("due_date"))
+        # Sin fecha no hay hora; "" (quitar) se guarda como NULL
+        new_due = args.get("due_date", task.get("due_date")) or None
+        new_time = (args.get("due_time", task.get("due_time")) or None) if new_due else None
 
-        database.update_task(
-            task_id=task_id,
-            title=new_title,
-            description=new_desc,
-            due_date=new_due,
-            db_path=self.db_path,
-        )
-
+        tag_ids = None  # None = no tocar las etiquetas
         if "tags" in args or "priority" in args:
-            existing_tags = database.get_task_tags(task_id, db_path=self.db_path)
+            existing_tags = task["tags"]
             tag_ids = []
 
             # Prioridad
@@ -596,7 +590,20 @@ class McpToolExecutor:
                     if et["category"].lower() != "priority" and et["tag_value_id"] not in tag_ids:
                         tag_ids.append(et["tag_value_id"])
 
-            database.set_task_tags(task_id, tag_ids, db_path=self.db_path)
+        # Una sola transacción y una sola versión; conserva lo que el agente no envía
+        database.save_task_full(
+            task_id,
+            args.get("title", task["title"]),
+            description=args.get("description", task.get("description") or ""),
+            due_date=new_due,
+            due_time=new_time,
+            tag_value_ids=tag_ids,
+            recurrence=task.get("recurrence") or "none",
+            linked_board_id=task.get("linked_board_id"),
+            tag_text=task.get("tag_text") or "",
+            tag_color=task.get("tag_color") or "#6b7280",
+            db_path=self.db_path,
+        )
 
         audit_entry = f"[{self.client_name}]: Tarea actualizada a través de MCP."
         database.add_task_log(task_id, audit_entry, db_path=self.db_path)
