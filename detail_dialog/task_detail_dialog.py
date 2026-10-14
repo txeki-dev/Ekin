@@ -14,6 +14,7 @@ from strings import t
 from icons import lucide_icon
 from .markdown_edit import MarkdownTextEdit, RichTextToolbar
 from .log_entry import LogEntryWidget
+from .repo_files import list_repo_files
 from .tag_pill import ClickableTagPill, color_icon
 from .tag_manager_dialog import TagManagerDialog
 from .tag_picker_dialog import TagPickerDialog
@@ -78,6 +79,7 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         self._all_logs = []
         self._visible_log_count = DEFAULT_LOGS_PAGE_SIZE
         self._load_previous_btn = None
+        self._repo_files = None  # archivos del directorio local del tablero (se listan al primer «@»)
         self._last_adjusted_content_w = None
 
         self.setWindowTitle(t("task_detail.window_title"))
@@ -1064,8 +1066,21 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
             self.reload_links()
 
     def _task_links_for_mentions(self):
-        """Enlaces / Adjuntos actuales de la tarea que se ofrecen al escribir «@»."""
-        return database.get_task_links(self.task_id, self.db_path)
+        """Lo que se ofrece al escribir «@»: los Enlaces / Adjuntos actuales de la tarea y, si el
+        tablero tiene directorio local, los archivos de ese repo que aún no están adjuntos."""
+        links = database.get_task_links(self.task_id, self.db_path)
+        attached = {lnk["url"] for lnk in links}
+        return links + [f for f in self._repo_file_mentions() if f["url"] not in attached]
+
+    def _repo_file_mentions(self):
+        if self._repo_files is None:
+            board = database.get_board(database.get_task_board_id(self.task_id, self.db_path), self.db_path)
+            root = board and board.get("local_dir")
+            self._repo_files = [
+                {"url": os.path.normpath(os.path.join(root, rel)), "label": rel, "source": "repo"}
+                for rel in list_repo_files(root)
+            ] if root and os.path.isdir(root) else []
+        return self._repo_files
 
     def add_log_entry(self):
         """Crea una nueva entrada de diario con el texto del input."""

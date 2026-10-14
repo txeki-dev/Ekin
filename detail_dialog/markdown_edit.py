@@ -818,7 +818,8 @@ class MarkdownTextEdit(QTextEdit):
         for link in items:
             local = _is_local_link(link["url"])
             label = link["label"] or os.path.basename(link["url"].replace("\\", "/").rstrip("/")) or link["url"]
-            item = QStandardItem(lucide_icon("paperclip" if local else "link-2", styles.COLORS["text_soft"], 14), label)
+            icon = "code" if link.get("source") == "repo" else "paperclip" if local else "link-2"
+            item = QStandardItem(lucide_icon(icon, styles.COLORS["text_soft"], 14), label)
             item.setData(link["url"], Qt.UserRole)
             item.setToolTip(link["url"])
             model.appendRow(item)
@@ -838,7 +839,8 @@ class MarkdownTextEdit(QTextEdit):
         completer.complete(rect)
 
     def _insert_mention(self, index):
-        """Sustituye «@texto» por un enlace al adjunto elegido («📄 nombre» o «🔗 nombre»)."""
+        """Sustituye «@texto» por un enlace al adjunto elegido («📄 nombre» o «🔗 nombre»); los
+        archivos locales se emiten por local_link_pasted para que la tarea los adjunte."""
         url = index.data(Qt.UserRole)
         label = index.data(Qt.DisplayRole)
         prefix = self._mention_prefix()
@@ -855,6 +857,8 @@ class MarkdownTextEdit(QTextEdit):
         cursor.endEditBlock()
         self.setTextCursor(cursor)
         self._mention_completer.popup().hide()
+        if local:  # p. ej. un archivo del repo del tablero: pasa a Enlaces / Adjuntos (sin duplicar)
+            self.local_link_pasted.emit(url, label)
 
     def keyPressEvent(self, event):
         # Con el desplegable de menciones abierto, Enter/Tab/Esc los gestiona el QCompleter.

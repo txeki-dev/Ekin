@@ -55,6 +55,10 @@ def init_db(db_path=None):
         # Pack del AI Prompt Clipboard del tablero. NULL = pack por defecto (DEV).
         if "prompt_pack" not in columns_info:
             cursor.execute("ALTER TABLE boards ADD COLUMN prompt_pack TEXT DEFAULT NULL")
+        # Directorio local (repo) asociado al tablero. Dato de esta máquina: no se sincroniza
+        # ni se exporta. NULL = sin directorio.
+        if "local_dir" not in columns_info:
+            cursor.execute("ALTER TABLE boards ADD COLUMN local_dir TEXT DEFAULT NULL")
 
         # Tabla de columnas (columns)
         cursor.execute("""

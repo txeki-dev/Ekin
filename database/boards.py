@@ -12,6 +12,7 @@ __all__ = [
     "delete_board",
     "set_board_mcp_config",
     "set_board_prompt_pack",
+    "set_board_local_dir",
     "get_board_mutation_fingerprint",
 ]
 
@@ -34,7 +35,7 @@ def get_boards(db_path=None, include_archived=False):
         cursor = conn.cursor()
         query = (
             "SELECT id, name, color, archived, created_at, sync_path, last_synced_at, "
-            "sync_hash, board_uuid, mcp_enabled, mcp_secret, ai_system_prompt FROM boards"
+            "sync_hash, board_uuid, mcp_enabled, mcp_secret, ai_system_prompt, local_dir FROM boards"
         )
         if not include_archived:
             query += " WHERE archived = 0"
@@ -65,7 +66,8 @@ def get_board(board_id, db_path=None):
         cursor = conn.cursor()
         cursor.execute(
             """SELECT id, name, color, archived, created_at, sync_path, last_synced_at,
-                      sync_hash, board_uuid, mcp_enabled, mcp_secret, ai_system_prompt, prompt_pack
+                      sync_hash, board_uuid, mcp_enabled, mcp_secret, ai_system_prompt, prompt_pack,
+                      local_dir
                FROM boards WHERE id = ?""",
             (board_id,),
         )
@@ -80,7 +82,7 @@ def get_board_by_uuid(board_uuid, db_path=None):
         cursor = conn.cursor()
         cursor.execute(
             """SELECT id, name, color, archived, created_at, sync_path, last_synced_at,
-                      sync_hash, board_uuid, mcp_enabled, mcp_secret, ai_system_prompt
+                      sync_hash, board_uuid, mcp_enabled, mcp_secret, ai_system_prompt, local_dir
                FROM boards WHERE board_uuid = ?""",
             (board_uuid,),
         )
@@ -101,6 +103,11 @@ def set_board_prompt_pack(board_id, pack_id, db_path=None):
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute("UPDATE boards SET prompt_pack = ? WHERE id = ?", (pack_id, board_id))
+
+def set_board_local_dir(board_id, local_dir, db_path=None):
+    """Asocia (o quita, con None/"") el directorio local del repo del tablero."""
+    with get_connection(db_path) as conn:
+        conn.execute("UPDATE boards SET local_dir = ? WHERE id = ?", (local_dir or None, board_id))
 
 def set_board_mcp_config(board_id, enabled, secret=None, ai_system_prompt=None, db_path=None):
     """Configura el estado de activación, token secreto y prompt de IA para el tablero."""

@@ -429,6 +429,7 @@ class McpToolExecutor:
             "name": self.board["name"],
             "color": self.board["color"],
             "ai_system_prompt": self.board.get("ai_system_prompt") or "",
+            "local_directory": self.board.get("local_dir"),
             "total_tasks": total_tasks,
             "columns": cols_summary,
         }
@@ -1070,6 +1071,8 @@ class McpProtocolHandler:
             "- Política de Orden y Posicionamiento: El orden visual de las tareas en cada columna es de más reciente a más antiguo (de arriba hacia abajo). Al mover o crear tareas, sitúalas en la parte superior (posición 0 por defecto) para que lo más reciente aparezca siempre arriba.",
             "- Puedes leer y mover tareas a lo largo de las columnas existentes, añadir notas en su diario y actualizar prioridades y etiquetas.",
         ]
+        if self.board.get("local_dir"):
+            instructions.append(f"- Directorio local del repositorio (CWD esperado): {self.board['local_dir']}")
         if prompt_custom:
             instructions.append(f"\n### Instrucciones Metodológicas Específicas:\n{prompt_custom}")
 

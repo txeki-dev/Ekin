@@ -52,6 +52,11 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
     `QUrl.toLocalFile()` gave `C:/…` vs the picker's `C:\…`, duplicating attachments. Pending: user check with a
     real Explorer drag in the runtime app.
 
+- [x] **DONE (2026-10-14) — #85 Link a board to a local folder (repo)** `[FEAT]`
+  · `boards.local_dir` (migration + `set_board_local_dir`), `BoardEditDialog` row, `detail_dialog/repo_files.py`
+    (`git ls-files` / walk fallback), `@` mentions + attach on pick, MCP `local_directory` + instructions,
+    `{{repo_path}}`. 9 tests (`tests/test_local_dir.py`), incl. "never leaves the machine" (sync/export/template/copy).
+
 _Added 2026-09-26 from an RDi exploration session (`<rdi_exploration_protocol>`), grounded in
 graphify AST analysis and cross-referenced against this backlog._
 

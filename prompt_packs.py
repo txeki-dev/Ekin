@@ -99,4 +99,7 @@ def fill_variables(text, values):
 
 def board_variables(board):
     """Variables que se rellenan solas a partir del tablero."""
-    return {"board_name": board["name"], "mcp_server": claude_code_server_name(board["name"])}
+    variables = {"board_name": board["name"], "mcp_server": claude_code_server_name(board["name"])}
+    if board.get("local_dir"):
+        variables["repo_path"] = board["local_dir"]
+    return variables

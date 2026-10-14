@@ -334,12 +334,15 @@ class BoardButton(QFrame):
 
 
 class BoardEditDialog(QDialog):
-    """Diálogo personalizado para crear o editar un tablero (nombre y color de fondo)."""
-    def __init__(self, title="Editar Tablero", name="", color="#3b82f6", parent=None):
+    """Diálogo personalizado para crear o editar un tablero (nombre, color y, al editar, su
+    directorio local). `self.local_dir` guarda la carpeta elegida (None = sin vincular)."""
+    def __init__(self, title="Editar Tablero", name="", color="#3b82f6", parent=None,
+                 local_dir=None, with_local_dir=False):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setMinimumWidth(440)
         self.color = color
+        self.local_dir = local_dir
 
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
@@ -356,6 +359,23 @@ class BoardEditDialog(QDialog):
         self.color_picker = ColorCirclesPicker(self.color)
         self.color_picker.color_changed.connect(self._on_color_picked)
         layout.addWidget(self.color_picker)
+
+        # Directorio local (repo): CWD de los agentes de IA y archivos para las menciones «@»
+        if with_local_dir:
+            layout.addWidget(QLabel(t("sidebar.board_edit.local_dir_label")))
+            dir_row = QHBoxLayout()
+            self.local_dir_input = QLineEdit(local_dir or "")
+            self.local_dir_input.setReadOnly(True)
+            self.local_dir_input.setPlaceholderText(t("sidebar.board_edit.local_dir_placeholder"))
+            dir_row.addWidget(self.local_dir_input, 1)
+            browse_btn = QPushButton(t("sidebar.board_edit.local_dir_browse"))
+            browse_btn.clicked.connect(self._browse_local_dir)
+            dir_row.addWidget(browse_btn)
+            self.local_dir_clear_btn = QPushButton(t("sidebar.board_edit.local_dir_clear"))
+            self.local_dir_clear_btn.clicked.connect(lambda: self._set_local_dir(None))
+            self.local_dir_clear_btn.setEnabled(bool(local_dir))
+            dir_row.addWidget(self.local_dir_clear_btn)
+            layout.addLayout(dir_row)
         layout.addStretch()
 
         # Botones Guardar / Cancelar
@@ -393,6 +413,18 @@ class BoardEditDialog(QDialog):
 
     def _on_color_picked(self, color):
         self.color = color
+
+    def _browse_local_dir(self):
+        path = QFileDialog.getExistingDirectory(
+            self, t("sidebar.board_edit.local_dir_dialog_title"), self.local_dir or os.path.expanduser("~")
+        )
+        if path:
+            self._set_local_dir(os.path.normpath(path))
+
+    def _set_local_dir(self, path):
+        self.local_dir = path
+        self.local_dir_input.setText(path or "")
+        self.local_dir_clear_btn.setEnabled(bool(path))
 
     def validate_and_accept(self):
         if not self.name_input.text().strip():
@@ -1028,15 +1060,19 @@ class SidebarWidget(QFrame):
 
         active_btn = self.board_buttons[self.active_board_id]
         
+        board = database.get_board(self.active_board_id, self.db_path)
         dialog = BoardEditDialog(
             t("sidebar.board_edit.edit_title"),
             name=active_btn.name,
             color=active_btn.color,
-            parent=self
+            parent=self,
+            local_dir=board.get("local_dir"),
+            with_local_dir=True,
         )
         if dialog.exec() == QDialog.Accepted:
             name, color = dialog.get_data()
             database.update_board(self.active_board_id, name, color, self.db_path)
+            database.set_board_local_dir(self.active_board_id, dialog.local_dir, self.db_path)
             self.reload_boards(select_board_id=self.active_board_id)
             self.board_changed.emit()
 
