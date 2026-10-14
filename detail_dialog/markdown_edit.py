@@ -1096,7 +1096,9 @@ class MarkdownTextEdit(QTextEdit):
             urls = source.urls()
             local_urls = [u for u in urls if u.isLocalFile() or u.scheme() == "file"]
             if local_urls:
-                self.insert_local_files([u.toLocalFile() or u.path() for u in local_urls])
+                # Ruta nativa (C:\...): toLocalFile() da «/» y el mismo archivo se duplicaría en
+                # Enlaces / Adjuntos frente al elegido con el clip
+                self.insert_local_files([os.path.normpath(u.toLocalFile() or u.path()) for u in local_urls])
                 return
 
         # 2. Si es imagen en portapapeles
@@ -1112,7 +1114,7 @@ class MarkdownTextEdit(QTextEdit):
             is_file_url = raw_text.lower().startswith("file:///")
             is_win_path = bool(re.match(r'^[a-zA-Z]:[/\\]', raw_text)) or raw_text.startswith(("\\\\", "//"))
             if (is_file_url or is_win_path) and (os.path.exists(raw_text) or is_file_url or is_win_path):
-                local_path = QUrl(raw_text).toLocalFile() if is_file_url else raw_text
+                local_path = os.path.normpath(QUrl(raw_text).toLocalFile()) if is_file_url else raw_text
                 norm_path = local_path.replace("\\", "/")
                 filename = os.path.basename(norm_path.rstrip("/")) or local_path
                 file_href = raw_text if is_file_url else QUrl.fromLocalFile(local_path).toString()

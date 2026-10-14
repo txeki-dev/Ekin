@@ -45,6 +45,13 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
   - **Solution:** server-side active-task resolution (In Progress → Review → Ready) and per-column flow; prompts use roles.
     GTD/Opositor packs already named their columns explicitly — only pointed their daily/session prompts at the new data.
 
+- [x] **DONE (2026-10-14) — #82 Drag & drop files into Description and Journal** `[FEAT]`
+  · `detail_dialog/markdown_edit.py::insertFromMimeData` (native path normalization). 2 tests driving real
+    drag-enter/move/drop events on `desc_input`, `log_input` and an edited `LogEntryWidget`.
+  - **Finding:** the drop path already worked through `insertFromMimeData` (from #61) but was untested, and
+    `QUrl.toLocalFile()` gave `C:/…` vs the picker's `C:\…`, duplicating attachments. Pending: user check with a
+    real Explorer drag in the runtime app.
+
 _Added 2026-09-26 from an RDi exploration session (`<rdi_exploration_protocol>`), grounded in
 graphify AST analysis and cross-referenced against this backlog._
 

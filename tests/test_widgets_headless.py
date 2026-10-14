@@ -2475,3 +2475,72 @@ def test_board_config_dialog_cloud_options(qapp):
     assert any(t("sync.menu_unlink").strip() in a for a in actions_synced)
     assert not any(t("sync.link_btn").strip() in a for a in actions_synced)
     dlg_synced.deleteLater()
+
+
+def _drop_files(qapp, editor, paths):
+    """Simula soltar archivos del Explorador sobre un editor: enter → move → drop en el viewport
+    (el Explorador ofrece Copy | Move | Link)."""
+    from PySide6.QtCore import QUrl
+    from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent
+    from PySide6.QtWidgets import QApplication
+    mime = QMimeData()
+    mime.setUrls([QUrl.fromLocalFile(p) for p in paths])
+    pos = QPoint(12, 12)
+    actions = Qt.CopyAction | Qt.MoveAction | Qt.LinkAction
+    enter = QDragEnterEvent(pos, actions, mime, Qt.LeftButton, Qt.NoModifier)
+    QApplication.sendEvent(editor.viewport(), enter)
+    move = QDragMoveEvent(pos, actions, mime, Qt.LeftButton, Qt.NoModifier)
+    QApplication.sendEvent(editor.viewport(), move)
+    drop = QDropEvent(QPointF(pos), actions, mime, Qt.LeftButton, Qt.NoModifier)
+    QApplication.sendEvent(editor.viewport(), drop)
+    qapp.processEvents()
+    return enter.isAccepted() and move.isAccepted() and drop.isAccepted()
+
+
+def test_dropping_files_on_description_and_journal_attaches_them(qapp, db_path):
+    """#82: arrastrar archivos desde el Explorador a la Descripción, a una nueva entrada del
+    Diario o a una entrada en edición inserta «📄 nombre», los añade a Enlaces / Adjuntos (sin
+    duplicados) y los ofrece en la mención «@»."""
+    import os
+    task_id = _make_task(db_path)
+    database.create_log(task_id, "<p>entrada</p>", db_path=db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+    dlg.setAttribute(Qt.WA_DontShowOnScreen, True)
+    dlg.show()
+    qapp.processEvents()
+
+    plano, informe, foto = (os.path.abspath(n) for n in ("plano.dwg", "informe.pdf", "foto.png"))
+    assert _drop_files(qapp, dlg.desc_input, [plano, informe])
+    assert _drop_files(qapp, dlg.log_input, [informe])
+    entry = next(
+        dlg.logs_layout.itemAt(i).widget() for i in range(dlg.logs_layout.count())
+        if isinstance(dlg.logs_layout.itemAt(i).widget(), LogEntryWidget)
+    )
+    entry._enter_edit_mode()
+    qapp.processEvents()
+    assert _drop_files(qapp, entry._editor, [foto])
+
+    assert "📄 plano.dwg" in dlg.desc_input.toPlainText() and "📄 informe.pdf" in dlg.desc_input.toPlainText()
+    assert "📄 informe.pdf" in dlg.log_input.toPlainText()
+    assert "📄 foto.png" in entry._editor.toPlainText()
+    assert [lnk["url"] for lnk in database.get_task_links(task_id, db_path)] == [plano, informe, foto]
+    assert {i["label"] for i in dlg.desc_input.mention_provider()} == {"plano.dwg", "informe.pdf", "foto.png"}
+    _cleanup_dialog(qapp, dlg)
+
+
+def test_dropped_file_already_attached_with_the_clip_is_not_duplicated(qapp, db_path):
+    """#82: QUrl.toLocalFile() devuelve «C:/...»; sin normalizar, el mismo archivo soltado tras
+    adjuntarlo con el clip («C:\...») aparecía dos veces en Enlaces / Adjuntos."""
+    import os
+    task_id = _make_task(db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+    dlg.setAttribute(Qt.WA_DontShowOnScreen, True)
+    dlg.show()
+    qapp.processEvents()
+
+    spec = os.path.abspath("spec.docx")
+    dlg.desc_input.insert_local_files([spec])  # lo que hace el clip (ruta nativa)
+    assert _drop_files(qapp, dlg.log_input, [spec])
+
+    assert [lnk["url"] for lnk in database.get_task_links(task_id, db_path)] == [spec]
+    _cleanup_dialog(qapp, dlg)
