@@ -284,3 +284,63 @@ def test_circuit_breaker_embedding_fast_fail(monkeypatch):
 
     cb.reset()
 
+
+
+# =====================================================================
+# #84: FLUJO POR COLUMNAS Y TAREA ACTIVA EN EL RESUMEN EJECUTIVO
+# =====================================================================
+
+def _agile_board(db_path):
+    import templates
+    board_id = templates.create_board_from_template("Flujo", "#2563eb", templates.TEMPLATE_SOFTWARE_AGILE, db_path=db_path)
+    cols = [c["id"] for c in database.get_columns(board_id, db_path=db_path)]
+    for col_id in cols:  # la plantilla siembra tareas de ejemplo
+        for task in database.get_tasks(col_id, db_path=db_path):
+            database.delete_task(task["id"], db_path=db_path)
+    return board_id, dict(zip(("backlog", "ready", "in_progress", "review", "done"), cols))
+
+
+def _active(db_path, board_id):
+    active = local_ai.generate_daily_standup_data(board_id, db_path=db_path)["active_task"]
+    return active and active["id"]
+
+
+def test_standup_active_task_follows_in_progress_review_ready(db_path):
+    """#84: la tarea activa se resuelve en el servidor (In Progress → Review → Ready) para que el
+    INTRO no tenga que adivinar columnas ni llamar a list_tasks. Backlog no cuenta como activa."""
+    board_id, col = _agile_board(db_path)
+    assert _active(db_path, board_id) is None
+
+    database.create_task(col["backlog"], "Idea", db_path=db_path)
+    database.create_task(col["done"], "Hecha", db_path=db_path)
+    assert _active(db_path, board_id) is None
+
+    ready = database.create_task(col["ready"], "Lista", db_path=db_path)
+    assert _active(db_path, board_id) == ready
+    review = database.create_task(col["review"], "En revisión", db_path=db_path)
+    assert _active(db_path, board_id) == review
+    doing = database.create_task(col["in_progress"], "En curso", db_path=db_path)
+    assert _active(db_path, board_id) == doing
+
+
+def test_standup_columns_flow_and_due_soon(db_path):
+    board_id, col = _agile_board(db_path)
+    soon = (datetime.now() + timedelta(days=2)).strftime("%Y-%m-%d")
+    later = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
+    for i in range(7):
+        database.create_task(col["backlog"], f"Idea {i}", db_path=db_path)
+    due = database.create_task(col["ready"], "Vence pronto", due_date=soon, db_path=db_path)
+    database.create_task(col["ready"], "Vence tarde", due_date=later, db_path=db_path)
+    database.create_task(col["done"], "Hecha con fecha", due_date=soon, db_path=db_path)
+
+    data = local_ai.generate_daily_standup_data(board_id, db_path=db_path)
+    flow = {c["role"]: c for c in data["columns_flow"]}
+    assert [c["role"] for c in data["columns_flow"]] == ["backlog", "ready", "in_progress", "review", "done"]
+    assert flow["backlog"]["count"] == 7 and len(flow["backlog"]["top_tasks"]) == 5
+    assert flow["done"]["count"] == 1 and flow["done"]["top_tasks"] == []
+    assert flow["ready"]["wip_limit"] == 5
+    assert [t["id"] for t in data["due_soon"]] == [due]
+
+    md = local_ai.format_daily_standup_markdown(data, "Flujo")
+    assert "Tarea activa" in md and f"#{due}" in md
+    assert "Flujo por columnas" in md and "[backlog]" in md and "Vencimientos" in md

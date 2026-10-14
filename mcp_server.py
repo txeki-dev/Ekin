@@ -208,11 +208,12 @@ def get_mcp_tools_schema() -> List[Dict[str, Any]]:
         },
         {
             "name": "list_task_comments",
-            "description": "Consulta todas las notas y entradas de diario registradas para una tarea.",
+            "description": "Consulta todas las notas y entradas de diario registradas para una tarea (texto plano).",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "task_id": {"type": "integer", "description": "ID de la tarea."},
+                    "mask_sensitive": {"type": "boolean", "description": "Si es True, aplica sanitización local de datos sensibles y PII."},
                 },
                 "required": ["task_id"],
             },
@@ -342,6 +343,19 @@ def get_mcp_tools_schema() -> List[Dict[str, Any]]:
     ]
 
 
+def _masked(text: Optional[str], mask_sensitive: bool) -> Optional[str]:
+    """Texto con los datos sensibles enmascarados (Privacy Shield) si se pide."""
+    if mask_sensitive and text:
+        import privacy_shield
+        return privacy_shield.sanitize_text(text)[0]
+    return text
+
+
+def _clean_text(html_text: Optional[str], mask_sensitive: bool) -> str:
+    """Texto plano de un HTML de Qt (sin DOCTYPE/<style>), enmascarado si se pide."""
+    return _masked(clean_html_description(html_text or ""), mask_sensitive)
+
+
 # --- EJECUTOR DE TOOLS CON SANDBOXING ESTRICTO ---
 
 class McpToolExecutor:
@@ -393,6 +407,7 @@ class McpToolExecutor:
 
     def _tool_get_board_info(self, args: Dict[str, Any]) -> Dict[str, Any]:
         columns = database.get_columns(self.board_id, db_path=self.db_path)
+        roles = column_roles.column_roles(columns)
         total_tasks = 0
         cols_summary = []
         for c in columns:
@@ -401,6 +416,7 @@ class McpToolExecutor:
             cols_summary.append({
                 "id": c["id"],
                 "name": c["name"],
+                "role": roles[c["id"]],
                 "position": c["position"],
                 "color": c["color"],
                 "wip_limit": c.get("wip_limit"),
@@ -419,10 +435,12 @@ class McpToolExecutor:
 
     def _tool_list_columns(self, args: Dict[str, Any]) -> List[Dict[str, Any]]:
         columns = database.get_columns(self.board_id, db_path=self.db_path)
+        roles = column_roles.column_roles(columns)
         return [
             {
                 "id": c["id"],
                 "name": c["name"],
+                "role": roles[c["id"]],
                 "color": c["color"],
                 "position": c["position"],
                 "wip_limit": c.get("wip_limit"),
@@ -488,23 +506,21 @@ class McpToolExecutor:
         links = database.get_task_links(task_id, db_path=self.db_path)
         logs = database.get_task_logs(task_id, db_path=self.db_path)
 
-        desc = task.get("description", "") or ""
-        if mask_sensitive and desc:
-            import privacy_shield
-            desc, _ = privacy_shield.sanitize_text(desc)
-
         return {
             "id": task["id"],
             "column_id": task["column_id"],
             "column_name": col_name,
             "title": task["title"],
-            "description": desc,
+            "description": _clean_text(task.get("description"), mask_sensitive),
             "due_date": task.get("due_date"),
             "due_time": task.get("due_time"),
             "recurrence": task.get("recurrence", "none"),
             "tags": [{"category": tg["category"], "value": tg["value"], "color": tg["color"]} for tg in tags],
             "links": [{"id": lnk["id"], "url": lnk["url"], "label": lnk["label"]} for lnk in links],
-            "logs": [{"id": lg["id"], "content": lg["content"], "created_at": lg["created_at"]} for lg in logs],
+            "logs": [
+                {"id": lg["id"], "content": _clean_text(lg["content"], mask_sensitive), "created_at": lg["created_at"]}
+                for lg in logs
+            ],
         }
 
     def _tool_create_task(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -677,9 +693,13 @@ class McpToolExecutor:
 
     def _tool_list_task_comments(self, args: Dict[str, Any]) -> List[Dict[str, Any]]:
         task_id = args["task_id"]
+        mask_sensitive = bool(args.get("mask_sensitive", False))
         self._verify_task_belongs_to_board(task_id)
         logs = database.get_task_logs(task_id, db_path=self.db_path)
-        return [{"id": entry["id"], "content": entry["content"], "created_at": entry["created_at"]} for entry in logs]
+        return [
+            {"id": entry["id"], "content": _clean_text(entry["content"], mask_sensitive), "created_at": entry["created_at"]}
+            for entry in logs
+        ]
 
     def _tool_add_task_link(self, args: Dict[str, Any]) -> Dict[str, Any]:
         task_id = args["task_id"]
@@ -709,6 +729,10 @@ class McpToolExecutor:
         if mask_sensitive:
             markdown, _ = privacy_shield.sanitize_text(markdown)
 
+        def masked(item):
+            return {**item, "title": _masked(item["title"], mask_sensitive)}
+
+        active = data["active_task"]
         return {
             "board_id": self.board_id,
             "board_name": self.board["name"],
@@ -717,6 +741,9 @@ class McpToolExecutor:
             "stagnant_count": len(data["stagnant"]),
             "completed_recently_count": len(data["completed_recently"]),
             "wip_violations": data["wip_violations"],
+            "active_task": masked(active) if active else None,
+            "columns_flow": [{**c, "top_tasks": [masked(t) for t in c["top_tasks"]]} for c in data["columns_flow"]],
+            "due_soon": [masked(t) for t in data["due_soon"]],
             "executive_markdown": markdown,
         }
 
@@ -745,6 +772,7 @@ class McpToolExecutor:
             "due_date": task.get("due_date"),
             "description": clean_desc,
             "journal_summary": diary_summary,
+            "latest_comment": _clean_text(logs[-1]["content"], mask_sensitive) if logs else "",
             "total_logs_count": len(logs),
         }
 
@@ -1032,7 +1060,8 @@ class McpProtocolHandler:
     def _build_instructions(self) -> str:
         prompt_custom = self.board.get("ai_system_prompt") or ""
         columns = database.get_columns(self.board["id"], db_path=self.db_path)
-        cols_str = ", ".join(f"'{c['name']}' (ID: {c['id']})" for c in columns)
+        roles = column_roles.column_roles(columns)
+        cols_str = ", ".join(f"'{c['name']}' (ID: {c['id']}, rol: {roles[c['id']]})" for c in columns)
 
         instructions = [
             f"# Contexto del Tablero Ekin Kanban: '{self.board['name']}'",

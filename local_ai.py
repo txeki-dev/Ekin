@@ -23,7 +23,7 @@ import subprocess
 import zipfile
 import math
 import hashlib
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Generator, Callable
 import column_roles
 import database
@@ -265,6 +265,10 @@ def generate_daily_standup_data(board_id: int, db_path: Optional[str] = None) ->
 
     now = datetime.now()
     roles = column_roles.column_roles(columns)
+    columns_flow = []
+    first_by_role = {}
+    due_soon = []
+    due_limit = (now + timedelta(days=7)).strftime("%Y-%m-%d")
 
     for col in columns:
         col_id = col["id"]
@@ -273,8 +277,28 @@ def generate_daily_standup_data(board_id: int, db_path: Optional[str] = None) ->
         tasks = database.get_tasks(col_id, db_path)
         total_tasks += len(tasks)
 
-        is_done = roles[col_id] == column_roles.DONE
-        is_in_progress = roles[col_id] == column_roles.IN_PROGRESS
+        role = roles[col_id]
+        is_done = role == column_roles.DONE
+        is_in_progress = role == column_roles.IN_PROGRESS
+
+        # Flujo por columnas: lo que el agente necesita para encontrar trabajo sin list_tasks
+        columns_flow.append({
+            "id": col_id,
+            "name": col_name,
+            "role": role,
+            "count": len(tasks),
+            "wip_limit": wip_limit,
+            "top_tasks": [] if is_done else [
+                {"id": t["id"], "title": t["title"], "due_date": t.get("due_date")} for t in tasks[:5]
+            ],
+        })
+        if tasks and role not in first_by_role:
+            first_by_role[role] = {"id": tasks[0]["id"], "title": tasks[0]["title"], "column_name": col_name, "role": role}
+        if not is_done:
+            due_soon += [
+                {"id": t["id"], "title": t["title"], "column_name": col_name, "due_date": t["due_date"]}
+                for t in tasks if t.get("due_date") and t["due_date"] <= due_limit
+            ]
 
         if wip_limit and len(tasks) > wip_limit:
             wip_violations.append({
@@ -308,6 +332,12 @@ def generate_daily_standup_data(board_id: int, db_path: Optional[str] = None) ->
                 if days_inactive >= 3:
                     stagnant.append(t_data)
 
+    # Tarea activa: lo que está en curso, después lo pendiente de revisión, después lo listo
+    active_task = next(
+        (first_by_role[r] for r in (column_roles.IN_PROGRESS, column_roles.REVIEW, column_roles.READY) if r in first_by_role),
+        None,
+    )
+
     return {
         "board_id": board_id,
         "board_name": board_name,
@@ -317,6 +347,9 @@ def generate_daily_standup_data(board_id: int, db_path: Optional[str] = None) ->
         "stagnant": stagnant,
         "wip_violations": wip_violations,
         "columns_count": len(columns),
+        "active_task": active_task,
+        "columns_flow": columns_flow,
+        "due_soon": sorted(due_soon, key=lambda t: t["due_date"])[:10],
     }
 
 
@@ -333,8 +366,35 @@ def format_daily_standup_markdown(standup_data: dict, board_name: str = "") -> s
         f"# 📋 Daily Standup — {b_name}",
         "*Resumen ejecutivo de flujo y salud del tablero*",
         "",
-        "## 🟢 Completado recientemente",
+        "## 🎯 Tarea activa",
     ]
+    active = standup_data.get("active_task")
+    if active:
+        lines.append(f"- **{active['title']}** `[#{active['id']}]` ({active['column_name']}, {active['role']})")
+    else:
+        lines.append("- *(Nada en In Progress, Review ni Ready: revisa el Backlog)*")
+
+    lines.append("")
+    lines.append("## 🧭 Flujo por columnas")
+    for c in standup_data.get("columns_flow", []):
+        limit = f"/{c['wip_limit']}" if c.get("wip_limit") else ""
+        tops = ", ".join(f"#{t['id']} {t['title']}" for t in c["top_tasks"])
+        more = c["count"] - len(c["top_tasks"])
+        if tops and more > 0:
+            tops += f" (+{more} más)"
+        lines.append(f"- **{c['name']}** [{c['role']}] {c['count']}{limit}" + (f": {tops}" if tops else ""))
+
+    lines.append("")
+    lines.append("## 📅 Vencimientos (7 días)")
+    due = standup_data.get("due_soon", [])
+    if due:
+        for t in due:
+            lines.append(f"- **{t['title']}** `[#{t['id']}]` — {t['due_date']} ({t['column_name']})")
+    else:
+        lines.append("- *(Nada vence en los próximos 7 días)*")
+
+    lines.append("")
+    lines.append("## 🟢 Completado recientemente")
     if completed:
         for t in completed[:8]:
             lines.append(f"- **{t.get('title')}** `[#{t.get('id')}]` ({t.get('column_name')})")

@@ -36,6 +36,15 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
   - **Problem:** Task Detail (`setHtml`) and the Journal (rich-text `QLabel`) collapsed the agents' Markdown.
   - **Solution:** `QTextDocument.setMarkdown(GitHub | NoHTML)` → body fragment; HTML input kept as-is.
 
+- [x] **DONE (2026-10-14) — #84 AI prompts + MCP summary map the board by column role** `[REFACTOR]`
+  · `local_ai.generate_daily_standup_data`/`format_daily_standup_markdown` (`active_task`, `columns_flow`, `due_soon`),
+    `mcp_server.py` (`role` in `list_columns`/`get_board_info`/instructions, `latest_comment`, clean
+    `list_task_comments`/`get_task`), `assets/prompt_packs/{dev,gtd,opositor}.json`. 7 tests.
+  - **Problem:** the summary only saw done/in-progress, so INTRO (no `list_tasks`) could not find Ready/Review/Backlog
+    work; DEV prompts located columns by position; comments came back as raw Qt HTML.
+  - **Solution:** server-side active-task resolution (In Progress → Review → Ready) and per-column flow; prompts use roles.
+    GTD/Opositor packs already named their columns explicitly — only pointed their daily/session prompts at the new data.
+
 _Added 2026-09-26 from an RDi exploration session (`<rdi_exploration_protocol>`), grounded in
 graphify AST analysis and cross-referenced against this backlog._
 

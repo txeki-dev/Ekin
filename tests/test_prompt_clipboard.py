@@ -182,3 +182,22 @@ def test_import_button_adds_pack_and_selects_it(qapp, db_path, monkeypatch, tmp_
     assert _titles(dlg) == ["THREAT MODEL"]
     assert database.get_board(board_id, db_path)["prompt_pack"] == "user:Security"
     dlg.close()
+
+
+def test_dev_pack_maps_columns_by_role_not_by_position():
+    """#84: los prompts DEV adivinaban columnas por posición ("the column right after
+    in-progress", "last (done) column") y el INTRO no veía Ready, Review ni Backlog."""
+    prompts = {p["id"]: p["prompt"] for p in prompt_packs.load_pack("dev")}
+    assert "active_task" in prompts["intro"] and "columns_flow" in prompts["intro"]
+    for pid, text in prompts.items():
+        for vague in ("right after in-progress", "last (done) column", "first (backlog) column",
+                      "top card of the in-progress column", "top of the ready column"):
+            assert vague not in text, (pid, vague)
+
+
+@pytest.mark.parametrize("pack_id", ["dev", "opositor", "gtd"])
+def test_builtin_pack_variables_are_board_variables_or_asked(pack_id):
+    asked = {"tema", "tiempo_disponible"}
+    board_vars = set(prompt_packs.board_variables({"name": "X"}))
+    for p in prompt_packs.load_pack(pack_id):
+        assert set(prompt_packs.find_variables(p["prompt"])) <= board_vars | asked, p["id"]

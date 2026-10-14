@@ -759,3 +759,64 @@ def test_mcp_writes_markdown_as_qt_html(db_path, mcp_board):
     comment = database.get_task_logs(created, db_path=db_path)[-1]["content"]
     assert "<li" in comment and "&lt;b&gt;dos&lt;/b&gt;" in comment
     assert clean_html_description(comment).startswith("[Claude Code]: DONE:")
+
+
+QT_HTML = (
+    '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd">\n'
+    '<html><head><meta name="qrichtext" content="1" /><style type="text/css">\n'
+    "p, li { white-space: pre-wrap; }\n</style></head>"
+    '<body style=" font-family:\'Figtree\';"><p>Escribe a dev@ejemplo.com</p></body></html>'
+)
+
+
+def test_mcp_exposes_column_roles_and_active_task(db_path, mcp_board):
+    """#84: list_columns, get_board_info, las instrucciones y el resumen exponen el rol de cada
+    columna y la tarea activa, para que los prompts no dependan del nombre o la posición."""
+    columns = database.get_columns(mcp_board["id"], db_path=db_path)
+    for c in columns:  # la plantilla siembra tareas de ejemplo
+        for task in database.get_tasks(c["id"], db_path=db_path):
+            database.delete_task(task["id"], db_path=db_path)
+    ready = database.create_task(columns[1]["id"], "Lista para dev@ejemplo.com", db_path=db_path)
+    handler = McpProtocolHandler(mcp_board, db_path=db_path)
+    executor = handler.executor
+
+    roles = [c["role"] for c in executor._tool_list_columns({})]
+    assert roles == ["backlog", "ready", "in_progress", "review", "done"]
+    assert [c["role"] for c in executor._tool_get_board_info({})["columns"]] == roles
+    assert "rol: ready" in handler._build_instructions()
+
+    summary = executor._tool_get_board_executive_summary({"mask_sensitive": True})
+    assert summary["active_task"]["id"] == ready and summary["active_task"]["role"] == "ready"
+    assert "dev@ejemplo.com" not in json.dumps(summary, ensure_ascii=False)
+    assert [c["role"] for c in summary["columns_flow"]] == roles
+
+
+def test_mcp_comments_and_get_task_return_clean_text(db_path, mcp_board):
+    """#84: list_task_comments y get_task devolvían el HTML de Qt crudo (DOCTYPE, <style>)."""
+    col = database.get_columns(mcp_board["id"], db_path=db_path)[0]["id"]
+    task_id = database.create_task(col, "T", description=QT_HTML, db_path=db_path)
+    database.add_task_log(task_id, QT_HTML, db_path=db_path)
+    executor = McpProtocolHandler(mcp_board, db_path=db_path).executor
+
+    comments = executor._tool_list_task_comments({"task_id": task_id})
+    assert comments[-1]["content"] == "Escribe a dev@ejemplo.com"
+    masked = executor._tool_list_task_comments({"task_id": task_id, "mask_sensitive": True})
+    assert "dev@ejemplo.com" not in masked[-1]["content"]
+
+    task = executor._tool_get_task({"task_id": task_id})
+    assert task["description"] == "Escribe a dev@ejemplo.com"
+    assert all("<!DOCTYPE" not in log["content"] for log in task["logs"])
+
+    schema = next(t for t in __import__("mcp_server").get_mcp_tools_schema() if t["name"] == "list_task_comments")
+    assert "mask_sensitive" in schema["inputSchema"]["properties"]
+
+
+def test_mcp_condensed_context_includes_latest_comment(db_path, mcp_board):
+    col = database.get_columns(mcp_board["id"], db_path=db_path)[0]["id"]
+    task_id = database.create_task(col, "T", db_path=db_path)
+    database.add_task_log(task_id, "<p>Primera</p>", db_path=db_path)
+    database.add_task_log(task_id, QT_HTML, db_path=db_path)
+    executor = McpProtocolHandler(mcp_board, db_path=db_path).executor
+
+    ctx = executor._tool_get_task_condensed_context({"task_id": task_id, "mask_sensitive": True})
+    assert ctx["latest_comment"].startswith("Escribe a ") and "dev@ejemplo.com" not in ctx["latest_comment"]
