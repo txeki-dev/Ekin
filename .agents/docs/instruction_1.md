@@ -80,17 +80,17 @@ final mueve a 🚀 Done con hash. `graphify update .` tras cambios de código.
 
 ### #97 — BUG: mover entre columnas no incrementa `tasks.version`  `[S]`
 
-- [ ] Test rojo en `tests/test_board_sync.py` (con los helpers del archivo): tablero sincronizado
+- [x] Test rojo en `tests/test_board_sync.py` (con los helpers del archivo): tablero sincronizado
   → mover la tarea de columna en local (`update_task_positions`) + editar su título en el
   `.ekboard` remoto subiendo `version` → `sync_board_with_file` → la tarea conserva la
   columna local **y** el título remoto. Segundo test: mover sin cambios remotos →
   `SyncResult.conflicts == 0`.
-- [ ] `database/tasks.py::update_task_positions`: por cada tupla,
+- [x] `database/tasks.py::update_task_positions`: por cada tupla,
   `version = version + CASE WHEN column_id != ? THEN 1 ELSE 0 END` (se compara con la columna
   nueva antes de sobrescribirla; el `SET` de SQLite evalúa con los valores previos de la fila).
   Reordenar dentro de la misma columna no sube `version`.
-- [ ] `mcp_server._tool_move_task`: el mismo `CASE` en su UPDATE.
-- [ ] Tests: reordenar en la misma columna no cambia `version`; arrastre, deshacer y MCP
+- [x] `mcp_server._tool_move_task`: el mismo `CASE` en su UPDATE.
+- [x] Tests: reordenar en la misma columna no cambia `version`; arrastre, deshacer y MCP
   `move_task` suben exactamente 1; `tests/test_batch_drag_drop.py` y
   `tests/test_incremental_rendering.py` siguen verdes.
 
@@ -100,7 +100,7 @@ Decisión D1 (usuario, 2026-10-14): movimientos **vía MCP** a la columna con ro
 **cualquier tablero** (SW, GTD, Opositor…). Los arrastres manuales no cambian. La fecha retirada
 queda registrada en el diario.
 
-- [ ] `column_roles.py` (nuevo, puro, sin Qt): constantes `BACKLOG, READY, IN_PROGRESS, REVIEW,
+- [x] `column_roles.py` (nuevo, puro, sin Qt): constantes `BACKLOG, READY, IN_PROGRESS, REVIEW,
   DONE, OTHER`; `classify_column(name: str) -> str` (minúsculas + sin acentos vía
   `unicodedata`; precedencia done > review > in_progress > ready > backlog). Palabras clave:
   done = `done, hecho, shipped, completad, terminad, cerrad, resuelto, finaliz, dominad`;
@@ -110,14 +110,14 @@ queda registrada en el diario.
   pendiente, todo, to do, por hacer`. `column_roles(columns) -> dict[int, str]`: aplica
   `classify_column` y, si ninguna es backlog/done, asigna backlog a la primera `other` y done a
   la última `other` por `position`.
-- [ ] `local_ai.generate_daily_standup_data`: sustituir las tuplas inline de `is_done` /
+- [x] `local_ai.generate_daily_standup_data`: sustituir las tuplas inline de `is_done` /
   `is_in_progress` por `column_roles(columns)` (comportamiento idéntico para los nombres actuales).
-- [ ] `mcp_server.McpToolExecutor._tool_move_task`: si el rol destino es `done` y la tarea tiene
+- [x] `mcp_server.McpToolExecutor._tool_move_task`: si el rol destino es `done` y la tarea tiene
   `due_date`: en el **mismo UPDATE** de #97, `due_date = NULL, due_time = NULL` (como un
   movimiento a Done siempre cambia de columna, `version` sube exactamente una vez). Añadir al audit
   "Fecha de vencimiento retirada (era YYYY-MM-DD[ HH:MM]) al pasar a '<columna>'." y
   `"due_date_cleared": true` a la respuesta.
-- [ ] Tests: `tests/test_column_roles.py` (tabla con las columnas de las plantillas
+- [x] Tests: `tests/test_column_roles.py` (tabla con las columnas de las plantillas
   `software_agile`, `gtd_personal`, `opositor_study`, `getting_started` + fallbacks);
   `tests/test_mcp.py`: done limpia fecha/hora, sube `version` y lo registra (en un tablero SW
   y en uno de plantilla GTD); columna no-done la conserva; tarea sin fecha → sin audit extra;
@@ -125,60 +125,60 @@ queda registrada en el diario.
 
 ### #98 — BUG: MCP `update_task` por la ruta legada  `[S]`
 
-- [ ] Test rojo en `tests/test_mcp.py`: tarea con `tag_text`/`tag_color`, `recurrence`,
+- [x] Test rojo en `tests/test_mcp.py`: tarea con `tag_text`/`tag_color`, `recurrence`,
   `linked_board_id` y `due_time` → MCP `update_task` (solo `title`) → se conservan todos;
   `due_time` nuevo se guarda; `due_date: ""` deja `due_date` y `due_time` a NULL; `version` sube
   exactamente 1.
-- [ ] `mcp_server._tool_update_task`: leer la tarea completa y llamar a
+- [x] `mcp_server._tool_update_task`: leer la tarea completa y llamar a
   `database.save_task_full(...)` con los valores actuales para lo que no venga en `args`
   (`recurrence`, `linked_board_id`, `tag_text`, `tag_color`, `due_time`); `due_date`/`due_time`
   vacíos → `None`; si `due_date` queda a `None`, `due_time` también. Etiquetas y prioridad:
   calcular `tag_value_ids` con la lógica actual y pasarlos en la misma llamada (`None` si no se
   tocan, así `save_task_full` no borra las etiquetas). El audit del diario va después.
-- [ ] `get_mcp_tools_schema`: `update_task` acepta `due_time` (`HH:MM`).
-- [ ] `database.update_task` **se mantiene**: aunque deja de tener llamadores en producción,
+- [x] `get_mcp_tools_schema`: `update_task` acepta `due_time` (`HH:MM`).
+- [x] `database.update_task` **se mantiene**: aunque deja de tener llamadores en producción,
   5 tests lo usan como helper (`test_board_sync.py`, `test_database.py`).
 
 ### #99 — BUG: el Markdown de los agentes MCP se ve como un único párrafo  `[S]`
 
-- [ ] `html_utils.py` (raíz, ya compartido por el MCP): `markdown_to_qt_html(text: str) -> str`.
+- [x] `html_utils.py` (raíz, ya compartido por el MCP): `markdown_to_qt_html(text: str) -> str`.
   Vacío → `""`; si `Qt.mightBeRichText(text)` → se devuelve tal cual; si no →
   `QTextDocument.setMarkdown(text, MarkdownDialectGitHub | MarkdownNoHTML)` + `toHtml()` (sin
   dependencias nuevas). Verificar al implementar que `MarkdownNoHTML` convierte las etiquetas en
   texto; si no, escapar `<`/`>` antes.
-- [ ] `mcp_server`: aplicarlo a `description` en `_tool_create_task`, `_tool_create_tasks_batch`
+- [x] `mcp_server`: aplicarlo a `description` en `_tool_create_task`, `_tool_create_tasks_batch`
   y `_tool_update_task` (sobre la ruta de #98), y al comentario en `_tool_add_task_comment`
   (sustituye a `html.escape`); el prefijo de autoría se escapa como `\[cliente\]:` para que
   CommonMark no lo trate como definición de enlace. El embedding semántico se sigue indexando
   con el texto original.
-- [ ] `database/__init__.py`: migración única (bandera `md_content_migrated` en `app_settings`)
+- [x] `database/__init__.py`: migración única (bandera `md_content_migrated` en `app_settings`)
   que convierte las `tasks.description` y `task_logs.content` que no son rich text y contienen
   `\n`. Los backups de arranque (`backups.py`) ya cubren el rollback.
-- [ ] Tests (`tests/test_mcp.py`, `tests/test_database.py`): encabezados, listas, task lists,
+- [x] Tests (`tests/test_mcp.py`, `tests/test_database.py`): encabezados, listas, task lists,
   negrita y `code` → HTML de Qt; el HTML de entrada no se toca; `<script>`/`<img>` en Markdown
   salen como texto; el prefijo `[cliente]:` sigue visible; `list_tasks` y
   `get_task_condensed_context` devuelven texto limpio con viñetas; la migración convierte solo
   los registros afectados y es idempotente.
-- [ ] Verificación manual en la app real: una tarjeta y un comentario creados por MCP con
+- [x] Verificación manual en la app real: una tarjeta y un comentario creados por MCP con
   Markdown se ven con formato.
 
 ### #84 — Revisión de AI PROMPTS y arquitectura de columnas  `[M]`
 
-- [ ] `local_ai.generate_daily_standup_data`: añadir
+- [x] `local_ai.generate_daily_standup_data`: añadir
   `columns_flow: [{id, name, role, count, wip_limit, top_tasks: [{id, title}] (≤3; vacío en done)}]`
   y `active_task: {id, title, column_name, role} | None`, resuelta como primera tarjeta de
   **in_progress → review → ready** (orden de columnas; dentro, `position`).
-- [ ] `local_ai.format_daily_standup_markdown`: secciones nuevas "🎯 Tarea activa" y
+- [x] `local_ai.format_daily_standup_markdown`: secciones nuevas "🎯 Tarea activa" y
   "🧭 Flujo por columnas" (`nombre [rol] n/límite: #id título, …`), y top 5 del backlog.
-- [ ] `mcp_server`: `_tool_get_board_executive_summary` devuelve `active_task` y `columns_flow`
+- [x] `mcp_server`: `_tool_get_board_executive_summary` devuelve `active_task` y `columns_flow`
   (títulos saneados si `mask_sensitive`); `_tool_list_columns` y `_tool_get_board_info` añaden
   `role`; `_build_instructions` lista columnas con su rol.
-- [ ] `mcp_server._tool_list_task_comments`: `content` pasa por `clean_html_description` y acepta
+- [x] `mcp_server._tool_list_task_comments`: `content` pasa por `clean_html_description` y acepta
   `mask_sensitive` (actualizar el esquema en `get_mcp_tools_schema`); `_tool_get_task`: limpiar
   `description` y `logs[].content` igual que `list_tasks`.
-- [ ] `mcp_server._tool_get_task_condensed_context`: añadir `latest_comment` (última entrada
+- [x] `mcp_server._tool_get_task_condensed_context`: añadir `latest_comment` (última entrada
   limpia y enmascarada) — es lo que el INTRO llama "latest handoff comment".
-- [ ] `assets/prompt_packs/dev.json`, reescribir con roles explícitos:
+- [x] `assets/prompt_packs/dev.json`, reescribir con roles explícitos:
   - **INTRO**: Active Task = `active_task` del resumen (el servidor ya aplica
     In Progress → Review/QA → Ready). Si es `null`, proponer las primeras tarjetas del Backlog
     (de `columns_flow`) para triage. La salida añade una línea "Pending: n Ready · n Review ·
@@ -188,10 +188,10 @@ queda registrada en el diario.
     column" → "la columna con `role` backlog / in_progress / review / done de `list_columns`".
     OUTRO: tarjetas terminadas = las de `review` (y `in_progress` cerradas hoy) → `done`; Next
     Step sobre el `active_task` de un resumen recién pedido.
-- [ ] `assets/prompt_packs/gtd.json` y `opositor.json`: revisar cada prompt contra las columnas
+- [x] `assets/prompt_packs/gtd.json` y `opositor.json`: revisar cada prompt contra las columnas
   de su plantilla (`templates.py`) y corregir referencias inexistentes o ambiguas.
-- [ ] `templates.py`: revisar el `ai_system_prompt` de las tres plantillas por la misma razón.
-- [ ] Tests: `tests/test_local_ai_rdi.py` (precedencia de `active_task`; `None` si todo vacío;
+- [x] `templates.py`: revisar el `ai_system_prompt` de las tres plantillas por la misma razón.
+- [x] Tests: `tests/test_local_ai_rdi.py` (precedencia de `active_task`; `None` si todo vacío;
   `columns_flow` con roles); `tests/test_mcp.py` (`list_task_comments`/`get_task` sin
   `<!DOCTYPE`/`<style>`; `role` en `list_columns`; `latest_comment`);
   `tests/test_prompt_clipboard.py` (los packs de fábrica cargan, sus `{{variables}}` son de
@@ -199,18 +199,18 @@ queda registrada en el diario.
 
 ### #82 — Drag&Drop de archivos en Description y Journal  `[S]`
 
-- [ ] Test rojo en `tests/test_widgets_headless.py`: simular
+- [x] Test rojo en `tests/test_widgets_headless.py`: simular
   `QDragEnterEvent`/`QDragMoveEvent`/`QDropEvent` con `QMimeData.setUrls([file://…])` (uno y
   varios archivos) sobre el `viewport()` de `desc_input`, `log_input` y del editor de un
   `LogEntryWidget` en edición. Esperado: enlace "📄 nombre" en el punto de drop, una emisión de
   `local_link_pasted` por archivo, el archivo en Enlaces/Adjuntos (sin duplicados) y visible
   en el popup `@`.
-- [ ] Si falla, `detail_dialog/markdown_edit.py::MarkdownTextEdit`: sobrescribir
+- [x] Si falla, `detail_dialog/markdown_edit.py::MarkdownTextEdit`: sobrescribir
   `dragEnterEvent`/`dragMoveEvent`/`dropEvent` para mime con URLs locales:
   `setDropAction(Qt.CopyAction)` (el Explorador propone *Move*), colocar el cursor con
   `cursorForPosition(event.position().toPoint())`, llamar a `insert_local_files(paths)` y
   `acceptProposedAction()`. Cualquier otro mime → `super()`.
-- [ ] Verificación manual en la app real: Explorador → Description, Journal (nueva entrada y
+- [x] Verificación manual en la app real: Explorador → Description, Journal (nueva entrada y
   edición de una publicada), varios archivos y una carpeta.
 
 ### #85 — Asociar un directorio local con el tablero  `[M]`
