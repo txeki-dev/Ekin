@@ -381,7 +381,11 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         if not self.board_id or self.board_id == -1:
             return
 
-        if QApplication.mouseButtons() != Qt.NoButton:
+        # Posponer mientras se arrastra/pulsa, o mientras hay un menú o un diálogo modal abierto:
+        # su exec() es un bucle anidado y recargar destruiría las columnas/tarjetas que lo
+        # abrieron, que al volver tocarían un objeto ya borrado (#102, #103)
+        if (QApplication.mouseButtons() != Qt.NoButton or QApplication.activePopupWidget() is not None
+                or QApplication.activeModalWidget() is not None):
             self._mcp_reload_debounce_timer.start(200)
             return
 

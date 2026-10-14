@@ -108,16 +108,20 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
             pass
 
     def _on_mcp_board_mutated(self, board_id: int):
-        """Refresca los datos y el diario en vivo si un agente de IA modifica la tarea vía MCP."""
+        """Refresca en vivo la tarea si otro (agente vía MCP, otro proceso, sync) la cambia: el
+        formulario solo se repinta si el usuario no tiene cambios sin guardar; si los tiene,
+        save_changes() ya conserva los campos que él no tocó (#103)."""
         try:
             fresh = database.get_task(self.task_id, self.db_path)
-            if fresh:
-                if hasattr(self, "title_edit") and not self.title_edit.hasFocus():
-                    self.title_edit.setText(fresh["title"])
-                self.task_data = fresh
-                self.reload_logs()
-        except Exception:
-            pass
+            if not fresh:
+                self._close_deleted_task()
+                return
+            if self._form_state() == self._loaded_form:
+                self._apply_task_fields(fresh)
+            self.task_data = fresh
+            self.reload_logs()
+        except RuntimeError:
+            pass  # el diálogo ya se destruyó y la señal global aún llegaba
 
     def exec(self):
         """Abre el diálogo de forma síncrona sin bloquear la ventana padre, permitiendo
@@ -492,8 +496,7 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
             self.reject()
             return
 
-        self.title_input.setText(task["title"])
-        self.desc_input.setHtml(task["description"] or "")
+        self._apply_task_fields(task)
 
         # Kicker de cabecera: TABLERO · COLUMNA (en mayúsculas)
         col = database.get_column(task["column_id"], self.db_path)
@@ -506,6 +509,21 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         # Cargar temporizador
         self._timer_started_at = task.get("timer_started_at")
         self._refresh_timer_ui()
+
+        # Cargar última edición de notas
+        updated_at = task.get("updated_at") or task.get("created_at")
+        self._update_notes_last_edited_label(updated_at)
+
+        # Cargar enlaces y logs
+        self._visible_log_count = DEFAULT_LOGS_PAGE_SIZE
+        self.reload_links()
+        self.reload_logs(preserve_scroll=False)
+
+    def _apply_task_fields(self, task):
+        """Vuelca en el formulario los campos editables de `task` y toma la foto con la que
+        save_changes() distingue lo que cambió el usuario de lo que cambiaron otros (#103)."""
+        self.title_input.setText(task["title"])
+        self.desc_input.setHtml(task["description"] or "")
 
         # Cargar fecha de vencimiento
         due_date = task.get("due_date")
@@ -540,14 +558,44 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         # Cargar tablero vinculado
         self._refresh_linked_board_combo(task.get("linked_board_id"))
 
-        # Cargar última edición de notas
-        updated_at = task.get("updated_at") or task.get("created_at")
-        self._update_notes_last_edited_label(updated_at)
+        self._loaded_form = self._form_state()
 
-        # Cargar enlaces y logs
-        self._visible_log_count = DEFAULT_LOGS_PAGE_SIZE
-        self.reload_links()
-        self.reload_logs(preserve_scroll=False)
+    def _form_state(self):
+        """Campos editables tal y como están ahora en el formulario."""
+        due = (None, None)
+        if self.due_enable_chk.isChecked():
+            due = (
+                self.due_date_edit.date().toString("yyyy-MM-dd"),
+                self.due_time_edit.time().toString("HH:mm") if self.due_time_chk.isChecked() else None,
+            )
+        return {
+            "title": self.title_input.text().strip(),
+            "description": self.desc_input.toHtml(),
+            "due": due,
+            "tag_value_ids": [tag["tag_value_id"] for tag in self.current_tags],
+            "recurrence": self._recurrence_values[self.recurrence_combo.currentIndex()],
+            "linked_board_id": self.linked_board_combo.currentData(),
+        }
+
+    @staticmethod
+    def _task_state(task):
+        """Los mismos campos que _form_state(), con los valores guardados en la base de datos."""
+        return {
+            "title": task["title"],
+            "description": task["description"] or "",
+            "due": (task.get("due_date") or None, (task.get("due_time") or None) if task.get("due_date") else None),
+            "tag_value_ids": [tag["tag_value_id"] for tag in task.get("tags", [])],
+            "recurrence": task.get("recurrence") or "none",
+            "linked_board_id": task.get("linked_board_id"),
+        }
+
+    def _close_deleted_task(self):
+        """La tarea se borró fuera de este diálogo (agente, otro proceso, sync): avisar y cerrar."""
+        if self.task_deleted:
+            return
+        self.task_deleted = True
+        QMessageBox.information(self, t("task_detail.deleted_elsewhere_title"), t("task_detail.deleted_elsewhere_body"))
+        self.reject()
 
     def render_tags(self):
         """Dibuja las etiquetas asignadas como pastillas (excluyendo Prioridad, que tiene su
@@ -767,36 +815,30 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         self.render_tags()
 
     def save_changes(self):
-        """Guarda el título, descripción, etiquetas y fecha de vencimiento."""
-        title = self.title_input.text().strip()
-        if not title:
+        """Guarda título, descripción, fecha, etiquetas, recurrencia y tablero vinculado. Solo se
+        escriben los campos que el usuario cambió desde que se cargaron: el resto conserva el
+        valor actual de la base de datos, que un agente (MCP), otro proceso o la sync .ekboard
+        pueden haber cambiado mientras el detalle estaba abierto (#103)."""
+        fresh = database.get_task(self.task_id, self.db_path)
+        if not fresh:
+            self._close_deleted_task()
+            return
+        mine, theirs = self._form_state(), self._task_state(fresh)
+        merged = {key: mine[key] if mine[key] != self._loaded_form[key] else theirs[key] for key in mine}
+        if not merged["title"]:
             QMessageBox.warning(self, t("task_detail.warn_title"), t("task_detail.warn_empty_title"))
             return
 
-        description = self.desc_input.toHtml()
-
-        # Obtener fecha y hora de vencimiento
-        due_date = None
-        due_time = None
-        if self.due_enable_chk.isChecked():
-            due_date = self.due_date_edit.date().toString("yyyy-MM-dd")
-            if self.due_time_chk.isChecked():
-                due_time = self.due_time_edit.time().toString("HH:mm")
-
         # Guardar atómicamente todos los atributos de la tarea en una sola transacción
-        tag_value_ids = [tag["tag_value_id"] for tag in self.current_tags]
-        recurrence_val = self._recurrence_values[self.recurrence_combo.currentIndex()]
-        linked_board_val = self.linked_board_combo.currentData()
-
         database.save_task_full(
             self.task_id,
-            title=title,
-            description=description,
-            due_date=due_date,
-            due_time=due_time,
-            tag_value_ids=tag_value_ids,
-            recurrence=recurrence_val,
-            linked_board_id=linked_board_val,
+            title=merged["title"],
+            description=merged["description"],
+            due_date=merged["due"][0],
+            due_time=merged["due"][1],
+            tag_value_ids=merged["tag_value_ids"],
+            recurrence=merged["recurrence"],
+            linked_board_id=merged["linked_board_id"],
             db_path=self.db_path,
         )
 

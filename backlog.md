@@ -83,10 +83,19 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
   · `widgets.py::TaskCard.mouseReleaseEvent` calls `super()` before emitting `clicked`/`ctrl_clicked`.
     1 test reproducing the exact log error (`shiboken6.delete` in the click handler).
 
+- [x] **DONE (2026-10-14) — #103 Concurrent edits: closing Task Detail no longer reverts others' changes** `[BUG]`
+  · `TaskDetailDialog` (`_apply_task_fields`, `_form_state`/`_task_state` three-way merge in `save_changes`, real live
+    refresh, `_close_deleted_task`), `BoardViewWidget._perform_safe_mcp_board_reload` (waits for menus/modals).
+    6 tests (`tests/test_concurrent_edit.py`). SQLite side was already sound (WAL, `busy_timeout` 15 s, per-thread
+    connections); drag & drop recompacts from the DB, not from widgets.
+  - **Still open by design:** same-field conflicts are "the user's edit wins" (no merge inside a description);
+    shared `.ekboard` boards stay last-writer-wins per task (#97).
+
 - [x] **DONE (2026-10-14) — #74 part A: MCP server text in English** `[TOKENS]`
   · `mcp_server.py` (tool schema, instructions, errors, messages), `local_ai.format_daily_standup_markdown`.
     Tool schema 8,171 → 7,225 chars (−12 %; more in tokens, as Spanish tokenizes worse — no API key here to count
-    exactly). Journal audit entries stay in the UI language (user-facing). Part B (LLM translation spike) pending.
+    exactly). Journal audit entries stay in the UI language (user-facing). Scope closed to part A by the
+    user (2026-10-14): parts B (measurement) and C (local-LLM translation) dropped.
 
 _Added 2026-09-26 from an RDi exploration session (`<rdi_exploration_protocol>`), grounded in
 graphify AST analysis and cross-referenced against this backlog._

@@ -66,7 +66,8 @@ auditoría del código actual (`mcp_server.py`, `local_ai.py`, `prompt_packs.py`
 | 2 | 88 | Semáforo de cuota de CLIs | M | 87 (paso de init opcional) |
 | 3 | 101 | BUG: el servidor MCP no arranca al abrir Ekin | S | — |
 | 3 | 102 | BUG: «TaskCard already deleted» al cerrar el detalle | S | — |
-| 3 | 74 | Respuestas MCP en inglés | A: S · B: S · C: M | 84 (mismos tools) |
+| 3 | 103 | BUG: edición concurrente (cambios perdidos al cerrar el detalle) | S | — |
+| 3 | 74 | Respuestas MCP en inglés (**solo A**; B y C descartadas) | S | 84 (mismos tools) |
 | 4 | 81 | PWA Ekin Móvil | XL (épica) | ADR aprobado |
 
 ### Flujo de trabajo por tarjeta
