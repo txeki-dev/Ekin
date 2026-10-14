@@ -150,8 +150,8 @@
     "semantic_hash": ""
   },
   "pyproject.toml": {
-    "mtime": 1792001352.2010028,
-    "ast_hash": "2e514ca46d19ee8e9fa03f66d4d4d589",
+    "mtime": 1792001545.618713,
+    "ast_hash": "8a06441a3dcc81b269ef9b611e87a2d8",
     "semantic_hash": ""
   },
   "search_dialog.py": {
@@ -170,13 +170,13 @@
     "semantic_hash": ""
   },
   "sidebar.py": {
-    "mtime": 1792000901.3945155,
-    "ast_hash": "7e5b2cfb13d2f6a7f462c661bcf93cf0",
+    "mtime": 1792001605.7593937,
+    "ast_hash": "0bce5bebc17a075cc0f13a6158c4a334",
     "semantic_hash": ""
   },
   "strings.py": {
-    "mtime": 1792001253.5217793,
-    "ast_hash": "5bea3aaadd930534ecb3b828265cc3d1",
+    "mtime": 1792001505.5489638,
+    "ast_hash": "cad7ac1f3f642997374c143055fd8395",
     "semantic_hash": ""
   },
   "styles.py": {
@@ -355,8 +355,8 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1792001351.523998,
-    "ast_hash": "2e9e334199fda28d365df582e0753c29",
+    "mtime": 1792001624.2341661,
+    "ast_hash": "0bac2a3282f734a518c97a24cf5c6f0f",
     "semantic_hash": ""
   },
   "README.md": {
@@ -365,8 +365,8 @@
     "semantic_hash": ""
   },
   "backlog.md": {
-    "mtime": 1792001351.5922046,
-    "ast_hash": "5d7231649e30830bddda49026a8e1509",
+    "mtime": 1792001624.3065145,
+    "ast_hash": "dd72cbb8484236074989dc25fe8b23c8",
     "semantic_hash": ""
   },
   "ekin_icon.png": {
@@ -950,18 +950,38 @@
     "semantic_hash": ""
   },
   "start_working.py": {
-    "mtime": 1792001232.131237,
-    "ast_hash": "209920505fa3be1f76b88e03eae5921a",
+    "mtime": 1792001505.1047182,
+    "ast_hash": "739cfca9f4cbca402c2135bc90113be8",
     "semantic_hash": ""
   },
   "tests/test_start_working.py": {
-    "mtime": 1792001284.6617923,
-    "ast_hash": "4b9ff5f3bbc68334ed6c0d15c1ad07dd",
+    "mtime": 1792001545.166653,
+    "ast_hash": "e645bb92f8d2a13734b5121ac2fe621c",
     "semantic_hash": ""
   },
   "assets/icons/lucide/play.svg": {
     "mtime": 1792001232.1890278,
     "ast_hash": "3984b09453ac8b08cf809f27bb237454",
+    "semantic_hash": ""
+  },
+  "assets/claude_statusline.py": {
+    "mtime": 1792001430.4215815,
+    "ast_hash": "7a028e6d87a6fb6f34e5971aa09bbf28",
+    "semantic_hash": ""
+  },
+  "cli_quota.py": {
+    "mtime": 1792001430.4718153,
+    "ast_hash": "1d12153a831bc089f8bbfa0defa27ea2",
+    "semantic_hash": ""
+  },
+  "quota_popup.py": {
+    "mtime": 1792001462.0674846,
+    "ast_hash": "2e69a449c7f2e613793a9bbff7a0d4b7",
+    "semantic_hash": ""
+  },
+  "tests/test_cli_quota.py": {
+    "mtime": 1792001534.603909,
+    "ast_hash": "f7419d0ab98d213504cc248187848f12",
     "semantic_hash": ""
   }
 }

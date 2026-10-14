@@ -215,44 +215,44 @@ queda registrada en el diario.
 
 ### #85 — Asociar un directorio local con el tablero  `[M]`
 
-- [ ] `database/__init__.py`: migración aditiva `boards.local_dir TEXT DEFAULT NULL` (patrón
+- [x] `database/__init__.py`: migración aditiva `boards.local_dir TEXT DEFAULT NULL` (patrón
   `PRAGMA table_info`). `database/boards.py`: `set_board_local_dir(board_id, path|None)` (en
   `__all__`), y `local_dir` en `get_board`, `get_board_by_uuid` y `get_boards`.
-- [ ] Es un dato de máquina: **no** se escribe en `.ekboard` (`board_sync.export_board_to_sync_dict`),
+- [x] Es un dato de máquina: **no** se escribe en `.ekboard` (`board_sync.export_board_to_sync_dict`),
   ni en exportaciones JSON (`exporter`), ni en plantillas (`templates.export_board_to_template`),
   ni se copia con `copy_board`.
-- [ ] `sidebar.py::BoardEditDialog(..., local_dir=None)`: fila "Directorio local (repo)" con
+- [x] `sidebar.py::BoardEditDialog(..., local_dir=None)`: fila "Directorio local (repo)" con
   `QLineEdit` de solo lectura + "Examinar…" (`QFileDialog.getExistingDirectory`) + "Quitar";
   atributo `self.local_dir`; `get_data()` sin cambios (contrato intacto). El flujo de editar
   tablero (`sidebar.py` ~1031/1050) persiste con `set_board_local_dir`. Textos EN/ES en
   `strings.py`.
-- [ ] MCP: `get_board_info` añade `local_directory`; `_build_instructions` añade
+- [x] MCP: `get_board_info` añade `local_directory`; `_build_instructions` añade
   "Directorio local del repositorio (CWD esperado): <ruta>" si está definido.
   `prompt_packs.board_variables` añade `repo_path` cuando exista.
-- [ ] `detail_dialog/repo_files.py` (nuevo, puro): `list_repo_files(root, limit=5000) -> list[str]`
+- [x] `detail_dialog/repo_files.py` (nuevo, puro): `list_repo_files(root, limit=5000) -> list[str]`
   (rutas relativas): `git -C root ls-files --cached --others --exclude-standard` (timeout 3 s,
   `CREATE_NO_WINDOW`); si falla, `os.walk` saltando `.git, venv, .venv, node_modules,
   __pycache__, dist, build, .pytest_cache`.
-- [ ] `TaskDetailDialog._task_links_for_mentions`: enlaces de la tarea primero y después los
+- [x] `TaskDetailDialog._task_links_for_mentions`: enlaces de la tarea primero y después los
   archivos del repo (`{"url": ruta_absoluta, "label": ruta_relativa, "source": "repo"}`), con la
   lista calculada de forma perezosa al primer `@` y cacheada por diálogo.
   `MarkdownTextEdit._insert_mention`: para elementos locales emite `local_link_pasted(url, label)`
   (el diálogo ya deduplica) → el archivo entra en Enlaces/Adjuntos. Icono distinto para archivos
   del repo (`lucide_icon` existente).
-- [ ] Tests: migración + set/get; exportaciones sin `local_dir`; `list_repo_files` con
+- [x] Tests: migración + set/get; exportaciones sin `local_dir`; `list_repo_files` con
   `.gitignore` (repo git temporal) y con fallback; el proveedor `@` incluye archivos solo si el
   tablero tiene `local_dir`; elegir un archivo del repo lo añade a los enlaces.
 
 ### #86 — Visor de `diary.md` / `diary_archive.md`  `[S]`
 
-- [ ] `diary_viewer_dialog.py` (nuevo): `DiaryViewerDialog(board_id, db_path, parent)` con
+- [x] `diary_viewer_dialog.py` (nuevo): `DiaryViewerDialog(board_id, db_path, parent)` con
   `QTabWidget`, una pestaña por archivo existente de (`diary.md`, `diary_archive.md`) en
   `local_dir`; cada una con un `QTextBrowser.setMarkdown(texto)` (UTF-8, `errors="replace"`) y
   `setOpenExternalLinks(True)`; botones "Recargar" (conserva el scroll) y "Abrir en editor"
   (`QDesktopServices.openUrl`). `self.finished.connect(self.deleteLater)` (patrón anti-fuga).
-- [ ] `board_view.py`: botón de cabecera `diary_btn` (lucide `book-open`), visible solo si el
+- [x] `board_view.py`: botón de cabecera `diary_btn` (lucide `book-open`), visible solo si el
   tablero tiene `local_dir` y existe al menos un archivo; se reevalúa en `load_board`.
-- [ ] Tests: pestañas solo para archivos existentes; el Markdown se renderiza (texto del
+- [x] Tests: pestañas solo para archivos existentes; el Markdown se renderiza (texto del
   encabezado sin `#`); visibilidad del botón según `local_dir`.
 
 ### #87 — START WORKING: lanzar la CLI desde el tablero  `[M]`
@@ -261,55 +261,55 @@ Decisión D2 (usuario, 2026-10-14): **consola externa**. Una terminal embebida e
 ANSI (p. ej. `pywinpty` + widget propio): mucho riesgo para poco valor. En Windows 11,
 `CREATE_NEW_CONSOLE` ya abre en Windows Terminal si es la consola por defecto.
 
-- [ ] `cli_tools.py` (nuevo): registro `CliTool(id, name, exe, update_args, prompt_args)`:
+- [x] `cli_tools.py` (nuevo): registro `CliTool(id, name, exe, update_args, prompt_args)`:
   `claude` (update `["update"]`, prompt `[p]`), `agy` (update `["update"]`, prompt `["-i", p]`),
   `gemini` (sin update, prompt `["-i", p]`). `detect_installed()` vía `shutil.which`.
   `build_launch(tool, prompt) -> (argv, via_clipboard)`: si el ejecutable resuelto es
   `.cmd`/`.bat` → argv sin prompt y `via_clipboard=True` (hallazgo 7); si es `.exe` → prompt
   como argumento.
-- [ ] Registro del MCP: `claude` → `claude mcp get <name>`; si no existe,
+- [x] Registro del MCP: `claude` → `claude mcp get <name>`; si no existe,
   `claude mcp add --transport sse <name> <url>` con `cwd=local_dir`. `agy` → determinar la
   sintaxis con `agy mcp add --help` al implementar; si no es automatizable, avisar y copiar la
   config.
-- [ ] `start_working.py` (nuevo): `StartWorkingWorker(QThread)` con señal de progreso por paso:
+- [x] `start_working.py` (nuevo): `StartWorkingWorker(QThread)` con señal de progreso por paso:
   (1) MCP del tablero activo (`mcp_enabled`) y `get_mcp_manager().start()`; si el MCP del
   tablero está desactivado → abrir `McpSyncDialog` y abortar; (2) `<cli> update` (timeout 120 s,
   fallo no bloqueante); (3) registro del MCP; (4) lanzamiento con
   `subprocess.Popen(argv, cwd=local_dir, creationflags=CREATE_NEW_CONSOLE)`.
-- [ ] Prompt: prompt `intro` del pack del tablero (`load_pack(resolve_pack_id(...))`; si no hay
+- [x] Prompt: prompt `intro` del pack del tablero (`load_pack(resolve_pack_id(...))`; si no hay
   `intro`, el primero) con `fill_variables(..., board_variables(board))`; las variables sin
   resolver se piden con `prompt_clipboard_dialog.ask_variable_values`. Con `via_clipboard`
   → se copia el prompt y se muestra el aviso "INTRO copiado: pégalo con Ctrl+V".
-- [ ] Selección: con más de una CLI detectada, modal de elección (lista + Aceptar) y el proceso
+- [x] Selección: con más de una CLI detectada, modal de elección (lista + Aceptar) y el proceso
   continúa; con ninguna, mensaje con las CLIs soportadas.
-- [ ] `board_view.py`: botón de cabecera "Start working" (lucide `play`) visible solo con
+- [x] `board_view.py`: botón de cabecera "Start working" (lucide `play`) visible solo con
   `local_dir`; diálogo de progreso con los 4 pasos.
-- [ ] Tests (sin procesos reales: `subprocess` y `shutil.which` simulados): detección;
+- [x] Tests (sin procesos reales: `subprocess` y `shutil.which` simulados): detección;
   `build_launch` para `.exe` y `.cmd`; secuencia y abortos del worker; visibilidad del botón.
 
 ### #88 — Semáforo de cuota restante de las CLIs  `[M]`
 
-- [ ] `scripts/ekin_statusline.py` → se instala en `~/.ekin/bin/`: lee el JSON de stdin, escribe
+- [x] `scripts/ekin_statusline.py` → se instala en `~/.ekin/bin/`: lee el JSON de stdin, escribe
   `~/.ekin/cli_quota/claude.json` (`rate_limits` + `captured_at`), y si había una status line
   previa (guardada en `~/.ekin/cli_quota/claude_prev_statusline.json`) le reenvía el mismo stdin
   e imprime su salida; si no, imprime una línea mínima (`5h 23% · 7d 41%`).
-- [ ] `cli_quota.py` (nuevo): `install_claude_statusline()` / `uninstall_claude_statusline()`
+- [x] `cli_quota.py` (nuevo): `install_claude_statusline()` / `uninstall_claude_statusline()`
   sobre `~/.claude/settings.json` — **solo tras pulsar un botón explícito**, con copia de
   seguridad, conservando el resto de claves y restaurando la status line previa al
   desinstalar. Usa el `python.exe` de Ekin (`sys.executable`; no `pythonw`, la status line
   necesita stdout). `read_quota(tool_id) -> QuotaSnapshot | None` (ventanas con `resets_at`
   vencido = sin dato). `quota_state(snapshot) -> green|amber|red|grey` sobre el mayor uso de
   5h/7d (verde < 70 %, ámbar 70–90 %, rojo ≥ 90 %, gris = sin datos o caducado).
-- [ ] `agy` / `gemini`: sin fuente documentada → "Sin datos (la CLI no expone la cuota)".
+- [x] `agy` / `gemini`: sin fuente documentada → "Sin datos (la CLI no expone la cuota)".
   Volver a revisar `agy help` al implementar.
-- [ ] `board_view.py`: botón semáforo junto a los de cabecera (punto pintado con el color de
+- [x] `sidebar.py` (barra de utilidades, junto a calendario y ajustes, como pide la tarjeta): botón semáforo (punto pintado con el color de
   estado) → popover por CLI detectada: "Sesión (5 h): 77 % restante — se reinicia 15:00",
   "Semanal (7 d): 59 % restante — lun 10:00", "Datos de hh:mm (se actualizan mientras hay una
   sesión de Claude Code abierta)", y botón Activar/Desactivar lectura. Refresco con
   `QFileSystemWatcher` sobre `claude.json`.
-- [ ] Integración con #87: el diálogo de progreso muestra la cuota de la CLI elegida y avisa si
+- [x] Integración con #87: el diálogo de progreso muestra la cuota de la CLI elegida y avisa si
   está en rojo antes de lanzar.
-- [ ] Tests: parseo y estados; caducidad por `resets_at`; el script escribe el snapshot y
+- [x] Tests: parseo y estados; caducidad por `resets_at`; el script escribe el snapshot y
   encadena la status line previa (subproceso real con un one-liner de Python); instalar y
   desinstalar sobre un HOME temporal conservando claves y creando la copia de seguridad.
 
