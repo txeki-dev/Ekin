@@ -68,6 +68,13 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
   - **Finding:** Ekin's MCP server only started from the MCP dialog's *Save*, so after every app restart it was down
     until then; START WORKING now starts it. Pending user checks: real launch, and `agy` talking to `/rpc`.
 
+- [x] **DONE (2026-10-14) — #88 Remaining AI CLI quota traffic light** `[FEAT]`
+  · `cli_quota.py` (`read_quota`, `quota_state`, opt-in `install/uninstall_claude_statusline`), `assets/claude_statusline.py`
+    (stdlib status-line tap, chains the previous status line), `quota_popup.py`, sidebar utility-bar dot (60 s refresh),
+    red-quota confirmation in START WORKING. 11 tests (`tests/test_cli_quota.py`, real subprocess for the script).
+  - Placed in the sidebar utility bar (the card asks for it next to settings/calendar), not the board header.
+    Only Claude Code exposes its quota (documented status-line `rate_limits`); agy/gemini show "No data".
+
 _Added 2026-09-26 from an RDi exploration session (`<rdi_exploration_protocol>`), grounded in
 graphify AST analysis and cross-referenced against this backlog._
 

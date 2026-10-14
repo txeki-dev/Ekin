@@ -21,6 +21,8 @@ from version import __version__
 from undo import UndoAction
 import templates
 from board_template_dialogs import CreateBoardDialog, SaveAsTemplateDialog
+import cli_quota
+from quota_popup import QuotaPopup, quota_dot_icon, tooltip_text
 
 if getattr(sys, "frozen", False):
     _APP_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(sys.executable)))
@@ -526,6 +528,12 @@ class SidebarWidget(QFrame):
         self._clock_timer.timeout.connect(self._update_clock)
         self._clock_timer.start(10000)  # cada 10 s (precisión de minuto de sobra)
 
+        # Semáforo de cuota: la status line de Claude Code reescribe el dato en cada respuesta
+        self.refresh_quota_indicator()
+        self._quota_timer = QTimer(self)
+        self._quota_timer.timeout.connect(self.refresh_quota_indicator)
+        self._quota_timer.start(60000)
+
     def init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 20, 10, 10)
@@ -688,6 +696,15 @@ class SidebarWidget(QFrame):
         self.calendar_btn.clicked.connect(self.open_calendar_requested.emit)
         icons_row.addWidget(self.calendar_btn)
 
+        # Semáforo de cuota restante de las CLIs de IA (el color lo fija refresh_quota_indicator)
+        self.quota_btn = QPushButton()
+        self.quota_btn.setObjectName("UtilityIconButton")
+        self.quota_btn.setIconSize(QSize(17, 17))
+        self.quota_btn.setFixedSize(34, 28)
+        self.quota_btn.setCursor(Qt.PointingHandCursor)
+        self.quota_btn.clicked.connect(self.show_quota)
+        icons_row.addWidget(self.quota_btn)
+
         self.settings_btn = QPushButton()
         self.settings_btn.setObjectName("UtilityIconButton")
         self.settings_btn.setIcon(lucide_icon("sliders-horizontal", styles.COLORS['text_soft'], 17))
@@ -748,6 +765,19 @@ class SidebarWidget(QFrame):
     def _on_notification_task(self, task_id, board_id):
         self.open_task_requested.emit(task_id, board_id)
 
+    def refresh_quota_indicator(self):
+        """Colorea el semáforo según la cuota restante de Claude Code (gris sin datos)."""
+        snapshot = cli_quota.read_quota()
+        self.quota_btn.setIcon(quota_dot_icon(cli_quota.quota_state(snapshot)))
+        self.quota_btn.setToolTip(tooltip_text(snapshot))
+
+    def show_quota(self):
+        """Muestra el detalle de la cuota por CLI anclado bajo el semáforo."""
+        popup = QuotaPopup(self)
+        popup.move(self.quota_btn.mapToGlobal(QPoint(0, self.quota_btn.height() + 4)))
+        popup.exec()
+        self.refresh_quota_indicator()
+
     def refresh_theme(self):
         """Re-aplica los colores dependientes del tema en los widgets de la barra lateral que
         fijan su color al construirse (iconos de la barra de utilidades, botones inferiores,
@@ -758,6 +788,7 @@ class SidebarWidget(QFrame):
         self.bell_btn.setIcon(lucide_icon("bell", soft, 17))
         self.search_btn.setIcon(lucide_icon("search", soft, 17))
         self.calendar_btn.setIcon(lucide_icon("calendar", soft, 17))
+        self.refresh_quota_indicator()
         self.settings_btn.setIcon(lucide_icon("sliders-horizontal", soft, 17))
         self.shortcuts_btn.setIcon(lucide_icon("command", soft, 17))
         self.add_btn.setIcon(lucide_icon("plus", styles.COLORS["on_accent"], 16))

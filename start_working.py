@@ -8,11 +8,13 @@ import os
 from PySide6.QtCore import QEventLoop, Qt, QThread, Signal
 from PySide6.QtWidgets import QApplication, QInputDialog, QMessageBox, QProgressDialog
 
+import cli_quota
 import cli_tools
 import database
 import prompt_packs
 from mcp_server import get_mcp_manager
 from prompt_clipboard_dialog import ask_variable_values
+from quota_popup import quota_lines
 from strings import t
 
 
@@ -78,6 +80,15 @@ def start_working(parent, board_id, db_path=None, open_mcp_dialog=None):
     if not picked:
         return None
     tool, exe_path = picked
+    if tool.id == "claude":
+        snapshot = cli_quota.read_quota()
+        if cli_quota.quota_state(snapshot) == cli_quota.RED:
+            answer = QMessageBox.question(
+                parent, t("start_working.title"),
+                t("start_working.quota_red", lines="\n".join(quota_lines(snapshot))),
+            )
+            if answer != QMessageBox.Yes:
+                return None
 
     prompt = start_prompt(board)
     missing = prompt_packs.find_variables(prompt)

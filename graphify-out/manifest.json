@@ -15,8 +15,8 @@
     "semantic_hash": "c9858a77903b6601d5f0e842983865bf"
   },
   "board_view.py": {
-    "mtime": 1792001063.7703772,
-    "ast_hash": "87bf94a1a7fc44c46ac4ce3ef781d8cd",
+    "mtime": 1792001254.556208,
+    "ast_hash": "67f9bb6f89bee5a93c82be1c4a488f14",
     "semantic_hash": ""
   },
   "calendar_view.py": {
@@ -150,8 +150,8 @@
     "semantic_hash": ""
   },
   "pyproject.toml": {
-    "mtime": 1792001072.1813772,
-    "ast_hash": "d83a4cc56329ea80ed0cb7386d52ccea",
+    "mtime": 1792001352.2010028,
+    "ast_hash": "2e514ca46d19ee8e9fa03f66d4d4d589",
     "semantic_hash": ""
   },
   "search_dialog.py": {
@@ -175,8 +175,8 @@
     "semantic_hash": ""
   },
   "strings.py": {
-    "mtime": 1792001040.656772,
-    "ast_hash": "1dce29e511558f9e76b16db6f58044fd",
+    "mtime": 1792001253.5217793,
+    "ast_hash": "5bea3aaadd930534ecb3b828265cc3d1",
     "semantic_hash": ""
   },
   "styles.py": {
@@ -355,8 +355,8 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1792001120.5438774,
-    "ast_hash": "e01e7c6162601f1ad8361d5842c35336",
+    "mtime": 1792001351.523998,
+    "ast_hash": "2e9e334199fda28d365df582e0753c29",
     "semantic_hash": ""
   },
   "README.md": {
@@ -365,8 +365,8 @@
     "semantic_hash": ""
   },
   "backlog.md": {
-    "mtime": 1792001120.62578,
-    "ast_hash": "9bf946249b104776a6f34b49d17ee56e",
+    "mtime": 1792001351.5922046,
+    "ast_hash": "5d7231649e30830bddda49026a8e1509",
     "semantic_hash": ""
   },
   "ekin_icon.png": {
@@ -942,6 +942,26 @@
   "assets/icons/lucide/book-open.svg": {
     "mtime": 1792001020.23466,
     "ast_hash": "3c45716d8a0d539894c392bad07a4d06",
+    "semantic_hash": ""
+  },
+  "cli_tools.py": {
+    "mtime": 1792001186.8536146,
+    "ast_hash": "558312c9c9f0859778e546fd06ce5188",
+    "semantic_hash": ""
+  },
+  "start_working.py": {
+    "mtime": 1792001232.131237,
+    "ast_hash": "209920505fa3be1f76b88e03eae5921a",
+    "semantic_hash": ""
+  },
+  "tests/test_start_working.py": {
+    "mtime": 1792001284.6617923,
+    "ast_hash": "4b9ff5f3bbc68334ed6c0d15c1ad07dd",
+    "semantic_hash": ""
+  },
+  "assets/icons/lucide/play.svg": {
+    "mtime": 1792001232.1890278,
+    "ast_hash": "3984b09453ac8b08cf809f27bb237454",
     "semantic_hash": ""
   }
 }

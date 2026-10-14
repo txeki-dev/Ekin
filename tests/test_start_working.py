@@ -13,6 +13,13 @@ import templates
 from board_view import BoardViewWidget
 
 
+@pytest.fixture(autouse=True)
+def no_real_quota(tmp_path, monkeypatch):
+    """La cuota real de Claude Code de esta máquina no debe influir (en rojo, preguntaría)."""
+    import cli_quota
+    monkeypatch.setattr(cli_quota, "QUOTA_DIR", str(tmp_path / "cli_quota"))
+
+
 def _sw_board(db_path, local_dir, mcp=True):
     board_id = templates.create_board_from_template("SW - Demo", "#2563eb", templates.TEMPLATE_SOFTWARE_AGILE, db_path=db_path)
     database.set_board_local_dir(board_id, local_dir, db_path=db_path)
