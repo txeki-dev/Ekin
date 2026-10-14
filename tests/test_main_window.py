@@ -15,7 +15,17 @@ def _make_task_on_board(db_path, board_name="B"):
     return board_id, task_id
 
 
-def _make_window(monkeypatch):
+class _FakeMcpManager:
+    """Gestor MCP simulado: ningún test debe abrir el puerto 8765 real (#101)."""
+    def __init__(self, ok=True):
+        self.ok, self.started = ok, 0
+
+    def start(self):
+        self.started += 1
+        return self.ok
+
+
+def _make_window(monkeypatch, mcp_manager=None):
     """Construye una MainWindow apta para tests: __init__ agenda dos
     QTimer.singleShot sueltos (sin padre) para notify_due_today/check_for_updates --
     el segundo dispara subprocess.run(["git", ...]) reales. Sin parche, quedan
@@ -29,6 +39,8 @@ def _make_window(monkeypatch):
     monkeypatch.setattr(main_module.MainWindow, "check_for_updates", lambda self: None)
     monkeypatch.setattr(main_module.MainWindow, "_maybe_show_weekly_digest", lambda self: None)
     monkeypatch.setattr(main_module.MainWindow, "_maybe_show_landing_tour", lambda self: None)
+    manager = mcp_manager or _FakeMcpManager()
+    monkeypatch.setattr(main_module, "get_mcp_manager", lambda db_path=None: manager)
     return main_module.MainWindow()
 
 
@@ -531,3 +543,34 @@ def test_installer_download_thread_sha256_verification(tmp_path, monkeypatch):
 
 
 
+
+
+def test_mcp_server_autostarts_when_a_board_has_mcp_enabled(qapp, db_path, monkeypatch):
+    """#101: el servidor MCP solo arrancaba al guardar el diálogo MCP; tras cada reinicio de la
+    app (p. ej. al actualizarse) los agentes se quedaban sin tablero hasta abrir ese diálogo."""
+    monkeypatch.setattr(database, "DB_NAME", db_path)
+    board_id, _ = _make_task_on_board(db_path)
+    database.set_board_mcp_config(board_id, enabled=True, db_path=db_path)
+    manager = _FakeMcpManager()
+    window = _make_window(monkeypatch, manager)
+    assert manager.started == 1
+    _close_window(qapp, window)
+
+
+def test_mcp_server_stays_closed_without_mcp_boards(qapp, db_path, monkeypatch):
+    monkeypatch.setattr(database, "DB_NAME", db_path)
+    _make_task_on_board(db_path)
+    manager = _FakeMcpManager()
+    window = _make_window(monkeypatch, manager)
+    assert manager.started == 0
+    _close_window(qapp, window)
+
+
+def test_busy_mcp_port_does_not_break_startup(qapp, db_path, monkeypatch):
+    monkeypatch.setattr(database, "DB_NAME", db_path)
+    board_id, _ = _make_task_on_board(db_path)
+    database.set_board_mcp_config(board_id, enabled=True, db_path=db_path)
+    manager = _FakeMcpManager(ok=False)
+    window = _make_window(monkeypatch, manager)
+    assert manager.started == 1 and window.board_view is not None
+    _close_window(qapp, window)

@@ -64,6 +64,8 @@ auditoría del código actual (`mcp_server.py`, `local_ai.py`, `prompt_packs.py`
 | 2 | 86 | Visor `diary.md` / `diary_archive.md` | S | 85 |
 | 2 | 87 | START WORKING (lanzar CLI) | M | 85, 84 |
 | 2 | 88 | Semáforo de cuota de CLIs | M | 87 (paso de init opcional) |
+| 3 | 101 | BUG: el servidor MCP no arranca al abrir Ekin | S | — |
+| 3 | 102 | BUG: «TaskCard already deleted» al cerrar el detalle | S | — |
 | 3 | 74 | Respuestas MCP en inglés | A: S · B: S · C: M | 84 (mismos tools) |
 | 4 | 81 | PWA Ekin Móvil | XL (épica) | ADR aprobado |
 
@@ -313,6 +315,28 @@ ANSI (p. ej. `pywinpty` + widget propio): mucho riesgo para poco valor. En Windo
   encadena la status line previa (subproceso real con un one-liner de Python); instalar y
   desinstalar sobre un HOME temporal conservando claves y creando la copia de seguridad.
 
+### #101 — BUG: el servidor MCP no arranca al abrir Ekin  `[S]`
+
+Hallazgo de la Oleada 2: `McpManager.start()` solo se llama al guardar el diálogo MCP
+(`mcp_sync_dialog.py:373`), así que tras cada reinicio (incluida la auto-actualización) el MCP
+queda caído hasta abrir ese diálogo.
+
+- [ ] Test rojo: `MainWindow` con un tablero `mcp_enabled = 1` llama a `get_mcp_manager().start()`;
+  sin tableros con MCP, no lo llama.
+- [ ] `main.py` (`MainWindow.__init__`, tras `init_db` y la migración): si
+  `any(b["mcp_enabled"] for b in database.get_boards(include_archived=True))` →
+  `get_mcp_manager(database.DB_NAME).start()`; un `False` (puerto ocupado) solo se registra en el log.
+- [ ] `tests/test_main_window.py` ya neutraliza timers y llamadas externas al construir
+  `MainWindow`: simular `get_mcp_manager` igual, para que ningún test abra el puerto 8765 real.
+
+### #102 — BUG: «TaskCard already deleted» al cerrar el detalle  `[S]`
+
+- [ ] Test rojo en `tests/test_widgets_headless.py`: `TaskCard` con un manejador de `clicked` que
+  destruye la tarjeta (como la recarga por MCP durante el `exec()` del detalle) → el
+  `mouseReleaseEvent` no lanza `RuntimeError`.
+- [ ] `widgets.py::TaskCard.mouseReleaseEvent`: llamar a `super().mouseReleaseEvent(event)` antes de
+  emitir `clicked` / `ctrl_clicked` (no tocar `self` tras el bucle anidado).
+
 ### #74 — Respuestas MCP en inglés para ahorrar tokens  `[A: S · B: S · C: M]`
 
 Decisión D4 (usuario, 2026-10-14): A ya; B como puerta go/no-go; C solo si B lo justifica.
@@ -405,6 +429,9 @@ En esta sesión solo se hace la fase 0; el resto entra como sub-tarjetas en el B
   % restante de 5 h y 7 d y la hora de reinicio; los datos caducados salen en gris; activar y
   desactivar conserva el resto de `~/.claude/settings.json` (y la status line previa); las
   CLIs sin fuente muestran "Sin datos".
+- **#101:** tras abrir la app (o reiniciarse al actualizarse) el MCP responde sin tocar el diálogo,
+  siempre que algún tablero lo tenga activado.
+- **#102:** cerrar el detalle de una tarjeta tras una recarga del tablero no lanza excepciones.
 - **#74:** A: tools, instrucciones y resumen ejecutivo en inglés. B: informe de ahorro y latencia
   con decisión go/no-go en la tarjeta. C (si go): con el toggle desactivado, salida idéntica
   byte a byte; activado, nunca añade latencia (fallo de caché → original).

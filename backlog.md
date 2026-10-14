@@ -75,6 +75,10 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
   - Placed in the sidebar utility bar (the card asks for it next to settings/calendar), not the board header.
     Only Claude Code exposes its quota (documented status-line `rate_limits`); agy/gemini show "No data".
 
+- [x] **DONE (2026-10-14) — #101 MCP server starts with the app** `[BUG]`
+  · `main.py` (`MainWindow.__init__`: start `get_mcp_manager()` if any board has `mcp_enabled`). 3 tests
+    (`tests/test_main_window.py`, whose `_make_window` now fakes the manager so no test opens port 8765).
+
 _Added 2026-09-26 from an RDi exploration session (`<rdi_exploration_protocol>`), grounded in
 graphify AST analysis and cross-referenced against this backlog._
 

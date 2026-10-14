@@ -23,6 +23,7 @@ from PySide6.QtGui import QIcon, QShortcut, QKeySequence, QFontDatabase, QDeskto
 import database
 import backups
 import markdown_html
+from mcp_server import get_mcp_manager
 import styles
 import strings
 from strings import t
@@ -226,6 +227,11 @@ class MainWindow(QMainWindow):
             markdown_html.migrate_plain_text_content()
         except Exception as exc:
             log.warning("No se pudo migrar el Markdown guardado por MCP: %s", exc)
+        # Servidor MCP en marcha desde el arranque si algún tablero lo tiene activado (#101);
+        # antes solo arrancaba al guardar el diálogo MCP y cada reinicio dejaba a los agentes fuera
+        if any(b["mcp_enabled"] for b in database.get_boards(include_archived=True)):
+            if not get_mcp_manager(database.DB_NAME).start():
+                log.warning("No se pudo arrancar el servidor MCP al iniciar Ekin")
         # Adelantar tareas recurrentes vencidas a su próxima ocurrencia
         try:
             database.advance_overdue_recurring(date.today().isoformat())
