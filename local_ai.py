@@ -25,6 +25,7 @@ import math
 import hashlib
 from datetime import datetime
 from typing import Optional, Generator, Callable
+import column_roles
 import database
 from html_utils import clean_html_description
 from strings import t as _t  # alias: `t` se usa como variable de bucle en este módulo
@@ -263,6 +264,7 @@ def generate_daily_standup_data(board_id: int, db_path: Optional[str] = None) ->
     total_tasks = 0
 
     now = datetime.now()
+    roles = column_roles.column_roles(columns)
 
     for col in columns:
         col_id = col["id"]
@@ -271,9 +273,8 @@ def generate_daily_standup_data(board_id: int, db_path: Optional[str] = None) ->
         tasks = database.get_tasks(col_id, db_path)
         total_tasks += len(tasks)
 
-        col_lower = col_name.lower()
-        is_done = any(k in col_lower for k in ("done", "hecho", "shipped", "completad", "terminad", "cerrad", "resuelto", "finaliz"))
-        is_in_progress = any(k in col_lower for k in ("progress", "curso", "doing", "haciendo", "wip", "activo", "desarrollo"))
+        is_done = roles[col_id] == column_roles.DONE
+        is_in_progress = roles[col_id] == column_roles.IN_PROGRESS
 
         if wip_limit and len(tasks) > wip_limit:
             wip_violations.append({

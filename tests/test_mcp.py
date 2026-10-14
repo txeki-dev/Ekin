@@ -622,3 +622,56 @@ def test_mcp_move_task_bumps_version_only_on_column_change(db_path, mcp_board):
 
     executor._tool_move_task({"task_id": task_id, "target_column_id": columns[2]["id"]})
     assert database.get_task(task_id, db_path)["version"] == v0 + 1
+
+
+def _done_and_other_columns(db_path, board_id):
+    import column_roles
+    columns = database.get_columns(board_id, db_path=db_path)
+    done = next(c for c in columns if column_roles.classify_column(c["name"]) == column_roles.DONE)
+    other = next(c for c in columns if c["id"] != done["id"])
+    return done, other
+
+
+@pytest.mark.parametrize("template", [templates.TEMPLATE_SOFTWARE_AGILE, templates.TEMPLATE_GTD_PERSONAL])
+def test_mcp_move_task_to_done_clears_due_date(db_path, template):
+    """#83: cuando un agente pasa una tarjeta a Done (en cualquier tablero) se le quita la fecha,
+    para que no siga en el Calendario ni en Mi trabajo; la fecha antigua queda en el diario."""
+    board_id = templates.create_board_from_template("Tablero", "#2563eb", template, db_path=db_path)
+    board = database.get_board(board_id, db_path=db_path)
+    done, other = _done_and_other_columns(db_path, board_id)
+    task_id = database.create_task(other["id"], "Con fecha", due_date="2026-10-20", db_path=db_path)
+    database.save_task_full(task_id, "Con fecha", due_date="2026-10-20", due_time="10:30", db_path=db_path)
+    version = database.get_task(task_id, db_path)["version"]
+
+    executor = McpProtocolHandler(board, db_path=db_path, client_name="Agente").executor
+    res = executor._tool_move_task({"task_id": task_id, "target_column_id": done["id"]})
+
+    task = database.get_task(task_id, db_path)
+    assert (task["due_date"], task["due_time"]) == (None, None)
+    assert task["version"] == version + 1
+    assert res["due_date_cleared"] is True
+    assert any("2026-10-20 10:30" in log["content"] for log in database.get_task_logs(task_id, db_path=db_path))
+    assert all(t["id"] != task_id for t in database.get_scheduled_tasks(db_path=db_path))
+
+
+def test_mcp_move_task_to_other_column_keeps_due_date(db_path, mcp_board):
+    done, other = _done_and_other_columns(db_path, mcp_board["id"])
+    target = next(c for c in database.get_columns(mcp_board["id"], db_path=db_path) if c["id"] not in (done["id"], other["id"]))
+    task_id = database.create_task(other["id"], "Con fecha", due_date="2026-10-20", db_path=db_path)
+
+    executor = McpProtocolHandler(mcp_board, db_path=db_path).executor
+    res = executor._tool_move_task({"task_id": task_id, "target_column_id": target["id"]})
+
+    assert database.get_task(task_id, db_path)["due_date"] == "2026-10-20"
+    assert res["due_date_cleared"] is False
+
+
+def test_mcp_move_task_to_done_without_due_date_logs_no_date(db_path, mcp_board):
+    done, other = _done_and_other_columns(db_path, mcp_board["id"])
+    task_id = database.create_task(other["id"], "Sin fecha", db_path=db_path)
+
+    executor = McpProtocolHandler(mcp_board, db_path=db_path).executor
+    res = executor._tool_move_task({"task_id": task_id, "target_column_id": done["id"]})
+
+    assert res["due_date_cleared"] is False
+    assert not any("Fecha de vencimiento" in log["content"] for log in database.get_task_logs(task_id, db_path=db_path))

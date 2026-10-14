@@ -15,6 +15,13 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
     task as untouched: a collaborator's edit of the same task overwrote the newer local move, or a phantom
     conflict was counted. Conflicts stay last-writer-wins per task (no field-level merge — out of scope).
 
+- [x] **DONE (2026-10-14) — #83 MCP `move_task` into a Done column clears the due date** `[BUG]`
+  · `column_roles.py` (new: `classify_column`, `column_roles`), `mcp_server._tool_move_task`,
+    `local_ai.generate_daily_standup_data`. 18 tests (`test_column_roles.py`, `test_mcp.py`).
+  - **Problem:** cards an agent moved to Done kept their date, so they lingered in the Calendar and My Work.
+  - **Solution:** any board; same UPDATE as the move (one `version` bump); old date logged in the journal.
+    Done needs to be named as such (no last-column fallback) so a custom board never loses dates by surprise.
+
 _Added 2026-09-26 from an RDi exploration session (`<rdi_exploration_protocol>`), grounded in
 graphify AST analysis and cross-referenced against this backlog._
 

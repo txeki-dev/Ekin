@@ -29,6 +29,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qs, urlparse
 
+import column_roles
 import database
 from html_utils import clean_html_description
 
@@ -608,8 +609,11 @@ class McpToolExecutor:
         target_col_id = args["target_column_id"]
         target_pos = args.get("target_position")
 
-        self._verify_task_belongs_to_board(task_id)
+        task = self._verify_task_belongs_to_board(task_id)
         target_col = self._verify_column_belongs_to_board(target_col_id)
+
+        # Al pasar a Done la tarea deja de vencer: sin fecha no sale en Calendario ni Mi trabajo
+        clear_due = bool(task.get("due_date")) and column_roles.classify_column(target_col["name"]) == column_roles.DONE
 
         with database.get_connection(self.db_path) as conn:
             cursor = conn.cursor()
@@ -629,12 +633,17 @@ class McpToolExecutor:
             cursor.execute(
                 """UPDATE tasks
                    SET column_id = ?, position = ?, updated_at = CURRENT_TIMESTAMP,
-                       version = version + (column_id != ?)
+                       version = version + (column_id != ?),
+                       due_date = CASE WHEN ? THEN NULL ELSE due_date END,
+                       due_time = CASE WHEN ? THEN NULL ELSE due_time END
                    WHERE id = ?""",
-                (target_col_id, target_pos, target_col_id, task_id),
+                (target_col_id, target_pos, target_col_id, clear_due, clear_due, task_id),
             )
 
         audit_entry = f"[{self.client_name}]: Tarea desplazada a columna '{target_col['name']}' (situada arriba, pos {target_pos})."
+        if clear_due:
+            old_due = " ".join(v for v in (task["due_date"], task.get("due_time")) if v)
+            audit_entry += f" Fecha de vencimiento retirada (era {old_due}) al pasar a '{target_col['name']}'."
         database.add_task_log(task_id, audit_entry, db_path=self.db_path)
 
         get_mcp_event_bus().board_mutated.emit(self.board_id)
@@ -644,6 +653,7 @@ class McpToolExecutor:
             "column_id": target_col_id,
             "column_name": target_col["name"],
             "position": target_pos,
+            "due_date_cleared": clear_due,
         }
 
     def _tool_add_task_comment(self, args: Dict[str, Any]) -> Dict[str, Any]:
