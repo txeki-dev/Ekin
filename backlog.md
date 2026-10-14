@@ -5,6 +5,16 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 
 ## 🎯 Prioritized Backlog
 
+_Added 2026-10-14 — backlog session of the 'SW - Ekin' board (plan: `.agents/docs/instruction_1.md`).
+Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #87 → #88 · Wave 3: #74 · Wave 4: #81 (ADR)._
+
+- [x] **DONE (2026-10-14) — #97 Moving a card to another column now bumps `tasks.version`** `[BUG]`
+  · `database/tasks.py::update_task_positions`, `mcp_server._tool_move_task` (`version + (column_id != ?)`).
+    4 tests (`test_board_sync.py`, `test_database.py`, `test_mcp.py`).
+  - **Problem:** drag & drop, undo/redo and MCP `move_task` never bumped `version`, so `board_sync` saw the
+    task as untouched: a collaborator's edit of the same task overwrote the newer local move, or a phantom
+    conflict was counted. Conflicts stay last-writer-wins per task (no field-level merge — out of scope).
+
 _Added 2026-09-26 from an RDi exploration session (`<rdi_exploration_protocol>`), grounded in
 graphify AST analysis and cross-referenced against this backlog._
 

@@ -1470,3 +1470,23 @@ def test_fts5_search_fallback_on_error(db_path):
     assert res[0]["id"] == t_id
 
 
+
+
+def test_update_task_positions_bumps_version_only_on_column_change(db_path):
+    """#97: cambiar de columna sube `version` (la sync lo ve como cambio local); reordenar dentro
+    de la misma columna no, para no fabricar conflictos al reordenar."""
+    board_id = database.create_board("Versiones", db_path=db_path)
+    col_a = database.create_column(board_id, "A", db_path=db_path)
+    col_b = database.create_column(board_id, "B", db_path=db_path)
+    t1 = database.create_task(col_a, "t1", db_path=db_path)
+    t2 = database.create_task(col_a, "t2", db_path=db_path)
+
+    def version(task_id):
+        return database.get_task(task_id, db_path)["version"]
+
+    v1, v2 = version(t1), version(t2)
+    database.update_task_positions([(t1, col_a, 1), (t2, col_a, 0)], db_path)
+    assert (version(t1), version(t2)) == (v1, v2)
+
+    database.update_task_positions([(t1, col_b, 0)], db_path)
+    assert version(t1) == v1 + 1

@@ -282,13 +282,18 @@ def advance_overdue_recurring(today_iso, db_path=None):
 def update_task_positions(task_positions, db_path=None):
     """Actualiza de golpe la columna y posición de varias tareas (para reordenación drag-and-drop).
     task_positions: lista de tuplas/diccionarios: (task_id, column_id, position)
+    Cambiar de columna sube `version` (la sync .ekboard lo trata como cambio local); reordenar
+    dentro de la misma columna no, para no fabricar conflictos.
     """
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         for task_id, col_id, pos in task_positions:
             cursor.execute(
-                "UPDATE tasks SET column_id = ?, position = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (col_id, pos, task_id)
+                """UPDATE tasks
+                   SET column_id = ?, position = ?, updated_at = CURRENT_TIMESTAMP,
+                       version = version + (column_id != ?)
+                   WHERE id = ?""",
+                (col_id, pos, col_id, task_id)
             )
 
 def delete_task(task_id, db_path=None):

@@ -638,3 +638,50 @@ def test_get_board_last_local_modified(sync_test_db):
     database.create_column(empty_board_id, "Columna", db_path=db_path)
     assert database.get_board_last_local_modified(empty_board_id, db_path=db_path) is None
 
+
+
+def _remote_task(file_data, title):
+    return next(t for t in file_data["tasks"] if t["title"] == title)
+
+
+def test_sync_local_move_survives_older_remote_edit(sync_test_db):
+    """#97: mover una tarjeta de columna cuenta como cambio local. Antes no subía `version`, así
+    que si un compañero había editado la misma tarea la sync adoptaba su columna y el movimiento
+    local (más reciente) se perdía."""
+    db_path = sync_test_db["db_path"]
+    board_id = sync_test_db["board_id"]
+    task1_id = sync_test_db["task1_id"]
+    sync_file = str(sync_test_db["tmp_path"] / "tablero_compartido.ekboard")
+    board_sync.sync_board_with_file(board_id, sync_file, db_path)
+
+    # Edición remota de la misma tarea, anterior al movimiento local
+    with open(sync_file, "r", encoding="utf-8") as f:
+        file_data = json.load(f)
+    remote_t1 = _remote_task(file_data, "Tarea 1")
+    remote_t1["title"] = "Tarea 1 (editada en remoto)"
+    remote_t1["version"] += 1
+    remote_t1["updated_at"] = "2000-01-01 00:00:00"
+    with open(sync_file, "w", encoding="utf-8") as f:
+        json.dump(file_data, f, indent=2)
+
+    database.update_task_positions([(task1_id, sync_test_db["col2_id"], 0)], db_path)
+    board_sync.sync_board_with_file(board_id, sync_file, db_path)
+
+    assert database.get_task(task1_id, db_path)["column_id"] == sync_test_db["col2_id"]
+
+
+def test_sync_local_move_without_remote_changes_is_not_a_conflict(sync_test_db):
+    """#97: un movimiento local sin cambios remotos se exporta sin contarse como conflicto."""
+    db_path = sync_test_db["db_path"]
+    board_id = sync_test_db["board_id"]
+    sync_file = str(sync_test_db["tmp_path"] / "tablero_compartido.ekboard")
+    board_sync.sync_board_with_file(board_id, sync_file, db_path)
+
+    database.update_task_positions([(sync_test_db["task1_id"], sync_test_db["col2_id"], 0)], db_path)
+    res = board_sync.sync_board_with_file(board_id, sync_file, db_path)
+
+    assert res.conflicts_resolved == 0
+    with open(sync_file, "r", encoding="utf-8") as f:
+        file_data = json.load(f)
+    done_uuid = next(c["column_uuid"] for c in file_data["columns"] if c["name"] == "Hecho")
+    assert _remote_task(file_data, "Tarea 1")["column_uuid"] == done_uuid

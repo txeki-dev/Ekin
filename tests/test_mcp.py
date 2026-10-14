@@ -607,3 +607,18 @@ def test_mcp_sse_send_to_session_queue_limit():
     assert server.send_to_session("queue-test", {"count": 101}) is False
     assert session.is_closed is True
 
+
+
+def test_mcp_move_task_bumps_version_only_on_column_change(db_path, mcp_board):
+    """#97: el move_task del MCP sube `version` al cambiar de columna (para que la sync .ekboard
+    lo vea como cambio local) y no al recolocar dentro de la misma columna."""
+    columns = database.get_columns(mcp_board["id"], db_path=db_path)
+    task_id = database.create_task(columns[0]["id"], "Versionada", db_path=db_path)
+    executor = McpProtocolHandler(mcp_board, db_path=db_path).executor
+
+    v0 = database.get_task(task_id, db_path)["version"]
+    executor._tool_move_task({"task_id": task_id, "target_column_id": columns[0]["id"], "target_position": 0})
+    assert database.get_task(task_id, db_path)["version"] == v0
+
+    executor._tool_move_task({"task_id": task_id, "target_column_id": columns[2]["id"]})
+    assert database.get_task(task_id, db_path)["version"] == v0 + 1

@@ -625,9 +625,13 @@ class McpToolExecutor:
                     (target_col_id, task_id, target_pos),
                 )
 
+            # Cambiar de columna sube `version` para que la sync .ekboard lo vea como cambio local
             cursor.execute(
-                "UPDATE tasks SET column_id = ?, position = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (target_col_id, target_pos, task_id),
+                """UPDATE tasks
+                   SET column_id = ?, position = ?, updated_at = CURRENT_TIMESTAMP,
+                       version = version + (column_id != ?)
+                   WHERE id = ?""",
+                (target_col_id, target_pos, target_col_id, task_id),
             )
 
         audit_entry = f"[{self.client_name}]: Tarea desplazada a columna '{target_col['name']}' (situada arriba, pos {target_pos})."
