@@ -25,8 +25,8 @@
     "semantic_hash": ""
   },
   "database/__init__.py": {
-    "mtime": 1790619692.2868187,
-    "ast_hash": "2eb1db0c76075c37828c4c8bee6b6ec6",
+    "mtime": 1792000795.9291885,
+    "ast_hash": "2dc651e9273123ffa8d3c8f0b8d3528f",
     "semantic_hash": ""
   },
   "database/board_ops.py": {
@@ -35,8 +35,8 @@
     "semantic_hash": "70b6e47cb0533da13186b4afd0215da1"
   },
   "database/boards.py": {
-    "mtime": 1790619699.0495718,
-    "ast_hash": "27ff8e9914362879d0ab409a665145a4",
+    "mtime": 1792000804.672177,
+    "ast_hash": "40235917417e58246b51a11f02c474f0",
     "semantic_hash": ""
   },
   "database/columns.py": {
@@ -105,8 +105,8 @@
     "semantic_hash": ""
   },
   "detail_dialog/markdown_edit.py": {
-    "mtime": 1792000195.1390438,
-    "ast_hash": "22f214fd13013802ffdf31dc87fee4db",
+    "mtime": 1792000849.9160914,
+    "ast_hash": "ddbeadce742c5dd3816551a1063b9799",
     "semantic_hash": ""
   },
   "detail_dialog/tag_manager_dialog.py": {
@@ -125,8 +125,8 @@
     "semantic_hash": "18171b8520d1520329fba7ab6645610b"
   },
   "detail_dialog/task_detail_dialog.py": {
-    "mtime": 1790622332.531797,
-    "ast_hash": "362b88c4a39c14381bb07f9939e9ee86",
+    "mtime": 1792000842.1277928,
+    "ast_hash": "fcf632fd4dc045f311703dc9ff5e1a54",
     "semantic_hash": ""
   },
   "exporter.py": {
@@ -170,13 +170,13 @@
     "semantic_hash": ""
   },
   "sidebar.py": {
-    "mtime": 1790617764.104708,
-    "ast_hash": "d05fd2c9dd02e4a507bb0ac4635ae5cc",
+    "mtime": 1792000901.3945155,
+    "ast_hash": "7e5b2cfb13d2f6a7f462c661bcf93cf0",
     "semantic_hash": ""
   },
   "strings.py": {
-    "mtime": 1790622221.9961462,
-    "ast_hash": "6554615a05423087f65157001fedee29",
+    "mtime": 1792000885.1862502,
+    "ast_hash": "306f7b3f5918d155c50bff88e05be856",
     "semantic_hash": ""
   },
   "styles.py": {
@@ -355,8 +355,8 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1792000248.540949,
-    "ast_hash": "c1cd22c7969c83da692291a4c4450df4",
+    "mtime": 1792001006.0632703,
+    "ast_hash": "6686c5f94f5b3da8bef78c65ea77f886",
     "semantic_hash": ""
   },
   "README.md": {
@@ -365,8 +365,8 @@
     "semantic_hash": ""
   },
   "backlog.md": {
-    "mtime": 1792000248.6170735,
-    "ast_hash": "72aea52edd8635c500df35048c067b2f",
+    "mtime": 1792001006.1829019,
+    "ast_hash": "bf741e6f4b10130bd4dcce0c263cacea",
     "semantic_hash": ""
   },
   "ekin_icon.png": {
@@ -795,8 +795,8 @@
     "semantic_hash": ""
   },
   "mcp_server.py": {
-    "mtime": 1791999933.3931952,
-    "ast_hash": "0f8fffd86a4f9024c8edc06a91bfdedd",
+    "mtime": 1792000860.2200184,
+    "ast_hash": "a6a6e5524bd2ef5e44668b857aaa3e13",
     "semantic_hash": ""
   },
   "mcp_sync_dialog.py": {
@@ -865,8 +865,8 @@
     "semantic_hash": ""
   },
   "prompt_packs.py": {
-    "mtime": 1790619671.9954255,
-    "ast_hash": "7a17755c451f6a4d45993d063d04820d",
+    "mtime": 1792000860.312801,
+    "ast_hash": "ad1db30f0541acf3dbf3080cfe83e20d",
     "semantic_hash": ""
   },
   "tests/test_prompt_clipboard.py": {
@@ -917,6 +917,16 @@
   "tests/test_markdown_html.py": {
     "mtime": 1791999665.4465225,
     "ast_hash": "317e0a2bcb65ffc8dda5c321c195571f",
+    "semantic_hash": ""
+  },
+  "detail_dialog/repo_files.py": {
+    "mtime": 1792000816.673527,
+    "ast_hash": "32bacdfe208e833274c34d0d1ef8edde",
+    "semantic_hash": ""
+  },
+  "tests/test_local_dir.py": {
+    "mtime": 1792000946.1968732,
+    "ast_hash": "987365ad65a8bc257efa40568c15fed3",
     "semantic_hash": ""
   }
 }

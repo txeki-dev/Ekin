@@ -15,6 +15,7 @@ from detail_dialog import TaskDetailDialog
 from undo import UndoAction
 from board_dialogs import BoardColumnsArea, ColumnEditDialog, BoardSelectionDialog
 from board_mixins import BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin
+from diary_viewer_dialog import DiaryViewerDialog, diary_files
 
 __all__ = ["BoardViewWidget", "BoardColumnsArea", "ColumnEditDialog", "BoardSelectionDialog"]
 
@@ -182,6 +183,16 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         self.prompts_btn.setIconSize(QSize(15, 15))
         self.prompts_btn.clicked.connect(self._open_prompt_clipboard_dialog)
         header_layout.addWidget(self.prompts_btn)
+
+        # Diarios de desarrollo del directorio local (solo si el tablero tiene uno con diarios)
+        self.diary_btn = QPushButton(f" {t('board_view.diary_btn')}")
+        self.diary_btn.setCursor(Qt.PointingHandCursor)
+        self.diary_btn.setToolTip(t("board_view.diary_tooltip"))
+        self.diary_btn.setIcon(lucide_icon("book-open", styles.COLORS['text_soft'], 15))
+        self.diary_btn.setIconSize(QSize(15, 15))
+        self.diary_btn.clicked.connect(self._open_diary_viewer)
+        self.diary_btn.hide()
+        header_layout.addWidget(self.diary_btn)
 
         # Botón MCP (Agente IA)
         self.mcp_btn = QPushButton(t("mcp.board_btn_inactive"))
@@ -514,6 +525,7 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
 
         # Obtener información del tablero (incluyendo el color)
         board_info = database.get_board(board_id, self.db_path)
+        self.diary_btn.setVisible(bool(board_info and diary_files(board_info.get("local_dir"))))
         if board_info:
             self.board_title_label.setText(board_info["name"])
             board_color = board_info["color"]
@@ -654,6 +666,10 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
             return
         from prompt_clipboard_dialog import PromptClipboardDialog
         PromptClipboardDialog(self.board_id, db_path=self.db_path, parent=self.window()).exec()
+
+    def _open_diary_viewer(self):
+        """Abre los diarios de desarrollo (diary.md / diary_archive.md) del directorio local."""
+        DiaryViewerDialog(self.board_id, db_path=self.db_path, parent=self.window()).exec()
 
     def clear_columns_layout(self):
         """Limpia todos los widgets del layout de columnas."""
