@@ -15,8 +15,8 @@
     "semantic_hash": "c9858a77903b6601d5f0e842983865bf"
   },
   "board_view.py": {
-    "mtime": 1790619815.4507768,
-    "ast_hash": "1281b1b1f6dba16282c97b0234de1a7d",
+    "mtime": 1792001063.7703772,
+    "ast_hash": "87bf94a1a7fc44c46ac4ce3ef781d8cd",
     "semantic_hash": ""
   },
   "calendar_view.py": {
@@ -150,8 +150,8 @@
     "semantic_hash": ""
   },
   "pyproject.toml": {
-    "mtime": 1791999707.1238627,
-    "ast_hash": "7aaf558b22b55fa6149e693f539f0a0f",
+    "mtime": 1792001072.1813772,
+    "ast_hash": "d83a4cc56329ea80ed0cb7386d52ccea",
     "semantic_hash": ""
   },
   "search_dialog.py": {
@@ -175,8 +175,8 @@
     "semantic_hash": ""
   },
   "strings.py": {
-    "mtime": 1792000885.1862502,
-    "ast_hash": "306f7b3f5918d155c50bff88e05be856",
+    "mtime": 1792001040.656772,
+    "ast_hash": "1dce29e511558f9e76b16db6f58044fd",
     "semantic_hash": ""
   },
   "styles.py": {
@@ -355,8 +355,8 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1792001006.0632703,
-    "ast_hash": "6686c5f94f5b3da8bef78c65ea77f886",
+    "mtime": 1792001120.5438774,
+    "ast_hash": "e01e7c6162601f1ad8361d5842c35336",
     "semantic_hash": ""
   },
   "README.md": {
@@ -365,8 +365,8 @@
     "semantic_hash": ""
   },
   "backlog.md": {
-    "mtime": 1792001006.1829019,
-    "ast_hash": "bf741e6f4b10130bd4dcce0c263cacea",
+    "mtime": 1792001120.62578,
+    "ast_hash": "9bf946249b104776a6f34b49d17ee56e",
     "semantic_hash": ""
   },
   "ekin_icon.png": {
@@ -927,6 +927,21 @@
   "tests/test_local_dir.py": {
     "mtime": 1792000946.1968732,
     "ast_hash": "987365ad65a8bc257efa40568c15fed3",
+    "semantic_hash": ""
+  },
+  "diary_viewer_dialog.py": {
+    "mtime": 1792001040.1306212,
+    "ast_hash": "90dbd088933e7d73e8cb686ddc3c4c75",
+    "semantic_hash": ""
+  },
+  "tests/test_diary_viewer.py": {
+    "mtime": 1792001063.8609955,
+    "ast_hash": "a9a2ad974e85ef37dd129798561513dc",
+    "semantic_hash": ""
+  },
+  "assets/icons/lucide/book-open.svg": {
+    "mtime": 1792001020.23466,
+    "ast_hash": "3c45716d8a0d539894c392bad07a4d06",
     "semantic_hash": ""
   }
 }

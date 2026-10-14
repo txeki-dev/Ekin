@@ -21,14 +21,14 @@ py-modules = [
     "analytics", "backups",
     "board_dialogs", "board_mixins", "board_sync", "board_sync_controller",
     "board_template_dialogs", "board_view", "bulk_add_dialog", "calendar_view",
-    "cloud_sync_dialog", "color_picker", "column_roles", "command_palette", "dashboard_view",
+    "cli_tools", "cloud_sync_dialog", "color_picker", "column_roles", "command_palette", "dashboard_view",
     "diary_viewer_dialog",
     "ekin_mcp", "export_dialog", "exporter", "html_utils", "icons",
     "ics_export", "importer", "local_ai", "logging_setup", "main", "markdown_html",
     "mcp_server", "mcp_sync_dialog", "my_work_view", "onboarding_dialog",
     "privacy_shield", "prompt_clipboard_dialog", "prompt_packs",
     "reminders", "search_dialog", "settings_dialog", "shortcuts_dialog",
-    "sidebar", "strings", "styles", "templates", "undo", "version", "widgets"
+    "sidebar", "start_working", "strings", "styles", "templates", "undo", "version", "widgets"
 ]
 packages = ["database", "detail_dialog"]
 

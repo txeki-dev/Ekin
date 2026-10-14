@@ -61,6 +61,13 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
   · `diary_viewer_dialog.py` (`DiaryViewerDialog`, `diary_files`), header *Diary* button (`book-open` Lucide icon),
     visible only with diaries in `local_dir`. 3 tests (`tests/test_diary_viewer.py`); real 94 KB archive renders in ~15 ms.
 
+- [x] **DONE (2026-10-14) — #87 START WORKING (launch the AI CLI from the board)** `[FEAT]`
+  · `cli_tools.py` (registry, `detect_installed`, `build_launch`, `update_cli`, `ensure_mcp_registered`, `launch`),
+    `start_working.py` (`start_prompt`, `StartWorkingWorker`, `start_working`), header button (`play` icon).
+    External console (decision D2). 11 tests (`tests/test_start_working.py`), no real processes.
+  - **Finding:** Ekin's MCP server only started from the MCP dialog's *Save*, so after every app restart it was down
+    until then; START WORKING now starts it. Pending user checks: real launch, and `agy` talking to `/rpc`.
+
 _Added 2026-09-26 from an RDi exploration session (`<rdi_exploration_protocol>`), grounded in
 graphify AST analysis and cross-referenced against this backlog._
 

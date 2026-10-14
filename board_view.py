@@ -1,3 +1,4 @@
+import os
 from PySide6.QtCore import Qt, Signal, QSize, QTimer
 from PySide6.QtWidgets import (
     QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
@@ -193,6 +194,16 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         self.diary_btn.clicked.connect(self._open_diary_viewer)
         self.diary_btn.hide()
         header_layout.addWidget(self.diary_btn)
+
+        # START WORKING: abre la CLI del agente en el directorio local (solo si el tablero tiene uno)
+        self.start_working_btn = QPushButton(f" {t('board_view.start_working_btn')}")
+        self.start_working_btn.setCursor(Qt.PointingHandCursor)
+        self.start_working_btn.setToolTip(t("board_view.start_working_tooltip"))
+        self.start_working_btn.setIcon(lucide_icon("play", styles.COLORS['text_soft'], 15))
+        self.start_working_btn.setIconSize(QSize(15, 15))
+        self.start_working_btn.clicked.connect(self._start_working)
+        self.start_working_btn.hide()
+        header_layout.addWidget(self.start_working_btn)
 
         # Botón MCP (Agente IA)
         self.mcp_btn = QPushButton(t("mcp.board_btn_inactive"))
@@ -525,7 +536,9 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
 
         # Obtener información del tablero (incluyendo el color)
         board_info = database.get_board(board_id, self.db_path)
-        self.diary_btn.setVisible(bool(board_info and diary_files(board_info.get("local_dir"))))
+        local_dir = board_info and board_info.get("local_dir")
+        self.diary_btn.setVisible(bool(diary_files(local_dir)))
+        self.start_working_btn.setVisible(bool(local_dir) and os.path.isdir(local_dir))
         if board_info:
             self.board_title_label.setText(board_info["name"])
             board_color = board_info["color"]
@@ -670,6 +683,12 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
     def _open_diary_viewer(self):
         """Abre los diarios de desarrollo (diary.md / diary_archive.md) del directorio local."""
         DiaryViewerDialog(self.board_id, db_path=self.db_path, parent=self.window()).exec()
+
+    def _start_working(self):
+        """START WORKING: MCP en marcha, CLI actualizada y abierta en el repo con el INTRO."""
+        from start_working import start_working
+        start_working(self.window(), self.board_id, db_path=self.db_path, open_mcp_dialog=self._open_mcp_sync_dialog)
+        self._update_mcp_btn_ui()
 
     def clear_columns_layout(self):
         """Limpia todos los widgets del layout de columnas."""
