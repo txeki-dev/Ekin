@@ -46,11 +46,11 @@ def test_generate_daily_standup_data_and_markdown(db_path):
 
     md = local_ai.format_daily_standup_markdown(data, "Proyecto Alpha")
     assert "Daily Standup — Proyecto Alpha" in md
-    assert "Completado recientemente" in md
+    assert "Recently completed" in md
     assert "Tarea Finalizada" in md
-    assert "En curso / Próximo foco" in md
-    assert "Bloqueos / Tareas estancadas" in md
-    assert "exceso WIP" in md or "límite WIP" in md.lower()
+    assert "In progress" in md
+    assert "Blocked / stalled" in md
+    assert "over their WIP limit" in md
 
 
 # =====================================================================
@@ -342,5 +342,5 @@ def test_standup_columns_flow_and_due_soon(db_path):
     assert [t["id"] for t in data["due_soon"]] == [due]
 
     md = local_ai.format_daily_standup_markdown(data, "Flujo")
-    assert "Tarea activa" in md and f"#{due}" in md
-    assert "Flujo por columnas" in md and "[backlog]" in md and "Vencimientos" in md
+    assert "Active task" in md and f"#{due}" in md
+    assert "Flow by column" in md and "[backlog]" in md and "Due in the next 7 days" in md

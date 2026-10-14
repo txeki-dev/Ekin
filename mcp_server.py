@@ -88,19 +88,19 @@ class McpPermissionDenied(Exception):
 def authenticate_and_get_board(board_uuid: str, token: Optional[str] = None, db_path: Optional[str] = None) -> Dict[str, Any]:
     """Valida que el tablero exista, tenga MCP activado y que el token coincida si está configurado."""
     if not board_uuid:
-        raise McpSecurityError("Se requiere 'board_uuid' para autenticar la conexión MCP.")
+        raise McpSecurityError("'board_uuid' is required to authenticate the MCP connection.")
 
     board = database.get_board_by_uuid(board_uuid, db_path=db_path)
     if not board:
-        raise McpSecurityError(f"Tablero con UUID '{board_uuid}' no encontrado.")
+        raise McpSecurityError(f"Board with UUID '{board_uuid}' not found.")
 
     if not board.get("mcp_enabled"):
-        raise McpSecurityError(f"El acceso MCP está desactivado por el usuario para el tablero '{board['name']}'.")
+        raise McpSecurityError(f"MCP access is disabled by the user for board '{board['name']}'.")
 
     expected_secret = board.get("mcp_secret")
     if expected_secret:
         if not token or not secrets.compare_digest(token, expected_secret):
-            raise McpSecurityError("Token secreto de autenticación MCP inválido o no proporcionado.")
+            raise McpSecurityError("Invalid or missing MCP secret token.")
 
     return board
 
@@ -112,7 +112,7 @@ def get_mcp_tools_schema() -> List[Dict[str, Any]]:
     return [
         {
             "name": "get_board_info",
-            "description": "Obtiene información general del tablero: nombre, color, columnas activas y resumen de tareas.",
+            "description": "Board overview: name, color, local directory, columns (with their flow role) and task counts.",
             "inputSchema": {
                 "type": "object",
                 "properties": {},
@@ -120,7 +120,7 @@ def get_mcp_tools_schema() -> List[Dict[str, Any]]:
         },
         {
             "name": "list_columns",
-            "description": "Lista todas las columnas del tablero en su orden visual con sus IDs y límites WIP.",
+            "description": "Lists the board's columns in visual order with their IDs, flow role (backlog / ready / in_progress / review / done / other) and WIP limits.",
             "inputSchema": {
                 "type": "object",
                 "properties": {},
@@ -128,144 +128,144 @@ def get_mcp_tools_schema() -> List[Dict[str, Any]]:
         },
         {
             "name": "list_tasks",
-            "description": "Lista las tarjetas/tareas del tablero, opcionalmente filtradas por columna o etiqueta.",
+            "description": "Lists the board's task cards, optionally filtered by column or tag.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "column_id": {"type": "integer", "description": "ID de la columna para filtrar tareas."},
-                    "tag": {"type": "string", "description": "Nombre de la etiqueta para filtrar."},
+                    "column_id": {"type": "integer", "description": "Column ID to filter by."},
+                    "tag": {"type": "string", "description": "Tag name to filter by."},
                 },
             },
         },
         {
             "name": "get_task",
-            "description": "Obtiene todos los detalles de una tarea: título, descripción Markdown, tags, fechas, checklist, links e historial de logs.",
+            "description": "Full task details: title, plain-text description, tags, dates, links and journal entries.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "task_id": {"type": "integer", "description": "ID único de la tarea."},
+                    "task_id": {"type": "integer", "description": "Task ID."},
                 },
                 "required": ["task_id"],
             },
         },
         {
             "name": "create_task",
-            "description": "Crea una nueva tarjeta de tarea dentro de una de las columnas del tablero.",
+            "description": "Creates a task card in one of the board's columns.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "column_id": {"type": "integer", "description": "ID de la columna donde se ubicará la tarea."},
-                    "title": {"type": "string", "description": "Título breve y descriptivo de la tarea."},
-                    "description": {"type": "string", "description": "Descripción detallada en formato Markdown."},
-                    "due_date": {"type": "string", "description": "Fecha de vencimiento en formato ISO (YYYY-MM-DD)."},
-                    "priority": {"type": "string", "description": "Prioridad sugerida (ej. 'High', 'Medium', 'Low', 'P0-Critical')."},
-                    "tags": {"type": "array", "items": {"type": "string"}, "description": "Lista de nombres de etiquetas a asociar."},
+                    "column_id": {"type": "integer", "description": "Column ID for the new task."},
+                    "title": {"type": "string", "description": "Short, descriptive title."},
+                    "description": {"type": "string", "description": "Detailed description in Markdown."},
+                    "due_date": {"type": "string", "description": "Due date (YYYY-MM-DD)."},
+                    "priority": {"type": "string", "description": "Suggested priority (e.g. 'High', 'Medium', 'Low', 'P0-Critical')."},
+                    "tags": {"type": "array", "items": {"type": "string"}, "description": "Tag names to attach."},
                 },
                 "required": ["column_id", "title"],
             },
         },
         {
             "name": "update_task",
-            "description": "Modifica el título, descripción, fecha de vencimiento, prioridad o etiquetas de una tarea.",
+            "description": "Updates a task's title, description, due date/time, priority or tags; fields not sent are kept.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "task_id": {"type": "integer", "description": "ID de la tarea a actualizar."},
-                    "title": {"type": "string", "description": "Nuevo título."},
-                    "description": {"type": "string", "description": "Nueva descripción en Markdown."},
-                    "due_date": {"type": "string", "description": "Nueva fecha de vencimiento (YYYY-MM-DD o vacío para quitar; quitarla también quita la hora)."},
-                    "due_time": {"type": "string", "description": "Nueva hora de vencimiento (HH:MM o vacío para quitar). Requiere fecha."},
-                    "priority": {"type": "string", "description": "Nueva prioridad."},
-                    "tags": {"type": "array", "items": {"type": "string"}, "description": "Nueva lista de etiquetas."},
+                    "task_id": {"type": "integer", "description": "Task ID."},
+                    "title": {"type": "string", "description": "New title."},
+                    "description": {"type": "string", "description": "New description in Markdown."},
+                    "due_date": {"type": "string", "description": "New due date (YYYY-MM-DD, or empty to remove it; removing it also removes the time)."},
+                    "due_time": {"type": "string", "description": "New due time (HH:MM, or empty to remove it). Requires a due date."},
+                    "priority": {"type": "string", "description": "New priority."},
+                    "tags": {"type": "array", "items": {"type": "string"}, "description": "New tag list (replaces the current tags)."},
                 },
                 "required": ["task_id"],
             },
         },
         {
             "name": "move_task",
-            "description": "Mueve una tarea de una columna a otra o cambia su posición. Por defecto se ubica en la parte superior (posición 0, más reciente arriba).",
+            "description": "Moves a task to another column or position (default: top, position 0 — newest first). Moving it into a done column clears its due date.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "task_id": {"type": "integer", "description": "ID de la tarea a desplazar."},
-                    "target_column_id": {"type": "integer", "description": "ID de la columna de destino."},
-                    "target_position": {"type": "integer", "description": "Posición ordinal en la columna (opcional, por defecto 0 para situarla arriba del todo)."},
+                    "task_id": {"type": "integer", "description": "Task ID."},
+                    "target_column_id": {"type": "integer", "description": "Target column ID."},
+                    "target_position": {"type": "integer", "description": "Position in the column (optional; default 0, the top)."},
                 },
                 "required": ["task_id", "target_column_id"],
             },
         },
         {
             "name": "add_task_comment",
-            "description": "Añade una nota o comentario al diario/historial de la tarea. Se marcará con autoría IA.",
+            "description": "Adds a comment to the task's journal, attributed to the AI agent.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "task_id": {"type": "integer", "description": "ID de la tarea."},
-                    "comment": {"type": "string", "description": "Contenido de la nota o comentario en Markdown."},
+                    "task_id": {"type": "integer", "description": "Task ID."},
+                    "comment": {"type": "string", "description": "Comment in Markdown."},
                 },
                 "required": ["task_id", "comment"],
             },
         },
         {
             "name": "list_task_comments",
-            "description": "Consulta todas las notas y entradas de diario registradas para una tarea (texto plano).",
+            "description": "Lists a task's journal entries as plain text.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "task_id": {"type": "integer", "description": "ID de la tarea."},
-                    "mask_sensitive": {"type": "boolean", "description": "Si es True, aplica sanitización local de datos sensibles y PII."},
+                    "task_id": {"type": "integer", "description": "Task ID."},
+                    "mask_sensitive": {"type": "boolean", "description": "If true, masks sensitive data and PII locally."},
                 },
                 "required": ["task_id"],
             },
         },
         {
             "name": "add_task_link",
-            "description": "Asocia un enlace URL o ruta de archivo local a la tarjeta de la tarea.",
+            "description": "Attaches a URL or local file path to the task.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "task_id": {"type": "integer", "description": "ID de la tarea."},
-                    "url": {"type": "string", "description": "URL o ruta de archivo."},
-                    "label": {"type": "string", "description": "Texto descriptivo del enlace."},
+                    "task_id": {"type": "integer", "description": "Task ID."},
+                    "url": {"type": "string", "description": "URL or file path."},
+                    "label": {"type": "string", "description": "Link label."},
                 },
                 "required": ["task_id", "url"],
             },
         },
         {
             "name": "delete_task_link",
-            "description": "Elimina un enlace o archivo adjunto de una tarea.",
+            "description": "Removes a link or attachment from a task.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "task_id": {"type": "integer", "description": "ID de la tarea."},
-                    "link_id": {"type": "integer", "description": "ID del enlace a eliminar."},
+                    "task_id": {"type": "integer", "description": "Task ID."},
+                    "link_id": {"type": "integer", "description": "Link ID to remove."},
                 },
                 "required": ["task_id", "link_id"],
             },
         },
         {
             "name": "get_board_executive_summary",
-            "description": "Obtiene un resumen ejecutivo de alto nivel del estado del tablero, flujo Kanban, métricas WIP y cuellos de botella (ahorra miles de tokens de contexto al agente).",
+            "description": "Token-cheap board summary: active_task (top of In Progress, else Review, else Ready), columns_flow (role, count, WIP limit and top cards per column), due_soon, WIP violations and stalled work.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "mask_sensitive": {
                         "type": "boolean",
-                        "description": "Si es True, aplica sanitización local de datos sensibles y PII (API keys, emails, credenciales).",
+                        "description": "If true, masks sensitive data and PII locally (API keys, e-mails, credentials).",
                     },
                 },
             },
         },
         {
             "name": "get_task_condensed_context",
-            "description": "Obtiene el contexto condensado y sintetizado de una tarea (título, descripción limpia y resumen ejecutivo del diario) optimizado para minimizar el consumo de tokens del agente.",
+            "description": "Token-cheap task context: title, column, plain-text description, journal summary and latest_comment (the latest handoff).",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "task_id": {"type": "integer", "description": "ID de la tarea."},
+                    "task_id": {"type": "integer", "description": "Task ID."},
                     "mask_sensitive": {
                         "type": "boolean",
-                        "description": "Si es True, aplica sanitización local de datos sensibles y PII.",
+                        "description": "If true, masks sensitive data and PII locally.",
                     },
                 },
                 "required": ["task_id"],
@@ -273,26 +273,26 @@ def get_mcp_tools_schema() -> List[Dict[str, Any]]:
         },
         {
             "name": "sanitize_text",
-            "description": "Filtra y sanitiza cadenas de texto en local, enmascarando claves de API, tokens privados, credenciales y correos electrónicos.",
+            "description": "Masks API keys, private tokens, credentials and e-mails in a text, locally.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "text": {"type": "string", "description": "Texto a sanitizar."},
+                    "text": {"type": "string", "description": "Text to sanitize."},
                 },
                 "required": ["text"],
             },
         },
         {
             "name": "search_tasks_semantic",
-            "description": "Realiza una búsqueda semántica basada en embeddings sobre las tareas del tablero para encontrar tareas conceptualmente afines a una consulta en lenguaje natural.",
+            "description": "Embedding-based semantic search over the board's tasks for a natural-language query.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "query": {"type": "string", "description": "Consulta en lenguaje natural o concepto a buscar."},
-                    "top_k": {"type": "integer", "description": "Número máximo de tareas a retornar (por defecto 5)."},
+                    "query": {"type": "string", "description": "Natural-language query."},
+                    "top_k": {"type": "integer", "description": "Maximum number of tasks to return (default 5)."},
                     "mask_sensitive": {
                         "type": "boolean",
-                        "description": "Si es True, aplica sanitización local de datos sensibles y PII (claves API, tokens, emails).",
+                        "description": "If true, masks sensitive data and PII locally (API keys, tokens, e-mails).",
                     },
                 },
                 "required": ["query"],
@@ -300,25 +300,25 @@ def get_mcp_tools_schema() -> List[Dict[str, Any]]:
         },
         {
             "name": "create_tasks_batch",
-            "description": "Crea múltiples tarjetas de tareas de forma atómica en una columna dentro de una única transacción.",
+            "description": "Creates several task cards in one column, atomically.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "column_id": {"type": "integer", "description": "ID de la columna donde se crearán las tareas."},
+                    "column_id": {"type": "integer", "description": "Column ID for the new tasks."},
                     "tasks": {
                         "type": "array",
                         "items": {
                             "type": "object",
                             "properties": {
-                                "title": {"type": "string", "description": "Título de la tarea."},
-                                "description": {"type": "string", "description": "Descripción en Markdown."},
-                                "priority": {"type": "string", "description": "Prioridad sugerida (ej. 'High', 'Medium', 'P0-Critical')."},
-                                "due_date": {"type": "string", "description": "Fecha de vencimiento en formato ISO (YYYY-MM-DD)."},
-                                "tags": {"type": "array", "items": {"type": "string"}, "description": "Lista de etiquetas."},
+                                "title": {"type": "string", "description": "Task title."},
+                                "description": {"type": "string", "description": "Description in Markdown."},
+                                "priority": {"type": "string", "description": "Suggested priority (e.g. 'High', 'Medium', 'P0-Critical')."},
+                                "due_date": {"type": "string", "description": "Due date (YYYY-MM-DD)."},
+                                "tags": {"type": "array", "items": {"type": "string"}, "description": "Tag names."},
                             },
                             "required": ["title"],
                         },
-                        "description": "Lista de tareas a crear.",
+                        "description": "Tasks to create.",
                     },
                 },
                 "required": ["column_id", "tasks"],
@@ -326,15 +326,15 @@ def get_mcp_tools_schema() -> List[Dict[str, Any]]:
         },
         {
             "name": "control_task_timer",
-            "description": "Controla el temporizador de ejecución de una tarea (iniciar, detener o consultar estado) para rastrear el tiempo dedicado por el agente.",
+            "description": "Starts, stops or reads a task's timer to track the time spent on it.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "task_id": {"type": "integer", "description": "ID de la tarea."},
+                    "task_id": {"type": "integer", "description": "Task ID."},
                     "action": {
                         "type": "string",
                         "enum": ["start", "stop", "status"],
-                        "description": "Acción a realizar sobre el temporizador: 'start' para iniciarlo, 'stop' para detenerlo, 'status' para consultar tiempo transcurrido.",
+                        "description": "'start', 'stop' or 'status' (elapsed time).",
                     },
                 },
                 "required": ["task_id", "action"],
@@ -372,12 +372,12 @@ class McpToolExecutor:
         for col in columns:
             if col["id"] == column_id:
                 return col
-        raise McpSecurityError(f"La columna ID {column_id} no pertenece al tablero vinculado (ID {self.board_id}).")
+        raise McpSecurityError(f"Column ID {column_id} does not belong to the linked board (ID {self.board_id}).")
 
     def _verify_task_belongs_to_board(self, task_id: int) -> Dict[str, Any]:
         task = database.get_task(task_id, db_path=self.db_path)
         if not task:
-            raise McpSecurityError(f"Tarea con ID {task_id} no encontrada.")
+            raise McpSecurityError(f"Task ID {task_id} not found.")
 
         # Verificar que la columna de la tarea pertenezca al tablero
         self._verify_column_belongs_to_board(task["column_id"])
@@ -387,13 +387,13 @@ class McpToolExecutor:
         # BLOQUEO EXPLÍCITO DE COLUMNAS (REGLA HUMAN-ONLY)
         if any(tool_name.startswith(p) for p in ("create_column", "delete_column", "update_column", "rename_column")):
             raise McpPermissionDenied(
-                "Operación denegada: la creación, edición, renombrado o eliminación de columnas "
-                "está reservada exclusivamente al usuario humano para garantizar el gobierno del flujo de trabajo."
+                "Denied: creating, editing, renaming or deleting columns is reserved to the human user, "
+                "who governs the workflow."
             )
 
         handler = getattr(self, f"_tool_{tool_name}", None)
         if not handler:
-            raise ValueError(f"Herramienta desconocida: '{tool_name}'")
+            raise ValueError(f"Unknown tool: '{tool_name}'")
 
         res_data = handler(arguments)
         return {
@@ -571,7 +571,7 @@ class McpToolExecutor:
         # Notificar a la UI
         get_mcp_event_bus().board_mutated.emit(self.board_id)
 
-        return {"success": True, "task_id": task_id, "message": f"Tarea '{title}' creada con éxito."}
+        return {"success": True, "task_id": task_id, "message": f"Task '{title}' created."}
 
     def _tool_update_task(self, args: Dict[str, Any]) -> Dict[str, Any]:
         task_id = args["task_id"]
@@ -881,7 +881,7 @@ class McpToolExecutor:
             "success": True,
             "created_count": len(created_ids),
             "tasks": created_summary,
-            "message": f"Se crearon {len(created_ids)} tareas con éxito en la columna ID {col_id}."
+            "message": f"Created {len(created_ids)} tasks in column ID {col_id}."
         }
 
     def _tool_control_task_timer(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -916,7 +916,7 @@ class McpToolExecutor:
                 "task_id": task_id,
                 "timer_running": True,
                 "started_at": timer_started_at,
-                "message": f"Temporizador en marcha para tarea {task_id}.",
+                "message": f"Timer running for task {task_id}.",
             }
         elif action == "stop":
             elapsed = _calc_elapsed(timer_started_at)
@@ -930,7 +930,7 @@ class McpToolExecutor:
                 "task_id": task_id,
                 "timer_running": False,
                 "elapsed_seconds": round(elapsed, 1),
-                "message": f"Temporizador detenido para tarea {task_id}.",
+                "message": f"Timer stopped for task {task_id}.",
             }
         elif action == "status":
             is_running = bool(timer_started_at)
@@ -942,7 +942,7 @@ class McpToolExecutor:
                 "elapsed_seconds": round(elapsed, 1),
             }
         else:
-            raise ValueError(f"Acción de temporizador no reconocida: '{action}'. Debe ser 'start', 'stop' o 'status'.")
+            raise ValueError(f"Unknown timer action: '{action}'. Use 'start', 'stop' or 'status'.")
 
 
 # --- PROCESADOR JSON-RPC DE PROTOCOLO MCP ---
@@ -991,7 +991,7 @@ class McpProtocolHandler:
                     "prompts": [
                         {
                             "name": "kanban_board_context",
-                            "description": f"Contexto operativo e instrucciones metodológicas para el tablero '{self.board['name']}'.",
+                            "description": f"Working context and method instructions for board '{self.board['name']}'.",
                             "arguments": [],
                         }
                     ]
@@ -1012,14 +1012,14 @@ class McpProtocolHandler:
                         ],
                     }
                 else:
-                    raise ValueError(f"Prompt no encontrado: '{prompt_name}'")
+                    raise ValueError(f"Prompt not found: '{prompt_name}'")
             else:
                 return {
                     "jsonrpc": "2.0",
                     "id": req_id,
                     "error": {
                         "code": -32601,
-                        "message": f"Método no soportado: '{method}'",
+                        "message": f"Unsupported method: '{method}'",
                     },
                 }
 
@@ -1044,7 +1044,7 @@ class McpProtocolHandler:
                 "id": req_id,
                 "error": {
                     "code": -32000,
-                    "message": f"Violación de seguridad Sandbox: {str(exc)}",
+                    "message": f"Sandbox security violation: {str(exc)}",
                 },
             }
         except Exception as exc:
@@ -1054,7 +1054,7 @@ class McpProtocolHandler:
                 "id": req_id,
                 "error": {
                     "code": -32603,
-                    "message": f"Error interno MCP: {str(exc)}",
+                    "message": f"Internal MCP error: {str(exc)}",
                 },
             }
 
@@ -1062,19 +1062,19 @@ class McpProtocolHandler:
         prompt_custom = self.board.get("ai_system_prompt") or ""
         columns = database.get_columns(self.board["id"], db_path=self.db_path)
         roles = column_roles.column_roles(columns)
-        cols_str = ", ".join(f"'{c['name']}' (ID: {c['id']}, rol: {roles[c['id']]})" for c in columns)
+        cols_str = ", ".join(f"'{c['name']}' (ID: {c['id']}, role: {roles[c['id']]})" for c in columns)
 
         instructions = [
-            f"# Contexto del Tablero Ekin Kanban: '{self.board['name']}'",
-            f"- Columnas disponibles: {cols_str}",
-            "- Regla Fundamental de Gobierno: NO intentes crear, editar o eliminar columnas. Solo el usuario humano puede alterar la estructura de columnas.",
-            "- Política de Orden y Posicionamiento: El orden visual de las tareas en cada columna es de más reciente a más antiguo (de arriba hacia abajo). Al mover o crear tareas, sitúalas en la parte superior (posición 0 por defecto) para que lo más reciente aparezca siempre arriba.",
-            "- Puedes leer y mover tareas a lo largo de las columnas existentes, añadir notas en su diario y actualizar prioridades y etiquetas.",
+            f"# Ekin Kanban board: '{self.board['name']}'",
+            f"- Columns: {cols_str}",
+            "- Columns are human-only: never try to create, edit or delete them.",
+            "- Cards are ordered newest first (top to bottom): create and move cards to the top (position 0, the default).",
+            "- You can read and move cards across the existing columns, comment on their journal and update their priority and tags.",
         ]
         if self.board.get("local_dir"):
-            instructions.append(f"- Directorio local del repositorio (CWD esperado): {self.board['local_dir']}")
+            instructions.append(f"- Local repository directory (expected working directory): {self.board['local_dir']}")
         if prompt_custom:
-            instructions.append(f"\n### Instrucciones Metodológicas Específicas:\n{prompt_custom}")
+            instructions.append(f"\n### Board-specific instructions:\n{prompt_custom}")
 
         return "\n".join(instructions)
 

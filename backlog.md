@@ -83,6 +83,11 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
   · `widgets.py::TaskCard.mouseReleaseEvent` calls `super()` before emitting `clicked`/`ctrl_clicked`.
     1 test reproducing the exact log error (`shiboken6.delete` in the click handler).
 
+- [x] **DONE (2026-10-14) — #74 part A: MCP server text in English** `[TOKENS]`
+  · `mcp_server.py` (tool schema, instructions, errors, messages), `local_ai.format_daily_standup_markdown`.
+    Tool schema 8,171 → 7,225 chars (−12 %; more in tokens, as Spanish tokenizes worse — no API key here to count
+    exactly). Journal audit entries stay in the UI language (user-facing). Part B (LLM translation spike) pending.
+
 _Added 2026-09-26 from an RDi exploration session (`<rdi_exploration_protocol>`), grounded in
 graphify AST analysis and cross-referenced against this backlog._
 

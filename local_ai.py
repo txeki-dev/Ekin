@@ -254,7 +254,7 @@ def summarize_diary_offline(logs: list[dict], task_title: str = "") -> str:
 def generate_daily_standup_data(board_id: int, db_path: Optional[str] = None) -> dict:
     """Extrae métricas y estado del flujo del tablero para generar el informe Daily Standup."""
     board = database.get_board(board_id, db_path)
-    board_name = board["name"] if board else "Tablero"
+    board_name = board["name"] if board else "Board"
     columns = database.get_columns(board_id, db_path)
 
     completed_recently = []
@@ -355,7 +355,7 @@ def generate_daily_standup_data(board_id: int, db_path: Optional[str] = None) ->
 
 def format_daily_standup_markdown(standup_data: dict, board_name: str = "") -> str:
     """Formatea la estructura de standup_data en un reporte Markdown elegante."""
-    b_name = board_name or standup_data.get("board_name") or "Tablero"
+    b_name = board_name or standup_data.get("board_name") or "Board"
     completed = standup_data.get("completed_recently", [])
     in_prog = standup_data.get("in_progress", [])
     stagnant = standup_data.get("stagnant", [])
@@ -364,69 +364,69 @@ def format_daily_standup_markdown(standup_data: dict, board_name: str = "") -> s
 
     lines = [
         f"# 📋 Daily Standup — {b_name}",
-        "*Resumen ejecutivo de flujo y salud del tablero*",
+        "*Executive summary of the board's flow and health*",
         "",
-        "## 🎯 Tarea activa",
+        "## 🎯 Active task",
     ]
     active = standup_data.get("active_task")
     if active:
         lines.append(f"- **{active['title']}** `[#{active['id']}]` ({active['column_name']}, {active['role']})")
     else:
-        lines.append("- *(Nada en In Progress, Review ni Ready: revisa el Backlog)*")
+        lines.append("- *(Nothing in In Progress, Review or Ready: check the Backlog)*")
 
     lines.append("")
-    lines.append("## 🧭 Flujo por columnas")
+    lines.append("## 🧭 Flow by column")
     for c in standup_data.get("columns_flow", []):
         limit = f"/{c['wip_limit']}" if c.get("wip_limit") else ""
         tops = ", ".join(f"#{t['id']} {t['title']}" for t in c["top_tasks"])
         more = c["count"] - len(c["top_tasks"])
         if tops and more > 0:
-            tops += f" (+{more} más)"
+            tops += f" (+{more} more)"
         lines.append(f"- **{c['name']}** [{c['role']}] {c['count']}{limit}" + (f": {tops}" if tops else ""))
 
     lines.append("")
-    lines.append("## 📅 Vencimientos (7 días)")
+    lines.append("## 📅 Due in the next 7 days")
     due = standup_data.get("due_soon", [])
     if due:
         for t in due:
             lines.append(f"- **{t['title']}** `[#{t['id']}]` — {t['due_date']} ({t['column_name']})")
     else:
-        lines.append("- *(Nada vence en los próximos 7 días)*")
+        lines.append("- *(Nothing due in the next 7 days)*")
 
     lines.append("")
-    lines.append("## 🟢 Completado recientemente")
+    lines.append("## 🟢 Recently completed")
     if completed:
         for t in completed[:8]:
             lines.append(f"- **{t.get('title')}** `[#{t.get('id')}]` ({t.get('column_name')})")
     else:
-        lines.append("- *(Ninguna tarea completada recientemente)*")
+        lines.append("- *(No recently completed tasks)*")
 
     lines.append("")
-    lines.append("## 🟡 En curso / Próximo foco")
+    lines.append("## 🟡 In progress")
     if in_prog:
         for t in in_prog[:10]:
             days = t.get("days_inactive", 0)
-            inact_str = f" — *inactiva {days}d*" if days > 0 else ""
+            inact_str = f" — *idle {days}d*" if days > 0 else ""
             lines.append(f"- **{t.get('title')}** `[#{t.get('id')}]` ({t.get('column_name')}){inact_str}")
     else:
-        lines.append("- *(No hay tareas activas actualmente en curso)*")
+        lines.append("- *(No tasks in progress)*")
 
     lines.append("")
-    lines.append("## 🔴 Bloqueos / Tareas estancadas")
+    lines.append("## 🔴 Blocked / stalled")
     if stagnant:
         for t in stagnant:
-            lines.append(f"- ⚠️ **{t.get('title')}** `[#{t.get('id')}]` lleva **{t.get('days_inactive')} días** sin actividad en *{t.get('column_name')}*.")
+            lines.append(f"- ⚠️ **{t.get('title')}** `[#{t.get('id')}]` idle for **{t.get('days_inactive')} days** in *{t.get('column_name')}*.")
     elif wip_warns:
         for w in wip_warns:
-            lines.append(f"- ⚠️ Límite WIP superado en columna **{w['column_name']}** ({w['count']}/{w['limit']} tareas).")
+            lines.append(f"- ⚠️ WIP limit exceeded in **{w['column_name']}** ({w['count']}/{w['limit']} tasks).")
     else:
-        lines.append("- ✨ *¡Flujo limpio! Sin bloqueos ni tareas estancadas detectadas.*")
+        lines.append("- ✨ *Clean flow: nothing blocked or stalled.*")
 
     lines.append("")
-    lines.append("## 📊 Métricas de Salud del Tablero")
-    wip_status = f"⚠️ {len(wip_warns)} columnas con exceso WIP" if wip_warns else "✅ Óptimo (WIP respetado)"
-    lines.append(f"- **Total de tareas**: {total} | **En curso**: {len(in_prog)} | **Hechas**: {len(completed)}")
-    lines.append(f"- **Estado de límites WIP**: {wip_status}")
+    lines.append("## 📊 Board health")
+    wip_status = f"⚠️ {len(wip_warns)} columns over their WIP limit" if wip_warns else "✅ WIP limits respected"
+    lines.append(f"- **Tasks**: {total} | **In progress**: {len(in_prog)} | **Done recently**: {len(completed)}")
+    lines.append(f"- **WIP limits**: {wip_status}")
 
     return "\n".join(lines)
 

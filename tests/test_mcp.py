@@ -37,16 +37,16 @@ def test_mcp_authentication_and_sandboxing(db_path, mcp_board):
     assert board["id"] == mcp_board["id"]
 
     # 2. Token inválido
-    with pytest.raises(McpSecurityError, match="Token secreto"):
+    with pytest.raises(McpSecurityError, match="secret token"):
         authenticate_and_get_board(mcp_board["board_uuid"], "token_erroneo", db_path=db_path)
 
     # 3. Token no proporcionado cuando hay secret configurado
-    with pytest.raises(McpSecurityError, match="Token secreto"):
+    with pytest.raises(McpSecurityError, match="secret token"):
         authenticate_and_get_board(mcp_board["board_uuid"], None, db_path=db_path)
 
     # 4. MCP desactivado
     database.set_board_mcp_config(mcp_board["id"], enabled=False, db_path=db_path)
-    with pytest.raises(McpSecurityError, match="desactivado por el usuario"):
+    with pytest.raises(McpSecurityError, match="disabled by the user"):
         authenticate_and_get_board(mcp_board["board_uuid"], "secret123", db_path=db_path)
 
 
@@ -63,7 +63,7 @@ def test_mcp_columns_mutation_strictly_blocked(db_path, mcp_board):
         }
         res = handler.handle(req)
         assert res["error"]["code"] == -32600
-        assert "exclusivamente al usuario humano" in res["error"]["message"]
+        assert "reserved to the human user" in res["error"]["message"]
 
 
 def test_mcp_tools_execution(db_path, mcp_board):
@@ -157,7 +157,7 @@ def test_mcp_tools_execution(db_path, mcp_board):
         },
     })
     assert cross_res["error"]["code"] == -32000
-    assert "no pertenece al tablero vinculado" in cross_res["error"]["message"]
+    assert "does not belong to the linked board" in cross_res["error"]["message"]
 
     # 7. add_task_comment y list_task_comments
     handler.handle({
@@ -225,7 +225,7 @@ def test_mcp_prompts_synergy(db_path, mcp_board):
     p_get = handler.handle({"jsonrpc": "2.0", "id": 2, "method": "prompts/get", "params": {"name": "kanban_board_context"}})
     text_content = p_get["result"]["messages"][0]["content"]["text"]
     assert "Tech Lead y Scrum Master" in text_content
-    assert "NO intentes crear, editar o eliminar columnas" in text_content
+    assert "Columns are human-only" in text_content
 
 
 def test_mcp_http_server_live(db_path, mcp_board):
@@ -470,7 +470,7 @@ def test_mcp_create_tasks_batch(db_path, mcp_board):
     }
     err_res = handler.handle(invalid_req)
     assert err_res["error"]["code"] == -32000
-    assert "no pertenece al tablero" in err_res["error"]["message"]
+    assert "does not belong to the linked board" in err_res["error"]["message"]
 
 
 def test_mcp_control_task_timer(db_path, mcp_board):
@@ -550,7 +550,7 @@ def test_mcp_control_task_timer(db_path, mcp_board):
         },
     })
     assert inv_res["error"]["code"] == -32603
-    assert "no reconocida" in inv_res["error"]["message"]
+    assert "Unknown timer action" in inv_res["error"]["message"]
 
 
 def test_mcp_sse_session_scavenger():
@@ -783,7 +783,7 @@ def test_mcp_exposes_column_roles_and_active_task(db_path, mcp_board):
     roles = [c["role"] for c in executor._tool_list_columns({})]
     assert roles == ["backlog", "ready", "in_progress", "review", "done"]
     assert [c["role"] for c in executor._tool_get_board_info({})["columns"]] == roles
-    assert "rol: ready" in handler._build_instructions()
+    assert "role: ready" in handler._build_instructions()
 
     summary = executor._tool_get_board_executive_summary({"mask_sensitive": True})
     assert summary["active_task"]["id"] == ready and summary["active_task"]["role"] == "ready"

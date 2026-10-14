@@ -240,8 +240,8 @@
     "semantic_hash": "3dd3df13194cc9d6f26d3b0329c58312"
   },
   "tests/test_widgets_headless.py": {
-    "mtime": 1792000193.845452,
-    "ast_hash": "f53ba6c69c47644fc9bb7eee921c5406",
+    "mtime": 1792002240.349672,
+    "ast_hash": "8e90f8493f60a5eec99cc7a695b17a65",
     "semantic_hash": ""
   },
   "tests/test_widgets_logic.py": {
@@ -260,8 +260,8 @@
     "semantic_hash": "ab7ddd18e7254a33dd41ad8432acc436"
   },
   "widgets.py": {
-    "mtime": 1790616326.9153042,
-    "ast_hash": "2778c570d1ef8f663554fb806188c5d9",
+    "mtime": 1792002249.129722,
+    "ast_hash": "adea9a61e677fe9bec2e774715749001",
     "semantic_hash": ""
   },
   ".agents/docs/archive/2026-07-22_v0.4.0.md": {
@@ -355,8 +355,8 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1792002220.1258588,
-    "ast_hash": "2197c39527d77e2f80f2d3298b29df12",
+    "mtime": 1792002304.599489,
+    "ast_hash": "388c2f83acb68816419d2b21381b8cd7",
     "semantic_hash": ""
   },
   "README.md": {
@@ -365,8 +365,8 @@
     "semantic_hash": ""
   },
   "backlog.md": {
-    "mtime": 1792002220.217652,
-    "ast_hash": "55eb59b27bf4b407a2ce0429dc8e3e4c",
+    "mtime": 1792002304.705073,
+    "ast_hash": "89f7955ea018b530fd0b45b63d7b914a",
     "semantic_hash": ""
   },
   "ekin_icon.png": {
