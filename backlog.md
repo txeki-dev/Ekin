@@ -29,6 +29,13 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
   - **Solution:** one transaction / one version, untouched fields preserved. `database.update_task` is kept:
     5 tests use it as a helper.
 
+- [x] **DONE (2026-10-14) — #99 Agent Markdown stored as Qt HTML** `[BUG]`
+  · `markdown_html.py` (new: `markdown_to_qt_html`, `author_entry_html`, `migrate_plain_text_content`),
+    `mcp_server.py` (create/batch/update/comment), `html_utils.clean_html_description` (checkboxes), `main.py`
+    (one-off migration). 8 tests (`test_markdown_html.py`, `test_mcp.py`) + headless render of Task Detail.
+  - **Problem:** Task Detail (`setHtml`) and the Journal (rich-text `QLabel`) collapsed the agents' Markdown.
+  - **Solution:** `QTextDocument.setMarkdown(GitHub | NoHTML)` → body fragment; HTML input kept as-is.
+
 _Added 2026-09-26 from an RDi exploration session (`<rdi_exploration_protocol>`), grounded in
 graphify AST analysis and cross-referenced against this backlog._
 

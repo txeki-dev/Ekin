@@ -32,6 +32,7 @@ from urllib.parse import parse_qs, urlparse
 import column_roles
 import database
 from html_utils import clean_html_description
+from markdown_html import author_entry_html, markdown_to_qt_html
 
 logger = logging.getLogger("ekin.mcp")
 
@@ -519,7 +520,7 @@ class McpToolExecutor:
         task_id = database.create_task(
             column_id=col_id,
             title=title,
-            description=desc,
+            description=markdown_to_qt_html(desc),
             due_date=due_date,
             db_path=self.db_path,
         )
@@ -594,7 +595,7 @@ class McpToolExecutor:
         database.save_task_full(
             task_id,
             args.get("title", task["title"]),
-            description=args.get("description", task.get("description") or ""),
+            description=markdown_to_qt_html(args["description"]) if "description" in args else task.get("description") or "",
             due_date=new_due,
             due_time=new_time,
             tag_value_ids=tag_ids,
@@ -665,11 +666,10 @@ class McpToolExecutor:
 
     def _tool_add_task_comment(self, args: Dict[str, Any]) -> Dict[str, Any]:
         task_id = args["task_id"]
-        comment = html.escape(args["comment"].strip())
         self._verify_task_belongs_to_board(task_id)
 
-        safe_client = html.escape(self.client_name)
-        entry = f"[{safe_client}]: {comment}"
+        # Markdown sin HTML embebido: lo que el agente escriba como etiqueta sale como texto
+        entry = author_entry_html(self.client_name, args["comment"].strip())
         log_id = database.add_task_log(task_id, entry, db_path=self.db_path)
 
         get_mcp_event_bus().board_mutated.emit(self.board_id)
@@ -807,7 +807,7 @@ class McpToolExecutor:
             tasks_data.append({
                 "column_id": col_id,
                 "title": title,
-                "description": desc,
+                "description": markdown_to_qt_html(desc),
                 "due_date": due,
             })
 

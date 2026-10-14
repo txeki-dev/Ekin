@@ -22,6 +22,7 @@ from PySide6.QtCore import Qt, QTimer, QByteArray, QThread, Signal, QUrl
 from PySide6.QtGui import QIcon, QShortcut, QKeySequence, QFontDatabase, QDesktopServices
 import database
 import backups
+import markdown_html
 import styles
 import strings
 from strings import t
@@ -220,6 +221,11 @@ class MainWindow(QMainWindow):
 
         # Inicializar base de datos
         database.init_db()
+        # Una sola vez: pasar a HTML el Markdown que guardaban los agentes por MCP (#99)
+        try:
+            markdown_html.migrate_plain_text_content()
+        except Exception as exc:
+            log.warning("No se pudo migrar el Markdown guardado por MCP: %s", exc)
         # Adelantar tareas recurrentes vencidas a su próxima ocurrencia
         try:
             database.advance_overdue_recurring(date.today().isoformat())

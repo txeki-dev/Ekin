@@ -24,6 +24,8 @@ def clean_html_description(raw: str) -> str:
     text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
     text = re.sub(r'</p\s*>', '\n\n', text, flags=re.IGNORECASE)
     text = re.sub(r'</(?:tr|div|h[1-6])\s*>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'<li\b[^>]*\bclass="checked"[^>]*>', '• [x] ', text, flags=re.IGNORECASE)
+    text = re.sub(r'<li\b[^>]*\bclass="unchecked"[^>]*>', '• [ ] ', text, flags=re.IGNORECASE)
     text = re.sub(r'<li\b[^>]*>', '• ', text, flags=re.IGNORECASE)
     text = re.sub(r'</li\s*>', '\n', text, flags=re.IGNORECASE)
 

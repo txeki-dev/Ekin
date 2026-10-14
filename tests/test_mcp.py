@@ -17,6 +17,7 @@ from mcp_server import (
     authenticate_and_get_board,
     get_mcp_event_bus,
 )
+from html_utils import clean_html_description
 from mcp_sync_dialog import McpSyncDialog
 import templates
 
@@ -735,3 +736,26 @@ def test_mcp_update_task_replaces_tags_and_priority_like_before(db_path, mcp_boa
     executor._tool_update_task({"task_id": task_id, "tags": ["frontend"]})
     values = {(tg["category"], tg["value"]) for tg in database.get_task_tags(task_id, db_path=db_path)}
     assert values == {("Priority", "P1-High"), ("General", "frontend")}
+
+
+MD_DESC = "### DoD\n\n- [ ] tests\n- [ ] docs"
+
+
+def test_mcp_writes_markdown_as_qt_html(db_path, mcp_board):
+    """#99: create_task, create_tasks_batch, update_task y add_task_comment guardan el Markdown
+    del agente como HTML de Qt (la app lo pinta con setHtml / QLabel rich text)."""
+    col = database.get_columns(mcp_board["id"], db_path=db_path)[0]["id"]
+    executor = McpProtocolHandler(mcp_board, db_path=db_path, client_name="Claude Code").executor
+
+    created = executor._tool_create_task({"column_id": col, "title": "A", "description": MD_DESC})["task_id"]
+    batch = executor._tool_create_tasks_batch({"column_id": col, "tasks": [{"title": "B", "description": MD_DESC}]})
+    updated = batch["tasks"][0]["task_id"]
+    executor._tool_update_task({"task_id": updated, "description": "Nueva\n\n- x"})
+    executor._tool_add_task_comment({"task_id": created, "comment": "DONE:\n- uno\n- <b>dos</b>"})
+
+    for task_id in (created, updated):
+        assert '<li class="unchecked"' in database.get_task(created, db_path)["description"]
+        assert "<li" in database.get_task(task_id, db_path)["description"]
+    comment = database.get_task_logs(created, db_path=db_path)[-1]["content"]
+    assert "<li" in comment and "&lt;b&gt;dos&lt;/b&gt;" in comment
+    assert clean_html_description(comment).startswith("[Claude Code]: DONE:")
