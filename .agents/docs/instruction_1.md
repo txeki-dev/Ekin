@@ -321,31 +321,31 @@ Hallazgo de la Oleada 2: `McpManager.start()` solo se llama al guardar el diálo
 (`mcp_sync_dialog.py:373`), así que tras cada reinicio (incluida la auto-actualización) el MCP
 queda caído hasta abrir ese diálogo.
 
-- [ ] Test rojo: `MainWindow` con un tablero `mcp_enabled = 1` llama a `get_mcp_manager().start()`;
+- [x] Test rojo: `MainWindow` con un tablero `mcp_enabled = 1` llama a `get_mcp_manager().start()`;
   sin tableros con MCP, no lo llama.
-- [ ] `main.py` (`MainWindow.__init__`, tras `init_db` y la migración): si
+- [x] `main.py` (`MainWindow.__init__`, tras `init_db` y la migración): si
   `any(b["mcp_enabled"] for b in database.get_boards(include_archived=True))` →
   `get_mcp_manager(database.DB_NAME).start()`; un `False` (puerto ocupado) solo se registra en el log.
-- [ ] `tests/test_main_window.py` ya neutraliza timers y llamadas externas al construir
+- [x] `tests/test_main_window.py` ya neutraliza timers y llamadas externas al construir
   `MainWindow`: simular `get_mcp_manager` igual, para que ningún test abra el puerto 8765 real.
 
 ### #102 — BUG: «TaskCard already deleted» al cerrar el detalle  `[S]`
 
-- [ ] Test rojo en `tests/test_widgets_headless.py`: `TaskCard` con un manejador de `clicked` que
+- [x] Test rojo en `tests/test_widgets_headless.py`: `TaskCard` con un manejador de `clicked` que
   destruye la tarjeta (como la recarga por MCP durante el `exec()` del detalle) → el
   `mouseReleaseEvent` no lanza `RuntimeError`.
-- [ ] `widgets.py::TaskCard.mouseReleaseEvent`: llamar a `super().mouseReleaseEvent(event)` antes de
+- [x] `widgets.py::TaskCard.mouseReleaseEvent`: llamar a `super().mouseReleaseEvent(event)` antes de
   emitir `clicked` / `ctrl_clicked` (no tocar `self` tras el bucle anidado).
 
 ### #74 — Respuestas MCP en inglés para ahorrar tokens  `[A: S · B: S · C: M]`
 
 Decisión D4 (usuario, 2026-10-14): A ya; B como puerta go/no-go; C solo si B lo justifica.
 
-- [ ] **A. Texto del servidor en inglés (sin LLM, coste cero):** descripciones de
+- [x] **A. Texto del servidor en inglés (sin LLM, coste cero):** descripciones de
   `get_mcp_tools_schema`, `_build_instructions`, mensajes de error del ejecutor y
   `format_daily_standup_markdown` (solo lo usa el MCP — verificado). Los audits del diario
   siguen en el idioma de la UI (los ve el usuario). Ajustar los tests que comparan cadenas.
-- [ ] **B. Medición (spike):** `scripts/measure_mcp_tokens.py` vuelca las respuestas reales
+- [ ] **B. Medición (spike):** `scripts/measure_mcp_tokens.py` vuelca las respuestas reales **BLOQUEADO (2026-10-14)**: sin LLM local ni credenciales de Anthropic en este PC; pendiente de decisión del usuario.
   (`list_tasks`, resumen ejecutivo, `get_task_condensed_context` de 5 tarjetas) en ES y su
   traducción EN con el modelo candidato, y mide tokens (endpoint `count_tokens` de Anthropic
   si hay `ANTHROPIC_API_KEY`; si no, aproximado y marcado como tal) y latencia por tarjeta.

@@ -355,8 +355,8 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1792002304.599489,
-    "ast_hash": "388c2f83acb68816419d2b21381b8cd7",
+    "mtime": 1792002515.9663117,
+    "ast_hash": "394c221e8bd1a8a5314373d068de6a0b",
     "semantic_hash": ""
   },
   "README.md": {
@@ -365,8 +365,8 @@
     "semantic_hash": ""
   },
   "backlog.md": {
-    "mtime": 1792002304.705073,
-    "ast_hash": "89f7955ea018b530fd0b45b63d7b914a",
+    "mtime": 1792002516.0538688,
+    "ast_hash": "544f5da82e8d00fa1eaf777b3b8702f0",
     "semantic_hash": ""
   },
   "ekin_icon.png": {
@@ -445,8 +445,8 @@
     "semantic_hash": ""
   },
   "local_ai.py": {
-    "mtime": 1791999889.2813752,
-    "ast_hash": "a5af8f8636bcf08f6ba5632fcc36e655",
+    "mtime": 1792002397.8134222,
+    "ast_hash": "bd1d29522fbb93e65e1f79d89c48543d",
     "semantic_hash": ""
   },
   "tests/test_local_ai.py": {
@@ -795,8 +795,8 @@
     "semantic_hash": ""
   },
   "mcp_server.py": {
-    "mtime": 1792000860.2200184,
-    "ast_hash": "a6a6e5524bd2ef5e44668b857aaa3e13",
+    "mtime": 1792002380.6076782,
+    "ast_hash": "8be3f11280f914095123c384ac91ab27",
     "semantic_hash": ""
   },
   "mcp_sync_dialog.py": {
@@ -810,8 +810,8 @@
     "semantic_hash": ""
   },
   "tests/test_mcp.py": {
-    "mtime": 1791999957.1578023,
-    "ast_hash": "25adb4e4ca3149a4168e18422e17d044",
+    "mtime": 1792002453.0805995,
+    "ast_hash": "5873f67b5ae0095e1c2474213e50cbcc",
     "semantic_hash": ""
   },
   "tests/test_templates.py": {
@@ -845,8 +845,8 @@
     "semantic_hash": ""
   },
   "tests/test_local_ai_rdi.py": {
-    "mtime": 1791999957.1578023,
-    "ast_hash": "0413494f6f1afd1dc92d39da9fc6d379",
+    "mtime": 1792002453.0805995,
+    "ast_hash": "19fa90616ea195b37c44757069301d92",
     "semantic_hash": ""
   },
   "tests/test_mcp_live_refresh.py": {
