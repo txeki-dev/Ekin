@@ -145,8 +145,8 @@
     "semantic_hash": "7130dba7d9eed4113ccfb12d6aff53de"
   },
   "main.py": {
-    "mtime": 1791999707.0677502,
-    "ast_hash": "3dd462f9ccfc1927cdd87903c7c634d8",
+    "mtime": 1792002158.1465626,
+    "ast_hash": "2e835d0d5e2656b2ca17bb17fb89c142",
     "semantic_hash": ""
   },
   "pyproject.toml": {
@@ -225,8 +225,8 @@
     "semantic_hash": "a6ddaaf9a107d99c7df7c8420847e86d"
   },
   "tests/test_main_window.py": {
-    "mtime": 1790421908.7219746,
-    "ast_hash": "c10fd94c77abf0c639446202b987d50d",
+    "mtime": 1792002147.745351,
+    "ast_hash": "206c4fc1d1b37c91e4fe0a5fb78bd4ad",
     "semantic_hash": ""
   },
   "tests/test_timer_board_view.py": {
@@ -355,8 +355,8 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1792001624.2341661,
-    "ast_hash": "0bac2a3282f734a518c97a24cf5c6f0f",
+    "mtime": 1792002220.1258588,
+    "ast_hash": "2197c39527d77e2f80f2d3298b29df12",
     "semantic_hash": ""
   },
   "README.md": {
@@ -365,8 +365,8 @@
     "semantic_hash": ""
   },
   "backlog.md": {
-    "mtime": 1792001624.3065145,
-    "ast_hash": "dd72cbb8484236074989dc25fe8b23c8",
+    "mtime": 1792002220.217652,
+    "ast_hash": "55eb59b27bf4b407a2ce0429dc8e3e4c",
     "semantic_hash": ""
   },
   "ekin_icon.png": {
@@ -895,8 +895,8 @@
     "semantic_hash": ""
   },
   ".agents/docs/instruction_1.md": {
-    "mtime": 1792001652.2765021,
-    "ast_hash": "a88a80ec8a51a2fa0f751db2edab49d7",
+    "mtime": 1792002126.2874157,
+    "ast_hash": "eed02b6c5d9481867980f547e2076577",
     "semantic_hash": ""
   },
   "column_roles.py": {

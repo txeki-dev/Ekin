@@ -79,6 +79,10 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
   · `main.py` (`MainWindow.__init__`: start `get_mcp_manager()` if any board has `mcp_enabled`). 3 tests
     (`tests/test_main_window.py`, whose `_make_window` now fakes the manager so no test opens port 8765).
 
+- [x] **DONE (2026-10-14) — #102 "TaskCard already deleted" after closing Task Detail** `[BUG]`
+  · `widgets.py::TaskCard.mouseReleaseEvent` calls `super()` before emitting `clicked`/`ctrl_clicked`.
+    1 test reproducing the exact log error (`shiboken6.delete` in the click handler).
+
 _Added 2026-09-26 from an RDi exploration session (`<rdi_exploration_protocol>`), grounded in
 graphify AST analysis and cross-referenced against this backlog._
 

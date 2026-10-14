@@ -2544,3 +2544,21 @@ def test_dropped_file_already_attached_with_the_clip_is_not_duplicated(qapp, db_
 
     assert [lnk["url"] for lnk in database.get_task_links(task_id, db_path)] == [spec]
     _cleanup_dialog(qapp, dlg)
+
+
+def test_task_card_click_handler_may_destroy_the_card(qapp):
+    """#102: `clicked` abre el detalle con exec() (bucle anidado); si mientras tanto una recarga
+    del tablero (p. ej. por MCP) destruye la tarjeta, mouseReleaseEvent llamaba después a
+    super() sobre un objeto C++ ya borrado → RuntimeError «TaskCard already deleted»."""
+    import shiboken6
+    from widgets import TaskCard
+    from PySide6.QtGui import QMouseEvent
+    from PySide6.QtCore import QEvent, QPointF
+
+    for modifier, signal in ((Qt.KeyboardModifier.NoModifier, "clicked"), (Qt.KeyboardModifier.ControlModifier, "ctrl_clicked")):
+        card = TaskCard({"id": 7, "title": "Se destruye al abrir", "column_id": 1})
+        getattr(card, signal).connect(lambda _tid, c=card: shiboken6.delete(c))
+        pos = QPointF(10, 10)
+        card.mousePressEvent(QMouseEvent(QEvent.Type.MouseButtonPress, pos, pos, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, modifier))
+        card.mouseReleaseEvent(QMouseEvent(QEvent.Type.MouseButtonRelease, pos, pos, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, modifier))
+        assert not shiboken6.isValid(card)

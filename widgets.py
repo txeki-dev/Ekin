@@ -593,6 +593,9 @@ class TaskCard(QFrame):
         self.drag_ended.emit()
 
     def mouseReleaseEvent(self, event):
+        # super() primero: `clicked` abre el detalle con exec() y, si mientras tanto se recarga el
+        # tablero (p. ej. por MCP), esta tarjeta ya no existe al volver; no tocar self después
+        super().mouseReleaseEvent(event)
         # Si se soltó el click izquierdo y no se inició drag, se considera un click normal
         if event.button() == Qt.LeftButton:
             click_dist = (event.position().toPoint() - self.drag_start_position).manhattanLength()
@@ -601,7 +604,6 @@ class TaskCard(QFrame):
                     self.ctrl_clicked.emit(self.task_id)
                 else:
                     self.clicked.emit(self.task_id)
-        super().mouseReleaseEvent(event)
 
 
 class TaskListArea(QWidget):
