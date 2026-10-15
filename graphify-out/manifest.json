@@ -145,8 +145,8 @@
     "semantic_hash": "7130dba7d9eed4113ccfb12d6aff53de"
   },
   "main.py": {
-    "mtime": 1792054146.8545375,
-    "ast_hash": "5425148874e305ba20aad761c1823bba",
+    "mtime": 1792055960.1125677,
+    "ast_hash": "1b3cd1c6da1f0e7e39dc819e4c04d055",
     "semantic_hash": ""
   },
   "pyproject.toml": {
@@ -175,8 +175,8 @@
     "semantic_hash": ""
   },
   "strings.py": {
-    "mtime": 1792048684.622646,
-    "ast_hash": "4194051c7d0402b66afbbc57352dacf6",
+    "mtime": 1792055956.042516,
+    "ast_hash": "29e408031b05a321ed5f0be54a82c2e4",
     "semantic_hash": ""
   },
   "styles.py": {
@@ -225,8 +225,8 @@
     "semantic_hash": "a6ddaaf9a107d99c7df7c8420847e86d"
   },
   "tests/test_main_window.py": {
-    "mtime": 1792053906.4813921,
-    "ast_hash": "9b75245142c91556eb696e17562e31af",
+    "mtime": 1792055911.9769242,
+    "ast_hash": "39a1b4eac71b65bc1835c29cdfe52b03",
     "semantic_hash": ""
   },
   "tests/test_timer_board_view.py": {
@@ -355,8 +355,8 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1792055466.7474139,
-    "ast_hash": "92702829b3fc4cfcb62ea34ef27d5f6e",
+    "mtime": 1792056068.4282877,
+    "ast_hash": "5f4ff5723913e21c90211b0277d47e15",
     "semantic_hash": ""
   },
   "README.md": {
@@ -365,8 +365,8 @@
     "semantic_hash": ""
   },
   "backlog.md": {
-    "mtime": 1792055475.4753683,
-    "ast_hash": "4cd0dcdb1a6fcd0ec3ec349b57a7a038",
+    "mtime": 1792056074.1971867,
+    "ast_hash": "396b59df37e1f15dcfdcca9f44572446",
     "semantic_hash": ""
   },
   "ekin_icon.png": {
@@ -770,8 +770,8 @@
     "semantic_hash": "2518e718a15587e94042d2f10bb98b03"
   },
   "board_mixins.py": {
-    "mtime": 1790618222.314354,
-    "ast_hash": "d9dc420cfed857aa944866bd112b9d89",
+    "mtime": 1792055955.9056654,
+    "ast_hash": "4c79d7582c9015976e7f7a735df01a9a",
     "semantic_hash": ""
   },
   "board_template_dialogs.py": {
@@ -795,8 +795,8 @@
     "semantic_hash": ""
   },
   "mcp_server.py": {
-    "mtime": 1792002380.6076782,
-    "ast_hash": "8be3f11280f914095123c384ac91ab27",
+    "mtime": 1792055927.8763494,
+    "ast_hash": "050f923e4ac96e5f0cb1f1c5daa87328",
     "semantic_hash": ""
   },
   "mcp_sync_dialog.py": {
@@ -810,8 +810,8 @@
     "semantic_hash": ""
   },
   "tests/test_mcp.py": {
-    "mtime": 1792002453.0805995,
-    "ast_hash": "5873f67b5ae0095e1c2474213e50cbcc",
+    "mtime": 1792055911.9769242,
+    "ast_hash": "7842c6c9c4e5ddc64d48297fca6aa405",
     "semantic_hash": ""
   },
   "tests/test_templates.py": {
