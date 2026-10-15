@@ -355,18 +355,18 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1792069131.4911568,
-    "ast_hash": "e88ee4b745666583817047fefb11a307",
+    "mtime": 1792079420.9311733,
+    "ast_hash": "56a770be4335549921cce90573734cd8",
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1792056970.0128398,
-    "ast_hash": "51308bae96f2f3bc7f67f7faac4d9040",
+    "mtime": 1792075683.3952403,
+    "ast_hash": "74edf204ddd6a7ac06eea685a6b4c903",
     "semantic_hash": ""
   },
   "backlog.md": {
-    "mtime": 1792069131.3578005,
-    "ast_hash": "6a3ba365395d6f28773fdd5b8b4b6c2c",
+    "mtime": 1792079413.688481,
+    "ast_hash": "020a1476d2e48b695492fee280544178",
     "semantic_hash": ""
   },
   "ekin_icon.png": {
@@ -810,8 +810,8 @@
     "semantic_hash": ""
   },
   "tests/test_mcp.py": {
-    "mtime": 1792055911.9769242,
-    "ast_hash": "7842c6c9c4e5ddc64d48297fca6aa405",
+    "mtime": 1792079244.7487772,
+    "ast_hash": "1eabcd10780908529bdb1ea762b539c2",
     "semantic_hash": ""
   },
   "tests/test_templates.py": {
@@ -870,8 +870,8 @@
     "semantic_hash": ""
   },
   "tests/test_prompt_clipboard.py": {
-    "mtime": 1791999856.0827065,
-    "ast_hash": "bfce39626f05da649018f37f27a2f859",
+    "mtime": 1792079244.6807003,
+    "ast_hash": "c7a729b8ad600227e370c26a547d3378",
     "semantic_hash": ""
   },
   "assets/icons/lucide/clipboard-list.svg": {
@@ -881,7 +881,7 @@
   },
   "assets/prompt_packs/dev.json": {
     "mtime": 1792000060.140701,
-    "ast_hash": "48eeee147ebc881f92f1629e81d47307",
+    "ast_hash": "",
     "semantic_hash": ""
   },
   "assets/prompt_packs/gtd.json": {
