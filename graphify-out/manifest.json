@@ -125,8 +125,8 @@
     "semantic_hash": "18171b8520d1520329fba7ab6645610b"
   },
   "detail_dialog/task_detail_dialog.py": {
-    "mtime": 1792050820.4444275,
-    "ast_hash": "c621ff3f15a5969e5d26b8b9e802786f",
+    "mtime": 1792068500.0429788,
+    "ast_hash": "f556506329b903823bafa0a642d7b458",
     "semantic_hash": ""
   },
   "exporter.py": {
@@ -150,8 +150,8 @@
     "semantic_hash": ""
   },
   "pyproject.toml": {
-    "mtime": 1792001545.618713,
-    "ast_hash": "8a06441a3dcc81b269ef9b611e87a2d8",
+    "mtime": 1792069131.273966,
+    "ast_hash": "a16b5519392b459fc3e296e195d2aaf2",
     "semantic_hash": ""
   },
   "search_dialog.py": {
@@ -180,13 +180,13 @@
     "semantic_hash": ""
   },
   "styles.py": {
-    "mtime": 1792048577.1713371,
-    "ast_hash": "11faff8c2ffb390912e830426e058ef7",
+    "mtime": 1792068500.0636415,
+    "ast_hash": "b9020ab7d04cefe53335836a52d498bb",
     "semantic_hash": ""
   },
   "tests/conftest.py": {
-    "mtime": 1790442353.4705157,
-    "ast_hash": "deb4ce7117e7e5b5ac13dd5bdec094db",
+    "mtime": 1792068015.8580883,
+    "ast_hash": "f29fd16971027638bc7ae82f748b9eff",
     "semantic_hash": ""
   },
   "tests/test_backups.py": {
@@ -240,8 +240,8 @@
     "semantic_hash": "3dd3df13194cc9d6f26d3b0329c58312"
   },
   "tests/test_widgets_headless.py": {
-    "mtime": 1792002240.349672,
-    "ast_hash": "8e90f8493f60a5eec99cc7a695b17a65",
+    "mtime": 1792068500.0636415,
+    "ast_hash": "9b003ba91e0d2edfb1e6d642a4105a23",
     "semantic_hash": ""
   },
   "tests/test_widgets_logic.py": {
@@ -260,8 +260,8 @@
     "semantic_hash": "ab7ddd18e7254a33dd41ad8432acc436"
   },
   "widgets.py": {
-    "mtime": 1792002249.129722,
-    "ast_hash": "adea9a61e677fe9bec2e774715749001",
+    "mtime": 1792068500.065652,
+    "ast_hash": "4775bba38124d7cf8ad3f7516d086c70",
     "semantic_hash": ""
   },
   ".agents/docs/archive/2026-07-22_v0.4.0.md": {
@@ -355,18 +355,18 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1792056068.4282877,
-    "ast_hash": "5f4ff5723913e21c90211b0277d47e15",
+    "mtime": 1792069131.4911568,
+    "ast_hash": "e88ee4b745666583817047fefb11a307",
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1792055466.6858354,
-    "ast_hash": "bb4a21f4fd71b946950e155dfa4bbbfd",
+    "mtime": 1792056970.0128398,
+    "ast_hash": "51308bae96f2f3bc7f67f7faac4d9040",
     "semantic_hash": ""
   },
   "backlog.md": {
-    "mtime": 1792056074.1971867,
-    "ast_hash": "396b59df37e1f15dcfdcca9f44572446",
+    "mtime": 1792069131.3578005,
+    "ast_hash": "6a3ba365395d6f28773fdd5b8b4b6c2c",
     "semantic_hash": ""
   },
   "ekin_icon.png": {
