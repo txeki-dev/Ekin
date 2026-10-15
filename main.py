@@ -611,6 +611,8 @@ class MainWindow(QMainWindow):
         """Arranca el servidor MCP; si el puerto sigue ocupado (p. ej. por la instancia que se
         está cerrando tras actualizarse, #106), reintenta cada 0,5 s antes de rendirse."""
         if get_mcp_manager(database.DB_NAME).start():
+            if hasattr(self, "board_view"):  # reintento: el pie mostraba «no disponible» (#107)
+                self.board_view._update_mcp_btn_ui()
             return
         if attempts > 1:
             QTimer.singleShot(500, self, lambda: self._start_mcp_server(attempts - 1))

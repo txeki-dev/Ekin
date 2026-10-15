@@ -585,12 +585,15 @@ def test_busy_mcp_port_is_retried_until_it_is_released(qapp, db_path, monkeypatc
     database.set_board_mcp_config(board_id, enabled=True, db_path=db_path)
     manager = _FakeMcpManager(ok=False)
     window = _make_window(monkeypatch, manager)
+    refreshed = []  # #107: el botón MCP del pie deja de decir «no disponible»
+    monkeypatch.setattr(window.board_view, "_update_mcp_btn_ui", lambda: refreshed.append(True))
     manager.ok = True  # la instancia anterior suelta el puerto
     for _ in range(40):
         if manager.started == 2:
             break
         QTest.qWait(50)
     assert manager.started == 2
+    assert refreshed == [True]
     _close_window(qapp, window)
 
 

@@ -16,6 +16,16 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
   the ADR is approved.
 
 
+- [x] **DONE (2026-10-15) — #107 Two open Ekins no longer share the MCP port 8765 silently** `[BUG]`
+  · `mcp_server.McpHttpServer.allow_reuse_address`, `board_mixins._update_mcp_btn_ui`, `main._start_mcp_server`,
+    `strings.py`. 3 tests (`test_mcp.py`, `test_main_window.py`) + 1 updated.
+  - **Problem:** `SO_REUSEADDR` on Windows let a second Ekin bind 8765 while the first listened: requests went to
+    the first, the second's footer said the agent was connected, and dev checkouts each have their own DB
+    (`ekin_board.db` relative to the cwd), so agents could write to the other Ekin's board.
+  - **Solution:** no `SO_REUSEADDR` on Windows (verified: a second bind fails, also against an older Ekin, and
+    rebinding with 20 sockets in `TIME_WAIT` works); footer button *unavailable* state when MCP is enabled but
+    this Ekin's server isn't running, refreshed when the #106 retry gets the port (now needed on Windows too).
+
 - [x] **DONE (2026-10-15) — #97 `.ekboard` sync merges concurrent edits of the same task field by field** `[ARCH]`
   · `board_sync.py` (`_merge_task_fields`, `_sync_bases`), `database/sync.py::mark_board_tasks_synced`,
     new `tasks.sync_base`. 4 tests (`test_board_sync.py`).
@@ -39,8 +49,8 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
     `pyside6.abi3.dll` (Windows event 1000), right after `QThreadStorage: entry N destroyed before end of thread`.
   - **Solution:** the new version starts as a detached process and this one leaves with `QApplication.quit()`;
     `aboutToQuit` now stops the MCP server (it never stopped before), freeing port 8765. At launch a busy port
-    is retried every 0.5 s (10 tries). On Windows `SO_REUSEADDR` already lets the new instance bind while the
-    old one still listens (the old one answers until it closes); the retry is for Linux/macOS.
+    is retried every 0.5 s (10 tries). Since #107 dropped `SO_REUSEADDR` on Windows, the retry is what
+    covers the moment the old instance still holds the port there too.
 
 - [x] **DONE (2026-10-14) — #97 Moving a card to another column now bumps `tasks.version`** `[BUG]`
   · `database/tasks.py::update_task_positions`, `mcp_server._tool_move_task` (`version + (column_id != ?)`).

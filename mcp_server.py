@@ -20,6 +20,7 @@ from __future__ import annotations
 import html
 import json
 import logging
+import os
 import queue
 import re
 import secrets
@@ -1272,6 +1273,12 @@ class McpHttpHandler(BaseHTTPRequestHandler):
 
 
 class McpHttpServer(ThreadingHTTPServer):
+    # En Windows, SO_REUSEADDR deja que un segundo Ekin se enlace al puerto con el primero aún
+    # escuchando (las peticiones siguen yendo al primero) y no hace falta para reenlazar tras
+    # cerrar (#107). En Linux/macOS no permite compartir un puerto que escucha y sí hace falta
+    # para reenlazar con conexiones en TIME_WAIT.
+    allow_reuse_address = os.name != "nt"
+
     def __init__(self, server_address, RequestHandlerClass, db_path: Optional[str] = None):
         super().__init__(server_address, RequestHandlerClass)
         self.db_path = db_path

@@ -12,6 +12,7 @@ from PySide6.QtGui import QDesktopServices
 import database
 import styles
 import board_sync
+from mcp_server import get_mcp_manager
 from strings import t
 from icons import lucide_icon
 from cloud_sync_dialog import CloudSyncInfoDialog
@@ -271,8 +272,28 @@ class BoardMcpUiMixin:
 
         board_info = database.get_board(self.board_id, self.db_path)
         is_mcp_active = bool(board_info and board_info.get("mcp_enabled", 0))
+        manager = get_mcp_manager(self.db_path) if is_mcp_active else None
 
-        if is_mcp_active:
+        if manager and not manager.is_running():
+            # MCP activado pero el servidor de este Ekin no escucha: el puerto lo tiene otro
+            # programa, p. ej. otro Ekin abierto (#107)
+            self.mcp_btn.setText(t("mcp.board_btn_unavailable"))
+            self.mcp_btn.setToolTip(t("mcp.board_btn_tooltip_unavailable", port=manager.port))
+            self.mcp_btn.setIcon(lucide_icon("sparkles", styles.COLORS['danger'], 15))
+            self.mcp_btn.setIconSize(QSize(15, 15))
+            self.mcp_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: transparent;
+                    border: 1px solid {styles.COLORS['danger']};
+                    border-radius: 999px;
+                    color: {styles.COLORS['danger']};
+                    padding: 6px 14px;
+                    font-size: 12px;
+                    font-weight: 600;
+                }}
+                QPushButton:hover {{ background-color: {styles.COLORS['bg_hover']}; }}
+            """)
+        elif is_mcp_active:
             self.mcp_btn.setText(t("mcp.board_btn_active"))
             self.mcp_btn.setToolTip(t("mcp.board_btn_tooltip_active"))
             self.mcp_btn.setIcon(lucide_icon("sparkles", styles.COLORS['accent'], 15))

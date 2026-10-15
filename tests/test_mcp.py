@@ -6,6 +6,7 @@ seguridad de sandbox, bloqueo de columnas y herramientas de manipulación de tar
 import json
 import socket
 import urllib.request
+from types import SimpleNamespace
 
 import pytest
 
@@ -286,10 +287,14 @@ def test_mcp_sync_dialog_headless(qapp, db_path, mcp_board):
     dlg.reject()
 
 
-def test_board_view_mcp_btn_states(qapp, db_path, mcp_board):
+def test_board_view_mcp_btn_states(qapp, db_path, mcp_board, monkeypatch):
     """Verifica que el botón MCP en BoardViewWidget refleje el estado activo/inactivo."""
     from board_view import BoardViewWidget
     from strings import t
+
+    import board_mixins
+    running = SimpleNamespace(is_running=lambda: True, port=8765)
+    monkeypatch.setattr(board_mixins, "get_mcp_manager", lambda db_path=None: running)
 
     bv = BoardViewWidget(db_path=db_path)
     bv.load_board(mcp_board["id"])
@@ -820,3 +825,41 @@ def test_mcp_condensed_context_includes_latest_comment(db_path, mcp_board):
 
     ctx = executor._tool_get_task_condensed_context({"task_id": task_id, "mask_sensitive": True})
     assert ctx["latest_comment"].startswith("Escribe a ") and "dev@ejemplo.com" not in ctx["latest_comment"]
+
+
+def test_second_mcp_manager_cannot_bind_a_port_already_in_use(db_path):
+    """#107: en Windows, SO_REUSEADDR dejaba que un segundo Ekin se enlazara al 8765 con el primero
+    escuchando: las peticiones seguían yendo al primero y el segundo creía tener su MCP en marcha."""
+    first, second = McpManager(db_path=db_path), McpManager(db_path=db_path)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    assert first.start(port=port) is True
+    try:
+        assert second.start(port=port) is False
+        assert not second.is_running()
+    finally:
+        second.stop()
+        first.stop()
+
+
+def test_board_view_mcp_btn_shows_unavailable_when_server_is_not_running(qapp, db_path, mcp_board, monkeypatch):
+    """#107: con el MCP activado en el tablero pero el servidor de este Ekin parado (el puerto lo
+    tiene otro programa, p. ej. otro Ekin abierto), el botón ya no dice que el agente está conectado."""
+    import board_mixins
+    from board_view import BoardViewWidget
+    from strings import t
+
+    manager = SimpleNamespace(running=False, port=8765)
+    manager.is_running = lambda: manager.running
+    monkeypatch.setattr(board_mixins, "get_mcp_manager", lambda db_path=None: manager)
+
+    bv = BoardViewWidget(db_path=db_path)
+    bv.load_board(mcp_board["id"])
+    assert bv.mcp_btn.text() == t("mcp.board_btn_unavailable")
+    assert "8765" in bv.mcp_btn.toolTip()
+
+    manager.running = True
+    bv._update_mcp_btn_ui()
+    assert bv.mcp_btn.text() == t("mcp.board_btn_active")
+    bv.deleteLater()
