@@ -355,8 +355,8 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1792054123.9807274,
-    "ast_hash": "5bea690975de045d77ae6ddf71c21d8d",
+    "mtime": 1792054328.9512668,
+    "ast_hash": "a75789ede813dd22ef4e9b39f783f4f5",
     "semantic_hash": ""
   },
   "README.md": {
@@ -365,8 +365,8 @@
     "semantic_hash": ""
   },
   "backlog.md": {
-    "mtime": 1792054123.8470984,
-    "ast_hash": "61415dd2b58e2f3b02773f1042a8e783",
+    "mtime": 1792054329.0131829,
+    "ast_hash": "19259b7487959ea53238f75642f9d966",
     "semantic_hash": ""
   },
   "ekin_icon.png": {
@@ -430,9 +430,9 @@
     "semantic_hash": "ba63c432c8d87c5a64b15576c0dde797"
   },
   "board_sync.py": {
-    "mtime": 1789322290.4783795,
-    "ast_hash": "bc5896b12a3fa6f705341791872fb031",
-    "semantic_hash": "bc5896b12a3fa6f705341791872fb031"
+    "mtime": 1792054270.5953107,
+    "ast_hash": "b0f62476117e2d88697fac69eaafe9b1",
+    "semantic_hash": ""
   },
   "database/sync.py": {
     "mtime": 1790368480.8796358,
@@ -440,8 +440,8 @@
     "semantic_hash": ""
   },
   "tests/test_board_sync.py": {
-    "mtime": 1791999205.420662,
-    "ast_hash": "0468f058370a7535f4ebb31d144d772a",
+    "mtime": 1792054265.556997,
+    "ast_hash": "1fe84604e58bcd792d41aa1ced0b2f5e",
     "semantic_hash": ""
   },
   "local_ai.py": {
