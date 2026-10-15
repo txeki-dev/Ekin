@@ -215,6 +215,7 @@ Press **Ctrl+/** anywhere, or click the **❔** button in the sidebar utility ba
   - **AGY CLI / stdio**: `python -m ekin_mcp --board-uuid <UUID> --token <TOKEN>`.
 * **▶ Work**: on a board linked to a local folder, the **Work** button in the board header opens your AI CLI right in the repo, with the board's MCP server running and registered and the start prompt (INTRO) loaded — or on the clipboard for npm-installed CLIs.
 * **Secure Governance**: The AI agent operates in a strict sandbox restricted only to that board. The agent can list, create, update, move, and comment on tasks (its journal entries are signed `[<client>]: …`, e.g. `[Claude Code]`), while column creation and structural alterations remain strictly reserved for the human user. All agent mutations reflect live in Ekin in real time.
+* **Task ids**: agents refer to cards by their id. Every card shows it in muted text before its title (e.g. `#108`), and so does the header of its detail view, so you can always tell which card an agent means.
 
 ---
 
