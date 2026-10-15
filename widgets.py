@@ -183,6 +183,7 @@ class TaskCard(QFrame):
         # El título (QLabel) sobre un padre con fondo estilado pinta el color de la ventana;
         # se fija su fondo al de la tarjeta para que integre (sin caja oscura).
         self.title_label.setStyleSheet(f"background-color: {card_bg};")
+        self.id_label.setStyleSheet(f"background-color: {card_bg};")
 
     def set_selected(self, selected: bool):
         """Activa o desactiva el estado visual de selección múltiple."""
@@ -200,6 +201,11 @@ class TaskCard(QFrame):
         title_row = QHBoxLayout()
         title_row.setContentsMargins(0, 0, 0, 0)
         title_row.setSpacing(6)
+
+        # Id de la tarea (#109): los agentes citan las tarjetas por él vía MCP
+        self.id_label = QLabel(f"#{self.task_id}")
+        self.id_label.setObjectName("TaskCardId")
+        title_row.addWidget(self.id_label, alignment=Qt.AlignTop)
 
         # Título de la tarea
         self.title_label = QLabel(self.task_data["title"])

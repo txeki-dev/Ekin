@@ -245,6 +245,24 @@ def _card_with_timer(started_at, alert_hours=24):
     return card
 
 
+def test_task_card_shows_its_id_next_to_the_title(qapp):
+    """#109: los agentes citan las tarjetas por su id (#108...); la tarjeta lo muestra."""
+    card = TaskCard({"id": 108, "title": "BUG: Arreglar TEST en Github"})
+    assert card.id_label.text() == "#108"
+    assert card.id_label.parent() is card.title_label.parent()
+
+
+def test_task_detail_dialog_shows_the_task_id(qapp, db_path):
+    """#109: el detalle muestra el id de la tarea en la cabecera, junto al título."""
+    board_id = database.create_board("Tablero", db_path=db_path)
+    col_id = database.create_column(board_id, "Col", db_path=db_path)
+    task_id = database.create_task(col_id, "Tarea", db_path=db_path)
+
+    dlg = TaskDetailDialog(task_id, db_path=db_path)
+    assert dlg.id_label.text() == f"#{task_id}"
+    dlg.reject()
+
+
 def test_timer_badge_hidden_when_no_timer(qapp):
     card = _card_with_timer(started_at=None)
     assert card.timer_container.isHidden()

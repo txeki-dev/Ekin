@@ -172,6 +172,10 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         # Título editable en sitio con botón rápido de duplicados
         title_row = QHBoxLayout()
         title_row.setSpacing(6)
+        # Id de la tarea (#109): el mismo que citan los agentes por MCP
+        self.id_label = QLabel(f"#{self.task_id}")
+        self.id_label.setObjectName("TaskDetailId")
+        title_row.addWidget(self.id_label)
         self.title_input = QLineEdit()
         self.title_input.setObjectName("TaskDetailTitle")
         self.title_input.setPlaceholderText(t("task_detail.title_placeholder"))

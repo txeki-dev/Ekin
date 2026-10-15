@@ -16,7 +16,15 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
   the ADR is approved.
 
 
-- [x] **DONE (2026-10-15) — #108 CI test suite crashed on Python 3.10 / 3.11** `[BUG]` · `tests/conftest.py`
+- [x] **DONE (2026-10-15) — #109 Task id visible on cards and in Task Detail** `[UX]` · `widgets.TaskCard.id_label`,
+  `TaskDetailDialog.id_label`, `styles.py` (`#TaskCardId`, `#TaskDetailId`). 2 tests (`test_widgets_headless.py`).
+  - **Problem:** agents cite cards by id over MCP (#108…), but the id was shown nowhere in Ekin.
+  - **Solution:** muted `#id` before the card title (its background follows `set_card_style`, so theme and
+    selection repaint it) and before the title in Task Detail's header. Checked in light and dark themes.
+
+- [ ] **IN PROGRESS (2026-10-15) — #108 CI test suite crashed on Python 3.10 / 3.11** `[BUG]` · `tests/conftest.py`
+  - **Status:** the segfault (exit 139) below is fixed (e7ed2bf); CI still aborts (exit 134, no traceback) in the
+    teardown of `test_task_detail_dialog_logs_scroll_to_latest` — a second, separate cause under diagnosis.
   - **Problem:** every CI run since 12c3329 (2026-10-14) died with exit 134/139 in the teardown of the autouse
     `_close_top_level_widgets_after_each_test` (`for widget in qapp.topLevelWidgets()`); 3.12 passed. On Python
     < 3.12 the cyclic GC can fire *inside* that call (while shiboken builds the Python list) and free an orphan

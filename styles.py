@@ -233,6 +233,13 @@ QListWidget::item:selected {{
     color: {c["text_main"]};
 }}
 
+#TaskCardId {{
+    font-size: 12px;
+    font-weight: 600;
+    color: {c["text_muted"]};
+    padding-top: 2px;
+}}
+
 #TaskCardTag {{
     font-size: 11px;
     padding: 3px 9px;
@@ -450,6 +457,13 @@ QCheckBox::indicator:disabled {{ opacity: 0.4; }}
     background: transparent;
     border: none;
     padding: 0px;
+}}
+
+#TaskDetailId {{
+    font-family: 'Caprasimo', 'Segoe UI', serif;
+    font-size: 25px;
+    color: {c["text_muted"]};
+    background: transparent;
 }}
 
 #TaskDetailTitle:focus {{
