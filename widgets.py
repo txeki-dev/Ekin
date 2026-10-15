@@ -673,10 +673,6 @@ class TaskListArea(QWidget):
                 pass
         return []
 
-    def _get_dragged_task_id(self, event) -> int:
-        ids = self._get_dragged_task_ids(event)
-        return ids[0] if ids else -1
-
     def _update_drop_indicator(self, event):
         task_ids = self._get_dragged_task_ids(event)
         drop_y = event.position().y()

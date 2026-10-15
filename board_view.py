@@ -1,3 +1,4 @@
+import logging
 import os
 from PySide6.QtCore import Qt, Signal, QSize, QTimer
 from PySide6.QtWidgets import (
@@ -17,6 +18,8 @@ from undo import UndoAction
 from board_dialogs import BoardColumnsArea, ColumnEditDialog, BoardSelectionDialog
 from board_mixins import BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin
 from diary_viewer_dialog import DiaryViewerDialog, diary_files
+
+logger = logging.getLogger("ekin.board")
 
 __all__ = ["BoardViewWidget", "BoardColumnsArea", "ColumnEditDialog", "BoardSelectionDialog"]
 
@@ -379,7 +382,8 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
                 get_mcp_event_bus().board_mutated.emit(self.board_id)
                 self._trigger_debounced_mcp_reload()
         except Exception:
-            pass
+            # Sondeo cada 400 ms: a nivel debug para no inundar el log si la BD está bloqueada
+            logger.debug("Fallo al comprobar cambios externos del tablero", exc_info=True)
 
     def _trigger_debounced_mcp_reload(self):
         """Inicia o reinicia el temporizador de debounce para recargar el tablero de forma suave."""
@@ -411,8 +415,9 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
             if scroll_area:
                 col_scrolls[cid] = scroll_area.verticalScrollBar().value()
 
-        # 3. Recargar el tablero sin emitir data_changed redundante
-        self.load_board(self.board_id, notify=False)
+        # 3. Recargar el tablero y notificar data_changed: es lo único que lleva el cambio del agente
+        # a la sync del .ekboard, la campana, el calendario, Mi trabajo y el .ics (#125)
+        self.load_board(self.board_id)
 
         # 4. Restaurar scrolls
         self.board_scroll_area.horizontalScrollBar().setValue(h_scroll)

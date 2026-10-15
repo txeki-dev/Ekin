@@ -124,3 +124,20 @@ def test_task_detail_dialog_live_refresh_on_mcp_log(qapp, db_path):
     assert "Agente IA" in dlg._all_logs[0]["content"]
 
     dlg.close()
+
+
+def test_mcp_reload_notifies_data_changed_and_requests_the_auto_sync(qapp, db_path, monkeypatch):
+    """#125: la recarga tras un cambio del agente usaba notify=False, así que data_changed nunca
+    salía: ni la sync automática del .ekboard ni la campana, el calendario o el .ics se enteraban."""
+    board_id = database.create_board("Tablero Agente", "#3b82f6", db_path=db_path)
+    col_id = database.create_column(board_id, "Col", "#3b82f6", db_path=db_path)
+    bv = BoardViewWidget(db_path=db_path)
+    bv.load_board(board_id)
+    notified, exports = [], []
+    bv.data_changed.connect(lambda: notified.append(True))
+    monkeypatch.setattr(bv.sync_controller, "trigger_auto_sync_export", lambda: exports.append(True))
+
+    database.create_task(col_id, "Tarjeta del agente", db_path=db_path)
+    bv._perform_safe_mcp_board_reload()
+
+    assert notified == [True] and exports == [True]

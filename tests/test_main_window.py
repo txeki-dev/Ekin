@@ -630,3 +630,48 @@ def test_git_update_restarts_in_a_new_process_and_quits_cleanly(qapp, db_path, m
         assert launched[0][1]["creationflags"] & subprocess.DETACHED_PROCESS
     assert quits == [True]
     _close_window(qapp, window)
+
+
+def test_mcp_change_on_a_board_not_on_screen_refreshes_the_global_views(qapp, db_path, monkeypatch):
+    """#125: un agente que cambia otro tablero (no el visible) no refrescaba campana, calendario,
+    Mi trabajo, Analíticas ni el .ics; ahora se refrescan una vez tras la ráfaga."""
+    from mcp_server import get_mcp_event_bus
+    monkeypatch.setattr(database, "DB_NAME", db_path)
+    board_id, _ = _make_task_on_board(db_path)
+    other_board = database.create_board("Otro", db_path=db_path)
+    window = _make_window(monkeypatch)
+    window.sidebar.select_board(board_id)
+    refreshed = []
+    for name, view in (("bell", window.sidebar), ("calendar", window.calendar_view),
+                       ("my_work", window.my_work_view), ("dashboard", window.dashboard_view)):
+        attr = "refresh_notifications" if name == "bell" else "refresh"
+        monkeypatch.setattr(view, attr, lambda name=name: refreshed.append(name))
+    monkeypatch.setattr(window, "sync_ics", lambda: refreshed.append("ics"))
+
+    get_mcp_event_bus().board_mutated.emit(board_id)
+    assert not window._mcp_global_refresh_timer.isActive()  # el visible lo cubre su data_changed
+
+    for _ in range(3):
+        get_mcp_event_bus().board_mutated.emit(other_board)
+    assert window._mcp_global_refresh_timer.isActive()
+    window._mcp_global_refresh_timer.timeout.emit()
+    assert refreshed == ["bell", "calendar", "my_work", "dashboard", "ics"]
+    _close_window(qapp, window)
+
+
+def test_installer_hash_is_read_from_the_labelled_release_line():
+    """#117: el actualizador buscaba cualquier hex de 64 en las notas, y la release no publicaba
+    ninguno: el instalador se ejecutaba sin verificar. Ahora el workflow añade «SHA-256: <hash>»
+    y el actualizador lee esa línea."""
+    from main import installer_sha256_from_notes
+    digest = "ab" * 32
+    notes = f"## [1.5.0]\n- commit {'cd' * 32} mencionado\n\nSHA-256: {digest.upper()}\n"
+    assert installer_sha256_from_notes(notes) == digest
+    assert installer_sha256_from_notes(f"Hash suelto {'cd' * 32}") is None
+    assert installer_sha256_from_notes("") is None and installer_sha256_from_notes(None) is None
+
+
+def test_release_workflow_publishes_the_installer_hash():
+    import pathlib
+    workflow = (pathlib.Path(__file__).resolve().parent.parent / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    assert "Get-FileHash -Algorithm SHA256" in workflow and "SHA-256: $hash" in workflow

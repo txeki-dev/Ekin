@@ -88,3 +88,14 @@ def test_migration_skips_journal_of_synced_boards(db_path):
     database.set_board_sync_path(board_id, "C:/compartido/b.ekboard", db_path=db_path)
 
     assert markdown_html.migrate_plain_text_content(db_path) == 0
+
+
+def test_a_tag_in_the_first_line_of_markdown_no_longer_skips_the_no_html_filter():
+    """#112: bastaba una etiqueta en la primera línea para que Qt.mightBeRichText diera el texto
+    por HTML: se guardaba tal cual (sin pasar por MarkdownNoHTML) y el Markdown se perdía."""
+    fragment = markdown_html.markdown_to_qt_html("**Fix** <b>x</b> <img src=x>\n\n- a\n- b")
+    assert "<img" not in fragment and "&lt;b&gt;" in fragment
+    assert "<li" in fragment and "font-weight:700" in fragment
+
+    entry = markdown_html.author_entry_html("Claude Code", "DONE: escape `<b>` in labels\n- a")
+    assert "&lt;b&gt;" in entry and "<li" in entry

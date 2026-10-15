@@ -22,6 +22,7 @@ from .html_utils import (
     fit_html_images,
     linkify_urls,
     apply_word_style_to_qt_table,
+    strip_network_resources,
 )
 from .markdown_dialogs import CodeBlockDialog, LinkDialog, TableInsertDialog
 from .security_utils import _is_local_link
@@ -222,7 +223,7 @@ class MarkdownTextEdit(QTextEdit):
         cursor.endEditBlock()
 
     def setHtml(self, html_text):
-        super().setHtml(html_text)
+        super().setHtml(strip_network_resources(html_text))
         self._apply_line_height()
 
     def setPlainText(self, text):

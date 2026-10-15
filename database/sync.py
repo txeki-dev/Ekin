@@ -81,21 +81,16 @@ def get_board_last_local_modified(board_id, db_path=None):
         return row[0] if row and row[0] else None
 
 
-def mark_board_tasks_synced(board_id, db_path=None, sync_bases=None):
-    """Marca todas las tareas del tablero como sincronizadas con el archivo compartido,
-    igualando synced_version = version. `sync_bases` ({task_uuid: JSON}) guarda además los
-    campos de cada tarea tal como quedaron en el archivo: la base de la fusión por campos (#97)."""
+def mark_board_tasks_synced(board_id, synced_tasks, db_path=None):
+    """Marca como sincronizadas las tareas que acaban de quedar en el archivo compartido.
+    `synced_tasks` ({task_uuid: (versión, JSON)}) trae la versión de cada tarea tal como está en
+    el archivo y sus campos fusionables: la base de la fusión por campos (#97). Se marca esa
+    versión y no la actual: una tarea creada o editada mientras tanto aún no está en el archivo
+    y la siguiente sync tiene que exportarla (#123)."""
     with get_connection(db_path) as conn:
-        conn.execute(
-            """UPDATE tasks
-               SET synced_version = version
-               WHERE column_id IN (SELECT id FROM columns WHERE board_id = ?)""",
-            (board_id,)
+        conn.executemany(
+            """UPDATE tasks SET synced_version = ?, sync_base = ?
+               WHERE task_uuid = ? AND column_id IN (SELECT id FROM columns WHERE board_id = ?)""",
+            [(version, base, task_uuid, board_id) for task_uuid, (version, base) in synced_tasks.items()],
         )
-        if sync_bases:
-            conn.executemany(
-                """UPDATE tasks SET sync_base = ?
-                   WHERE task_uuid = ? AND column_id IN (SELECT id FROM columns WHERE board_id = ?)""",
-                [(base, task_uuid, board_id) for task_uuid, base in sync_bases.items()],
-            )
 

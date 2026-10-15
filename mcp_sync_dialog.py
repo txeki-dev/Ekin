@@ -359,6 +359,10 @@ class McpSyncDialog(QDialog):
 
     def _save_and_apply(self):
         enabled = self.enable_checkbox.isChecked()
+        if enabled and not self.mcp_enabled and not self.token_input.text().strip():
+            # Sin token, cualquiera que conozca el UUID (viaja en el .ekboard) accede al tablero;
+            # un tablero que ya lo tenía activo sin token lo conserva para no romper sus registros (#114)
+            self._generate_new_token()
         secret = self.token_input.text().strip() or None
 
         database.set_board_mcp_config(

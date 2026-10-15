@@ -66,24 +66,6 @@ class BoardSyncUiMixin:
                 }}
             """)
 
-    def _update_sync_ui(self, board_id=None):
-        """Compatibilidad hacia atrás: actualiza el controlador de sincronización."""
-        target_id = board_id if board_id is not None else self.board_id
-        if target_id is not None:
-            self.sync_controller.set_board(target_id, self.db_path)
-
-    def _setup_file_watcher(self, path):
-        """Compatibilidad hacia atrás: delega en sync_controller."""
-        self.sync_controller.setup_file_watcher(path)
-
-    def _ensure_watcher_path_active(self):
-        """Compatibilidad hacia atrás: delega en sync_controller."""
-        self.sync_controller.ensure_watcher_path_active()
-
-    def _run_async_sync(self, user_initiated: bool = False, file_path: str = None):
-        """Ejecuta la sincronización en segundo plano delegando en el controlador."""
-        self.sync_controller.sync_now(user_initiated=user_initiated, blocking=False, file_path=file_path)
-
     def _on_sync_finished(self, res, user_initiated: bool = False):
         """Gestiona el diálogo de resultado cuando la sincronización es manual."""
         if res.status == "error":
@@ -160,7 +142,9 @@ class BoardSyncUiMixin:
         )
         if file_path:
             res = board_sync.sync_board_with_file(self.board_id, file_path, self.db_path)
-            if res.status != "error":
+            if res.status == "busy":
+                QMessageBox.information(self, t("sync.busy_title"), res.message)
+            elif res.status != "error":
                 self.load_board(self.board_id)
                 parent_win = self.window()
                 if hasattr(parent_win, "sidebar"):

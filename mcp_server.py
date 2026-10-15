@@ -26,6 +26,7 @@ import re
 import secrets
 import threading
 import time
+from datetime import date
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qs, urlparse
@@ -135,6 +136,7 @@ def get_mcp_tools_schema() -> List[Dict[str, Any]]:
                 "properties": {
                     "column_id": {"type": "integer", "description": "Column ID to filter by."},
                     "tag": {"type": "string", "description": "Tag name to filter by."},
+                    "mask_sensitive": {"type": "boolean", "description": "If true, masks sensitive data and PII locally."},
                 },
             },
         },
@@ -145,6 +147,7 @@ def get_mcp_tools_schema() -> List[Dict[str, Any]]:
                 "type": "object",
                 "properties": {
                     "task_id": {"type": "integer", "description": "Task ID."},
+                    "mask_sensitive": {"type": "boolean", "description": "If true, masks sensitive data and PII locally."},
                 },
                 "required": ["task_id"],
             },
@@ -344,6 +347,24 @@ def get_mcp_tools_schema() -> List[Dict[str, Any]]:
     ]
 
 
+_DUE_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_DUE_TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+
+def _check_due(due_date: Optional[str], due_time: Optional[str] = None) -> None:
+    """ValueError si la fecha u hora no siguen YYYY-MM-DD / HH:MM; vacías significan quitarlas.
+    Una cadena cualquiera se guardaba y la tarea desaparecía del calendario sin avisar (#126)."""
+    if due_date:
+        try:
+            valid = bool(_DUE_DATE_RE.match(due_date)) and bool(date.fromisoformat(due_date))
+        except ValueError:
+            valid = False
+        if not valid:
+            raise ValueError(f"Invalid due_date '{due_date}': use YYYY-MM-DD.")
+    if due_time and not _DUE_TIME_RE.match(due_time):
+        raise ValueError(f"Invalid due_time '{due_time}': use HH:MM (24 h).")
+
+
 def _masked(text: Optional[str], mask_sensitive: bool) -> Optional[str]:
     """Texto con los datos sensibles enmascarados (Privacy Shield) si se pide."""
     if mask_sensitive and text:
@@ -534,6 +555,7 @@ class McpToolExecutor:
         tag_names = args.get("tags", [])
 
         self._verify_column_belongs_to_board(col_id)
+        _check_due(due_date)
 
         task_id = database.create_task(
             column_id=col_id,
@@ -543,23 +565,29 @@ class McpToolExecutor:
             db_path=self.db_path,
         )
 
-        # Asignar etiquetas y prioridad si se especifican
+        # Registrar entrada de auditoría (escapando client_name para evitar inyección en QLabel)
+        safe_client = html.escape(self.client_name)
+        audit_entry = f"[{safe_client}]: Tarea creada a través de integración MCP."
+        self._finish_created_task(task_id, title, desc, priority, tag_names, audit_entry)
+
+        # Notificar a la UI
+        get_mcp_event_bus().board_mutated.emit(self.board_id)
+
+        return {"success": True, "task_id": task_id, "message": f"Task '{title}' created."}
+
+    def _finish_created_task(self, task_id, title, desc, priority, tag_names, audit_entry):
+        """Prioridad, etiquetas, entrada de auditoría e índice semántico de una tarea recién creada
+        (común a create_task y create_tasks_batch)."""
         tag_ids = []
         if priority:
-            prio_id = database.get_or_create_tag_value("Priority", priority, "#f59e0b", db_path=self.db_path)
-            tag_ids.append(prio_id)
-
+            tag_ids.append(database.get_or_create_tag_value("Priority", priority, "#f59e0b", db_path=self.db_path))
         for tname in tag_names:
             t_id = database.get_or_create_tag_value("General", tname, "#6b7280", db_path=self.db_path)
             if t_id not in tag_ids:
                 tag_ids.append(t_id)
-
         if tag_ids:
             database.set_task_tags(task_id, tag_ids, db_path=self.db_path)
 
-        # Registrar entrada de auditoría (escapando client_name para evitar inyección en QLabel)
-        safe_client = html.escape(self.client_name)
-        audit_entry = f"[{safe_client}]: Tarea creada a través de integración MCP."
         database.add_task_log(task_id, audit_entry, db_path=self.db_path)
 
         # Auto-indexar embedding para búsquedas semánticas inmediatas
@@ -567,12 +595,7 @@ class McpToolExecutor:
             import local_ai
             local_ai.index_task_embedding(task_id, title, desc, db_path=self.db_path)
         except Exception:
-            pass
-
-        # Notificar a la UI
-        get_mcp_event_bus().board_mutated.emit(self.board_id)
-
-        return {"success": True, "task_id": task_id, "message": f"Task '{title}' created."}
+            logger.warning("No se pudo indexar la tarea %s para la búsqueda semántica", task_id, exc_info=True)
 
     def _tool_update_task(self, args: Dict[str, Any]) -> Dict[str, Any]:
         task_id = args["task_id"]
@@ -581,6 +604,7 @@ class McpToolExecutor:
         # Sin fecha no hay hora; "" (quitar) se guarda como NULL
         new_due = args.get("due_date", task.get("due_date")) or None
         new_time = (args.get("due_time", task.get("due_time")) or None) if new_due else None
+        _check_due(new_due, new_time)
 
         tag_ids = None  # None = no tocar las etiquetas
         if "tags" in args or "priority" in args:
@@ -717,6 +741,9 @@ class McpToolExecutor:
         task_id = args["task_id"]
         link_id = args["link_id"]
         self._verify_task_belongs_to_board(task_id)
+        # El enlace tiene que ser de esa tarea: si no, se podía borrar uno de otro tablero (#121)
+        if link_id not in {lk["id"] for lk in database.get_task_links(task_id, db_path=self.db_path)}:
+            raise McpSecurityError(f"Link ID {link_id} does not belong to task {task_id}.")
 
         database.delete_task_link(link_id, db_path=self.db_path)
         get_mcp_event_bus().board_mutated.emit(self.board_id)
@@ -828,6 +855,8 @@ class McpToolExecutor:
             return {"success": True, "created_count": 0, "tasks": []}
 
         self._verify_column_belongs_to_board(col_id)
+        for t in tasks_list:
+            _check_due(t.get("due_date"))
 
         tasks_data = []
         for t in tasks_list:
@@ -847,29 +876,9 @@ class McpToolExecutor:
         audit_entry = f"[{safe_client}]: Tarea creada en lote (batch) a través de integración MCP."
 
         created_summary = []
-        import local_ai
-        for idx, tid in enumerate(created_ids):
-            t_orig = tasks_list[idx]
-            tag_names = t_orig.get("tags", [])
-            priority = t_orig.get("priority")
-            tag_ids = []
-            if priority:
-                prio_id = database.get_or_create_tag_value("Priority", priority, "#f59e0b", db_path=self.db_path)
-                tag_ids.append(prio_id)
-            for tname in tag_names:
-                t_id = database.get_or_create_tag_value("General", tname, "#6b7280", db_path=self.db_path)
-                if t_id not in tag_ids:
-                    tag_ids.append(t_id)
-            if tag_ids:
-                database.set_task_tags(tid, tag_ids, db_path=self.db_path)
-
-            database.add_task_log(tid, audit_entry, db_path=self.db_path)
-
-            try:
-                local_ai.index_task_embedding(tid, t_orig.get("title", ""), t_orig.get("description", ""), db_path=self.db_path)
-            except Exception:
-                pass
-
+        for t_orig, tid in zip(tasks_list, created_ids):
+            self._finish_created_task(tid, t_orig.get("title", ""), t_orig.get("description", ""),
+                                      t_orig.get("priority"), t_orig.get("tags", []), audit_entry)
             created_summary.append({
                 "task_id": tid,
                 "title": t_orig.get("title", ""),
@@ -1096,6 +1105,9 @@ class McpHttpHandler(BaseHTTPRequestHandler):
     """Manejador HTTP para Server-Sent Events (SSE) y llamadas JSON-RPC directas."""
 
     server: McpHttpServer
+    # Un cliente que deja de enviar (cabeceras o el cuerpo anunciado) ya no retiene su hilo para
+    # siempre (#115). El stream SSE solo escribe, con un keepalive por segundo: no le afecta.
+    timeout = 30
 
     def log_message(self, format, *args):
         # Desactivar logging verboso por consola
@@ -1232,7 +1244,11 @@ class McpHttpHandler(BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        raw_body = self.rfile.read(content_len).decode("utf-8", errors="replace")
+        try:
+            raw_body = self.rfile.read(content_len).decode("utf-8", errors="replace")
+        except OSError:  # incluye el timeout de socket: el cliente dejó de enviar
+            self.close_connection = True
+            return
         try:
             req_data = json.loads(raw_body)
         except Exception:
@@ -1297,7 +1313,7 @@ class McpHttpServer(ThreadingHTTPServer):
                 try:
                     self.scavenge_stale_sessions(max_idle_seconds=max_idle_seconds)
                 except Exception:
-                    pass
+                    logger.warning("Fallo al purgar sesiones SSE inactivas", exc_info=True)
 
         self._scavenger_thread = threading.Thread(target=_scavenger_loop, daemon=True, name="EkinMcpScavenger")
         self._scavenger_thread.start()

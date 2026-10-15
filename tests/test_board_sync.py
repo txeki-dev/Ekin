@@ -821,3 +821,98 @@ def test_field_merge_base_is_refreshed_after_every_sync(sync_test_db):
 
     task = database.get_task(task1_id, db_path)
     assert (task["title"], task["description"]) == ("Título remoto 2", "Local 3")
+
+
+def _all_titles(sync_test_db):
+    db_path = sync_test_db["db_path"]
+    return {t["title"] for c in ("col1_id", "col2_id") for t in database.get_tasks(sync_test_db[c], db_path)}
+
+
+def test_task_created_while_exporting_survives_the_next_syncs(sync_test_db, monkeypatch):
+    """#123: tras escribir el archivo, la sync marcaba como sincronizadas TODAS las tareas. Una
+    tarjeta creada entre la exportación y esa marca (p. ej. por un agente vía MCP) quedaba
+    «sincronizada» sin estar en el archivo, y la siguiente sync la daba por borrada en remoto."""
+    db_path = sync_test_db["db_path"]
+    board_id = sync_test_db["board_id"]
+    sync_file = str(sync_test_db["tmp_path"] / "tablero_compartido.ekboard")
+    board_sync.sync_board_with_file(board_id, sync_file, db_path)
+
+    original_write = board_sync.write_sync_file_atomic
+
+    def write_then_agent_creates_card(path, data):
+        new_hash = original_write(path, data)
+        database.create_task(sync_test_db["col1_id"], "Tarjeta del agente", db_path=db_path)
+        return new_hash
+
+    monkeypatch.setattr(board_sync, "write_sync_file_atomic", write_then_agent_creates_card)
+    database.update_task(sync_test_db["task1_id"], "Tarea 1 editada", "", "", "#6b7280", None, db_path)
+    assert board_sync.sync_board_with_file(board_id, sync_file, db_path).status == "exported"
+    monkeypatch.setattr(board_sync, "write_sync_file_atomic", original_write)
+
+    board_sync.sync_board_with_file(board_id, sync_file, db_path)
+    board_sync.sync_board_with_file(board_id, sync_file, db_path)
+
+    assert "Tarjeta del agente" in _all_titles(sync_test_db)
+    with open(sync_file, "r", encoding="utf-8") as f:
+        assert "Tarjeta del agente" in {t["title"] for t in json.load(f)["tasks"]}
+
+
+def test_local_changes_made_while_importing_are_not_overwritten_or_deleted(sync_test_db, monkeypatch):
+    """#123: la importación sin cambios locales decidía con una foto tomada antes y luego
+    sobrescribía todas las tareas y borraba las locales que no estaban en el archivo, aunque se
+    hubieran creado o editado mientras tanto."""
+    db_path = sync_test_db["db_path"]
+    board_id = sync_test_db["board_id"]
+    sync_file = str(sync_test_db["tmp_path"] / "tablero_compartido.ekboard")
+    board_sync.sync_board_with_file(board_id, sync_file, db_path)
+    _edit_remote_task(sync_file, "Tarea 1", title="Tarea 1 (remota)")
+    _edit_remote_task(sync_file, "Tarea 2", description="Detalles remotos")
+
+    original_backup = board_sync.create_premerge_backup
+
+    def backup_then_local_writes(bid, path=None):
+        backup = original_backup(bid, path)
+        database.create_task(sync_test_db["col1_id"], "Tarjeta del agente", db_path=db_path)
+        database.update_task(sync_test_db["task2_id"], "Tarea 2 local", "Detalles tarea 2", "", "#6b7280", None, db_path)
+        return backup
+
+    monkeypatch.setattr(board_sync, "create_premerge_backup", backup_then_local_writes)
+    assert board_sync.sync_board_with_file(board_id, sync_file, db_path).status == "imported"
+    monkeypatch.setattr(board_sync, "create_premerge_backup", original_backup)
+
+    assert {"Tarjeta del agente", "Tarea 2 local", "Tarea 1 (remota)"} <= _all_titles(sync_test_db)
+
+    # La siguiente sync fusiona por campos: el título local y la descripción remota conviven
+    board_sync.sync_board_with_file(board_id, sync_file, db_path)
+    task2 = database.get_task(sync_test_db["task2_id"], db_path)
+    assert (task2["title"], task2["description"]) == ("Tarea 2 local", "Detalles remotos")
+    with open(sync_file, "r", encoding="utf-8") as f:
+        assert {"Tarjeta del agente", "Tarea 2 local"} <= {t["title"] for t in json.load(f)["tasks"]}
+
+
+def test_sync_of_a_board_already_syncing_returns_busy_without_touching_anything(sync_test_db):
+    """#124: la sync manual de la barra lateral llamaba a sync_board_with_file en paralelo con la
+    automática del mismo tablero; dos ciclos leían, fusionaban y reescribían lo mismo."""
+    db_path = sync_test_db["db_path"]
+    board_id = sync_test_db["board_id"]
+    sync_file = sync_test_db["tmp_path"] / "tablero_compartido.ekboard"
+
+    with board_sync._board_sync_lock(board_id, db_path):
+        res = board_sync.sync_board_with_file(board_id, str(sync_file), db_path)
+
+    assert res.status == "busy" and res.message
+    assert not sync_file.exists()
+    assert database.get_board_sync_info(board_id, db_path)["sync_path"] is None
+    assert board_sync.sync_board_with_file(board_id, str(sync_file), db_path).status == "exported"
+
+
+def test_premerge_backup_failure_is_logged(sync_test_db, monkeypatch, caplog):
+    """#128: create_premerge_backup tragaba cualquier error sin dejar rastro en el log de
+    diagnóstico; la sync se aborta igual, pero ahora se sabe por qué."""
+    def fail(*_a, **_k):
+        raise OSError("disco lleno")
+
+    monkeypatch.setattr(board_sync, "export_board_to_sync_dict", fail)
+    with caplog.at_level("WARNING", logger="ekin.sync"):
+        assert board_sync.create_premerge_backup(sync_test_db["board_id"], sync_test_db["db_path"]) == ""
+    assert any(r.exc_info and "disco lleno" in str(r.exc_info[1]) for r in caplog.records)

@@ -16,6 +16,21 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
   the ADR is approved.
 
 
+- [x] **DONE (2026-10-15) — Codebase audit + remediation (#112–#130)** `[AUDIT]` · run with the new AUDIT/REMEDIATE
+  prompts (#111); 19 cards tagged `audit`, all fixed with a regression test first. Suite 578 → 628, ruff clean.
+  - **HIGH:** #123 sync data loss: tasks created or edited during a sync were marked synced, then deleted or overwritten.
+  - **MEDIUM:**
+    - #124 overlapping syncs of the same board (per-board lock, `busy` result);
+    - #125 agent changes never reached the shared `.ekboard`, bell, Calendar or `.ics`;
+    - #112 the HTML pass-through heuristic in `markdown_to_qt_html`;
+    - #113 images from network locations rendered from shared or imported HTML;
+    - #121 SSE transport tests (they found a `delete_task_link` cross-board hole).
+  - **LOW:**
+    - security: #114 token on MCP enable, #115 socket timeout, #116 dangerous extensions, #117 installer SHA-256 in releases, #118 Privacy Shield formats, #119 `mask_sensitive` in schemas, #120 `.env` ignored;
+    - bugs and QA: #126 due-date validation, #122 no `sleep` in the circuit-breaker test;
+    - tech debt: #127 DRY in MCP task creation, #128 swallowed exceptions now logged;
+    - cleanup: #129 dead methods, #130 llama-server engine removed.
+
 - [x] **DONE (2026-10-15) — #111 DEV pack: AUDIT left no cards and REMEDIATE had nothing to fix** `[BUG]` ·
   `assets/prompt_packs/dev.json`. 3 tests (`test_prompt_clipboard.py`, `test_mcp.py`).
   - **Problem:** AUDIT held every finding for one final `create_tasks_batch` and was framed offensively ("Cybersecurity

@@ -35,8 +35,8 @@ def extract(changelog_text: str, version: str) -> str:
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
-        print("usage: extract_release_notes.py <version>", file=sys.stderr)
+    if len(sys.argv) not in (2, 3):
+        print("usage: extract_release_notes.py <version> [output_file]", file=sys.stderr)
         return 2
     version = sys.argv[1].lstrip("v").strip()
     changelog = Path("CHANGELOG.md")
@@ -44,7 +44,13 @@ def main() -> int:
         return 0
     notes = extract(changelog.read_text(encoding="utf-8"), version)
     if notes:
-        sys.stdout.write(notes + "\n")
+        # Siempre UTF-8: en el runner de Windows la salida va en cp1252 y un emoji o una flecha
+        # de las notas tumbaba el paso; con fichero de salida no pasa por la tubería de pwsh
+        data = (notes + "\n").encode("utf-8")
+        if len(sys.argv) == 3:
+            Path(sys.argv[2]).write_bytes(data)
+        else:
+            sys.stdout.buffer.write(data)
     return 0
 
 

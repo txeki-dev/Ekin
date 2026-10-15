@@ -165,6 +165,10 @@ class BoardSyncController(QObject):
     def _handle_sync_finished(self, res: board_sync.SyncResult, user_initiated: bool = False):
         """Procesa la finalización de una sincronización."""
         self._sync_worker = None
+        if res.status == "busy":
+            # Otra sync del mismo tablero (p. ej. la manual de la barra lateral) sigue en curso (#124)
+            QTimer.singleShot(500, lambda: self.sync_now(user_initiated=user_initiated))
+            return
         self.ensure_watcher_path_active()
 
         self._last_sync_summary = format_sync_summary(res)

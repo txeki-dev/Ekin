@@ -129,6 +129,10 @@ ipython_config.py
 #   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
 #   pdm.lock
 
+# Environment files (API keys); OUTRO runs `git add .`
+.env
+.env.*
+
 # venv
 venv/
 ENV/

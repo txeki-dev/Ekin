@@ -63,7 +63,7 @@ jobs:
         env:
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          python .github/scripts/extract_release_notes.py "$env:VERSION" | Out-File -FilePath RELEASE_NOTES.md -Encoding utf8
+          python .github/scripts/extract_release_notes.py "$env:VERSION" RELEASE_NOTES.md
           if (-not (Test-Path RELEASE_NOTES.md) -or (Get-Item RELEASE_NOTES.md).Length -eq 0) {
             "Release v$env:VERSION`n`nSee [CHANGELOG.md](CHANGELOG.md) for details." | Out-File -FilePath RELEASE_NOTES.md -Encoding utf8
           }
@@ -117,6 +117,9 @@ jobs:
             Write-Error "Installer binary not found at $installerPath"
             exit 1
           }
+          # El actualizador de Ekin verifica el instalador con esta línea antes de ejecutarlo
+          $hash = (Get-FileHash -Algorithm SHA256 $installerPath).Hash.ToLower()
+          Add-Content -Path RELEASE_NOTES.md -Value "`nSHA-256: $hash" -Encoding utf8
           gh release create "v$env:VERSION" `
             --target "$env:GITHUB_SHA" `
             --title "v$env:VERSION" `

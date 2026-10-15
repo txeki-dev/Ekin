@@ -1356,16 +1356,15 @@ def test_database_sync_helpers_lifecycle(db_path):
     last_mod = database.get_board_last_local_modified(b1, db_path=db_path)
     assert last_mod is not None
 
-    # 7. mark_board_tasks_synced
-    # Simular versión avanzada
+    # 7. mark_board_tasks_synced: marca la versión que quedó en el archivo, no la actual (#123)
     with database.get_connection(db_path) as conn:
         conn.execute("UPDATE tasks SET version = 5, synced_version = 2 WHERE column_id = ?", (col1,))
-    database.mark_board_tasks_synced(b1, db_path=db_path)
+        uuids = [r["task_uuid"] for r in conn.execute("SELECT task_uuid FROM tasks WHERE column_id = ?", (col1,))]
+    database.mark_board_tasks_synced(b1, {u: (4, "{}") for u in uuids}, db_path=db_path)
     with database.get_connection(db_path) as conn:
-        rows = conn.execute("SELECT version, synced_version FROM tasks WHERE column_id = ?", (col1,)).fetchall()
+        rows = conn.execute("SELECT version, synced_version, sync_base FROM tasks WHERE column_id = ?", (col1,)).fetchall()
         for r in rows:
-            assert r["version"] == 5
-            assert r["synced_version"] == 5
+            assert (r["version"], r["synced_version"], r["sync_base"]) == (5, 4, "{}")
 
     # 8. unlink_board_sync
     database.unlink_board_sync(b1, db_path=db_path)

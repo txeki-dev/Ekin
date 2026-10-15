@@ -94,3 +94,36 @@ def test_controller_board_data_reloaded_signal(qapp, db_path):
     res_uptodate = board_sync.SyncResult(status="up_to_date", board_id=1)
     controller._handle_sync_finished(res_uptodate, user_initiated=False)
     assert len(reloaded) == 1
+
+
+def test_controller_retries_a_busy_sync_instead_of_reporting_it(qapp, db_path, monkeypatch):
+    """#124: si otra sync del mismo tablero está en curso, el resultado «busy» no se notifica
+    como terminado: el controlador la reintenta en un momento."""
+    import board_sync_controller
+    retries = []
+    monkeypatch.setattr(board_sync_controller.QTimer, "singleShot", lambda ms, fn: retries.append(ms))
+    controller = BoardSyncController(db_path=db_path)
+    finished = []
+    controller.sync_finished.connect(lambda res, user_init: finished.append(res))
+
+    controller._handle_sync_finished(board_sync.SyncResult(status="busy", board_id=1), user_initiated=True)
+
+    assert finished == [] and len(retries) == 1
+
+
+def test_sidebar_sync_now_on_a_busy_board_informs_instead_of_failing(qapp, db_path, monkeypatch, tmp_path):
+    """#124: «Sincronizar ahora» mientras la sync automática del mismo tablero sigue en curso
+    avisa de que ya se está sincronizando, sin mostrarlo como un error."""
+    import sidebar
+    board_id = database.create_board("Sync Board", "#3b82f6", db_path)
+    database.set_board_sync_path(board_id, str(tmp_path / "sync.ekboard"), db_path)
+    shown = []
+    monkeypatch.setattr(sidebar.QMessageBox, "information", lambda *a, **k: shown.append(("info", a[1])))
+    monkeypatch.setattr(sidebar.QMessageBox, "warning", lambda *a, **k: shown.append(("warning", a[1])))
+    bar = sidebar.SidebarWidget(db_path=db_path)
+
+    with board_sync._board_sync_lock(board_id, db_path):
+        bar.handle_sync_action(board_id, "sync")
+
+    assert shown == [("info", sidebar.t("sync.busy_title"))]
+    bar.deleteLater()

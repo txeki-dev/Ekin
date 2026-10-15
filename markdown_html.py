@@ -20,9 +20,11 @@ _FEATURES = QTextDocument.MarkdownFeature(
 
 
 def markdown_to_qt_html(text):
-    """Fragmento HTML de Qt para `text`. Lo que ya es HTML se devuelve tal cual; el resto se
-    interpreta como Markdown de GitHub sin HTML embebido."""
-    if not text or not text.strip() or Qt.mightBeRichText(text):
+    """Fragmento HTML de Qt para `text`. Lo que ya es HTML (empieza por una etiqueta) se devuelve
+    tal cual; el resto se interpreta como Markdown de GitHub sin HTML embebido. Basta
+    `mightBeRichText` no: da por HTML cualquier texto con una etiqueta en la primera línea, que
+    así se saltaba el filtro y perdía el Markdown (#112)."""
+    if not text or not text.strip() or (text.lstrip().startswith("<") and Qt.mightBeRichText(text)):
         return text or ""
     doc = QTextDocument()
     doc.setMarkdown(text, _FEATURES)

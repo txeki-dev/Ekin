@@ -121,7 +121,7 @@ ruff check .
 pytest
 ```
 
-The suite (560+ tests) covers the database layer, the `.ekboard` sync engine, the MCP server, prompt packs, local AI helpers, exporters, backups and the Qt widgets (headless, with `QT_QPA_PLATFORM=offscreen`), always against temporary, isolated SQLite databases (no risk to your local `ekin_board.db`).
+The suite (600+ tests) covers the database layer, the `.ekboard` sync engine, the MCP server, prompt packs, local AI helpers, exporters, backups and the Qt widgets (headless, with `QT_QPA_PLATFORM=offscreen`), always against temporary, isolated SQLite databases (no risk to your local `ekin_board.db`).
 
 ---
 
@@ -209,7 +209,7 @@ Press **Ctrl+/** anywhere, or click the **❔** button in the sidebar utility ba
 
 ### 7. Connecting AI Agents via MCP (Model Context Protocol)
 * **Sandboxed AI Collaboration**: Click the **Connect AI (MCP)** / **AI Agent (MCP)** button in the board's **footer** (which also shows the task count and cloud sync status) to connect external AI agents (Google Antigravity / AGY CLI, Claude Code, Cursor, Claude Desktop).
-* **1-Click Setup**: Turn on **Enable MCP access for this board** and save: the local server starts (`http://127.0.0.1:8765`) and, from then on, starts with the app. Copy the snippet for your client from the dialog's tabs:
+* **1-Click Setup**: Turn on **Enable MCP access for this board** and save: the local server starts (`http://127.0.0.1:8765`) and, from then on, starts with the app. If you leave the token field empty, Ekin generates one, so only clients you give it to can reach the board. Copy the snippet for your client from the dialog's tabs:
   - **Claude Code**: `claude mcp add --transport sse ekin-<board> "http://127.0.0.1:8765/sse?board=<UUID>&token=<TOKEN>"` (or let **▶ Work** register it for you).
   - **Claude Desktop / Cursor / Windsurf**: JSON configuration with the board's SSE URL.
   - **AGY CLI / stdio**: `python -m ekin_mcp --board-uuid <UUID> --token <TOKEN>`.

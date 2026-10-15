@@ -23,7 +23,7 @@ from PySide6.QtGui import QIcon, QShortcut, QKeySequence, QFontDatabase, QDeskto
 import database
 import backups
 import markdown_html
-from mcp_server import get_mcp_manager
+from mcp_server import get_mcp_event_bus, get_mcp_manager
 import styles
 import strings
 from strings import t
@@ -74,6 +74,14 @@ def parse_version_tuple(v_str: str):
     import re
     digits = re.findall(r"\d+", v_str)
     return tuple(int(x) for x in digits) if digits else (0,)
+
+
+def installer_sha256_from_notes(notes):
+    """SHA-256 del instalador según la línea «SHA-256: <hash>» que el workflow de release añade
+    a las notas (#117); None si no está. No vale cualquier hex de 64 caracteres de las notas."""
+    import re
+    m = re.search(r"^SHA-256:\s*([0-9a-fA-F]{64})\s*$", notes or "", re.MULTILINE)
+    return m.group(1).lower() if m else None
 
 
 class ReleaseCheckThread(QThread):
@@ -405,6 +413,14 @@ class MainWindow(QMainWindow):
         self.board_view.data_changed.connect(self.sync_ics)
         self.calendar_view.data_changed.connect(self.my_work_view.refresh)
 
+        # Un agente IA (MCP) que cambia un tablero que no está en pantalla: refrescar lo mismo una
+        # vez tras la ráfaga (el tablero visible lo cubre su propio data_changed, #125)
+        self._mcp_global_refresh_timer = QTimer(self)
+        self._mcp_global_refresh_timer.setSingleShot(True)
+        self._mcp_global_refresh_timer.setInterval(300)
+        self._mcp_global_refresh_timer.timeout.connect(self._refresh_global_views)
+        get_mcp_event_bus().board_mutated.connect(self._on_mcp_board_mutated)
+
         # Pastilla de "tablero enlazado" en una tarjeta: saltar directamente a ese tablero
         self.board_view.board_link_activated.connect(self.on_board_link_activated)
 
@@ -680,6 +696,18 @@ class MainWindow(QMainWindow):
             if board_id == self.sidebar.active_board_id:
                 self.board_view.load_board(board_id, notify=False)
 
+    def _on_mcp_board_mutated(self, board_id):
+        if board_id != self.board_view.board_id:
+            self._mcp_global_refresh_timer.start()
+
+    def _refresh_global_views(self):
+        """Campana, Calendario, Mi trabajo, Analíticas y .ics tras cambios fuera del tablero visible."""
+        self.sidebar.refresh_notifications()
+        self.calendar_view.refresh()
+        self.my_work_view.refresh()
+        self.dashboard_view.refresh()
+        self.sync_ics()
+
     def sync_ics(self):
         """Reescribe cada feed .ics con auto-sync configurado (el global de todos los
         tableros, más uno por cada tablero con su propia ruta). Cada feed solo se
@@ -856,13 +884,7 @@ class MainWindow(QMainWindow):
         progress_dlg.setMinimumDuration(0)
         progress_dlg.setValue(0)
 
-        # Extraer hash SHA-256 si viene documentado en las notas de la versión
-        expected_sha256 = None
-        if release_notes:
-            import re
-            m = re.search(r'\b([a-fA-F0-9]{64})\b', release_notes)
-            if m:
-                expected_sha256 = m.group(1).lower()
+        expected_sha256 = installer_sha256_from_notes(release_notes)
 
         download_thread = InstallerDownloadThread(download_url, dest_path, self, expected_sha256=expected_sha256)
         download_thread.finished.connect(download_thread.deleteLater)
@@ -1027,12 +1049,6 @@ class MainWindow(QMainWindow):
         if hasattr(self, "board_view") and self.board_view and self.board_view.isVisible():
             self.board_view.show_interactive_tour(step=0)
 
-    def show_landing_tour(self):
-        """Abre la guía de bienvenida y recorrido inicial de Ekin (modal de diapositivas)."""
-        from onboarding_dialog import LandingTourDialog
-        dlg = LandingTourDialog(self, db_path=database.DB_NAME)
-        dlg.exec()
-
 
 def apply_win32_icon(window):
     """Fuerza los iconos nativos de Win32 (WM_SETICON) directamente en el HWND de Windows."""
@@ -1065,8 +1081,6 @@ def main():
     register_fonts()
     app.setWindowIcon(app_icon())
 
-    import local_ai
-    app.aboutToQuit.connect(local_ai.stop_managed_runner)
     # Parar el MCP (y sus hilos) al salir libera el puerto 8765 para la siguiente instancia (#106)
     app.aboutToQuit.connect(get_mcp_manager(database.DB_NAME).stop)
 

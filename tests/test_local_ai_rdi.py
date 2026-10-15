@@ -216,8 +216,11 @@ def test_mcp_new_tools_and_mask_sensitive(db_path):
 # FASE 4: RESILIENCIA - CIRCUIT BREAKER LOCAL AI
 # =====================================================================
 
-def test_local_ai_circuit_breaker_lifecycle():
-    import time
+def test_local_ai_circuit_breaker_lifecycle(monkeypatch):
+    # Reloj controlado en vez de esperas reales (#122)
+    from types import SimpleNamespace
+    clock = [1000.0]
+    monkeypatch.setattr(local_ai, "time", SimpleNamespace(time=lambda: clock[0]))
 
     cb = local_ai.LocalAiCircuitBreaker(failure_threshold=2, recovery_timeout=0.1)
     assert cb.state == local_ai.LocalAiCircuitBreaker.STATE_CLOSED
@@ -233,8 +236,8 @@ def test_local_ai_circuit_breaker_lifecycle():
     assert cb.state == local_ai.LocalAiCircuitBreaker.STATE_OPEN
     assert cb.allow_request() is False
 
-    # 3. Esperar cooldown para pasar a HALF_OPEN
-    time.sleep(0.12)
+    # 3. Pasado el cooldown, HALF_OPEN
+    clock[0] += 0.12
     assert cb.state == local_ai.LocalAiCircuitBreaker.STATE_HALF_OPEN
     assert cb.allow_request() is True
 
@@ -243,8 +246,8 @@ def test_local_ai_circuit_breaker_lifecycle():
     assert cb.state == local_ai.LocalAiCircuitBreaker.STATE_OPEN
     assert cb.allow_request() is False
 
-    # 5. Esperar cooldown y éxito en HALF_OPEN -> vuelve a CLOSED
-    time.sleep(0.12)
+    # 5. Pasado el cooldown, éxito en HALF_OPEN -> vuelve a CLOSED
+    clock[0] += 0.12
     assert cb.state == local_ai.LocalAiCircuitBreaker.STATE_HALF_OPEN
     cb.record_success()
     assert cb.state == local_ai.LocalAiCircuitBreaker.STATE_CLOSED
@@ -344,3 +347,20 @@ def test_standup_columns_flow_and_due_soon(db_path):
     md = local_ai.format_daily_standup_markdown(data, "Flujo")
     assert "Active task" in md and f"#{due}" in md
     assert "Flow by column" in md and "[backlog]" in md and "Due in the next 7 days" in md
+
+
+# Valores falsos montados por partes: que ningún escáner de secretos los tome por reales
+@pytest.mark.parametrize("label, secret", [
+    ("[REDACTED_GITHUB_TOKEN]", "github" + "_pat_" + "A1b2" * 20),
+    ("[REDACTED_GOOGLE_API_KEY]", "AI" + "za" + "Fake" * 8 + "123"),
+    ("[REDACTED_SLACK_TOKEN]", "xo" + "xb-" + "0000000000-0000000000-fakefakefake"),
+    ("[REDACTED_STRIPE_KEY]", "sk" + "_live_" + "FAKE" * 6),
+    ("[REDACTED_JWT]", "ey" + "JhbGciOiJIUzI1NiJ9." + "eyJzdWIiOiJmYWtlIn0." + "ZmFrZXNpZ25hdHVyZQ"),
+    ("[REDACTED_ANTHROPIC_API_KEY]", "sk" + "-ant-" + "fake" * 8),
+])
+def test_privacy_shield_masks_more_secret_formats(label, secret):
+    """#118: mask_sensitive dejaba pasar tokens fine-grained de GitHub, claves de Google, Slack y
+    Stripe y JWT, y etiquetaba como de OpenAI las claves de Anthropic."""
+    masked, redactions = privacy_shield.sanitize_text(f"config: {secret} end")
+    assert secret not in masked and label in masked
+    assert len(redactions) == 1

@@ -21,11 +21,27 @@ import tempfile
 import time
 import uuid
 import glob
+import logging
+import threading
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from PySide6.QtCore import QThread, Signal
 
 import database
+import strings
+
+logger = logging.getLogger("ekin.sync")
+
+# Una sola sync a la vez por tablero: dos ciclos solapados (la automática y la manual de la barra
+# lateral) leían, fusionaban y reescribían el mismo archivo y las mismas filas (#124)
+_BOARD_SYNC_LOCKS: dict = {}
+_BOARD_SYNC_LOCKS_GUARD = threading.Lock()
+
+
+def _board_sync_lock(board_id: int, db_path=None) -> threading.Lock:
+    key = (os.path.abspath(db_path or database.DB_NAME), board_id)
+    with _BOARD_SYNC_LOCKS_GUARD:
+        return _BOARD_SYNC_LOCKS.setdefault(key, threading.Lock())
 
 
 @dataclass
@@ -117,12 +133,13 @@ def _merge_fields(task: dict) -> dict:
     }
 
 
-def _sync_bases(data: dict) -> dict:
-    """{task_uuid: JSON} con los campos fusionables de cada tarea tal como quedan en el archivo
-    compartido: la base con la que la siguiente fusión distingue qué lado cambió cada campo."""
+def _synced_tasks(data: dict, skip=()) -> dict:
+    """{task_uuid: (versión, JSON)} de cada tarea tal como queda en el archivo compartido: su
+    versión y sus campos fusionables, la base con la que la siguiente fusión distingue qué lado
+    cambió cada campo. `skip`: tareas que no se aplicaron y siguen pendientes."""
     return {
-        t["task_uuid"]: json.dumps(_merge_fields(t), ensure_ascii=False)
-        for t in data.get("tasks", []) if t.get("task_uuid")
+        t["task_uuid"]: (t.get("version", 1) or 1, json.dumps(_merge_fields(t), ensure_ascii=False))
+        for t in data.get("tasks", []) if t.get("task_uuid") and t["task_uuid"] not in skip
     }
 
 
@@ -300,9 +317,9 @@ def _prune_premerge_backups(backup_dir: str, board_id: int, keep: int = 10):
                 try:
                     os.remove(old_path)
                 except Exception:
-                    pass
+                    logger.warning("No se pudo borrar la copia pre-fusión antigua %s", old_path, exc_info=True)
     except Exception:
-        pass
+        logger.warning("No se pudieron podar las copias pre-fusión de %s", backup_dir, exc_info=True)
 
 
 def create_premerge_backup(board_id: int, db_path=None) -> str:
@@ -321,6 +338,7 @@ def create_premerge_backup(board_id: int, db_path=None) -> str:
         _prune_premerge_backups(backup_dir, board_id, keep=10)
         return backup_path
     except Exception:
+        logger.warning("No se pudo crear la copia pre-fusión del tablero %s", board_id, exc_info=True)
         return ""
 
 
@@ -336,7 +354,18 @@ def sync_board_with_file(board_id: int, file_path: str = None, db_path=None) -> 
        - Si no hay cambios locales -> importación directa ('imported').
        - Si hay cambios concurrentes locales y externos -> Fusión diferencial ('merged')
          respetando las tareas de ambos y archivando colisiones en el chat/diario.
+    Si ya hay otra sync del mismo tablero en curso devuelve 'busy' sin tocar nada.
     """
+    lock = _board_sync_lock(board_id, db_path)
+    if not lock.acquire(blocking=False):
+        return SyncResult(status="busy", board_id=board_id, message=strings.t("sync.busy_msg"))
+    try:
+        return _sync_board_with_file(board_id, file_path, db_path)
+    finally:
+        lock.release()
+
+
+def _sync_board_with_file(board_id: int, file_path: str = None, db_path=None) -> SyncResult:
     sync_info = database.get_board_sync_info(board_id, db_path)
     if not sync_info:
         return SyncResult(status="error", board_id=board_id, message="El tablero no existe.")
@@ -359,7 +388,7 @@ def sync_board_with_file(board_id: int, file_path: str = None, db_path=None) -> 
         new_hash = write_sync_file_atomic(target_path, data)
         now_ts = now_utc_iso()
         database.update_board_sync_state(board_id, now_ts, new_hash, db_path)
-        database.mark_board_tasks_synced(board_id, db_path, _sync_bases(data))
+        database.mark_board_tasks_synced(board_id, _synced_tasks(data), db_path)
         return SyncResult(
             status="exported",
             board_id=board_id,
@@ -465,7 +494,7 @@ def sync_board_with_file(board_id: int, file_path: str = None, db_path=None) -> 
         new_hash = write_sync_file_atomic(target_path, local_data)
         now_ts = now_utc_iso()
         database.update_board_sync_state(board_id, now_ts, new_hash, db_path)
-        database.mark_board_tasks_synced(board_id, db_path, _sync_bases(local_data))
+        database.mark_board_tasks_synced(board_id, _synced_tasks(local_data), db_path)
         return SyncResult(
             status="exported",
             board_id=board_id,
@@ -484,10 +513,10 @@ def sync_board_with_file(board_id: int, file_path: str = None, db_path=None) -> 
                 file_path=target_path,
                 message="Error de seguridad: No se pudo crear la copia de seguridad pre-fusión (pre-merge backup). Sincronización abortada para evitar pérdida de datos.",
             )
-        imported_count = _apply_remote_board_clean(board_id, remote_data, db_path)
+        imported_count, pending = _apply_remote_board_clean(board_id, remote_data, db_path)
         now_ts = now_utc_iso()
         database.update_board_sync_state(board_id, now_ts, current_file_hash, db_path)
-        database.mark_board_tasks_synced(board_id, db_path, _sync_bases(remote_data))
+        database.mark_board_tasks_synced(board_id, _synced_tasks(remote_data, skip=pending), db_path)
         return SyncResult(
             status="imported",
             board_id=board_id,
@@ -512,7 +541,7 @@ def sync_board_with_file(board_id: int, file_path: str = None, db_path=None) -> 
     new_hash = write_sync_file_atomic(target_path, merged_data)
     now_ts = now_utc_iso()
     database.update_board_sync_state(board_id, now_ts, new_hash, db_path)
-    database.mark_board_tasks_synced(board_id, db_path, _sync_bases(merged_data))
+    database.mark_board_tasks_synced(board_id, _synced_tasks(merged_data), db_path)
 
     return SyncResult(
         status="merged",
@@ -526,9 +555,14 @@ def sync_board_with_file(board_id: int, file_path: str = None, db_path=None) -> 
     )
 
 
-def _apply_remote_board_clean(board_id: int, remote_data: dict, db_path=None) -> int:
-    """Aplica limpiamente los datos remotos cuando no hay modificaciones locales."""
+def _apply_remote_board_clean(board_id: int, remote_data: dict, db_path=None) -> tuple[int, set]:
+    """Aplica limpiamente los datos remotos cuando no hay modificaciones locales. Devuelve
+    (tareas aplicadas, task_uuid remotas que no se aplicaron porque cambiaron en local)."""
     with database.get_connection(db_path) as conn:
+        # La decisión de que no había cambios locales se tomó con una foto anterior: bloquear
+        # la escritura y no tocar lo que se haya creado o editado desde entonces (#123)
+        if not conn.in_transaction:
+            conn.execute("BEGIN IMMEDIATE")
         cursor = conn.cursor()
 
         # Mapear columnas existentes
@@ -552,16 +586,26 @@ def _apply_remote_board_clean(board_id: int, remote_data: dict, db_path=None) ->
 
         # Mapear tareas existentes
         cursor.execute(
-            """SELECT t.id, t.task_uuid FROM tasks t
+            """SELECT t.id, t.task_uuid, t.version, t.synced_version FROM tasks t
                JOIN columns c ON c.id = t.column_id
                WHERE c.board_id = ?""",
             (board_id,)
         )
-        local_tasks = {row["task_uuid"]: row["id"] for row in cursor.fetchall() if row["task_uuid"]}
+        rows = [row for row in cursor.fetchall() if row["task_uuid"]]
+        local_tasks = {row["task_uuid"]: row["id"] for row in rows}
+        # Nunca sincronizadas o con versión posterior a la del archivo: la siguiente sync las fusiona
+        changed_locally = {
+            row["task_uuid"] for row in rows
+            if not row["synced_version"] or (row["version"] or 1) > row["synced_version"]
+        }
 
         tasks_processed = 0
+        pending = set()
         for r_task in remote_data.get("tasks", []):
             t_uuid = r_task["task_uuid"]
+            if t_uuid in changed_locally:
+                pending.add(t_uuid)
+                continue
             target_col_id = local_cols.get(r_task["column_uuid"])
             if not target_col_id:
                 # Si la columna no se encontró, asignar a la primera columna disponible
@@ -609,10 +653,10 @@ def _apply_remote_board_clean(board_id: int, remote_data: dict, db_path=None) ->
         # Eliminar tareas locales que ya no existen en el archivo remoto (borradas por colaboradores)
         remote_task_uuids = {r["task_uuid"] for r in remote_data.get("tasks", []) if r.get("task_uuid")}
         for l_uuid, l_id in list(local_tasks.items()):
-            if l_uuid not in remote_task_uuids:
+            if l_uuid not in remote_task_uuids and l_uuid not in changed_locally:
                 cursor.execute("DELETE FROM tasks WHERE id = ?", (l_id,))
 
-        return tasks_processed
+        return tasks_processed, pending
 
 
 def _execute_two_way_merge(board_id: int, remote_data: dict, last_synced_at: str, db_path=None) -> dict:
@@ -621,6 +665,9 @@ def _execute_two_way_merge(board_id: int, remote_data: dict, last_synced_at: str
     result = {"imported": 0, "exported": 0, "conflicts": 0, "details": []}
 
     with database.get_connection(db_path) as conn:
+        # Leer y escribir en la misma transacción: nada puede cambiar entre la lectura y la fusión
+        if not conn.in_transaction:
+            conn.execute("BEGIN IMMEDIATE")
         cursor = conn.cursor()
 
         # 1. Columnas

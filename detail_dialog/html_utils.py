@@ -3,19 +3,40 @@ Utilidades compartidas para procesamiento y saneamiento de HTML en descripciones
 Desacopla dependencias entre MarkdownTextEdit y LogEntryWidget.
 """
 
+import html as html_lib
 import re
+
+from .security_utils import _is_unc_path
+
+_RESOURCE_ATTR_RE = re.compile(r'''\b(src|background)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)''', re.IGNORECASE)
+_CSS_URL_RE = re.compile(r'''url\(\s*("[^"]*"|'[^']*'|[^)]*?)\s*\)''', re.IGNORECASE)
+
+
+def _is_network_target(raw: str) -> bool:
+    return _is_unc_path(html_lib.unescape(raw).strip().strip("\"'"))
+
+
+def strip_network_resources(html: str) -> str:
+    """Vacía las imágenes y fondos (`src`, `background`, `url(...)`) que apuntan a una ubicación
+    de red (UNC o file://host): Qt los resuelve solo con mostrar la tarjeta, sin ningún clic, y
+    el HTML puede venir de un .ekboard compartido, una importación o un agente (#113). Las
+    imágenes de Ekin (data:) y las locales se mantienen."""
+    if not html:
+        return html
+    html = _RESOURCE_ATTR_RE.sub(lambda m: f'{m.group(1)}=""' if _is_network_target(m.group(2)) else m.group(0), html)
+    return _CSS_URL_RE.sub(lambda m: "url()" if _is_network_target(m.group(1)) else m.group(0), html)
 
 
 def sanitize_chat_html(html: str) -> str:
     """Elimina cabeceras DOCTYPE de Qt y cualquier residuo corrupto de DTD para que no
-    se muestren como texto plano en el chat o en las descripciones."""
+    se muestren como texto plano en el chat o en las descripciones, y los recursos de red."""
     if not html:
         return html
     # Eliminar cualquier <!DOCTYPE ...> que incluya o no la URL de W3C
     cleaned = re.sub(r'<!DOCTYPE[^>]*>', '', html, flags=re.IGNORECASE)
     # Limpiar cualquier fragmento de DTD residual o previamente corrupto por el parser
     cleaned = re.sub(r'(?:<a\s+[^>]*?>)?http://www\.w3\.org/TR/REC-html40/strict\.dtd(?:</a>)?["\'>]*', '', cleaned, flags=re.IGNORECASE)
-    return cleaned
+    return strip_network_resources(cleaned)
 
 
 _FIT_HTML_CACHE: dict[tuple[int, int], str] = {}

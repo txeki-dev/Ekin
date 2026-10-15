@@ -951,7 +951,9 @@ class SidebarWidget(QFrame):
             return
         if action == "sync":
             res = board_sync.sync_board_with_file(board_id, db_path=self.db_path)
-            if res.status == "error":
+            if res.status == "busy":
+                QMessageBox.information(self, t("sync.busy_title"), res.message)
+            elif res.status == "error":
                 QMessageBox.warning(self, t("sync.error_title"), res.message)
             else:
                 self.reload_boards(select_board_id=self.active_board_id)
@@ -977,7 +979,9 @@ class SidebarWidget(QFrame):
             )
             if file_path:
                 res = board_sync.sync_board_with_file(board_id, file_path, self.db_path)
-                if res.status != "error":
+                if res.status == "busy":
+                    QMessageBox.information(self, t("sync.busy_title"), res.message)
+                elif res.status != "error":
                     self.reload_boards(select_board_id=self.active_board_id)
                     self.board_changed.emit()
                 else:

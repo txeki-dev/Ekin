@@ -26,6 +26,10 @@ _DANGEROUS_EXTENSIONS = {
     ".lnk", ".url", ".inf", ".application", ".gadget",
     # Scripts interpretados con asociación directa en el SO
     ".py", ".pyw", ".jar",
+    # Tipos de Windows que ejecutan código o montan contenido al abrirse (#116)
+    ".chm", ".scf", ".appref-ms", ".settingcontent-ms", ".library-ms", ".search-ms", ".xll",
+    ".iso", ".img", ".vhd", ".vhdx", ".diagcab", ".ps1xml", ".psc1", ".vb", ".ws",
+    ".msix", ".msixbundle", ".appx", ".appxbundle",
 }
 
 

@@ -942,11 +942,6 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         h.addWidget(del_btn)
         return row
 
-    def _confirm_open_untrusted_link(self, url, is_local):
-        """Verifies if the target is a UNC share, executable/script, or unsafe scheme,
-        and prompts the user with a security warning requiring explicit confirmation."""
-        return confirm_open_untrusted_link(self, url, is_local)
-
     def _open_link(self, url, is_local):
         open_link_safely(self, url, is_local)
 
