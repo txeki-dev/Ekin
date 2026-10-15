@@ -685,3 +685,31 @@ def test_sync_local_move_without_remote_changes_is_not_a_conflict(sync_test_db):
         file_data = json.load(f)
     done_uuid = next(c["column_uuid"] for c in file_data["columns"] if c["name"] == "Hecho")
     assert _remote_task(file_data, "Tarea 1")["column_uuid"] == done_uuid
+
+
+def test_two_way_merge_does_not_count_untouched_tasks_as_conflicts(sync_test_db):
+    """#97: la fusión bidireccional comparaba el column_uuid remoto con uno local que su consulta no
+    leía (siempre None), así que cada tarea que nadie había tocado contaba como conflicto y subía
+    su `version` aunque los cambios fueran en tareas distintas."""
+    db_path = sync_test_db["db_path"]
+    board_id = sync_test_db["board_id"]
+    task3_id = database.create_task(sync_test_db["col1_id"], "Tarea 3", db_path=db_path)
+    sync_file = str(sync_test_db["tmp_path"] / "tablero_compartido.ekboard")
+    board_sync.sync_board_with_file(board_id, sync_file, db_path)
+    task3_version = database.get_task(task3_id, db_path)["version"]
+
+    # Cambio remoto en la Tarea 2 y cambio local en la Tarea 1: ninguno toca la Tarea 3
+    with open(sync_file, "r", encoding="utf-8") as f:
+        file_data = json.load(f)
+    remote_t2 = _remote_task(file_data, "Tarea 2")
+    remote_t2["title"] = "Tarea 2 (editada en remoto)"
+    remote_t2["version"] += 1
+    with open(sync_file, "w", encoding="utf-8") as f:
+        json.dump(file_data, f, indent=2)
+    database.update_task_positions([(sync_test_db["task1_id"], sync_test_db["col2_id"], 0)], db_path)
+
+    res = board_sync.sync_board_with_file(board_id, sync_file, db_path)
+
+    assert res.status == "merged"
+    assert res.conflicts_resolved == 0
+    assert database.get_task(task3_id, db_path)["version"] == task3_version

@@ -588,13 +588,13 @@ def _execute_two_way_merge(board_id: int, remote_data: dict, last_synced_at: str
         cursor.execute(
             """SELECT t.id, t.column_id, t.title, t.description, t.tag_text, t.tag_color,
                       t.position, t.due_date, t.due_time, t.recurrence, t.task_uuid,
-                      t.version, t.synced_version, t.updated_at
+                      t.version, t.synced_version, t.updated_at, c.column_uuid
                FROM tasks t
                JOIN columns c ON c.id = t.column_id
                WHERE c.board_id = ?""",
             (board_id,)
         )
-        local_tasks = {row["task_uuid"]: dict(row) for row in cursor.fetchall() if row["task_uuid"]}
+        local_tasks ={row["task_uuid"]: dict(row) for row in cursor.fetchall() if row["task_uuid"]}
         remote_tasks = {t["task_uuid"]: t for t in remote_data.get("tasks", []) if "task_uuid" in t}
 
         # Procesar tareas remotas

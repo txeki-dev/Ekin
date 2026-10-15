@@ -18,6 +18,12 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
   same task are still last-writer-wins for the whole task. Rethink a field-level merge before resuming.
 
 
+- [x] **DONE (2026-10-15) — #97 The two-way merge no longer counts untouched tasks as conflicts** `[BUG]`
+  · `board_sync._execute_two_way_merge` (the local query now reads `c.column_uuid`). 1 test (`test_board_sync.py`).
+  - **Problem:** the `differs` safety net compared the remote `column_uuid` with a local one the query never
+    selected (always `None`), so whenever both sides had changes every untouched task counted as a conflict,
+    got its `version` bumped and its `updated_at` reset to now. The field-level merge is still open (above).
+
 - [x] **DONE (2026-10-15) — #106 No native crash when restarting after an auto-update** `[BUG]`
   · `main.py` (`_restart_app`, `_start_mcp_server`, `aboutToQuit` → MCP `stop`). 2 tests (`test_main_window.py`).
   - **Problem:** `os.execv` in `_check_git_updates` replaced the process without Qt's orderly shutdown (MCP
