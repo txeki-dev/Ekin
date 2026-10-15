@@ -459,7 +459,12 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
                 card.set_timer_alert_hours(timer_alert_hours)
                 if card.task_id in self.selected_task_ids:
                     card.set_selected(True)
-                card.clicked.connect(lambda tid, cid=col_data["id"]: self._handle_task_card_clicked(tid, cid))
+                # Diferido: el detalle abre un bucle anidado y, si se abriera dentro del clic,
+                # una recarga en vivo (p. ej. por MCP) destruiría esta tarjeta con su evento aún
+                # en la pila → cierre nativo de Qt al cerrar el detalle (0xc0000005)
+                card.clicked.connect(
+                    lambda tid, cid=col_data["id"]: self._handle_task_card_clicked(tid, cid), Qt.QueuedConnection
+                )
                 card.ctrl_clicked.connect(lambda tid, cid=col_data["id"]: self._handle_task_ctrl_clicked(tid, cid))
                 card.board_link_clicked.connect(self.board_link_activated.emit)
                 card.drag_ended.connect(self.finalize_hover_expand)

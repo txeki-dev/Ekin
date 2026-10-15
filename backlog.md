@@ -91,7 +91,11 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
 - [x] **DONE (2026-10-14) — #103 Concurrent edits: closing Task Detail no longer reverts others' changes** `[BUG]`
   · `TaskDetailDialog` (`_apply_task_fields`, `_form_state`/`_task_state` three-way merge in `save_changes`, real live
     refresh, `_close_deleted_task`), `BoardViewWidget._perform_safe_mcp_board_reload` (waits for menus/modals).
-    6 tests (`tests/test_concurrent_edit.py`). SQLite side was already sound (WAL, `busy_timeout` 15 s, per-thread
+    11 tests (`tests/test_concurrent_edit.py`). **Manual test 2026-10-15 found two more**: a native crash
+    (`0xc0000005` in `Qt6Widgets.dll`: the detail's nested loop ran inside the card's click event, and the live
+    reload freed the card → card click now `Qt.QueuedConnection`) and a stale snapshot (taken before the app
+    stylesheet changed the editor's default font → description now tracked with `document().isModified()`).
+    SQLite side was already sound (WAL, `busy_timeout` 15 s, per-thread
     connections); drag & drop recompacts from the DB, not from widgets.
   - **Still open by design:** same-field conflicts are "the user's edit wins" (no merge inside a description);
     shared `.ekboard` boards stay last-writer-wins per task (#97).

@@ -118,6 +118,7 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
                 return
             if self._form_state() == self._loaded_form:
                 self._apply_task_fields(fresh)
+            self._update_kicker(fresh)
             self.task_data = fresh
             self.reload_logs()
         except RuntimeError:
@@ -498,13 +499,7 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
 
         self._apply_task_fields(task)
 
-        # Kicker de cabecera: TABLERO · COLUMNA (en mayúsculas)
-        col = database.get_column(task["column_id"], self.db_path)
-        board = database.get_board(col["board_id"], self.db_path) if col else None
-        if board and col:
-            self.kicker_label.setText(
-                t("task_detail.kicker", board=board["name"], column=col["name"]).upper()
-            )
+        self._update_kicker(task)
 
         # Cargar temporizador
         self._timer_started_at = task.get("timer_started_at")
@@ -519,11 +514,24 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         self.reload_links()
         self.reload_logs(preserve_scroll=False)
 
+    def _update_kicker(self, task):
+        """Kicker de cabecera: TABLERO · COLUMNA (en mayúsculas). Se repinta en vivo si otro
+        (p. ej. un agente por MCP) mueve la tarea de columna."""
+        col = database.get_column(task["column_id"], self.db_path)
+        board = database.get_board(col["board_id"], self.db_path) if col else None
+        if board and col:
+            self.kicker_label.setText(
+                t("task_detail.kicker", board=board["name"], column=col["name"]).upper()
+            )
+
     def _apply_task_fields(self, task):
         """Vuelca en el formulario los campos editables de `task` y toma la foto con la que
         save_changes() distingue lo que cambió el usuario de lo que cambiaron otros (#103)."""
         self.title_input.setText(task["title"])
         self.desc_input.setHtml(task["description"] or "")
+        # "Modificado" = lo editó el usuario. Su HTML no sirve para saberlo: al mostrarse, la
+        # hoja de estilos de la app cambia la fuente por defecto y con ella el <body style>
+        self.desc_input.document().setModified(False)
 
         # Cargar fecha de vencimiento
         due_date = task.get("due_date")
@@ -570,7 +578,8 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
             )
         return {
             "title": self.title_input.text().strip(),
-            "description": self.desc_input.toHtml(),
+            # None = sin tocar desde que se cargó (ver _apply_task_fields)
+            "description": self.desc_input.toHtml() if self.desc_input.document().isModified() else None,
             "due": due,
             "tag_value_ids": [tag["tag_value_id"] for tag in self.current_tags],
             "recurrence": self._recurrence_values[self.recurrence_combo.currentIndex()],
@@ -579,7 +588,8 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
 
     @staticmethod
     def _task_state(task):
-        """Los mismos campos que _form_state(), con los valores guardados en la base de datos."""
+        """Los mismos campos que _form_state(), con los valores guardados en la base de datos (la
+        descripción, en crudo: solo se usa cuando el usuario no la tocó)."""
         return {
             "title": task["title"],
             "description": task["description"] or "",
