@@ -32,6 +32,11 @@ def _close_top_level_widgets_after_each_test(qapp):
     `_close_window` en test_main_window.py) -- es un cierre de red adicional para
     todos los demás, y es un no-op para lo que un test ya destruyó por su cuenta."""
     yield
+    # #108: con Python < 3.12 el GC cíclico puede saltar DENTRO de topLevelWidgets()
+    # (al crear la lista Python) y destruir un widget huérfano del test cuyo puntero
+    # C++ ya está en esa lista: segfault / heap corruption en CI (3.10 y 3.11). Se
+    # recoge la basura antes, en un punto seguro, para que no quede nada que liberar.
+    gc.collect()
     for widget in qapp.topLevelWidgets():
         if hasattr(widget, "close"):
             try:

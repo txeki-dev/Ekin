@@ -16,6 +16,15 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
   the ADR is approved.
 
 
+- [x] **DONE (2026-10-15) — #108 CI test suite crashed on Python 3.10 / 3.11** `[BUG]` · `tests/conftest.py`
+  - **Problem:** every CI run since 12c3329 (2026-10-14) died with exit 134/139 in the teardown of the autouse
+    `_close_top_level_widgets_after_each_test` (`for widget in qapp.topLevelWidgets()`); 3.12 passed. On Python
+    < 3.12 the cyclic GC can fire *inside* that call (while shiboken builds the Python list) and free an orphan
+    widget from the previous test whose C++ pointer is already in the list. 3.12+ only collects at safe points.
+    Latent since the fixture existed (6.11.1 is vulnerable too); PySide6 6.12.0 just shifted GC timing onto it.
+  - **Solution:** `gc.collect()` before `topLevelWidgets()`. Verified with a scratch plugin that forces the GC
+    inside that call: without the fix the suite dies at ~75 % (`0xC0000374`), with it 3/3 runs pass (573).
+
 - [x] **DONE (2026-10-15) — #107 Two open Ekins no longer share the MCP port 8765 silently** `[BUG]`
   · `mcp_server.McpHttpServer.allow_reuse_address`, `board_mixins._update_mcp_btn_ui`, `main._start_mcp_server`,
     `strings.py`. 3 tests (`test_mcp.py`, `test_main_window.py`) + 1 updated.
