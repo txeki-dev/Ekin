@@ -22,16 +22,19 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
   - **Solution:** muted `#id` before the card title (its background follows `set_card_style`, so theme and
     selection repaint it) and before the title in Task Detail's header. Checked in light and dark themes.
 
-- [ ] **IN PROGRESS (2026-10-15) — #108 CI test suite crashed on Python 3.10 / 3.11** `[BUG]` · `tests/conftest.py`
-  - **Status:** the segfault (exit 139) below is fixed (e7ed2bf); CI still aborts (exit 134, no traceback) in the
-    teardown of `test_task_detail_dialog_logs_scroll_to_latest` — a second, separate cause under diagnosis.
-  - **Problem:** every CI run since 12c3329 (2026-10-14) died with exit 134/139 in the teardown of the autouse
-    `_close_top_level_widgets_after_each_test` (`for widget in qapp.topLevelWidgets()`); 3.12 passed. On Python
-    < 3.12 the cyclic GC can fire *inside* that call (while shiboken builds the Python list) and free an orphan
-    widget from the previous test whose C++ pointer is already in the list. 3.12+ only collects at safe points.
-    Latent since the fixture existed (6.11.1 is vulnerable too); PySide6 6.12.0 just shifted GC timing onto it.
-  - **Solution:** `gc.collect()` before `topLevelWidgets()`. Verified with a scratch plugin that forces the GC
-    inside that call: without the fix the suite dies at ~75 % (`0xC0000374`), with it 3/3 runs pass (573).
+- [x] **DONE (2026-10-15) — #108 CI test suite crashed on Python 3.10 / 3.11** `[BUG]` · `pyproject.toml`,
+  `tests/conftest.py`. Every CI run since 12c3329 (2026-10-14) died on 3.10/3.11 (3.12 passed). Two causes:
+  - **Abort, exit 134 (the main one):** `Fatal Python error: none_dealloc: deallocating None` in the busy loop of
+    `test_task_detail_dialog_logs_scroll_to_latest`. On Linux, PySide6 **6.12.0** (2026-10-08) drops one reference
+    to `None` on every `QCoreApplication.processEvents()` call, even with no windows (measured in CI: 3,001 calls →
+    −3,001 refs; Windows doesn't leak). On 3.12+ `None` is immortal (PEP 683), so only 3.10/3.11 crash. pytest's fd
+    capture swallowed the message; a temporary `diag/108-ci` branch with `--capture=sys` exposed it.
+    **Fix:** `PySide6>=6.6.0,<7,!=6.12.0` (CI and the release build go back to 6.11.2; a fixed 6.12.x can come in).
+    The app never calls `processEvents()` and ships on Windows only, so users weren't affected.
+  - **Segfault, exit 139 (latent, fixed in e7ed2bf):** on Python < 3.12 the cyclic GC can fire *inside*
+    `qapp.topLevelWidgets()` in the autouse cleanup fixture and free an orphan widget whose C++ pointer is already
+    in the list (6.11.1 is vulnerable too). `gc.collect()` first; verified with a scratch plugin that forces the GC
+    inside that call (without the fix the suite dies at ~75 % with `0xC0000374`, with it 3/3 runs pass).
 
 - [x] **DONE (2026-10-15) — #107 Two open Ekins no longer share the MCP port 8765 silently** `[BUG]`
   · `mcp_server.McpHttpServer.allow_reuse_address`, `board_mixins._update_mcp_btn_ui`, `main._start_mcp_server`,
