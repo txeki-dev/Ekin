@@ -6,7 +6,20 @@ Ordered roughly by value/effort. Checkboxes track what's done.
 ## 🎯 Prioritized Backlog
 
 _Added 2026-10-14 — backlog session of the 'SW - Ekin' board (plan: `.agents/docs/instruction_1.md`).
-Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #87 → #88 · Wave 3: #74 · Wave 4: #81 (ADR)._
+Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #87 → #88 · Wave 3: #101 → #102 → #103 → #74 (part A)
+· Wave 4: #81 (ADR). **Status 2026-10-15:** waves 1–3 shipped and validated by the user (OUTRO b063add); the board
+(`SW - Ekin`) is the source of truth for what's open._
+
+**Open:**
+- [ ] **#81 PWA Ekin Mobile — Wave 4** `[FEAT]` — phase 81.0 first: ADR (LAN-first, PatrimonIA pattern: on-demand LAN
+  listener + mkcert TLS + mDNS + QR pairing + idempotent event queue) and sub-cards 81.1–81.5; no PWA code before
+  the ADR is approved.
+- [ ] **#97 Rethink `.ekboard` sync conflicts (parked)** `[ARCH]` — the `version` bump below shipped; conflicts on the
+  same task are still last-writer-wins for the whole task. Rethink a field-level merge before resuming.
+- [ ] **#106 Native crash in `pyside6.abi3.dll` when restarting after an auto-update** `[BUG]` — `os.execv` in
+  `main._check_git_updates` replaces the process without Qt's orderly shutdown (MCP server and sync threads alive);
+  spawn the new process detached and `QApplication.quit()` instead.
+
 
 - [x] **DONE (2026-10-14) — #97 Moving a card to another column now bumps `tasks.version`** `[BUG]`
   · `database/tasks.py::update_task_positions`, `mcp_server._tool_move_task` (`version + (column_id != ?)`).
@@ -14,6 +27,7 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
   - **Problem:** drag & drop, undo/redo and MCP `move_task` never bumped `version`, so `board_sync` saw the
     task as untouched: a collaborator's edit of the same task overwrote the newer local move, or a phantom
     conflict was counted. Conflicts stay last-writer-wins per task (no field-level merge — out of scope).
+  - The card itself is **parked** (2026-10-15) to rethink that field-level merge — see *Open* above.
 
 - [x] **DONE (2026-10-14) — #83 MCP `move_task` into a Done column clears the due date** `[BUG]`
   · `column_roles.py` (new: `classify_column`, `column_roles`), `mcp_server._tool_move_task`,
@@ -268,7 +282,7 @@ proposed. Ready for the `<feature_plan_tdd>` protocol._
 
 ---
 
-## 🚧 In progress (2026-09-05 — UI Refactor: "Warm Shell" from Claude Design handoff)
+## ✅ Done (2026-09-05/07 — UI Refactor: "Warm Shell" from Claude Design handoff)
 
 Full presentation refactor per the `Refactor UI para EKIN-handoff.zip` spec (design system
 "Organic": cream ground `#f5ead8`, single terracotta accent `#c67139`, sage second voice,
@@ -679,7 +693,7 @@ an unreachable `backups._prune_backups(keep=0)` edge case, minor task-link order
 
 ---
 
-## 🧹 Code quality & tech debt (found, not yet fixed)
+## 🧹 Code quality & tech debt (all resolved — new findings are tracked as board cards)
 
 - [x] **`db_path=DB_NAME` default binding is frozen at import.** *(Done in v0.4.0.)* All 38
   `database.py` functions now use `db_path=None` → `db_path or DB_NAME`, resolving at call time.

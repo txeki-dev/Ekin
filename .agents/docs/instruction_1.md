@@ -1,5 +1,17 @@
 # TECHNICAL DESIGN DOCUMENT — Backlog "SW - Ekin" (sesión 2026-10-14)
 
+## 0. Estado (2026-10-15, tras el OUTRO b063add)
+
+| Oleada | Resultado |
+|---|---|
+| 1 | ✅ #83, #98, #99, #84, #82 en Done. #97: el cambio de `version` está integrado, pero la tarjeta está **aparcada en el Backlog** para replantear una fusión por campos en la sync `.ekboard`. |
+| 2 | ✅ #85, #86, #87, #88 en Done. Mejora posterior pedida por el usuario: #104 (pie de página de estado, botón **Work** en lugar de «Start working», pestaña **Directorios locales** en Ajustes). El semáforo de #88 quedó en la barra lateral, como pedía la tarjeta. |
+| 3 | ✅ #101, #102, #103 (edición concurrente, validada a mano; destapó el cierre nativo 0xc0000005 y la foto previa a la hoja de estilos, c8e1af6) y #74 **solo parte A**; las partes B y C se descartaron. |
+| 4 | ⏳ #81: pendiente la fase 81.0 (ADR + sub-tarjetas), sin código hasta que el usuario apruebe el ADR. |
+
+Nuevo hallazgo pendiente: #106 (cierre nativo en `pyside6.abi3.dll` al reiniciar tras la auto-actualización por `os.execv`).
+Las casillas de las secciones de abajo reflejan lo implementado; las de las partes descartadas de #74 quedan sin marcar.
+
 ## 1. Overview
 
 Plan de implementación de las 12 tarjetas de `📥 Backlog & Triage`: las 9 originales (#74,
@@ -341,19 +353,20 @@ queda caído hasta abrir ese diálogo.
 ### #74 — Respuestas MCP en inglés para ahorrar tokens  `[A: S · B: S · C: M]`
 
 Decisión D4 (usuario, 2026-10-14): A ya; B como puerta go/no-go; C solo si B lo justifica.
+**Cierre (usuario, 2026-10-15): #74 se cierra solo con la parte A; B y C se descartan.**
 
 - [x] **A. Texto del servidor en inglés (sin LLM, coste cero):** descripciones de
   `get_mcp_tools_schema`, `_build_instructions`, mensajes de error del ejecutor y
   `format_daily_standup_markdown` (solo lo usa el MCP — verificado). Los audits del diario
   siguen en el idioma de la UI (los ve el usuario). Ajustar los tests que comparan cadenas.
-- [ ] **B. Medición (spike):** `scripts/measure_mcp_tokens.py` vuelca las respuestas reales **BLOQUEADO (2026-10-14)**: sin LLM local ni credenciales de Anthropic en este PC; pendiente de decisión del usuario.
+- [ ] ~~**B. Medición (spike):**~~ **DESCARTADA (2026-10-15).** `scripts/measure_mcp_tokens.py` vuelca las respuestas reales **BLOQUEADO (2026-10-14)**: sin LLM local ni credenciales de Anthropic en este PC; pendiente de decisión del usuario.
   (`list_tasks`, resumen ejecutivo, `get_task_condensed_context` de 5 tarjetas) en ES y su
   traducción EN con el modelo candidato, y mide tokens (endpoint `count_tokens` de Anthropic
   si hay `ANTHROPIC_API_KEY`; si no, aproximado y marcado como tal) y latencia por tarjeta.
   Candidatos: el Qwen2.5-Coder-1.5B actual frente a un instruct generalista ~3B Q4 vía
   `llama-server`. **Puerta:** seguir con C solo si ahorro ≥ 20 % en contenido de usuario y
   p95 < 3 s por tarjeta en este PC; si no, cerrar C como won't-do y documentarlo.
-- [ ] **C. Traducción LLM opt-in (si B pasa):** `mcp_translation.py` con
+- [ ] ~~**C. Traducción LLM opt-in (si B pasa):**~~ **DESCARTADA (2026-10-15).** `mcp_translation.py` con
   `translate_response(data)` que recorre las claves `title, description, content,
   journal_summary, latest_comment, executive_markdown`; caché en la tabla nueva
   `translations(src_hash TEXT PRIMARY KEY, lang TEXT, text TEXT, created_at TEXT)`. Acierto →
