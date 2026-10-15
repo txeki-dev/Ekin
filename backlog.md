@@ -16,10 +16,17 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
   the ADR is approved.
 - [ ] **#97 Rethink `.ekboard` sync conflicts (parked)** `[ARCH]` — the `version` bump below shipped; conflicts on the
   same task are still last-writer-wins for the whole task. Rethink a field-level merge before resuming.
-- [ ] **#106 Native crash in `pyside6.abi3.dll` when restarting after an auto-update** `[BUG]` — `os.execv` in
-  `main._check_git_updates` replaces the process without Qt's orderly shutdown (MCP server and sync threads alive);
-  spawn the new process detached and `QApplication.quit()` instead.
 
+
+- [x] **DONE (2026-10-15) — #106 No native crash when restarting after an auto-update** `[BUG]`
+  · `main.py` (`_restart_app`, `_start_mcp_server`, `aboutToQuit` → MCP `stop`). 2 tests (`test_main_window.py`).
+  - **Problem:** `os.execv` in `_check_git_updates` replaced the process without Qt's orderly shutdown (MCP
+    server threads alive), so every git auto-update ended in an access violation `0xc0000005` in
+    `pyside6.abi3.dll` (Windows event 1000), right after `QThreadStorage: entry N destroyed before end of thread`.
+  - **Solution:** the new version starts as a detached process and this one leaves with `QApplication.quit()`;
+    `aboutToQuit` now stops the MCP server (it never stopped before), freeing port 8765. At launch a busy port
+    is retried every 0.5 s (10 tries). On Windows `SO_REUSEADDR` already lets the new instance bind while the
+    old one still listens (the old one answers until it closes); the retry is for Linux/macOS.
 
 - [x] **DONE (2026-10-14) — #97 Moving a card to another column now bumps `tasks.version`** `[BUG]`
   · `database/tasks.py::update_task_positions`, `mcp_server._tool_move_task` (`version + (column_id != ?)`).

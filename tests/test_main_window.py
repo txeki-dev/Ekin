@@ -574,3 +574,56 @@ def test_busy_mcp_port_does_not_break_startup(qapp, db_path, monkeypatch):
     window = _make_window(monkeypatch, manager)
     assert manager.started == 1 and window.board_view is not None
     _close_window(qapp, window)
+
+
+def test_busy_mcp_port_is_retried_until_it_is_released(qapp, db_path, monkeypatch):
+    """#106: al reiniciar tras actualizarse, la instancia anterior puede tener aún el puerto
+    8765; el arranque reintenta en vez de dejar a los agentes sin tablero hasta reabrir Ekin."""
+    from PySide6.QtTest import QTest
+    monkeypatch.setattr(database, "DB_NAME", db_path)
+    board_id, _ = _make_task_on_board(db_path)
+    database.set_board_mcp_config(board_id, enabled=True, db_path=db_path)
+    manager = _FakeMcpManager(ok=False)
+    window = _make_window(monkeypatch, manager)
+    manager.ok = True  # la instancia anterior suelta el puerto
+    for _ in range(40):
+        if manager.started == 2:
+            break
+        QTest.qWait(50)
+    assert manager.started == 2
+    _close_window(qapp, window)
+
+
+def test_git_update_restarts_in_a_new_process_and_quits_cleanly(qapp, db_path, monkeypatch):
+    """#106: os.execv reemplazaba el proceso sin el cierre ordenado de Qt (con los hilos del MCP
+    y de la sync vivos) y cada actualización acababa en un cierre nativo en pyside6.abi3.dll.
+    Ahora la versión nueva arranca aparte y esta sale con QApplication.quit() (pasa por aboutToQuit)."""
+    import os
+    import subprocess
+    import sys
+    monkeypatch.setattr(database, "DB_NAME", db_path)
+    window = _make_window(monkeypatch)
+
+    outputs = {
+        ("rev-parse", "--is-inside-work-tree"): "true",
+        ("status", "-uno"): "Your branch is behind 'origin/main' by 1 commit.",
+    }
+    monkeypatch.setattr(
+        main_module.subprocess, "run",
+        lambda cmd, **kw: type("R", (), {"returncode": 0, "stdout": outputs.get(tuple(cmd[1:]), ""), "stderr": ""})(),
+    )
+    monkeypatch.setattr(main_module.QMessageBox, "question", lambda *a, **k: main_module.QMessageBox.Yes)
+    monkeypatch.setattr(main_module.QMessageBox, "information", lambda *a, **k: None)
+    launched, quits, execs = [], [], []
+    monkeypatch.setattr(main_module.subprocess, "Popen", lambda args, **kw: launched.append((args, kw)))
+    monkeypatch.setattr(main_module.QApplication, "quit", lambda: quits.append(True))
+    monkeypatch.setattr(main_module.os, "execv", lambda *a: execs.append(a))
+
+    window._check_git_updates()
+
+    assert execs == []
+    assert [args for args, _ in launched] == [[sys.executable] + sys.argv]
+    if os.name == "nt":
+        assert launched[0][1]["creationflags"] & subprocess.DETACHED_PROCESS
+    assert quits == [True]
+    _close_window(qapp, window)

@@ -230,8 +230,7 @@ class MainWindow(QMainWindow):
         # Servidor MCP en marcha desde el arranque si algún tablero lo tiene activado (#101);
         # antes solo arrancaba al guardar el diálogo MCP y cada reinicio dejaba a los agentes fuera
         if any(b["mcp_enabled"] for b in database.get_boards(include_archived=True)):
-            if not get_mcp_manager(database.DB_NAME).start():
-                log.warning("No se pudo arrancar el servidor MCP al iniciar Ekin")
+            self._start_mcp_server()
         # Adelantar tareas recurrentes vencidas a su próxima ocurrencia
         try:
             database.advance_overdue_recurring(date.today().isoformat())
@@ -608,6 +607,24 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
 
+    def _start_mcp_server(self, attempts=10):
+        """Arranca el servidor MCP; si el puerto sigue ocupado (p. ej. por la instancia que se
+        está cerrando tras actualizarse, #106), reintenta cada 0,5 s antes de rendirse."""
+        if get_mcp_manager(database.DB_NAME).start():
+            return
+        if attempts > 1:
+            QTimer.singleShot(500, self, lambda: self._start_mcp_server(attempts - 1))
+        else:
+            log.warning("No se pudo arrancar el servidor MCP al iniciar Ekin")
+
+    def _restart_app(self):
+        """Arranca la versión nueva como proceso aparte y cierra esta de forma ordenada (#106).
+        os.execv en Windows mataba el proceso con hilos vivos (MCP, sync), lo que acababa
+        en un cierre nativo en pyside6.abi3.dll."""
+        flags = subprocess.DETACHED_PROCESS if os.name == "nt" else 0
+        subprocess.Popen([sys.executable] + sys.argv, creationflags=flags)
+        QApplication.quit()
+
     def closeEvent(self, event):
         try:
             database.set_setting(
@@ -970,8 +987,8 @@ class MainWindow(QMainWindow):
                 t("main.update.done_body")
             )
 
-            # Reiniciar solo tras un pull exitoso (execv reemplaza el proceso entero).
-            os.execv(sys.executable, [sys.executable] + sys.argv)
+            # Reiniciar solo tras un pull exitoso.
+            self._restart_app()
         except Exception as e:
             if manual:
                 QMessageBox.warning(self, t("main.update.failed_title"), str(e))
@@ -1048,6 +1065,8 @@ def main():
 
     import local_ai
     app.aboutToQuit.connect(local_ai.stop_managed_runner)
+    # Parar el MCP (y sus hilos) al salir libera el puerto 8765 para la siguiente instancia (#106)
+    app.aboutToQuit.connect(get_mcp_manager(database.DB_NAME).stop)
 
     window = MainWindow()
     window.show()
