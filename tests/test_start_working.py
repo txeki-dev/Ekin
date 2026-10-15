@@ -153,10 +153,70 @@ def test_start_working_without_folder_or_cli_warns(db_path, tmp_path, flow, monk
     assert flow.launched is None and len(flow.messages) == 2
 
 
-def test_start_working_button_only_with_a_local_folder(qapp, db_path, tmp_path):
+def test_work_button_is_always_there_and_says_what_it_will_do(qapp, db_path, tmp_path):
     view = BoardViewWidget(db_path=db_path)
     view.load_board(_sw_board(db_path, None))
-    assert view.start_working_btn.isHidden()
-    view.load_board(_sw_board(db_path, str(tmp_path)))
     assert not view.start_working_btn.isHidden()
+    assert view.start_working_btn.toolTip() == sw.t("board_view.work_link_tooltip")
+    view.load_board(_sw_board(db_path, str(tmp_path)))
+    assert view.start_working_btn.toolTip() == sw.t("board_view.start_working_tooltip")
     view.close()
+
+
+def test_work_without_a_folder_asks_for_it_then_starts(qapp, db_path, tmp_path, monkeypatch):
+    """Enlazar el directorio cuesta un clic: Work lo pide si falta y sigue con START WORKING."""
+    import board_view as bv_module
+    view = BoardViewWidget(db_path=db_path)
+    board_id = _sw_board(db_path, None)
+    view.load_board(board_id)
+    started = []
+    monkeypatch.setattr(sw, "start_working", lambda *a, **k: started.append(a[1]))
+
+    monkeypatch.setattr(bv_module.QFileDialog, "getExistingDirectory", staticmethod(lambda *a, **k: ""))
+    view.start_working_btn.click()  # cancelado: no enlaza ni arranca
+    assert database.get_board(board_id, db_path=db_path)["local_dir"] is None and started == []
+
+    monkeypatch.setattr(bv_module.QFileDialog, "getExistingDirectory",
+                        staticmethod(lambda *a, **k: str(tmp_path).replace("\\", "/")))
+    view.start_working_btn.click()
+    assert database.get_board(board_id, db_path=db_path)["local_dir"] == str(tmp_path)
+    assert started == [board_id]
+    assert view.start_working_btn.toolTip() == sw.t("board_view.start_working_tooltip")
+    view.close()
+
+
+def test_status_moves_to_the_board_footer(qapp, db_path, tmp_path):
+    """La cabecera se recortaba: el recuento, el MCP y la sync viven ahora en el pie de página."""
+    view = BoardViewWidget(db_path=db_path)
+    view.load_board(_sw_board(db_path, None))
+    for widget in (view.board_counts_chip, view.mcp_btn, view.sync_btn):
+        assert view.board_footer.isAncestorOf(widget) and not view.board_header.isAncestorOf(widget)
+    for widget in (view.bulk_add_btn, view.prompts_btn, view.diary_btn, view.start_working_btn):
+        assert view.board_header.isAncestorOf(widget)
+    assert not view.board_footer.isHidden()
+    view.load_board(-1)
+    assert view.board_footer.isHidden()
+    view.close()
+
+
+def test_settings_local_folders_tab(qapp, db_path, tmp_path, monkeypatch):
+    import settings_dialog
+    linked = _sw_board(db_path, str(tmp_path))
+    unlinked = _sw_board(db_path, None)
+    dlg = settings_dialog.SettingsDialog(db_path)
+    assert dlg.tabs.count() == 2
+    assert set(dlg.local_dir_rows) >= {linked, unlinked}
+    assert dlg.local_dir_rows[linked][0].text() == str(tmp_path)
+    changes = []
+    dlg.local_dirs_changed.connect(lambda: changes.append(1))
+
+    other = tmp_path / "otro"
+    other.mkdir()
+    monkeypatch.setattr(settings_dialog.QFileDialog, "getExistingDirectory", staticmethod(lambda *a, **k: str(other)))
+    dlg._browse_local_dir(unlinked)
+    assert database.get_board(unlinked, db_path=db_path)["local_dir"] == str(other)
+
+    dlg.local_dir_rows[linked][1].click()  # Quitar
+    assert database.get_board(linked, db_path=db_path)["local_dir"] is None
+    assert not dlg.local_dir_rows[linked][1].isEnabled() and changes == [1, 1]
+    dlg.close()

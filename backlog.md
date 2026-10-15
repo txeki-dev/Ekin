@@ -83,6 +83,11 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
   · `widgets.py::TaskCard.mouseReleaseEvent` calls `super()` before emitting `clicked`/`ctrl_clicked`.
     1 test reproducing the exact log error (`shiboken6.delete` in the click handler).
 
+- [x] **DONE (2026-10-15) — Board header → status footer; Work button; Local folders tab in Settings** `[UX]`
+  · `board_view.py` (`board_footer` with count chip + MCP + sync; *Work* always visible, picks the folder if missing),
+    `settings_dialog.py` (tabs *General* / *Local folders*, `local_dirs_changed`), `styles.py` (themed tabs), `main.py`.
+    4 tests (`tests/test_start_working.py`). Verified by rendering at 1280 px (ES/EN): nothing cut off.
+
 - [x] **DONE (2026-10-14) — #103 Concurrent edits: closing Task Detail no longer reverts others' changes** `[BUG]`
   · `TaskDetailDialog` (`_apply_task_fields`, `_form_state`/`_task_state` three-way merge in `save_changes`, real live
     refresh, `_close_deleted_task`), `BoardViewWidget._perform_safe_mcp_board_reload` (waits for menus/modals).

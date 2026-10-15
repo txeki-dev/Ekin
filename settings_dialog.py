@@ -9,9 +9,12 @@ lógica de estado y persistencia sigue viviendo en tres widgets de respaldo ocul
 """
 from PySide6.QtCore import Qt, Signal, QRectF, QSize
 from PySide6.QtGui import QPainter, QColor
+import os
+
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox, QPushButton,
-    QFrame, QSpinBox, QButtonGroup, QSizePolicy, QWidget
+    QFrame, QSpinBox, QButtonGroup, QSizePolicy, QWidget, QTabWidget, QScrollArea,
+    QLineEdit, QFileDialog
 )
 
 import database
@@ -49,6 +52,7 @@ class SettingsDialog(QDialog):
     check_updates_requested = Signal()
     landing_tour_requested = Signal()
     interactive_tour_requested = Signal()
+    local_dirs_changed = Signal()     # se asoció o quitó el directorio local de algún tablero
 
     def __init__(self, db_path, parent=None):
         super().__init__(parent)
@@ -56,7 +60,7 @@ class SettingsDialog(QDialog):
         self.finished.connect(self.deleteLater)
         self.db_path = db_path
         self.setWindowTitle(t("settings.window_title"))
-        self.setMinimumWidth(560)
+        self.setMinimumWidth(640)  # pestañas + los dos botones del tour sin recortar
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(28, 26, 28, 26)
@@ -131,48 +135,54 @@ class SettingsDialog(QDialog):
         )
         self.digest_chk.hide()
 
+        # === Pestaña General: las preferencias de la aplicación ===
+        general = QWidget()
+        general_layout = QVBoxLayout(general)
+        general_layout.setContentsMargins(18, 18, 18, 18)
+        general_layout.setSpacing(18)
+
         # === Fila 1: Idioma (segmentado English / Español) ===
-        layout.addWidget(self._row(
+        general_layout.addWidget(self._row(
             t("settings.language_label"), t("settings.language_desc"), self._build_language_segment()
         ))
-        layout.addWidget(self._divider())
+        general_layout.addWidget(self._divider())
 
         # === Fila 2: Tema (segmentado Light / Dark) ===
-        layout.addWidget(self._row(
+        general_layout.addWidget(self._row(
             t("settings.theme_label"), t("settings.theme_desc"), self._build_theme_segment()
         ))
-        layout.addWidget(self._divider())
+        general_layout.addWidget(self._divider())
 
         # === Fila 3: Notificaciones (interruptor) ===
         self.notif_switch = ToggleSwitch()
         self.notif_switch.setChecked(self.notif_chk.isChecked())
         self.notif_switch.toggled.connect(self.notif_chk.setChecked)
-        layout.addWidget(self._row(
+        general_layout.addWidget(self._row(
             t("settings.notifications_label"), t("settings.notifications_desc"), self.notif_switch
         ))
-        layout.addWidget(self._divider())
+        general_layout.addWidget(self._divider())
 
         # === Fila 3: Umbral del temporizador (stepper) ===
-        layout.addWidget(self._row(
+        general_layout.addWidget(self._row(
             t("settings.timer_alert_label"), t("settings.timer_alert_desc"), self._build_stepper()
         ))
-        layout.addWidget(self._divider())
+        general_layout.addWidget(self._divider())
 
         # === Fila 4: Aviso por anticipación (stepper en días) ===
-        layout.addWidget(self._row(
+        general_layout.addWidget(self._row(
             t("settings.reminder_lead_label"), t("settings.reminder_lead_desc"),
             self._make_stepper(self.reminder_lead_spin, "d")
         ))
-        layout.addWidget(self._divider())
+        general_layout.addWidget(self._divider())
 
         # === Fila 5: Resumen semanal (interruptor) ===
         self.digest_switch = ToggleSwitch()
         self.digest_switch.setChecked(self.digest_chk.isChecked())
         self.digest_switch.toggled.connect(self.digest_chk.setChecked)
-        layout.addWidget(self._row(
+        general_layout.addWidget(self._row(
             t("settings.weekly_digest_label"), t("settings.weekly_digest_desc"), self.digest_switch
         ))
-        layout.addWidget(self._divider())
+        general_layout.addWidget(self._divider())
 
         # === Fila 6: Actualizaciones del sistema (botón manual) ===
         check_update_btn = QPushButton(f" {t('settings.check_updates_btn')}")
@@ -194,10 +204,10 @@ class SettingsDialog(QDialog):
             }}
         """)
         check_update_btn.clicked.connect(self.check_updates_requested.emit)
-        layout.addWidget(self._row(
+        general_layout.addWidget(self._row(
             t("settings.check_updates_label"), t("settings.check_updates_desc"), check_update_btn
         ))
-        layout.addWidget(self._divider())
+        general_layout.addWidget(self._divider())
 
         # === Fila 7: Guía de bienvenida y recorrido inicial ===
         tour_buttons_frame = QWidget()
@@ -250,11 +260,26 @@ class SettingsDialog(QDialog):
         landing_tour_btn.clicked.connect(self._on_landing_tour_clicked)
         tour_buttons_layout.addWidget(landing_tour_btn)
 
-        layout.addWidget(self._row(
+        general_layout.addWidget(self._row(
             t("settings.landing_tour_label"), t("settings.landing_tour_desc"), tour_buttons_frame
         ))
 
-        layout.addStretch()
+        general_layout.addStretch()
+
+        # En un QScrollArea: respeta la altura de las descripciones que saltan de línea (una
+        # pestaña sola no la propaga y las recortaba) y, si la ventana es baja, desplaza
+        general_scroll = QScrollArea()
+        general_scroll.setWidgetResizable(True)
+        general_scroll.setFrameShape(QFrame.NoFrame)
+        general_scroll.setWidget(general)
+        general_scroll.viewport().setStyleSheet(f"background-color: {styles.COLORS['bg_card']};")
+        general.setStyleSheet(f"background-color: {styles.COLORS['bg_card']};")
+        general_scroll.setMinimumHeight(general.sizeHint().height())
+
+        self.tabs = QTabWidget()
+        self.tabs.addTab(general_scroll, t("settings.tab_general"))
+        self.tabs.addTab(self._build_local_dirs_page(), t("settings.tab_local_dirs"))
+        layout.addWidget(self.tabs, 1)
 
         info = QLabel(t("settings.geometry_hint"))
         info.setWordWrap(True)
@@ -270,6 +295,72 @@ class SettingsDialog(QDialog):
         btns.addWidget(close_btn)
         layout.addLayout(btns)
 
+    def _build_local_dirs_page(self):
+        """Pestaña Directorios locales: cada tablero con su carpeta (repo), con Examinar y Quitar.
+        Los cambios se guardan al momento, como el resto de ajustes."""
+        page = QWidget()
+        outer = QVBoxLayout(page)
+        outer.setContentsMargins(18, 18, 18, 18)
+        outer.setSpacing(12)
+        hint = QLabel(t("settings.local_dirs_hint"))
+        hint.setWordWrap(True)
+        hint.setStyleSheet(f"font-size: 12px; color: {styles.COLORS['text_muted']}; background: transparent;")
+        outer.addWidget(hint)
+
+        holder = QWidget()
+        rows = QVBoxLayout(holder)
+        rows.setContentsMargins(0, 0, 0, 0)
+        rows.setSpacing(8)
+        self.local_dir_rows = {}
+        for board in database.get_boards(self.db_path):
+            row = QHBoxLayout()
+            name = QLabel(board["name"])
+            name.setFixedWidth(150)
+            name.setToolTip(board["name"])
+            name.setStyleSheet(f"font-weight: 600; color: {styles.COLORS['text_main']}; background: transparent;")
+            row.addWidget(name)
+            field = QLineEdit(board.get("local_dir") or "")
+            field.setToolTip(board.get("local_dir") or "")
+            field.setReadOnly(True)
+            field.setPlaceholderText(t("sidebar.board_edit.local_dir_placeholder"))
+            row.addWidget(field, 1)
+            browse = QPushButton(t("sidebar.board_edit.local_dir_browse"))
+            browse.clicked.connect(lambda _=False, board_id=board["id"]: self._browse_local_dir(board_id))
+            row.addWidget(browse)
+            clear = QPushButton(t("sidebar.board_edit.local_dir_clear"))
+            clear.setEnabled(bool(board.get("local_dir")))
+            clear.clicked.connect(lambda _=False, board_id=board["id"]: self._set_local_dir(board_id, None))
+            row.addWidget(clear)
+            rows.addLayout(row)
+            self.local_dir_rows[board["id"]] = (field, clear)
+        rows.addStretch()
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setWidget(holder)
+        # Un QScrollArea con hijos no muestra el relleno del contenedor: el fondo va en línea
+        scroll.viewport().setStyleSheet(f"background-color: {styles.COLORS['bg_card']};")
+        holder.setStyleSheet(f"background-color: {styles.COLORS['bg_card']};")
+        outer.addWidget(scroll, 1)
+        return page
+
+    def _browse_local_dir(self, board_id):
+        field, _ = self.local_dir_rows[board_id]
+        path = QFileDialog.getExistingDirectory(
+            self, t("sidebar.board_edit.local_dir_dialog_title"), field.text() or os.path.expanduser("~")
+        )
+        if path:
+            self._set_local_dir(board_id, os.path.normpath(path))
+
+    def _set_local_dir(self, board_id, path):
+        database.set_board_local_dir(board_id, path, self.db_path)
+        field, clear = self.local_dir_rows[board_id]
+        field.setText(path or "")
+        field.setToolTip(path or "")
+        clear.setEnabled(bool(path))
+        self.local_dirs_changed.emit()
+
     def _row(self, label_text, desc_text, control):
         """Fila de ajuste: etiqueta (600) + descripción (muted) a la izquierda, control a la derecha."""
         row = QFrame()
@@ -282,6 +373,7 @@ class SettingsDialog(QDialog):
         lbl.setStyleSheet(f"font-size: 14px; font-weight: 600; color: {styles.COLORS['text_main']}; background: transparent;")
         text_col.addWidget(lbl)
         desc = QLabel(desc_text)
+        desc.setWordWrap(True)  # que ceda ella el ancho y el control de la derecha no se recorte
         desc.setStyleSheet(f"font-size: 12px; color: {styles.COLORS['text_muted']}; background: transparent;")
         text_col.addWidget(desc)
         h.addLayout(text_col, 1)

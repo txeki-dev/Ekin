@@ -551,6 +551,7 @@ class MainWindow(QMainWindow):
         dlg.language_changed.connect(self._on_language_changed)
         dlg.check_updates_requested.connect(lambda: self.check_for_updates(manual=True))
         dlg.interactive_tour_requested.connect(self.start_interactive_tour)
+        dlg.local_dirs_changed.connect(self.board_view.refresh_local_dir_buttons)
         dlg.exec()
 
     def start_interactive_tour(self):

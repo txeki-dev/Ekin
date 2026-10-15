@@ -346,6 +346,31 @@ QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {{
 /* --- Controles de formulario (combos, spin/date/time, checkboxes) --- */
 /* Sin estas reglas, Qt los pinta con su paleta clara por defecto y quedan blancos
    sobre el tema oscuro. Se estilan de forma global para todas las pantallas. */
+/* --- Pestañas (Ajustes, visor de diarios) --- */
+QTabWidget::pane {{
+    border: 1px solid {c["border"]};
+    border-radius: 10px;
+    background-color: {c["bg_card"]};
+    top: -1px;
+}}
+QTabBar::tab {{
+    background: transparent;
+    color: {c["text_muted"]};
+    padding: 7px 16px;
+    margin-right: 4px;
+    border: 1px solid transparent;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+}}
+QTabBar::tab:hover {{ color: {c["text_main"]}; background-color: {c["bg_hover"]}; }}
+QTabBar::tab:selected {{
+    color: {c["text_main"]};
+    font-weight: 600;
+    background-color: {c["bg_card"]};
+    border: 1px solid {c["border"]};
+    border-bottom-color: {c["bg_card"]};
+}}
+
 QComboBox {{
     background-color: {c["bg_card"]};
     border: 1px solid {c["border"]};

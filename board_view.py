@@ -2,7 +2,7 @@ import os
 from PySide6.QtCore import Qt, Signal, QSize, QTimer
 from PySide6.QtWidgets import (
     QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QInputDialog, QMessageBox, QDialog, QApplication
+    QScrollArea, QInputDialog, QMessageBox, QDialog, QApplication, QFileDialog
 )
 import database
 import board_sync  # noqa: F401 - keeps import order to prevent circular import with controller
@@ -160,11 +160,6 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         self.board_title_label.setObjectName("BoardHeaderTitle")
         header_layout.addWidget(self.board_title_label)
 
-        # Chip neutro con el recuento de tareas y vencimientos de esta semana
-        self.board_counts_chip = QLabel("")
-        self.board_counts_chip.setObjectName("BoardCountsChip")
-        header_layout.addWidget(self.board_counts_chip, 0, Qt.AlignVCenter)
-
         header_layout.addStretch()
 
         # Botón de Creación Masiva de Tareas (Bulk Add Tasks)
@@ -195,30 +190,44 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         self.diary_btn.hide()
         header_layout.addWidget(self.diary_btn)
 
-        # START WORKING: abre la CLI del agente en el directorio local (solo si el tablero tiene uno)
+        # WORK: abre la CLI del agente en el directorio local; si el tablero aún no tiene uno,
+        # primero lo pide (así enlazar la carpeta cuesta un clic)
         self.start_working_btn = QPushButton(f" {t('board_view.start_working_btn')}")
         self.start_working_btn.setCursor(Qt.PointingHandCursor)
-        self.start_working_btn.setToolTip(t("board_view.start_working_tooltip"))
         self.start_working_btn.setIcon(lucide_icon("play", styles.COLORS['text_soft'], 15))
         self.start_working_btn.setIconSize(QSize(15, 15))
         self.start_working_btn.clicked.connect(self._start_working)
-        self.start_working_btn.hide()
         header_layout.addWidget(self.start_working_btn)
+
+        self.main_layout.addWidget(self.board_header)
+        self.board_header.hide()
+
+        # Pie de página de estado: recuento a la izquierda; MCP y sincronización a la derecha.
+        # Se añade al layout tras el carril (ver más abajo); la cabecera queda para el título y las acciones.
+        self.board_footer = QFrame()
+        self.board_footer.setObjectName("BoardFooterBar")
+        self.board_footer.setFixedHeight(44)
+        footer_layout = QHBoxLayout(self.board_footer)
+        footer_layout.setContentsMargins(15, 0, 15, 0)
+        footer_layout.setSpacing(10)
+
+        # Chip neutro con el recuento de tareas y vencimientos de esta semana
+        self.board_counts_chip = QLabel("")
+        self.board_counts_chip.setObjectName("BoardCountsChip")
+        footer_layout.addWidget(self.board_counts_chip, 0, Qt.AlignVCenter)
+        footer_layout.addStretch()
 
         # Botón MCP (Agente IA)
         self.mcp_btn = QPushButton(t("mcp.board_btn_inactive"))
         self.mcp_btn.setCursor(Qt.PointingHandCursor)
         self.mcp_btn.clicked.connect(self._open_mcp_sync_dialog)
-        header_layout.addWidget(self.mcp_btn)
+        footer_layout.addWidget(self.mcp_btn)
 
         # Botón de Sincronización OneDrive / Carpeta compartida
         self.sync_btn = QPushButton(t("sync.link_btn"))
         self.sync_btn.setCursor(Qt.PointingHandCursor)
         self.sync_btn.clicked.connect(self._on_sync_btn_clicked)
-        header_layout.addWidget(self.sync_btn)
-
-        self.main_layout.addWidget(self.board_header)
-        self.board_header.hide()
+        footer_layout.addWidget(self.sync_btn)
 
         # Banner del tour interactivo in-situ
         from onboarding_dialog import InteractiveTourBanner
@@ -315,7 +324,10 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
 
         self.main_layout.addWidget(self.selection_bar)
         self.selection_bar.hide()
-        
+
+        self.main_layout.addWidget(self.board_footer)
+        self.board_footer.hide()
+
         # Por defecto ocultamos la zona del tablero hasta cargar uno
         self.board_scroll_area.hide()
 
@@ -509,6 +521,7 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
             # Mostrar pantalla de bienvenida
             self.board_scroll_area.hide()
             self.board_header.hide()
+            self.board_footer.hide()
             self.selection_bar.hide()
             if hasattr(self, "tour_banner"):
                 self.tour_banner.hide()
@@ -523,6 +536,7 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         # Ocultar bienvenida y mostrar scroll area y cabecera
         self.welcome_widget.hide()
         self.board_header.show()
+        self.board_footer.show()
         self.board_scroll_area.show()
 
         # Fondo del carril y de la barra de cabecera: se fijan aquí (no en init_ui) para que
@@ -535,14 +549,18 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
                 border-bottom: 1.5px solid {styles.COLORS['border']};
             }}
         """)
+        self.board_footer.setStyleSheet(f"""
+            #BoardFooterBar {{
+                background-color: {styles.COLORS['bg_sidebar']};
+                border-top: 1.5px solid {styles.COLORS['border']};
+            }}
+        """)
 
         self.clear_columns_layout()
 
         # Obtener información del tablero (incluyendo el color)
         board_info = database.get_board(board_id, self.db_path)
-        local_dir = board_info and board_info.get("local_dir")
-        self.diary_btn.setVisible(bool(diary_files(local_dir)))
-        self.start_working_btn.setVisible(bool(local_dir) and os.path.isdir(local_dir))
+        self._update_local_dir_buttons(board_info)
         if board_info:
             self.board_title_label.setText(board_info["name"])
             board_color = board_info["color"]
@@ -688,8 +706,34 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         """Abre los diarios de desarrollo (diary.md / diary_archive.md) del directorio local."""
         DiaryViewerDialog(self.board_id, db_path=self.db_path, parent=self.window()).exec()
 
+    def refresh_local_dir_buttons(self):
+        """Tras cambiar el directorio local desde fuera (p. ej. Ajustes), repinta Diario y Work."""
+        if self.board_id and self.board_id != -1:
+            self._update_local_dir_buttons(database.get_board(self.board_id, self.db_path))
+
+    def _update_local_dir_buttons(self, board_info):
+        """Diario solo con diarios en el directorio local; Work siempre, con un tooltip que dice
+        si va a pedir el directorio (tablero sin enlazar) o a abrir la CLI."""
+        local_dir = board_info and board_info.get("local_dir")
+        self.diary_btn.setVisible(bool(diary_files(local_dir)))
+        linked = bool(local_dir) and os.path.isdir(local_dir)
+        self.start_working_btn.setToolTip(
+            t("board_view.start_working_tooltip") if linked else t("board_view.work_link_tooltip")
+        )
+
     def _start_working(self):
-        """START WORKING: MCP en marcha, CLI actualizada y abierta en el repo con el INTRO."""
+        """WORK: MCP en marcha, CLI actualizada y abierta en el repo con el INTRO. Si el tablero
+        aún no tiene directorio local, lo pide antes (un clic en vez de ir a Editar tablero)."""
+        board = database.get_board(self.board_id, self.db_path)
+        local_dir = board.get("local_dir")
+        if not (local_dir and os.path.isdir(local_dir)):
+            path = QFileDialog.getExistingDirectory(
+                self.window(), t("sidebar.board_edit.local_dir_dialog_title"), os.path.expanduser("~")
+            )
+            if not path:
+                return
+            database.set_board_local_dir(self.board_id, os.path.normpath(path), self.db_path)
+            self._update_local_dir_buttons(database.get_board(self.board_id, self.db_path))
         from start_working import start_working
         start_working(self.window(), self.board_id, db_path=self.db_path, open_mcp_dialog=self._open_mcp_sync_dialog)
         self._update_mcp_btn_ui()
