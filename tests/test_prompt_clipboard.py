@@ -1,6 +1,7 @@
 """#67: AI Prompt Clipboard por tablero (packs DEV / Opositor / GTD con el esquema JSON de
 AI-Dev-Prompt-Clipboard, variables {{...}} y pack recordado por tablero)."""
 import json
+import re
 
 import pytest
 from PySide6.QtWidgets import QApplication
@@ -193,6 +194,33 @@ def test_dev_pack_maps_columns_by_role_not_by_position():
         for vague in ("right after in-progress", "last (done) column", "first (backlog) column",
                       "top card of the in-progress column", "top of the ready column"):
             assert vague not in text, (pid, vague)
+
+
+def test_dev_pack_runs_real_graphify_commands_and_paths():
+    """#111: INITIAL y MIGRATE mandaban `graphify build` y `graphifyy claude`, que no existen (el
+    grafo inicial sale de `graphify update .`), y los prompts buscaban `GRAPH_REPORT.md` en la
+    raíz del repo en vez de en `graphify-out/`."""
+    subcommands = {"query", "path", "explain", "update", "hook", "claude"}
+    for p in prompt_packs.load_pack("dev"):
+        for extra_y, sub in re.findall(r"`graphify(y?) ([\w-]+)", p["prompt"]):
+            assert not extra_y and sub in subcommands, (p["id"], sub)
+        assert not re.search(r"(?<!graphify-out/)GRAPH_REPORT\.md", p["prompt"]), p["id"]
+
+
+def test_audit_findings_reach_remediate_through_tagged_cards():
+    """#111: AUDIT guardaba todos los hallazgos para un único `create_tasks_batch` final, en clave
+    ofensiva; al cortarse esa respuesta no quedó ninguna tarjeta y REMEDIATE (que solo miraba el
+    Backlog) dio la cola vacía por buena. Ahora las tarjetas llevan la etiqueta `audit`, se
+    registran por áreas, y REMEDIATE se detiene y pide AUDIT si no encuentra ninguna."""
+    prompts = {p["id"]: p["prompt"] for p in prompt_packs.load_pack("dev")}
+    audit, remediate = prompts["audit"], prompts["remediate"]
+    assert '"audit"' in audit and 'tag: "audit"' in remediate
+    assert "single `create_tasks_batch`" not in audit
+    assert "run `<codebase_audit_hybrid>` first" in remediate
+    for word in ("Cybersecurity", "THREAT", "Forensic", "forensic"):
+        assert word not in audit, word
+    for pid in ("audit", "remediate"):
+        assert "DEFENSIVE WRITING" in prompts[pid], pid
 
 
 @pytest.mark.parametrize("pack_id", ["dev", "opositor", "gtd"])

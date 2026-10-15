@@ -478,6 +478,23 @@ def test_mcp_create_tasks_batch(db_path, mcp_board):
     assert "does not belong to the linked board" in err_res["error"]["message"]
 
 
+def test_audit_cards_round_trip_through_the_audit_tag(db_path, mcp_board):
+    """#111: el prompt AUDIT crea sus tarjetas con `tags: ["audit", <categoría>]` y `priority`, y
+    REMEDIATE arma su cola con `list_tasks(tag="audit")`: solo deben volver esas tarjetas."""
+    executor = McpProtocolHandler(mcp_board, db_path=db_path, client_name="Claude Code").executor
+    col = database.get_columns(mcp_board["id"], db_path=db_path)[0]["id"]
+    executor._tool_create_task({"column_id": col, "title": "Feature sin auditar", "tags": ["ux"]})
+    executor._tool_create_tasks_batch({"column_id": col, "tasks": [
+        {"title": "[HIGH] [BUG] a.py: x", "priority": "P1-High", "tags": ["audit", "bug"]},
+        {"title": "[LOW] [CLEANUP] b.py: y", "priority": "P3-Low", "tags": ["audit", "cleanup"]},
+    ]})
+
+    queue = executor._tool_list_tasks({"tag": "audit"})
+    assert sorted(t["title"] for t in queue) == ["[HIGH] [BUG] a.py: x", "[LOW] [CLEANUP] b.py: y"]
+    assert all("audit" in t["tags"] and t["column_id"] == col for t in queue)
+    assert "P1-High" in next(t for t in queue if t["title"].startswith("[HIGH]"))["tags"]
+
+
 def test_mcp_control_task_timer(db_path, mcp_board):
     """Prueba el control de temporizadores de tareas (start, status, stop) vía MCP."""
     handler = McpProtocolHandler(mcp_board, db_path=db_path, client_name="TimerAgent")

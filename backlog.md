@@ -16,6 +16,21 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
   the ADR is approved.
 
 
+- [x] **DONE (2026-10-15) — #111 DEV pack: AUDIT left no cards and REMEDIATE had nothing to fix** `[BUG]` ·
+  `assets/prompt_packs/dev.json`. 3 tests (`test_prompt_clipboard.py`, `test_mcp.py`).
+  - **Problem:** AUDIT held every finding for one final `create_tasks_batch` and was framed offensively ("Cybersecurity
+    Auditor", "threat inspection", PoC probing). The model's safety filter cut that response twice, so no card was
+    created, and REMEDIATE, which only read Backlog, reported an empty queue as a clean codebase. INITIAL/MIGRATE
+    also ran non-existent `graphify build` / `graphifyy claude`, and every prompt looked for `GRAPH_REPORT.md` at the
+    repo root.
+  - **Solution:** AUDIT is now a defensive review (static verification only, no exploit content). It registers each
+    verified area at once (≤ 3 batches) with `tags: ["audit", <category>]` + `priority` and skips findings already on
+    the board. REMEDIATE queues by `list_tasks(tag: "audit")` (plus legacy untagged Backlog cards). With an empty
+    queue it first registers findings still in the conversation, otherwise it stops and asks for AUDIT. It writes a
+    regression test before each fix and sends unfixable cards back to Backlog as BLOCKED. INITIAL/MIGRATE now run
+    `graphify update .`, `pip install graphifyy` and `graphify claude install`, and every prompt reads
+    `graphify-out/GRAPH_REPORT.md`.
+
 - [x] **DONE (2026-10-15) — #109 Task id visible on cards and in Task Detail** `[UX]` · `widgets.TaskCard.id_label`,
   `TaskDetailDialog.id_label`, `styles.py` (`#TaskCardId`, `#TaskDetailId`). 2 tests (`test_widgets_headless.py`).
   - **Problem:** agents cite cards by id over MCP (#108…), but the id was shown nowhere in Ekin.
