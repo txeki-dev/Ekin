@@ -14,15 +14,23 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
 - [ ] **#81 PWA Ekin Mobile — Wave 4** `[FEAT]` — phase 81.0 first: ADR (LAN-first, PatrimonIA pattern: on-demand LAN
   listener + mkcert TLS + mDNS + QR pairing + idempotent event queue) and sub-cards 81.1–81.5; no PWA code before
   the ADR is approved.
-- [ ] **#97 Rethink `.ekboard` sync conflicts (parked)** `[ARCH]` — the `version` bump below shipped; conflicts on the
-  same task are still last-writer-wins for the whole task. Rethink a field-level merge before resuming.
 
+
+- [x] **DONE (2026-10-15) — #97 `.ekboard` sync merges concurrent edits of the same task field by field** `[ARCH]`
+  · `board_sync.py` (`_merge_task_fields`, `_sync_bases`), `database/sync.py::mark_board_tasks_synced`,
+    new `tasks.sync_base`. 4 tests (`test_board_sync.py`).
+  - **Problem:** conflicts on the same task were last-writer-wins for the whole task, so a local move was lost
+    if a collaborator renamed the card later (the card's original DoD).
+  - **Solution:** 3-way merge against the base each sync stores per task (the values it left in the file):
+    title · description · column (+ position) · due date+time · recurrence. One-sided changes are kept; only
+    two-sided changes are conflicts (newest wins, superseded description archived). Tags, links and journal keep
+    their union merge. No base (synced by an older Ekin) → old whole-task behaviour until the next sync.
 
 - [x] **DONE (2026-10-15) — #97 The two-way merge no longer counts untouched tasks as conflicts** `[BUG]`
   · `board_sync._execute_two_way_merge` (the local query now reads `c.column_uuid`). 1 test (`test_board_sync.py`).
   - **Problem:** the `differs` safety net compared the remote `column_uuid` with a local one the query never
     selected (always `None`), so whenever both sides had changes every untouched task counted as a conflict,
-    got its `version` bumped and its `updated_at` reset to now. The field-level merge is still open (above).
+    got its `version` bumped and its `updated_at` reset to now.
 
 - [x] **DONE (2026-10-15) — #106 No native crash when restarting after an auto-update** `[BUG]`
   · `main.py` (`_restart_app`, `_start_mcp_server`, `aboutToQuit` → MCP `stop`). 2 tests (`test_main_window.py`).
@@ -40,7 +48,7 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
   - **Problem:** drag & drop, undo/redo and MCP `move_task` never bumped `version`, so `board_sync` saw the
     task as untouched: a collaborator's edit of the same task overwrote the newer local move, or a phantom
     conflict was counted. Conflicts stay last-writer-wins per task (no field-level merge — out of scope).
-  - The card itself is **parked** (2026-10-15) to rethink that field-level merge — see *Open* above.
+  - The field-level merge followed on 2026-10-15 (see above).
 
 - [x] **DONE (2026-10-14) — #83 MCP `move_task` into a Done column clears the due date** `[BUG]`
   · `column_roles.py` (new: `classify_column`, `column_roles`), `mcp_server._tool_move_task`,

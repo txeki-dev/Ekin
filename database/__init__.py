@@ -125,6 +125,10 @@ def init_db(db_path=None):
             cursor.execute("ALTER TABLE tasks ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
         if "synced_version" not in tasks_columns:
             cursor.execute("ALTER TABLE tasks ADD COLUMN synced_version INTEGER NOT NULL DEFAULT 0")
+        # Campos de la tarea tal como quedaron en el .ekboard en la última sincronización (JSON):
+        # la base común de la fusión por campos (#97)
+        if "sync_base" not in tasks_columns:
+            cursor.execute("ALTER TABLE tasks ADD COLUMN sync_base TEXT DEFAULT NULL")
 
         # Migración: vínculo opcional de una tarea con OTRO tablero (p. ej. una tarea
         # resumen en "Tareas" que enlaza al detalle en el tablero "SW X")

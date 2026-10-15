@@ -713,3 +713,111 @@ def test_two_way_merge_does_not_count_untouched_tasks_as_conflicts(sync_test_db)
     assert res.status == "merged"
     assert res.conflicts_resolved == 0
     assert database.get_task(task3_id, db_path)["version"] == task3_version
+
+
+def _edit_remote_task(sync_file, task_title, **changes):
+    """Simula la edición de un compañero en el .ekboard, posterior a lo local: cambia campos y
+    sube `version`."""
+    with open(sync_file, "r", encoding="utf-8") as f:
+        file_data = json.load(f)
+    remote = _remote_task(file_data, task_title)
+    remote.update(changes)
+    remote["version"] += 1
+    remote["updated_at"] = (datetime.now() + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+    with open(sync_file, "w", encoding="utf-8") as f:
+        json.dump(file_data, f, indent=2)
+
+
+def test_field_merge_keeps_local_move_and_newer_remote_title(sync_test_db):
+    """#97: si en local se mueve la tarjeta y en remoto (más reciente) se edita su título, la
+    fusión por campos conserva las dos cosas: antes ganaba la tarea remota entera y el
+    movimiento local se perdía."""
+    db_path = sync_test_db["db_path"]
+    board_id = sync_test_db["board_id"]
+    task1_id = sync_test_db["task1_id"]
+    sync_file = str(sync_test_db["tmp_path"] / "tablero_compartido.ekboard")
+    board_sync.sync_board_with_file(board_id, sync_file, db_path)
+
+    _edit_remote_task(sync_file, "Tarea 1", title="Tarea 1 (editada en remoto)")
+    database.update_task_positions([(task1_id, sync_test_db["col2_id"], 0)], db_path)
+    res = board_sync.sync_board_with_file(board_id, sync_file, db_path)
+
+    assert res.status == "merged"
+    assert res.conflicts_resolved == 0
+    task = database.get_task(task1_id, db_path)
+    assert task["column_id"] == sync_test_db["col2_id"]
+    assert task["title"] == "Tarea 1 (editada en remoto)"
+    with open(sync_file, "r", encoding="utf-8") as f:
+        file_data = json.load(f)
+    done_uuid = next(c["column_uuid"] for c in file_data["columns"] if c["name"] == "Hecho")
+    assert _remote_task(file_data, "Tarea 1 (editada en remoto)")["column_uuid"] == done_uuid
+
+
+def test_field_merge_takes_each_side_changes_without_archiving(sync_test_db):
+    """#97: título cambiado en local y descripción en remoto no son una colisión: se quedan los
+    dos cambios y no se archiva ninguna descripción en el diario."""
+    db_path = sync_test_db["db_path"]
+    board_id = sync_test_db["board_id"]
+    task1_id = sync_test_db["task1_id"]
+    sync_file = str(sync_test_db["tmp_path"] / "tablero_compartido.ekboard")
+    board_sync.sync_board_with_file(board_id, sync_file, db_path)
+
+    _edit_remote_task(sync_file, "Tarea 1", description="Descripción del compañero")
+    database.update_task(task1_id, "Tarea 1 (local)", "Detalles tarea 1", "", "#6b7280", None, db_path)
+    res = board_sync.sync_board_with_file(board_id, sync_file, db_path)
+
+    assert res.conflicts_resolved == 0
+    task = database.get_task(task1_id, db_path)
+    assert task["title"] == "Tarea 1 (local)"
+    assert task["description"] == "Descripción del compañero"
+    assert not any("Sincronización OneDrive" in e["content"] for e in database.get_logs(task1_id, db_path))
+
+
+def test_field_merge_without_base_falls_back_to_newest_whole_task(sync_test_db):
+    """#97: una tarea sin base de la última sincronización (sincronizada con una versión anterior
+    de Ekin) no permite saber qué lado cambió cada campo: gana entera la versión más reciente."""
+    db_path = sync_test_db["db_path"]
+    board_id = sync_test_db["board_id"]
+    task1_id = sync_test_db["task1_id"]
+    sync_file = str(sync_test_db["tmp_path"] / "tablero_compartido.ekboard")
+    board_sync.sync_board_with_file(board_id, sync_file, db_path)
+    with database.get_connection(db_path) as conn:
+        conn.execute("UPDATE tasks SET sync_base = NULL WHERE id = ?", (task1_id,))
+
+    _edit_remote_task(sync_file, "Tarea 1", title="Tarea 1 (editada en remoto)")
+    database.update_task_positions([(task1_id, sync_test_db["col2_id"], 0)], db_path)
+    res = board_sync.sync_board_with_file(board_id, sync_file, db_path)
+
+    assert res.conflicts_resolved == 1
+    task = database.get_task(task1_id, db_path)
+    assert task["column_id"] == sync_test_db["col1_id"]
+    assert task["title"] == "Tarea 1 (editada en remoto)"
+
+
+def test_field_merge_base_is_refreshed_after_every_sync(sync_test_db):
+    """#97: la base se renueva al importar y al fusionar (no solo al exportar). Con una base
+    caducada, una descripción cambiada solo en local parecería cambiada en los dos lados."""
+    db_path = sync_test_db["db_path"]
+    board_id = sync_test_db["board_id"]
+    task1_id = sync_test_db["task1_id"]
+    sync_file = str(sync_test_db["tmp_path"] / "tablero_compartido.ekboard")
+    board_sync.sync_board_with_file(board_id, sync_file, db_path)
+
+    # 1. Importación: el compañero cambia la descripción
+    _edit_remote_task(sync_file, "Tarea 1", description="Remota 1")
+    assert board_sync.sync_board_with_file(board_id, sync_file, db_path).status == "imported"
+
+    # 2. Fusión: descripción en local, título en remoto
+    _edit_remote_task(sync_file, "Tarea 1", title="Título remoto")
+    database.update_task(task1_id, "Tarea 1", "Local 2", "", "#6b7280", None, db_path)
+    res = board_sync.sync_board_with_file(board_id, sync_file, db_path)
+    assert (res.status, res.conflicts_resolved) == ("merged", 0)
+
+    # 3. Otra fusión, ya con la base que dejó la anterior
+    _edit_remote_task(sync_file, "Título remoto", title="Título remoto 2")
+    database.update_task(task1_id, "Título remoto", "Local 3", "", "#6b7280", None, db_path)
+    res = board_sync.sync_board_with_file(board_id, sync_file, db_path)
+    assert (res.status, res.conflicts_resolved) == ("merged", 0)
+
+    task = database.get_task(task1_id, db_path)
+    assert (task["title"], task["description"]) == ("Título remoto 2", "Local 3")

@@ -5,10 +5,12 @@ ubicados en OneDrive, Nextcloud, Google Drive o carpetas de red corporativas.
 
 Características clave:
 1. Arquitectura Offline-First con sincronización en diferido.
-2. Fusión a nivel de entidad (tarea por tarea según task_uuid y versión/timestamp).
-3. Política No-Data-Loss: si dos usuarios editan la misma tarea simultáneamente,
-   se adopta la versión más reciente pero el contenido concurrente anterior se
-   archiva automáticamente en el diario/chat de la tarea como entrada de auditoría.
+2. Fusión por campos (tarea por tarea según task_uuid y versión): si dos usuarios editan la
+   misma tarea, cada campo se resuelve contra su valor en la última sincronización
+   (tasks.sync_base): se conserva lo que cambió un solo lado y, si cambiaron los dos, la
+   versión más reciente.
+3. Política No-Data-Loss: si los dos cambiaron la descripción, la que pierde se archiva
+   automáticamente en el diario/chat de la tarea como entrada de auditoría.
 4. Instantánea de seguridad automática previa a cada fusión (backups/sync_premerge_...).
 """
 
@@ -96,6 +98,55 @@ def read_sync_file_with_retry(file_path: str, max_attempts: int = 4) -> dict:
 def now_utc_iso() -> str:
     """Devuelve la fecha/hora actual en formato ISO 8601 UTC."""
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+
+# Grupos de campos que la fusión resuelve por separado (#97). Fecha y hora van juntas para no
+# dejar una hora sin fecha; la posición sigue a la columna.
+_MERGE_FIELD_GROUPS = (("title",), ("description",), ("column_uuid",), ("due_date", "due_time"), ("recurrence",))
+
+
+def _merge_fields(task: dict) -> dict:
+    """Campos fusionables de una tarea (local, remota o base), normalizados como en la exportación."""
+    return {
+        "title": task.get("title") or "",
+        "description": task.get("description") or "",
+        "column_uuid": task.get("column_uuid"),
+        "due_date": task.get("due_date") or None,
+        "due_time": task.get("due_time") or None,
+        "recurrence": task.get("recurrence") or "none",
+    }
+
+
+def _sync_bases(data: dict) -> dict:
+    """{task_uuid: JSON} con los campos fusionables de cada tarea tal como quedan en el archivo
+    compartido: la base con la que la siguiente fusión distingue qué lado cambió cada campo."""
+    return {
+        t["task_uuid"]: json.dumps(_merge_fields(t), ensure_ascii=False)
+        for t in data.get("tasks", []) if t.get("task_uuid")
+    }
+
+
+def _merge_task_fields(local: dict, remote: dict, base, remote_wins: bool):
+    """Fusión a tres bandas por grupos de campos (#97): lo que solo cambió un lado respecto a la
+    base de la última sincronización se conserva; si cambiaron los dos (o no hay base) gana el
+    lado más reciente. Devuelve (campos fusionados, grupos en colisión)."""
+    merged, collisions = dict(local), []
+    for group in _MERGE_FIELD_GROUPS:
+        l_vals = [local[f] for f in group]
+        r_vals = [remote[f] for f in group]
+        if l_vals == r_vals:
+            continue
+        b_vals = [base[f] for f in group] if base else None
+        if b_vals == l_vals:  # solo cambió en remoto
+            take_remote = True
+        elif b_vals == r_vals:  # solo cambió en local
+            take_remote = False
+        else:  # cambiaron los dos (o no hay base)
+            collisions.append(group)
+            take_remote = remote_wins
+        if take_remote:
+            merged.update({f: remote[f] for f in group})
+    return merged, collisions
 
 
 def export_board_to_sync_dict(board_id: int, db_path=None) -> dict:
@@ -308,7 +359,7 @@ def sync_board_with_file(board_id: int, file_path: str = None, db_path=None) -> 
         new_hash = write_sync_file_atomic(target_path, data)
         now_ts = now_utc_iso()
         database.update_board_sync_state(board_id, now_ts, new_hash, db_path)
-        database.mark_board_tasks_synced(board_id, db_path)
+        database.mark_board_tasks_synced(board_id, db_path, _sync_bases(data))
         return SyncResult(
             status="exported",
             board_id=board_id,
@@ -414,7 +465,7 @@ def sync_board_with_file(board_id: int, file_path: str = None, db_path=None) -> 
         new_hash = write_sync_file_atomic(target_path, local_data)
         now_ts = now_utc_iso()
         database.update_board_sync_state(board_id, now_ts, new_hash, db_path)
-        database.mark_board_tasks_synced(board_id, db_path)
+        database.mark_board_tasks_synced(board_id, db_path, _sync_bases(local_data))
         return SyncResult(
             status="exported",
             board_id=board_id,
@@ -436,7 +487,7 @@ def sync_board_with_file(board_id: int, file_path: str = None, db_path=None) -> 
         imported_count = _apply_remote_board_clean(board_id, remote_data, db_path)
         now_ts = now_utc_iso()
         database.update_board_sync_state(board_id, now_ts, current_file_hash, db_path)
-        database.mark_board_tasks_synced(board_id, db_path)
+        database.mark_board_tasks_synced(board_id, db_path, _sync_bases(remote_data))
         return SyncResult(
             status="imported",
             board_id=board_id,
@@ -457,11 +508,11 @@ def sync_board_with_file(board_id: int, file_path: str = None, db_path=None) -> 
     merge_res = _execute_two_way_merge(board_id, remote_data, last_synced_at, db_path)
 
     # Tras fusionar en base de datos local, re-exportar el estado unificado al archivo
-    database.mark_board_tasks_synced(board_id, db_path)
     merged_data = export_board_to_sync_dict(board_id, db_path)
     new_hash = write_sync_file_atomic(target_path, merged_data)
     now_ts = now_utc_iso()
     database.update_board_sync_state(board_id, now_ts, new_hash, db_path)
+    database.mark_board_tasks_synced(board_id, db_path, _sync_bases(merged_data))
 
     return SyncResult(
         status="merged",
@@ -565,7 +616,8 @@ def _apply_remote_board_clean(board_id: int, remote_data: dict, db_path=None) ->
 
 
 def _execute_two_way_merge(board_id: int, remote_data: dict, last_synced_at: str, db_path=None) -> dict:
-    """Ejecuta la fusión diferencial a nivel de tarea entre los cambios locales y los remotos."""
+    """Ejecuta la fusión diferencial (por tarea y, en la misma tarea, por campos) entre los
+    cambios locales y los remotos."""
     result = {"imported": 0, "exported": 0, "conflicts": 0, "details": []}
 
     with database.get_connection(db_path) as conn:
@@ -588,7 +640,7 @@ def _execute_two_way_merge(board_id: int, remote_data: dict, last_synced_at: str
         cursor.execute(
             """SELECT t.id, t.column_id, t.title, t.description, t.tag_text, t.tag_color,
                       t.position, t.due_date, t.due_time, t.recurrence, t.task_uuid,
-                      t.version, t.synced_version, t.updated_at, c.column_uuid
+                      t.version, t.synced_version, t.updated_at, t.sync_base, c.column_uuid
                FROM tasks t
                JOIN columns c ON c.id = t.column_id
                WHERE c.board_id = ?""",
@@ -672,53 +724,55 @@ def _execute_two_way_merge(board_id: int, remote_data: dict, last_synced_at: str
                     result["exported"] += 1
 
                 elif local_was_modified and remote_was_modified:
-                    # Conflicto real: ambos modificaron la misma tarea
-                    result["conflicts"] += 1
+                    # Ambos modificaron la misma tarea: fusión por campos contra la base (#97)
                     r_ver = r_task.get("version", 1)
                     l_ver = l_task.get("version", 1)
 
-                    # Elegir ganador de campos primarios según fecha o versión más reciente
+                    # Desempate de los campos que cambiaron los dos: fecha o versión más reciente
                     use_remote_primary = (r_updated > l_updated) or (r_updated == l_updated and r_ver >= l_ver)
 
-                    if use_remote_primary:
-                        chosen_title = r_task["title"]
-                        chosen_col = target_col_id
-                        chosen_due_date = r_task.get("due_date")
-                        chosen_due_time = r_task.get("due_time")
-                        chosen_desc = r_task.get("description", "")
-                        older_desc = l_task.get("description", "")
-                        older_label = "tu versión local"
+                    local_fields = _merge_fields(l_task)
+                    remote_fields = _merge_fields(r_task)
+                    base = _merge_fields(json.loads(l_task["sync_base"])) if l_task.get("sync_base") else None
+                    merged, collisions = _merge_task_fields(local_fields, remote_fields, base, use_remote_primary)
+                    if collisions:
+                        result["conflicts"] += 1
                     else:
-                        chosen_title = l_task["title"]
-                        chosen_col = l_task["column_id"]
-                        chosen_due_date = l_task.get("due_date")
-                        chosen_due_time = l_task.get("due_time")
-                        chosen_desc = l_task.get("description", "")
-                        older_desc = r_task.get("description", "")
-                        older_label = "la versión de OneDrive"
+                        result["imported"] += 1
 
-                    # Si las descripciones son distintas, aplicar política No-Data-Loss:
-                    # archivar la descripción previa en el chat/diario de la tarea
-                    if older_desc and older_desc.strip() and older_desc != chosen_desc:
-                        log_msg = (
-                            f"<p><b>⚠️ Sincronización OneDrive (Conflicto resuelto automáticamente):</b><br/>"
-                            f"Se ha mantenido la descripción más reciente. {older_label.capitalize()} se conserva aquí para consulta:</p>"
-                            f"<blockquote>{older_desc}</blockquote>"
-                        )
-                        cursor.execute(
-                            "INSERT INTO task_logs (task_id, content, created_at) VALUES (?, ?, ?)",
-                            (task_id, log_msg, now_utc_iso())
-                        )
-                        result["details"].append(f"Tarea '{chosen_title}': descripción concurrente archivada en el chat.")
+                    # La posición sigue a la columna elegida
+                    if merged["column_uuid"] == local_fields["column_uuid"]:
+                        chosen_col, chosen_pos = l_task["column_id"], l_task["position"]
+                    else:
+                        chosen_col, chosen_pos = target_col_id, r_task.get("position", 0)
+
+                    # Política No-Data-Loss: si los dos cambiaron la descripción, archivar la
+                    # que pierde en el chat/diario de la tarea
+                    if ("description",) in collisions:
+                        if use_remote_primary:
+                            older_desc, older_label = local_fields["description"], "tu versión local"
+                        else:
+                            older_desc, older_label = remote_fields["description"], "la versión de OneDrive"
+                        if older_desc.strip():
+                            log_msg = (
+                                f"<p><b>⚠️ Sincronización OneDrive (Conflicto resuelto automáticamente):</b><br/>"
+                                f"Se ha mantenido la descripción más reciente. {older_label.capitalize()} se conserva aquí para consulta:</p>"
+                                f"<blockquote>{older_desc}</blockquote>"
+                            )
+                            cursor.execute(
+                                "INSERT INTO task_logs (task_id, content, created_at) VALUES (?, ?, ?)",
+                                (task_id, log_msg, now_utc_iso())
+                            )
+                            result["details"].append(f"Tarea '{merged['title']}': descripción concurrente archivada en el chat.")
 
                     new_version = max(r_ver, l_ver) + 1
                     cursor.execute(
                         """UPDATE tasks
-                           SET column_id = ?, title = ?, description = ?, due_date = ?, due_time = ?,
-                               version = ?, synced_version = ?, updated_at = ?
+                           SET column_id = ?, position = ?, title = ?, description = ?, due_date = ?,
+                               due_time = ?, recurrence = ?, version = ?, synced_version = ?, updated_at = ?
                            WHERE id = ?""",
-                        (chosen_col, chosen_title, chosen_desc, chosen_due_date, chosen_due_time,
-                         new_version, new_version, now_utc_iso(), task_id)
+                        (chosen_col, chosen_pos, merged["title"], merged["description"], merged["due_date"],
+                         merged["due_time"], merged["recurrence"], new_version, new_version, now_utc_iso(), task_id)
                     )
 
                     # Unir logs, enlaces y tags sin duplicados
