@@ -233,13 +233,6 @@ QListWidget::item:selected {{
     color: {c["text_main"]};
 }}
 
-#TaskCardId {{
-    font-size: 12px;
-    font-weight: 600;
-    color: {c["text_muted"]};
-    padding-top: 2px;
-}}
-
 #TaskCardTag {{
     font-size: 11px;
     padding: 3px 9px;

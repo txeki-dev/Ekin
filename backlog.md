@@ -10,10 +10,39 @@ Wave 1: #97 → #83 → #98 → #99 → #84 → #82 · Wave 2: #85 → #86 → #
 · Wave 4: #81 (ADR). **Status 2026-10-15:** waves 1–3 shipped and validated by the user (OUTRO b063add); the board
 (`SW - Ekin`) is the source of truth for what's open._
 
+_Added 2026-10-18 — second backlog wave of 'SW - Ekin' (spec + DoD written on each card). Wave 1 (v1.6.0): #132 + #133
+→ #142 · Wave 2 (v1.7.0): #136 → #137 · Wave 3: #134 (code signing deferred) → #135 (decision doc + landing page on a
+Txek Systems domain, not registered yet). #81 stays for another session._
+
 **Open:**
 - [ ] **#81 PWA Ekin Mobile — Wave 4** `[FEAT]` — phase 81.0 first: ADR (LAN-first, PatrimonIA pattern: on-demand LAN
   listener + mkcert TLS + mDNS + QR pairing + idempotent event queue) and sub-cards 81.1–81.5; no PWA code before
   the ADR is approved.
+- [ ] **#133 Due date clipped on task cards — Wave 1** `[BUG]` — not reproduced yet (synthetic cards at 200 % with
+  Figtree render it whole); needs a screenshot from the user.
+- [ ] **#142 Diary button shows every `.md` / `.txt` of the repo — Wave 1** `[FEAT]` — root files as tabs (diaries
+  first) + a «More…» menu for subfolders; list by walking the folder, not `git ls-files` (`diary.md` is gitignored).
+- [ ] **#136 Audit the DEV / SOCRATIC / GTD board types — Wave 2** `[ARCH]` — findings as `audit` cards; rename
+  templates, packs and strings (new boards only, template and pack ids kept); PM board as a proposal.
+- [ ] **#137 Landing tour shows the AI-agent workflow — Wave 2** `[UX]` — after #136; slide bullets are hard-coded
+  Spanish today (no `t()`); add a workflow diagram reachable from the command palette.
+- [ ] **#134 Installer for non-technical users — Wave 3** `[FEAT]` — installer + SHA-256-verified updater already
+  exist; add an unattended update (`/SILENT`, relaunch) and a signing step that only runs when its secrets exist.
+- [ ] **#135 Monetization plan — Wave 3** `[ARCH]` — decision doc from the local drafts + public landing page.
+
+- [x] **DONE (2026-10-18) — #132 Task cards cut long titles and overflowed the column** `[BUG]` · `widgets.py`
+  (`TaskListArea`, `ColumnWidget.add_task_card`, `TaskCard`, `FlowLayout`), `styles.py`. 3 new tests + 1 updated
+  (`test_widgets_headless.py`).
+  - **Problem:** the column stacked its cards with `setAlignment(Qt.AlignTop)`. With an alignment, Qt sizes each card
+    from its `sizeHint`, computed for a wider width, not from the height its wrapped title needs at the real width:
+    titles of 3+ lines lost their first and last lines (40–50 px given, 60–80 needed). Cards could also be wider than
+    the column (296 px in a 272 px viewport), cutting every card in it on the right: the `#id` label took width from
+    every title line, and neither a word with no break point (`RELEASE/DISTRIBUTION`, snake_case) nor the date +
+    time + timer + linked-board row could wrap.
+  - **Solution:** a trailing stretch instead of the alignment; the `#id` inline at the start of the title (rich
+    text, `#TaskCardId` removed); break points (ZWSP) after `/`, `\` and `_` in the displayed title only; the
+    date/timer/link row is a `FlowLayout` that wraps (hidden items no longer leave a gap). Checked at 200 % with the
+    bundled Figtree font, light and dark themes.
 
 
 - [x] **DONE (2026-10-15) — Codebase audit + remediation (#112–#130)** `[AUDIT]` · run with the new AUDIT/REMEDIATE

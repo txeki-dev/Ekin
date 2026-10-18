@@ -1,3 +1,4 @@
+import html
 import json
 from datetime import datetime
 from PySide6.QtCore import Qt, QMimeData, QPoint, Signal, QRect, QRectF, QSize, QTimer
@@ -74,6 +75,9 @@ class FlowLayout(QLayout):
         spaceY = self.spacing()
 
         for item in self.itemList:
+            # Un widget oculto no ocupa sitio ni deja hueco de separación
+            if item.isEmpty():
+                continue
             nextX = x + item.sizeHint().width() + spaceX
             if nextX - spaceX > effectiveRect.right() and lineHeight > 0:
                 x = effectiveRect.x()
@@ -183,7 +187,6 @@ class TaskCard(QFrame):
         # El título (QLabel) sobre un padre con fondo estilado pinta el color de la ventana;
         # se fija su fondo al de la tarjeta para que integre (sin caja oscura).
         self.title_label.setStyleSheet(f"background-color: {card_bg};")
-        self.id_label.setStyleSheet(f"background-color: {card_bg};")
 
     def set_selected(self, selected: bool):
         """Activa o desactiva el estado visual de selección múltiple."""
@@ -202,14 +205,10 @@ class TaskCard(QFrame):
         title_row.setContentsMargins(0, 0, 0, 0)
         title_row.setSpacing(6)
 
-        # Id de la tarea (#109): los agentes citan las tarjetas por él vía MCP
-        self.id_label = QLabel(f"#{self.task_id}")
-        self.id_label.setObjectName("TaskCardId")
-        title_row.addWidget(self.id_label, alignment=Qt.AlignTop)
-
-        # Título de la tarea
-        self.title_label = QLabel(self.task_data["title"])
+        # Título de la tarea, precedido de su id (#109: los agentes citan las tarjetas por él)
+        self.title_label = QLabel(self._title_html())
         self.title_label.setObjectName("TaskCardTitle")
+        self.title_label.setTextFormat(Qt.RichText)
         self.title_label.setWordWrap(True)
         title_row.addWidget(self.title_label, stretch=1)
 
@@ -257,11 +256,11 @@ class TaskCard(QFrame):
         self.meta_layout.addWidget(self.priority_container)
 
         # --- Fila 3: vencimiento + temporizador + tablero enlazado ---
+        # Salta de línea si no caben: en una sola fila ensanchaban la tarjeta más allá de la
+        # columna (#132).
         row3 = QWidget()
         row3.setStyleSheet("background: transparent; border: none;")
-        row3_layout = QHBoxLayout(row3)
-        row3_layout.setContentsMargins(0, 0, 0, 0)
-        row3_layout.setSpacing(6)
+        row3_layout = FlowLayout(row3, margin=0, spacing=6)
 
         self.due_container = QWidget()
         self.due_container.setStyleSheet("background: transparent; border: none;")
@@ -293,7 +292,6 @@ class TaskCard(QFrame):
         self.board_link_btn.clicked.connect(self._emit_board_link_clicked)
         board_link_layout.addWidget(self.board_link_btn)
         row3_layout.addWidget(self.board_link_container)
-        row3_layout.addStretch()
         self.meta_layout.addWidget(row3)
 
         layout.addLayout(self.meta_layout)
@@ -302,6 +300,19 @@ class TaskCard(QFrame):
         self.update_tags_and_due(self.task_data.get("tags", []), self.task_data.get("due_date"))
         self._update_board_link()
         self.update_timer_badge()
+
+    def _title_html(self):
+        """Título en rich text con el id en línea al principio (#132: como widget aparte le
+        robaba ancho a cada línea). Admite cortes de línea tras el id y tras «/», «\\» y «_»,
+        para que ni el id ni una ruta o un identificador largo ensanchen la tarjeta; el título
+        guardado no cambia."""
+        title = html.escape(self.task_data["title"])
+        for sep in ("/", "\\", "_"):
+            title = title.replace(sep, sep + "​")
+        return (
+            f"<span style='font-size: 12px; color: {styles.COLORS['text_muted']};'>#{self.task_id}</span>"
+            f"&nbsp; {title}"
+        )
 
     def _emit_board_link_clicked(self):
         board_id = self.task_data.get("linked_board_id")
@@ -634,7 +645,10 @@ class TaskListArea(QWidget):
         self.list_layout = QVBoxLayout(self)
         self.list_layout.setContentsMargins(4, 4, 4, 10)
         self.list_layout.setSpacing(8)
-        self.list_layout.setAlignment(Qt.AlignTop)
+        # Tarjetas arriba con un stretch final y no con setAlignment(Qt.AlignTop): con alineación,
+        # Qt da a cada tarjeta la altura de su sizeHint (calculada para otro ancho), no la que pide
+        # su título envuelto a este ancho, y los títulos largos se cortaban (#132).
+        self.list_layout.addStretch(1)
 
     def _ensure_drop_indicator(self):
         if self._drop_indicator is None:
@@ -1137,4 +1151,5 @@ class ColumnWidget(QFrame):
         """Añade una tarjeta de tarea a la columna (no-op si está plegada)."""
         if not hasattr(self, "list_area"):
             return
-        self.list_area.list_layout.addWidget(card_widget)
+        layout = self.list_area.list_layout
+        layout.insertWidget(layout.count() - 1, card_widget)  # antes del stretch final

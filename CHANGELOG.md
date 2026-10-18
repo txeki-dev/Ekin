@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **Task cards cut long titles and overflowed their column (`widgets.py`, `styles.py`, #132)**: Titles of three or more lines lost their first and last lines, because the column stacked its cards top-aligned and Qt then sized each card for a wider width than the real one. Cards could also be wider than the column and get cut on the right: the `#id` took width from every title line, a word with no break point (`RELEASE/DISTRIBUTION`, `snake_case`) couldn't wrap, and neither could the date + time + timer + linked-board row. Cards now get the full height of their title, the `#id` sits inline at the start of the title, titles can break after `/`, `\` and `_` (the stored title is unchanged), and the date/timer/linked-board row wraps.
+
 ## [1.5.0] - 2026-10-15
 
 ### Added

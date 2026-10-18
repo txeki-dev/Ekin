@@ -11,7 +11,7 @@ from PySide6.QtGui import (
     QDragEnterEvent, QDragLeaveEvent, QDropEvent, QImage, QMouseEvent,
     QTextCursor, QKeyEvent, QTextListFormat
 )
-from PySide6.QtWidgets import QLabel, QPushButton, QWidget
+from PySide6.QtWidgets import QLabel, QPushButton, QScrollArea, QWidget
 
 import database
 import styles
@@ -246,10 +246,71 @@ def _card_with_timer(started_at, alert_hours=24):
 
 
 def test_task_card_shows_its_id_next_to_the_title(qapp):
-    """#109: los agentes citan las tarjetas por su id (#108...); la tarjeta lo muestra."""
+    """#109: los agentes citan las tarjetas por su id (#108...); la tarjeta lo muestra.
+    #132: va en línea al principio del propio título, sin robarle ancho a cada línea."""
     card = TaskCard({"id": 108, "title": "BUG: Arreglar TEST en Github"})
-    assert card.id_label.text() == "#108"
-    assert card.id_label.parent() is card.title_label.parent()
+    text = card.title_label.text()
+    assert "#108" in text
+    assert text.index("#108") < text.index("BUG: Arreglar TEST en Github")
+
+
+def _column_with_cards(qapp, tasks):
+    col = ColumnWidget({"id": 1, "name": "Ready", "color": "#8b5cf6"})
+    cards = []
+    for data in tasks:
+        card = TaskCard({"tags": [], **data})
+        col.add_task_card(card)
+        cards.append(card)
+    col.resize(ColumnWidget.EXPANDED_WIDTH, 1200)
+    col.show()
+    for _ in range(3):
+        qapp.processEvents()
+    return col, cards
+
+
+def _assert_cards_fit_the_column(col, cards):
+    viewport = col.findChild(QScrollArea).viewport()
+    for card in cards:
+        assert card.geometry().right() < viewport.width()
+
+
+def test_task_card_titles_get_the_height_they_need_in_a_column(qapp):
+    """#132: la columna alineaba sus tarjetas arriba (AlignTop) y, con esa alineación, Qt
+    da a cada tarjeta la altura de su sizeHint, calculada para un ancho mayor que el real:
+    los títulos de 3 o más líneas se cortaban por arriba y por abajo."""
+    col, cards = _column_with_cards(qapp, [
+        {"id": 134, "title": "RELEASE/DISTRIBUTION con Installer para Non-Technical-Users"},
+        {"id": 136, "title": "Auditar TABLEROS SW / OPOSITOR / GTD y revisar los prompts, "
+                             "la mecánica de start working y los flujos de agente"},
+    ])
+    for card in cards:
+        title = card.title_label
+        assert title.height() >= title.heightForWidth(title.width())
+    col.close()
+
+
+def test_task_cards_fit_the_column_width(qapp):
+    """#132: la fila de fecha + hora + temporizador + tablero enlazado no podía partirse y
+    ensanchaba todas las tarjetas de la columna, que se cortaban por la derecha."""
+    started = (datetime.now() - timedelta(hours=30)).isoformat(timespec="seconds")
+    col, cards = _column_with_cards(qapp, [
+        {"id": 1340, "title": "Instalador", "due_date": "2026-10-01", "due_time": "09:30",
+         "timer_started_at": started, "linked_board_id": 3, "linked_board_name": "SW - PatrimonIA"},
+        {"id": 7, "title": "Corto"},
+    ])
+    _assert_cards_fit_the_column(col, cards)
+    col.close()
+
+
+def test_task_card_title_breaks_long_paths_and_identifiers(qapp):
+    """#132: una palabra sin espacios (ruta, snake_case) no tenía dónde partirse: ensanchaba
+    el título y todas las tarjetas de la columna, que se cortaban por la derecha. Se parte
+    tras «/», «\\» o «_», sin tocar el título guardado."""
+    title = "Revisar board_sync_controller_background_worker_thread en detail_dialog/task_mixins.py"
+    col, cards = _column_with_cards(qapp, [{"id": 9999, "title": title}, {"id": 7, "title": "Corto"}])
+    _assert_cards_fit_the_column(col, cards)
+    assert cards[0].task_data["title"] == title
+    col.close()
 
 
 def test_task_detail_dialog_shows_the_task_id(qapp, db_path):
