@@ -18,12 +18,27 @@ Txek Systems domain, not registered yet). #81 stays for another session._
 - [ ] **#81 PWA Ekin Mobile — Wave 4** `[FEAT]` — phase 81.0 first: ADR (LAN-first, PatrimonIA pattern: on-demand LAN
   listener + mkcert TLS + mDNS + QR pairing + idempotent event queue) and sub-cards 81.1–81.5; no PWA code before
   the ADR is approved.
-- [ ] **#134 Installer for non-technical users — Wave 3** `[FEAT]` — installer + SHA-256-verified updater already
-  exist; add an unattended update (`/SILENT`, relaunch) and a signing step that only runs when its secrets exist.
+- [ ] **#147 Code signing for the installer (once there is a certificate)** `[FEAT]` — no signing step until a
+  provider is chosen (public-cert keys live in HSM/cloud since 2023, so no `.pfx` secret); sign `Ekin.exe` before
+  ISCC and the installer after it, **then** compute the SHA-256.
 - [ ] **#135 Monetization plan — Wave 3** `[ARCH]` — decision doc from the local drafts + public landing page.
 - [ ] **#144 / #145 / #146 Findings of the #136 audit** `[AUDIT]` `P3-Low` — built-in templates hard-coded in Spanish
   (#144, fits with #137), Socratic/GTD prompts always answer in Spanish (#145), Work and the local folder worded as a
   code repo on every board type (#146).
+
+- [x] **DONE (2026-10-18) — #134 Installed copies update unattended and reopen Ekin** `[FEAT]` · `main.py`
+  (`_launch_installer`), `installer.iss`, `.github/workflows/release.yml`, README. 3 tests (`test_main_window.py`).
+  - **Problem:** the installer, SHA-256-verified updater and releases already existed, but an update opened the full
+    setup wizard and closed Ekin, leaving the user to click through and restart it. Two pushes in a row also built
+    two releases at once (the second failed re-creating v1.7.0).
+  - **Solution:** the verified installer runs with `/SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS`; a
+    second `[Run]` entry (`skipifnotsilent runasoriginaluser`) reopens Ekin; `concurrency: release` queues release
+    runs. Code signing deferred to #147.
+  - **E2E (local, Inno Setup 6.7.3 + PyInstaller):** silent install of 1.7.0 → Ekin opens by itself; with Ekin
+    open, the 1.7.99 installer with the updater's arguments → exit 0, Ekin closed, same folder, version 1.7.99,
+    Ekin reopened; silent uninstall leaves nothing (folder, desktop link, registry key). Gotcha: the uninstall key
+    is `{E1D4A66C-…-EKIN00000001}}_is1` (Inno's `{{` escapes, `}}` doesn't); don't "fix" the AppId or upgrades
+    of existing installs break.
 
 - [x] **DONE (2026-10-18) — #137 Welcome guide built around the AI-agent workflow + workflow diagram** `[UX]` ·
   `onboarding_dialog.py`, new `workflow_dialog.py`, `main.py`, `settings_dialog.py`, `strings.py`, `templates.py`.
