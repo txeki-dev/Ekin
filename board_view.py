@@ -17,7 +17,7 @@ from detail_dialog import TaskDetailDialog
 from undo import UndoAction
 from board_dialogs import BoardColumnsArea, ColumnEditDialog, BoardSelectionDialog
 from board_mixins import BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin
-from diary_viewer_dialog import DiaryViewerDialog, diary_files
+from diary_viewer_dialog import DiaryViewerDialog, has_doc_files
 
 logger = logging.getLogger("ekin.board")
 
@@ -713,7 +713,7 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         PromptClipboardDialog(self.board_id, db_path=self.db_path, parent=self.window()).exec()
 
     def _open_diary_viewer(self):
-        """Abre los diarios de desarrollo (diary.md / diary_archive.md) del directorio local."""
+        """Abre los diarios de desarrollo y demás .md / .txt del directorio local."""
         DiaryViewerDialog(self.board_id, db_path=self.db_path, parent=self.window()).exec()
 
     def refresh_local_dir_buttons(self):
@@ -722,10 +722,10 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
             self._update_local_dir_buttons(database.get_board(self.board_id, self.db_path))
 
     def _update_local_dir_buttons(self, board_info):
-        """Diario solo con diarios en el directorio local; Work siempre, con un tooltip que dice
-        si va a pedir el directorio (tablero sin enlazar) o a abrir la CLI."""
+        """Diario solo si el directorio local tiene algún .md / .txt; Work siempre, con un tooltip
+        que dice si va a pedir el directorio (tablero sin enlazar) o a abrir la CLI."""
         local_dir = board_info and board_info.get("local_dir")
-        self.diary_btn.setVisible(bool(diary_files(local_dir)))
+        self.diary_btn.setVisible(has_doc_files(local_dir))
         linked = bool(local_dir) and os.path.isdir(local_dir)
         self.start_working_btn.setToolTip(
             t("board_view.start_working_tooltip") if linked else t("board_view.work_link_tooltip")

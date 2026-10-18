@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **The Diary button shows every Markdown and text file of the board's repo (`diary_viewer_dialog.py`, `board_view.py`, #142)**: Besides `diary.md` and `diary_archive.md` (still the first tabs), the viewer opens the other `.md` / `.txt` files of the repo's root as tabs, and a new **More…** menu, grouped by folder, opens the ones in subfolders as extra tabs. The folder is walked directly, so gitignored files such as the diaries are listed, while `venv`, `node_modules`, `.git`, build folders and `*.egg-info` are skipped (up to 500 files). `.txt` files are shown as plain text, *Reload* also picks up new files, and the button now shows whenever the folder has any `.md` / `.txt` file.
+
 ### Fixed
 - **Task cards cut long titles and overflowed their column (`widgets.py`, `styles.py`, #132)**: Titles of three or more lines lost their first and last lines, because the column stacked its cards top-aligned and Qt then sized each card for a wider width than the real one. Cards could also be wider than the column and get cut on the right: the `#id` took width from every title line, a word with no break point (`RELEASE/DISTRIBUTION`, `snake_case`) couldn't wrap, and neither could the date + time + timer + linked-board row. Cards now get the full height of their title, the `#id` sits inline at the start of the title, titles can break after `/`, `\` and `_` (the stored title is unchanged), and the date/timer/linked-board row wraps.
 
