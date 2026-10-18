@@ -1,7 +1,7 @@
 {
   ".claude/settings.local.json": {
     "mtime": 1785338761.0323222,
-    "ast_hash": "6e617c27d42818e94811485c0ad4d667",
+    "ast_hash": "",
     "semantic_hash": ""
   },
   ".github/scripts/extract_release_notes.py": {
@@ -145,8 +145,8 @@
     "semantic_hash": "7130dba7d9eed4113ccfb12d6aff53de"
   },
   "main.py": {
-    "mtime": 1792353480.6973548,
-    "ast_hash": "57994e4ab27e552b6a105a43976cd52b",
+    "mtime": 1792356992.1495996,
+    "ast_hash": "b60509301cb743b895e8dd856ea2783b",
     "semantic_hash": ""
   },
   "pyproject.toml": {
@@ -225,8 +225,8 @@
     "semantic_hash": "a6ddaaf9a107d99c7df7c8420847e86d"
   },
   "tests/test_main_window.py": {
-    "mtime": 1792353301.1780622,
-    "ast_hash": "8d1cdec370618960077e2d42b9aa1efb",
+    "mtime": 1792356992.1495996,
+    "ast_hash": "ee39972d9fac26eb7b5115e4f49adb11",
     "semantic_hash": ""
   },
   "tests/test_timer_board_view.py": {
@@ -350,18 +350,18 @@
     "semantic_hash": "84359f2fb8a28ec333804a7f1e58c9b5"
   },
   ".github/workflows/release.yml": {
-    "mtime": 1792083739.0470655,
-    "ast_hash": "de75338d475643d0ff5ed4557728d6d1",
+    "mtime": 1792356992.1495996,
+    "ast_hash": "88c16508397788292cba8c1fa6d4c234",
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1792355073.377225,
-    "ast_hash": "5eb8520d0128ef4feb9d27ea5cc01d79",
+    "mtime": 1792356992.1495996,
+    "ast_hash": "e58641d942e18cb9645d80eaf8657845",
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1792353704.04875,
-    "ast_hash": "c137fbb2e61d09cfdc54fd7c97b3504c",
+    "mtime": 1792356992.1495996,
+    "ast_hash": "4c2eed5c3fc79ed227512e915397ffdb",
     "semantic_hash": ""
   },
   "backlog.md": {
@@ -876,17 +876,17 @@
   },
   "assets/prompt_packs/dev.json": {
     "mtime": 1792079332.3303568,
-    "ast_hash": "9059333ee44ef23b3329ff33708762e9",
+    "ast_hash": "",
     "semantic_hash": ""
   },
   "assets/prompt_packs/gtd.json": {
     "mtime": 1792352906.5393481,
-    "ast_hash": "dec5d376ece6a86c2238801e1a063a75",
+    "ast_hash": "",
     "semantic_hash": ""
   },
   "assets/prompt_packs/opositor.json": {
     "mtime": 1792352906.5393481,
-    "ast_hash": "d6be7f08d4baf1f7c5144fa98ca1e69d",
+    "ast_hash": "",
     "semantic_hash": ""
   },
   ".agents/docs/instruction_1.md": {
