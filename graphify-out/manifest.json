@@ -15,8 +15,8 @@
     "semantic_hash": "c9858a77903b6601d5f0e842983865bf"
   },
   "board_view.py": {
-    "mtime": 1792081035.1056426,
-    "ast_hash": "8259ee29c58e3e3cd2acd48651a002bd",
+    "mtime": 1792351716.1459744,
+    "ast_hash": "352da7cf4650c9d6e421c62c19a5bb98",
     "semantic_hash": ""
   },
   "calendar_view.py": {
@@ -175,13 +175,13 @@
     "semantic_hash": ""
   },
   "strings.py": {
-    "mtime": 1792080551.6117215,
-    "ast_hash": "cb811ea932cfeae63253f815ed6b714a",
+    "mtime": 1792351716.9783485,
+    "ast_hash": "6df9fc3fea578dfb81f35b92329a844c",
     "semantic_hash": ""
   },
   "styles.py": {
-    "mtime": 1792068500.0636415,
-    "ast_hash": "b9020ab7d04cefe53335836a52d498bb",
+    "mtime": 1792351287.9057777,
+    "ast_hash": "3ba1f11158e73c9e4c65fda700a88d1c",
     "semantic_hash": ""
   },
   "tests/conftest.py": {
@@ -240,8 +240,8 @@
     "semantic_hash": "3dd3df13194cc9d6f26d3b0329c58312"
   },
   "tests/test_widgets_headless.py": {
-    "mtime": 1792068500.0636415,
-    "ast_hash": "9b003ba91e0d2edfb1e6d642a4105a23",
+    "mtime": 1792351428.5907242,
+    "ast_hash": "a9a412df27beb1534b79143f1a6c2c9a",
     "semantic_hash": ""
   },
   "tests/test_widgets_logic.py": {
@@ -260,8 +260,8 @@
     "semantic_hash": ""
   },
   "widgets.py": {
-    "mtime": 1792081477.2607062,
-    "ast_hash": "8c5f8b5b515d617f8f11f246d2ee037b",
+    "mtime": 1792351389.2892194,
+    "ast_hash": "eccb6fef64096b3e23e732d820e6b31c",
     "semantic_hash": ""
   },
   ".agents/docs/archive/2026-07-22_v0.4.0.md": {
@@ -355,18 +355,18 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1792083760.1546805,
-    "ast_hash": "488dcdf9eac679a72388b25da5f5b5cb",
+    "mtime": 1792351762.7021546,
+    "ast_hash": "237a3e6bc5cfe4adfec568bbc9bab914",
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1792083760.0602694,
-    "ast_hash": "e251ce46280da7741c84c6576ee779b5",
+    "mtime": 1792351762.7004035,
+    "ast_hash": "959a1b65171e503f6532d38ceb4c18e9",
     "semantic_hash": ""
   },
   "backlog.md": {
-    "mtime": 1792081673.861931,
-    "ast_hash": "fdd009761bf750784c3d4a61a27cafe7",
+    "mtime": 1792351564.246713,
+    "ast_hash": "94b8f997120a6f53bb2528cde753a9e9",
     "semantic_hash": ""
   },
   "ekin_icon.png": {
@@ -925,13 +925,13 @@
     "semantic_hash": ""
   },
   "diary_viewer_dialog.py": {
-    "mtime": 1792001040.1306212,
-    "ast_hash": "90dbd088933e7d73e8cb686ddc3c4c75",
+    "mtime": 1792351753.0651712,
+    "ast_hash": "cabe6f29c2890219becc0171784b072c",
     "semantic_hash": ""
   },
   "tests/test_diary_viewer.py": {
-    "mtime": 1792001063.8609955,
-    "ast_hash": "a9a2ad974e85ef37dd129798561513dc",
+    "mtime": 1792351671.593413,
+    "ast_hash": "e4da5db10e62d4ff2aa1e224d57ccd99",
     "semantic_hash": ""
   },
   "assets/icons/lucide/book-open.svg": {
