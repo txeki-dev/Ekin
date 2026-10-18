@@ -63,7 +63,7 @@ No Python, Git, or administrative rights required!
 3. Launch Ekin Kanban directly from your Desktop or Start Menu shortcut.
 
 > [!TIP]
-> **Automatic Updates**: When a new release is published, Ekin automatically detects it on startup, notifies you, and can download and apply the update seamlessly with one click.
+> **Automatic Updates**: When a new release is published, Ekin detects it on startup and asks you. Say **Yes** and it downloads the new installer, checks it against the SHA-256 published with the release, installs it in the background (you only see a progress bar, no wizard) and reopens itself.
 
 > [!NOTE]
 > **Windows SmartScreen Notice**: Windows may display a blue warning (*"Windows protected your PC / Unknown publisher"*) when launching the installer for the first time. This is standard for newly released software that does not carry an expensive enterprise commercial signing certificate. Simply click **"More info"** and then click **"Run anyway"**.
@@ -132,7 +132,7 @@ When you open Ekin Kanban, the application automatically performs a quick, silen
 If there is a newer version available on the `main` branch, a prompt will ask:
 > *“A new version of Ekin Kanban is available on GitHub. Do you want to download it and restart the app now?”*
 
-Clicking **Yes** fast-forwards the checkout (`git pull --ff-only`) and restarts the app on the spot. Installer-based copies check GitHub Releases instead and download the new installer.
+Clicking **Yes** fast-forwards the checkout (`git pull --ff-only`) and restarts the app on the spot. Installer-based copies check GitHub Releases instead: they download the new installer, verify its SHA-256 against the release notes, run it unattended (`/SILENT`, just a progress bar, closing Ekin so its files can be replaced) and reopen Ekin when it finishes.
 
 ---
 

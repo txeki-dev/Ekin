@@ -689,3 +689,48 @@ def test_release_workflow_publishes_the_installer_hash():
     import pathlib
     workflow = (pathlib.Path(__file__).resolve().parent.parent / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
     assert "Get-FileHash -Algorithm SHA256" in workflow and "SHA-256: $hash" in workflow
+
+
+def test_downloaded_installer_runs_unattended_and_ekin_quits(qapp, db_path, monkeypatch, tmp_path):
+    """#134: tras verificar el SHA-256, el instalador se abría con el asistente completo. Ahora va
+    en modo silencioso (solo la barra de progreso de Inno), sin preguntas ni reinicio, cerrando lo
+    que use sus archivos; Ekin sale para que se puedan reemplazar (installer.iss lo reabre)."""
+    monkeypatch.setattr(database, "DB_NAME", db_path)
+    window = _make_window(monkeypatch)
+    installer = tmp_path / "Ekin-Setup-v9.9.9.exe"
+    installer.write_bytes(b"MZ")
+    launched, quits, warned = [], [], []
+    monkeypatch.setattr(main_module.subprocess, "Popen", lambda args, **kw: launched.append(args))
+    monkeypatch.setattr(main_module.QApplication, "quit", lambda: quits.append(True))
+    monkeypatch.setattr(main_module.QMessageBox, "warning", lambda *a, **k: warned.append(a))
+
+    window._launch_installer(str(tmp_path / "no-es-un-instalador.txt"))
+    assert launched == [] and quits == [] and len(warned) == 1
+
+    window._launch_installer(str(installer))
+    assert launched == [[str(installer), "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS"]]
+    assert quits == [True]
+    _close_window(qapp, window)
+
+
+def test_installer_reopens_ekin_after_a_silent_update():
+    """#134: la entrada [Run] que abre Ekin lleva `skipifsilent`, así que tras una actualización
+    silenciosa Ekin no volvía a abrirse. Una segunda entrada lo abre solo en modo silencioso, como
+    el usuario que lanzó el instalador (no elevado)."""
+    import pathlib
+    iss = (pathlib.Path(__file__).resolve().parent.parent / "installer.iss").read_text(encoding="utf-8")
+    run = iss.split("[Run]", 1)[1]
+    entries = [line for line in run.splitlines() if line.startswith("Filename:")]
+    interactive = [e for e in entries if "skipifsilent" in e]
+    silent = [e for e in entries if "skipifnotsilent" in e]
+    assert len(interactive) == 1 and "postinstall" in interactive[0]
+    assert len(silent) == 1 and "{#MyAppExeName}" in silent[0]
+    assert "runasoriginaluser" in silent[0] and "nowait" in silent[0]
+
+
+def test_release_workflow_runs_one_release_at_a_time():
+    """#134: dos pushes seguidos lanzaban dos releases a la vez; la segunda no veía aún el tag,
+    recompilaba el instalador y fallaba al crear una release que ya existía (v1.7.0)."""
+    import pathlib
+    workflow = (pathlib.Path(__file__).resolve().parent.parent / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    assert "concurrency:" in workflow and "cancel-in-progress: false" in workflow

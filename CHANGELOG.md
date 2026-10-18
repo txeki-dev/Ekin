@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **Updates install unattended and reopen Ekin (`main.py`, `installer.iss`, #134)**: Installed copies used to open the full setup wizard after downloading an update and close Ekin, leaving the user to click through it and start the app again. The verified installer now runs silently (only Inno Setup's progress bar, no questions or reboot, closing whatever uses its files) and Ekin reopens when it finishes, as the user who started the update (not elevated).
+
+### Fixed
+- **Two releases could build at once (`.github/workflows/release.yml`, #134)**: Two pushes in a row started two release runs; the second didn't see the new tag yet, rebuilt the installer and failed to create a release that already existed (it happened with v1.7.0, harmlessly). Release runs now queue one after the other.
+
 ## [1.7.0] - 2026-10-18
 
 ### Added

@@ -14,6 +14,12 @@ on:
 permissions:
   contents: write
 
+# Una release cada vez: con dos pushes seguidos, la segunda ejecución esperaba a que la primera
+# creara el tag y se saltaba, en vez de recompilar y fallar al crear una release que ya existía.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     name: Build Installer & Publish Release

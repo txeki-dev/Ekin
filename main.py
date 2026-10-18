@@ -904,13 +904,7 @@ class MainWindow(QMainWindow):
 
         def on_finished(installer_path):
             progress_dlg.close()
-            try:
-                if not os.path.isfile(installer_path) or not installer_path.lower().endswith(".exe"):
-                    raise ValueError(f"Fichero de instalación inválido: {installer_path}")
-                subprocess.Popen([installer_path])
-                QApplication.quit()
-            except Exception as exc:
-                QMessageBox.warning(self, t("main.update.failed_title"), str(exc))
+            self._launch_installer(installer_path)
 
         def on_error(err_msg):
             progress_dlg.close()
@@ -926,6 +920,18 @@ class MainWindow(QMainWindow):
         download_thread.error.connect(on_error)
         self._installer_download_thread = download_thread
         download_thread.start()
+
+    def _launch_installer(self, installer_path):
+        """Lanza el instalador ya verificado en modo desatendido (#134): solo la barra de progreso de
+        Inno, sin preguntas ni reinicio, cerrando lo que use sus archivos. Ekin sale para que se
+        puedan reemplazar; installer.iss lo vuelve a abrir al terminar."""
+        try:
+            if not os.path.isfile(installer_path) or not installer_path.lower().endswith(".exe"):
+                raise ValueError(f"Fichero de instalación inválido: {installer_path}")
+            subprocess.Popen([installer_path, "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS"])
+            QApplication.quit()
+        except Exception as exc:
+            QMessageBox.warning(self, t("main.update.failed_title"), str(exc))
 
     def _check_git_updates(self, manual=False):
         """Verifica si hay actualizaciones en el repo de GitHub (modo git dev)."""
