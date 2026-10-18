@@ -20,8 +20,6 @@ Txek Systems domain, not registered yet). #81 stays for another session._
   the ADR is approved.
 - [ ] **#133 Due date clipped on task cards — Wave 1** `[BUG]` — not reproduced yet (synthetic cards at 200 % with
   Figtree render it whole); needs a screenshot from the user.
-- [ ] **#142 Diary button shows every `.md` / `.txt` of the repo — Wave 1** `[FEAT]` — root files as tabs (diaries
-  first) + a «More…» menu for subfolders; list by walking the folder, not `git ls-files` (`diary.md` is gitignored).
 - [ ] **#136 Audit the DEV / SOCRATIC / GTD board types — Wave 2** `[ARCH]` — findings as `audit` cards; rename
   templates, packs and strings (new boards only, template and pack ids kept); PM board as a proposal.
 - [ ] **#137 Landing tour shows the AI-agent workflow — Wave 2** `[UX]` — after #136; slide bullets are hard-coded
@@ -29,6 +27,15 @@ Txek Systems domain, not registered yet). #81 stays for another session._
 - [ ] **#134 Installer for non-technical users — Wave 3** `[FEAT]` — installer + SHA-256-verified updater already
   exist; add an unattended update (`/SILENT`, relaunch) and a signing step that only runs when its secrets exist.
 - [ ] **#135 Monetization plan — Wave 3** `[ARCH]` — decision doc from the local drafts + public landing page.
+
+- [x] **DONE (2026-10-18) — #142 The Diary button shows every `.md` / `.txt` of the repo** `[FEAT]` ·
+  `diary_viewer_dialog.py` (`doc_files`, `has_doc_files`), `board_view.py`, `strings.py`. `test_diary_viewer.py` 3 → 7.
+  - **Problem:** the viewer only opened `diary.md` / `diary_archive.md`; the user wanted every Markdown and text file.
+  - **Solution:** root files as tabs (diaries first, then A→Z) and a «More…» corner menu with one submenu per
+    top-level folder. The folder is walked directly (the diaries are gitignored, so `git ls-files` would hide them),
+    skipping `venv`, `node_modules`, `.git`, build folders and `*.egg-info`, capped at 500. `.txt` renders as plain
+    text; *Reload* adds new root files and keeps each tab's scroll; the button shows with any `.md` / `.txt`.
+    Submenus need an explicit parent: PySide destroyed the `QMenu` from `addMenu(str)` once unreferenced.
 
 - [x] **DONE (2026-10-18) — #132 Task cards cut long titles and overflowed the column** `[BUG]` · `widgets.py`
   (`TaskListArea`, `ColumnWidget.add_task_card`, `TaskCard`, `FlowLayout`), `styles.py`. 3 new tests + 1 updated
