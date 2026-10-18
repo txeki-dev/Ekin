@@ -18,8 +18,6 @@ Txek Systems domain, not registered yet). #81 stays for another session._
 - [ ] **#81 PWA Ekin Mobile — Wave 4** `[FEAT]` — phase 81.0 first: ADR (LAN-first, PatrimonIA pattern: on-demand LAN
   listener + mkcert TLS + mDNS + QR pairing + idempotent event queue) and sub-cards 81.1–81.5; no PWA code before
   the ADR is approved.
-- [ ] **#133 Due date clipped on task cards — Wave 1** `[BUG]` — not reproduced yet (synthetic cards at 200 % with
-  Figtree render it whole); needs a screenshot from the user.
 - [ ] **#134 Installer for non-technical users — Wave 3** `[FEAT]` — installer + SHA-256-verified updater already
   exist; add an unattended update (`/SILENT`, relaunch) and a signing step that only runs when its secrets exist.
 - [ ] **#135 Monetization plan — Wave 3** `[ARCH]` — decision doc from the local drafts + public landing page.
@@ -49,6 +47,16 @@ Txek Systems domain, not registered yet). #81 stays for another session._
     outlines from the student's draft, doubts answered after asking, no Spanish-law assumptions, generic tags and
     seed tasks); GTD gets *INICIO* (`gtd_intro`), which reports Inbox / @Next / @Waiting / due dates and proposes
     the next step.
+
+- [x] **DONE (2026-10-18) — #133 Due date cut off in Task Detail** `[BUG]` · `detail_dialog/task_detail_dialog.py`
+  (`_fit_due_date_edit`). 1 test (`test_widgets_headless.py`).
+  - **Problem:** the clipped date was the Task Detail `QDateEdit`, not the board card (the user's screenshot showed
+    it). Qt's `sizeHint` ignores the theme's `QAbstractSpinBox` padding (4px 8px) and the calendar button: the edit
+    field was 71 px for 73 px of text, so the last digit sat under the button.
+  - **Solution:** a minimum width = what the style says is not text area (frame, padding, buttons) + the widest
+    possible date in the current font + QLineEdit's 2 px margins. Checked at 200 % with Figtree.
+  - **Follow-up on #142 (same release):** the «More…» menu and its submenus now use `styles.style_menu` (they took
+    the system's dark palette and the text was unreadable). 1 test.
 
 - [x] **DONE (2026-10-18) — #142 The Diary button shows every `.md` / `.txt` of the repo** `[FEAT]` ·
   `diary_viewer_dialog.py` (`doc_files`, `has_doc_files`), `board_view.py`, `strings.py`. `test_diary_viewer.py` 3 → 7.

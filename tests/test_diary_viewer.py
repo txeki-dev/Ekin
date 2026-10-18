@@ -80,6 +80,22 @@ def test_more_menu_opens_subfolder_docs_as_tabs_once(qapp, db_path, tmp_path):
     dlg.close()
 
 
+def test_more_menu_and_its_submenus_follow_the_app_theme(qapp, db_path, tmp_path):
+    """#142: «Más…» y sus submenús no usaban styles.style_menu como el resto de menús de la app,
+    así que salían con la paleta oscura del sistema y el texto no se leía."""
+    import styles
+
+    _write(tmp_path, "docs/guide.md")
+    _write(tmp_path, ".agents/plan.md")
+    dlg = DiaryViewerDialog(_board(db_path, str(tmp_path)), db_path=db_path)
+    menu = dlg.more_btn.menu()
+    submenus = [action.menu() for action in menu.actions()]
+    assert len(submenus) == 2
+    for m in [menu, *submenus]:
+        assert styles.COLORS["bg_sidebar"] in m.styleSheet() and styles.COLORS["text_main"] in m.styleSheet()
+    dlg.close()
+
+
 def test_more_button_hidden_without_subfolder_docs(qapp, db_path, tmp_path):
     _write(tmp_path, "README.md")
     dlg = DiaryViewerDialog(_board(db_path, str(tmp_path)), db_path=db_path)

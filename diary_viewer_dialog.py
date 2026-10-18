@@ -11,6 +11,7 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QMenu, QPushButton, QTabWidget, QTextBrowser, QVBoxLayout
 
 import database
+import styles
 from detail_dialog.repo_files import _SKIP_DIRS
 from strings import t
 
@@ -69,6 +70,7 @@ class DiaryViewerDialog(QDialog):
         self.more_btn = QPushButton(t("diary_viewer.more"))
         self.more_btn.setToolTip(t("diary_viewer.more_tooltip"))
         self.more_btn.setMenu(QMenu(self.more_btn))
+        styles.style_menu(self.more_btn.menu())
         self.tabs.setCornerWidget(self.more_btn)
         layout.addWidget(self.tabs, 1)
 
@@ -120,6 +122,7 @@ class DiaryViewerDialog(QDialog):
         for folder, rel_paths in itertools.groupby(sub, key=lambda p: p.split("/", 1)[0]):
             # Con padre explícito: el QMenu de addMenu(str) lo destruye PySide al salir de ámbito
             folder_menu = QMenu(folder, menu)
+            styles.style_menu(folder_menu)
             menu.addMenu(folder_menu)
             for rel_path in rel_paths:
                 action = folder_menu.addAction(rel_path.split("/", 1)[1])
