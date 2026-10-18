@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-10-18
+
 ### Added
 - **AI workflow diagram (`workflow_dialog.py`, `main.py`, `settings_dialog.py`, #137)**: A new dialog shows how a task travels from idea to done when you work with an AI agent: capture, get it ready, **▶ Work**, the agent works and logs its progress, review and done, with who acts at each step (you, Ekin or the agent) and a note on columns and handoffs. It opens from the command palette (*Show the AI workflow diagram*), from a new *AI workflow* row in Settings and from the welcome guide.
 
