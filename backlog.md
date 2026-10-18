@@ -20,14 +20,23 @@ Txek Systems domain, not registered yet). #81 stays for another session._
   the ADR is approved.
 - [ ] **#133 Due date clipped on task cards — Wave 1** `[BUG]` — not reproduced yet (synthetic cards at 200 % with
   Figtree render it whole); needs a screenshot from the user.
-- [ ] **#137 Landing tour shows the AI-agent workflow — Wave 2** `[UX]` — after #136; slide bullets are hard-coded
-  Spanish today (no `t()`); add a workflow diagram reachable from the command palette.
 - [ ] **#134 Installer for non-technical users — Wave 3** `[FEAT]` — installer + SHA-256-verified updater already
   exist; add an unattended update (`/SILENT`, relaunch) and a signing step that only runs when its secrets exist.
 - [ ] **#135 Monetization plan — Wave 3** `[ARCH]` — decision doc from the local drafts + public landing page.
 - [ ] **#144 / #145 / #146 Findings of the #136 audit** `[AUDIT]` `P3-Low` — built-in templates hard-coded in Spanish
   (#144, fits with #137), Socratic/GTD prompts always answer in Spanish (#145), Work and the local folder worded as a
   code repo on every board type (#146).
+
+- [x] **DONE (2026-10-18) — #137 Welcome guide built around the AI-agent workflow + workflow diagram** `[UX]` ·
+  `onboarding_dialog.py`, new `workflow_dialog.py`, `main.py`, `settings_dialog.py`, `strings.py`, `templates.py`.
+  6 tests (`test_widgets_headless.py`, `test_main_window.py`).
+  - **Problem:** the slides described an older Ekin (no ▶ Work, Prompts, Diary or column roles; a removed SPEC
+    generator), their bullets were hard-coded Spanish (no `t()`), the slide card's `QFrame {…}` style boxed every
+    label, and the *Primeros Pasos* board pointed at header buttons that moved to the footer and old template names.
+  - **Solution:** 5 translated slides (board types and roles · cards with memory · work with your agent · a typical
+    day with an agent · shortcuts and views); `WorkflowDialog` with the 6 steps and who acts in each, opened from
+    the palette (`workflow`), Settings and the guide; card style scoped to `#LandingSlide`; tour step 4 and seed
+    cards 6/8/9 updated. Checked in EN/ES and light/dark.
 
 - [x] **DONE (2026-10-18) — #136 Board types audited and renamed: DEV, Socratic, GTD** `[ARCH]` · `templates.py`,
   `column_roles.py`, `assets/prompt_packs/{opositor,gtd}.json`, `strings.py`. 8 tests added or updated

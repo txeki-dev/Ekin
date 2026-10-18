@@ -198,7 +198,7 @@ TEMPLATE_GETTING_STARTED = BoardTemplate(
             description=(
                 "### ☁️ Sincronización en la Nube y Carpetas Compartidas\n"
                 "Ekin te permite colaborar y mantener tus tableros respaldados de forma offline-first:\n"
-                "- **Vincular a la Nube**: Haz clic en el botón de la nube en la cabecera del tablero o en las opciones del tablero (`...` o clic derecho en la barra lateral).\n"
+                "- **Vincular a la Nube**: Haz clic en el botón de la nube en el pie del tablero o en las opciones del tablero (`...` o clic derecho en la barra lateral).\n"
                 "- **Archivo único `.ekboard`**: Se genera un archivo portátil que puedes guardar en **Google Drive, Dropbox, OneDrive** o una carpeta compartida en red local (LAN).\n"
                 "- **Sincronización Reactiva**: Ekin detecta cambios automáticamente en segundo plano. Si otro usuario o tú editáis a la vez, el motor *No-Data-Loss* fusiona los cambios y archiva cualquier versión concurrente en el diario de la tarea.\n"
                 "- **Atajo rápido**: Usa `Ctrl+K` y escribe *Sincronizar* para forzar una sincronización manual al instante."
@@ -221,12 +221,14 @@ TEMPLATE_GETTING_STARTED = BoardTemplate(
             tags=["Calendario"],
         ),
         SeedTaskTemplate(
-            title="8. Conecta agentes IA con MCP o abre Ajustes (⚙️)",
+            title="8. Trabaja con un agente de IA (▶ Trabajar) o abre Ajustes (⚙️)",
             column_index=2,
             description=(
-                "### 🤖 Ecosistema Local MCP (Model Context Protocol)\n"
-                "- Pulsa el botón **`🤖 MCP`** en la cabecera superior del tablero para conectar asistentes IA (**Claude Code, Cursor, AGY CLI y Claude Desktop**).\n"
-                "- Cada tablero opera con un sandbox aislado y token secreto.\n"
+                "### 🤖 Trabajar con un agente de IA\n"
+                "- Enlaza el tablero con su carpeta local y pulsa **▶ Trabajar** en la cabecera: Ekin arranca el servidor MCP y abre tu CLI de IA (**Claude Code, Antigravity CLI o Gemini CLI**) en esa carpeta con el prompt de inicio.\n"
+                "- El agente lee el tablero, toma la tarea activa, deja su avance como comentarios y la mueve de columna; las columnas solo las cambias tú.\n"
+                "- **Prompts** (cabecera) tiene los prompts de tu tipo de tablero listos para copiar, y el botón **MCP** del pie conecta otros clientes (Cursor, Claude Desktop…). Cada tablero opera con un sandbox aislado y token secreto.\n"
+                "- Para ver el flujo completo: **Ctrl+K → Ver el diagrama del flujo de trabajo con IA**.\n"
                 "- Abre **Ajustes (⚙️)** en la barra lateral para alternar entre tema Claro y Oscuro, configurar avisos por anticipación o comprobar actualizaciones."
             ),
             priority="Alta",
@@ -239,7 +241,7 @@ TEMPLATE_GETTING_STARTED = BoardTemplate(
                 "### 🚀 ¡Has dominado los aspectos fundamentales de Ekin!\n"
                 "Ahora tienes todo el control:\n"
                 "- Haz clic en el botón **`+`** de la barra lateral izquierda para crear un nuevo tablero.\n"
-                "- Elige empezar con un lienzo en blanco o con una de las plantillas especializadas (**Desarrollo Software Agile**, **Opositor**, **GTD / Personal**).\n"
+                "- Elige empezar con un lienzo en blanco o con uno de los tipos de tablero (**DEV** para software, **Socrático** para estudiar guiado por preguntas, **GTD** para tu productividad personal).\n"
                 "- Puedes volver a consultar este tutorial o abrir la guía gráfica en cualquier momento desde **Ajustes (⚙️) > Tour y Bienvenida**."
             ),
             priority="Alta",

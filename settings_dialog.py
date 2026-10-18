@@ -263,6 +263,31 @@ class SettingsDialog(QDialog):
         general_layout.addWidget(self._row(
             t("settings.landing_tour_label"), t("settings.landing_tour_desc"), tour_buttons_frame
         ))
+        general_layout.addWidget(self._divider())
+
+        # === Fila 8: Diagrama del flujo de trabajo con IA (#137) ===
+        workflow_btn = QPushButton(f" {t('settings.workflow_btn')}")
+        workflow_btn.setIcon(lucide_icon("repeat", styles.COLORS["text_soft"], 14))
+        workflow_btn.setIconSize(QSize(14, 14))
+        workflow_btn.setCursor(Qt.PointingHandCursor)
+        workflow_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                border: 1px solid {styles.COLORS['border']};
+                border-radius: 8px;
+                padding: 6px 12px;
+                color: {styles.COLORS['text_soft']};
+                font-size: 12px;
+            }}
+            QPushButton:hover {{
+                background-color: {styles.COLORS['bg_hover']};
+                border-color: {styles.COLORS['border']};
+            }}
+        """)
+        workflow_btn.clicked.connect(self._on_workflow_clicked)
+        general_layout.addWidget(self._row(
+            t("settings.workflow_label"), t("settings.workflow_desc"), workflow_btn
+        ))
 
         general_layout.addStretch()
 
@@ -530,6 +555,10 @@ class SettingsDialog(QDialog):
         self.landing_tour_requested.emit()
         dlg = LandingTourDialog(self, db_path=self.db_path)
         dlg.exec()
+
+    def _on_workflow_clicked(self):
+        from workflow_dialog import WorkflowDialog
+        WorkflowDialog(self).exec()
 
     def _on_interactive_tour_clicked(self):
         self.interactive_tour_requested.emit()

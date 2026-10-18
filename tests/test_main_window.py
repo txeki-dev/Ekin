@@ -497,6 +497,20 @@ def test_command_palette_cloud_and_calendar_dispatch(qapp, db_path, monkeypatch)
     _close_window(qapp, window)
 
 
+def test_command_palette_opens_the_workflow_diagram(qapp, db_path, monkeypatch):
+    """#137: el diagrama del flujo de trabajo con IA se abre desde la paleta de comandos."""
+    import workflow_dialog
+
+    monkeypatch.setattr(database, "DB_NAME", db_path)
+    window = _make_window(monkeypatch)
+    opened = []
+    monkeypatch.setattr(workflow_dialog.WorkflowDialog, "exec", lambda self: opened.append(self) or 0)
+
+    window._run_command("workflow")
+    assert len(opened) == 1
+    _close_window(qapp, window)
+
+
 def test_installer_download_thread_sha256_verification(tmp_path, monkeypatch):
     import io
     import hashlib

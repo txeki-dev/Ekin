@@ -2301,18 +2301,19 @@ def test_landing_tour_dialog_navigation_and_persistence(qapp, db_path):
     assert dlg.stack.currentIndex() == 1
     assert dlg.prev_btn.isEnabled()
 
-    # Ir directamente a la última diapositiva (índice 3)
-    dlg._go_to_slide(3)
-    assert dlg._current_index == 3
+    # Ir directamente a la última diapositiva
+    last = dlg.stack.count() - 1
+    dlg._go_to_slide(last)
+    assert dlg._current_index == last
     assert t("landing.start_btn").strip() in dlg.next_btn.text()
 
     # Retroceder una
     dlg.prev_btn.click()
-    assert dlg._current_index == 2
+    assert dlg._current_index == last - 1
 
     # Avanzar a la última y pulsar Comenzar
     dlg.next_btn.click()
-    assert dlg._current_index == 3
+    assert dlg._current_index == last
     dlg.next_btn.click()
     assert database.get_setting("onboarding_tour_shown", "0", db_path) == "1"
 
@@ -2334,6 +2335,74 @@ def test_landing_tour_dialog_dont_show_checkbox(qapp, db_path):
     assert database.get_setting("onboarding_tour_shown", "0", db_path) == "0"
 
     dlg.deleteLater()
+
+
+def _visible_texts(widget):
+    """Textos no vacíos de los QLabel y QPushButton de `widget`."""
+    texts = [w.text().strip() for w in widget.findChildren(QLabel) + widget.findChildren(QPushButton)]
+    return [text for text in texts if text]
+
+
+def _known_texts(lang):
+    table = strings.STRINGS_EN if lang == "en" else strings.STRINGS_ES
+    return {value.strip() for value in table.values()}
+
+
+@pytest.mark.parametrize("lang", ["en", "es"])
+def test_landing_tour_texts_are_all_translated(qapp, db_path, lang):
+    """#137: las viñetas de las diapositivas estaban escritas en español en el código, así que en
+    inglés salían en español. Todo el texto visible sale ahora de strings.py en el idioma activo."""
+    from onboarding_dialog import LandingTourDialog
+
+    known = _known_texts(lang)
+    try:
+        strings.set_language(lang)
+        dlg = LandingTourDialog(db_path=db_path)
+        for page in range(dlg.stack.count()):
+            for text in _visible_texts(dlg.stack.widget(page)):
+                assert text in known, text
+        dlg.deleteLater()
+    finally:
+        strings.set_language("en")
+
+
+@pytest.mark.parametrize("lang", ["en", "es"])
+def test_workflow_dialog_shows_the_ai_workflow_translated(qapp, lang):
+    """#137: diagrama del flujo de trabajo con un agente de IA, de la idea a Done."""
+    from workflow_dialog import STEPS, WorkflowDialog
+
+    known = _known_texts(lang)
+    try:
+        strings.set_language(lang)
+        dlg = WorkflowDialog()
+        texts = _visible_texts(dlg)
+        assert len(STEPS) == 6
+        for key, _icon, _actor in STEPS:
+            assert t(f"workflow.{key}_title") in texts
+        for text in texts:
+            assert text in known, text
+        dlg.deleteLater()
+    finally:
+        strings.set_language("en")
+
+
+def test_landing_tour_and_settings_open_the_workflow_diagram(qapp, db_path, monkeypatch):
+    """#137: el diagrama se abre desde la guía de bienvenida y desde Ajustes."""
+    import workflow_dialog
+    from onboarding_dialog import LandingTourDialog
+    from settings_dialog import SettingsDialog
+
+    opened = []
+    monkeypatch.setattr(workflow_dialog.WorkflowDialog, "exec", lambda self: opened.append(self) or 0)
+
+    landing = LandingTourDialog(db_path=db_path)
+    next(b for b in landing.findChildren(QPushButton) if b.text().strip() == t("landing.workflow_btn")).click()
+    settings = SettingsDialog(db_path)
+    next(b for b in settings.findChildren(QPushButton) if b.text().strip() == t("settings.workflow_btn")).click()
+
+    assert len(opened) == 2
+    landing.deleteLater()
+    settings.deleteLater()
 
 
 def test_interactive_tour_banner_navigation_and_actions(qapp, db_path):

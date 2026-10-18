@@ -37,6 +37,7 @@ from search_dialog import SearchDialog
 from command_palette import CommandPalette
 from settings_dialog import SettingsDialog
 from shortcuts_dialog import ShortcutsDialog
+from workflow_dialog import WorkflowDialog
 from undo import UndoManager
 import reminders
 import logging_setup
@@ -476,6 +477,7 @@ class MainWindow(QMainWindow):
             ("search", t("palette.cmd_search")),
             ("settings", t("palette.cmd_settings")),
             ("shortcuts", t("palette.cmd_shortcuts")),
+            ("workflow", t("palette.cmd_workflow")),
             ("toggle_theme", t("palette.cmd_toggle_theme")),
             ("open_logs", t("palette.cmd_open_logs")),
         ]
@@ -511,6 +513,7 @@ class MainWindow(QMainWindow):
             "search": self.show_search,
             "settings": self.show_settings,
             "shortcuts": self.show_shortcuts,
+            "workflow": self.show_workflow,
             "toggle_theme": self._toggle_theme,
             "open_logs": self._open_logs_folder,
         }
@@ -604,6 +607,10 @@ class MainWindow(QMainWindow):
     def show_shortcuts(self):
         """Abre la ventana de referencia de atajos de teclado (Ctrl+/)."""
         ShortcutsDialog(self).exec()
+
+    def show_workflow(self):
+        """Abre el diagrama del flujo de trabajo con un agente de IA (#137)."""
+        WorkflowDialog(self).exec()
 
     def _do_undo(self):
         if self.undo_manager.undo():

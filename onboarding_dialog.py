@@ -36,7 +36,7 @@ class LandingTourDialog(QDialog):
         self.db_path = db_path
         self.setWindowTitle(t("landing.window_title"))
         self.setMinimumSize(600, 480)
-        self.resize(620, 500)
+        self.resize(680, 500)
 
         self._dots = []
         self._current_index = 0
@@ -87,52 +87,46 @@ class LandingTourDialog(QDialog):
         # 2. Contenedor de Diapositivas (QStackedWidget con tarjetas redondeadas)
         self.stack = QStackedWidget()
 
+        # Todo el texto sale de strings.py (#137: las viñetas estaban en español en el código).
+        # La 4.ª diapositiva enseña el flujo con un agente y abre su diagrama.
         slides_data = [
             {
                 "icon": "list",
                 "accent": styles.COLORS["accent"],
-                "title": t("landing.slide1_title"),
-                "desc": t("landing.slide1_desc"),
-                "bullets": [
-                    ("check", "Arrastrar y soltar fluido con previsualización nítida e inserción en tiempo real."),
-                    ("sliders-horizontal", "Límites WIP configurables por columna para mantener flujos ágiles sin sobrecarga."),
-                    ("copy", "Plantillas de fábrica (Agile Software, Opositor, GTD, En Blanco) y personalizables."),
-                ]
+                "slide": 1,
+                "bullets": ["check", "sliders-horizontal", "copy"],
             },
             {
                 "icon": "code",
                 "accent": "#0ea5e9",
-                "title": t("landing.slide2_title"),
-                "desc": t("landing.slide2_desc"),
-                "bullets": [
-                    ("clock", "Diario personal integrado por tarjeta con registro cronológico y trazabilidad."),
-                    ("code", "Editor enriquecido con bloques de código resaltados (</>), tablas y formato Markdown."),
-                    ("paperclip", "Adjuntos de archivos locales (con detección automática de rutas) y enlaces web."),
-                ]
+                "slide": 2,
+                "bullets": ["clock", "code", "paperclip"],
             },
             {
-                "icon": "sparkles",
+                "icon": "play",
                 "accent": styles.COLORS["accent_2_ink"],
-                "title": t("landing.slide3_title"),
-                "desc": t("landing.slide3_desc"),
-                "bullets": [
-                    ("cloud", "Servidor local Model Context Protocol (MCP) en HTTP/SSE (127.0.0.1:8765) y STDIO."),
-                    ("check", "Sandboxing estricto por tablero y gobernanza de columnas (Human-Only)."),
-                    ("sparkles", "Generador de especificaciones técnicas (TDD/SPEC) seleccionando múltiples tareas."),
-                ]
+                "slide": 3,
+                "bullets": ["play", "sparkles", "check"],
+            },
+            {
+                "icon": "repeat",
+                "accent": "#8b5cf6",
+                "slide": 4,
+                "bullets": ["list", "play", "sparkles", "search", "check"],
+                "workflow_button": True,
             },
             {
                 "icon": "command",
                 "accent": "#f59e0b",
-                "title": t("landing.slide4_title"),
-                "desc": t("landing.slide4_desc"),
-                "bullets": [
-                    ("command", "Ctrl+K: Paleta de comandos universal y captura ultrarrápida (+ título)."),
-                    ("list", "Ctrl+0: Vista Mi Trabajo para dominar tus entregas y fechas límite."),
-                    ("calendar", "Sincronización en vivo con Google, Apple y Outlook mediante feed .ics."),
-                ]
-            }
+                "slide": 5,
+                "bullets": ["command", "list", "calendar"],
+            },
         ]
+        for sdata in slides_data:
+            n = sdata["slide"]
+            sdata["title"] = t(f"landing.slide{n}_title")
+            sdata["desc"] = t(f"landing.slide{n}_desc")
+            sdata["bullets"] = [(icon, t(f"landing.slide{n}_b{i}")) for i, icon in enumerate(sdata["bullets"], start=1)]
 
         for sdata in slides_data:
             self.stack.addWidget(self._create_slide_page(sdata))
@@ -187,8 +181,11 @@ class LandingTourDialog(QDialog):
 
     def _create_slide_page(self, data: dict) -> QWidget:
         card = QFrame()
+        # Por objectName: con «QFrame {...}» el borde y el relleno caían también en cada QLabel
+        # (QLabel hereda de QFrame) y cada texto salía en su propia caja.
+        card.setObjectName("LandingSlide")
         card.setStyleSheet(f"""
-            QFrame {{
+            #LandingSlide {{
                 background-color: {styles.COLORS['bg_card']};
                 border: 1px solid {styles.COLORS['border']};
                 border-radius: 14px;
@@ -242,8 +239,19 @@ class LandingTourDialog(QDialog):
             bullets_layout.addLayout(brow)
 
         layout.addLayout(bullets_layout)
+        if data.get("workflow_button"):
+            workflow_btn = QPushButton(f" {t('landing.workflow_btn')}")
+            workflow_btn.setIcon(lucide_icon("chevron-right", styles.COLORS["accent"], 14))
+            workflow_btn.setIconSize(QSize(14, 14))
+            workflow_btn.setCursor(Qt.PointingHandCursor)
+            workflow_btn.clicked.connect(self._open_workflow)
+            layout.addWidget(workflow_btn, 0, Qt.AlignLeft)
         layout.addStretch()
         return card
+
+    def _open_workflow(self):
+        from workflow_dialog import WorkflowDialog
+        WorkflowDialog(self).exec()
 
     def _go_to_slide(self, index: int):
         self._current_index = max(0, min(index, self.stack.count() - 1))
