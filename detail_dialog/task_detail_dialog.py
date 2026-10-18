@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QDialog, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QScrollArea, QWidget,
     QMessageBox, QCheckBox, QDateEdit, QTimeEdit, QComboBox, QFileDialog,
-    QApplication
+    QApplication, QStyle, QStyleOptionSpinBox
 )
 from PySide6.QtGui import QKeySequence, QShortcut, QDesktopServices as QDesktopServices
 import database
@@ -253,6 +253,7 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         self.due_date_edit.setDate(QDate.currentDate())
         self.due_date_edit.setDisplayFormat("yyyy-MM-dd")
         self.due_date_edit.setEnabled(False)
+        self._fit_due_date_edit()
         row_2.addWidget(self.due_date_edit)
         self.due_time_chk = QCheckBox(t("task_detail.due_time_checkbox"))
         self.due_time_chk.setCursor(Qt.PointingHandCursor)
@@ -485,6 +486,19 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         shortcut.activated.connect(self.add_log_entry)
         shortcut_num = QShortcut(QKeySequence("Ctrl+Enter"), self)
         shortcut_num.activated.connect(self.add_log_entry)
+
+    def _fit_due_date_edit(self):
+        """Ancho mínimo para que quepa cualquier fecha (#133): el sizeHint de QDateEdit no cuenta
+        el padding de la QSS ni el botón del calendario, y el último dígito quedaba debajo."""
+        edit = self.due_date_edit
+        edit.ensurePolished()
+        fm = edit.fontMetrics()
+        widest = 8 * max(fm.horizontalAdvance(d) for d in "0123456789") + 2 * fm.horizontalAdvance("-")
+        opt = QStyleOptionSpinBox()
+        edit.initStyleOption(opt)
+        field = edit.style().subControlRect(QStyle.CC_SpinBox, opt, QStyle.SC_SpinBoxEditField, edit)
+        # Lo que no es área de texto (borde, padding, botones) + la fecha + 2 px de margen de QLineEdit por lado
+        edit.setMinimumWidth(opt.rect.width() - field.width() + widest + 4)
 
     def _sync_due_enabled(self):
         """Habilita/inhabilita fecha y hora según los checks."""

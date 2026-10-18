@@ -324,6 +324,33 @@ def test_task_detail_dialog_shows_the_task_id(qapp, db_path):
     dlg.reject()
 
 
+def test_task_detail_due_date_field_fits_any_date(qapp, db_path):
+    """#133: el sizeHint de QDateEdit no cuenta el padding de la QSS de la app ni el botón del
+    calendario, así que el área de texto quedaba más estrecha que la fecha y el último dígito
+    se cortaba."""
+    from PySide6.QtWidgets import QStyle, QStyleOptionSpinBox
+
+    board_id = database.create_board("Tablero", db_path=db_path)
+    col_id = database.create_column(board_id, "Col", db_path=db_path)
+    task_id = database.create_task(col_id, "Tarea", db_path=db_path)
+    previous_qss = qapp.styleSheet()
+    try:
+        qapp.setStyleSheet(styles.set_theme("light"))
+        dlg = TaskDetailDialog(task_id, db_path=db_path)
+        dlg.show()
+        qapp.processEvents()
+        edit = dlg.due_date_edit
+        opt = QStyleOptionSpinBox()
+        edit.initStyleOption(opt)
+        field = edit.style().subControlRect(QStyle.CC_SpinBox, opt, QStyle.SC_SpinBoxEditField, edit)
+        fm = edit.fontMetrics()
+        widest = 8 * max(fm.horizontalAdvance(d) for d in "0123456789") + 2 * fm.horizontalAdvance("-")
+        assert field.width() >= widest + 4  # + los 2 px de margen interno de QLineEdit a cada lado
+        dlg.reject()
+    finally:
+        qapp.setStyleSheet(previous_qss)
+
+
 def test_timer_badge_hidden_when_no_timer(qapp):
     card = _card_with_timer(started_at=None)
     assert card.timer_container.isHidden()
