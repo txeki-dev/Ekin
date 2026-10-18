@@ -51,6 +51,18 @@ def test_create_board_from_software_template(db_path):
     assert "Tipo" in categories
 
 
+def test_builtin_board_types_are_dev_socratic_and_gtd():
+    """#136: SW → DEV, Opositor → Socrático (cualquier estudio), Personal/GTD → GTD. Los ids no
+    cambian, para no romper nada que ya los use."""
+    names = {t.id: t.name for t in templates.get_builtin_templates()}
+    assert names["software_agile"] == "DEV — Desarrollo de software"
+    assert names["opositor_study"] == "Socrático — Estudio guiado por preguntas"
+    assert names["gtd_personal"] == "GTD — Getting Things Done"
+    socratic = templates.TEMPLATE_OPOSITOR
+    assert "socrátic" in socratic.ai_system_prompt.lower()
+    assert "oposiciones" not in socratic.category.lower()
+
+
 def test_create_board_from_opositor_template(db_path):
     tmpl = templates.TEMPLATE_OPOSITOR
     board_id = create_board_from_template("Oposición AGE", "#7c3aed", tmpl, db_path=db_path)
@@ -140,7 +152,7 @@ def test_create_board_dialog_headless(qapp, db_path):
         # Seleccionar plantilla opositor
         dlg._on_template_selected("opositor_study")
         assert dlg.selected_template.id == "opositor_study"
-        assert dlg.name_input.text() == "Opositor (Estudio Sistemático)"
+        assert dlg.name_input.text() == "Socrático — Estudio guiado por preguntas"
 
         # Comprobar filtro
         dlg._on_category_filter_changed(1)  # builtin

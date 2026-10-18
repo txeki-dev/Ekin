@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QApplication
 
 import database
 import prompt_packs
+import strings
 import templates
 from prompt_clipboard_dialog import PromptClipboardDialog
 
@@ -29,6 +30,31 @@ def test_builtin_packs_are_valid_and_target_the_board_mcp(pack_id):
     for p in prompts:
         assert p["title"] and p["category"] and p["prompt"]
         assert "{{mcp_server}}" in p["prompt"]
+
+
+def test_builtin_pack_names_follow_the_board_types():
+    """#136: los packs se llaman como los tipos de tablero (DEV / Socrático / GTD)."""
+    try:
+        strings.set_language("es")
+        assert dict(prompt_packs.list_packs())["opositor"] == "Socrático — Estudio guiado por preguntas"
+        assert dict(prompt_packs.list_packs())["dev"] == "DEV — Desarrollo de software"
+        strings.set_language("en")
+        packs = dict(prompt_packs.list_packs())
+        assert packs["opositor"] == "Socratic — Question-guided study"
+        assert packs["dev"] == "DEV — Software development"
+        assert packs["gtd"] == "GTD — Getting Things Done"
+    finally:
+        strings.set_language("en")
+
+
+def test_socratic_pack_guides_with_questions_for_any_subject():
+    """#136: el pack daba las respuestas (tests, esquemas, dudas) y era solo para oposiciones
+    españolas; ahora tiene un diálogo socrático y no depende de la legislación."""
+    prompts = {p["id"]: p for p in prompt_packs.load_pack("opositor")}
+    assert "socratic_dialogue" in prompts
+    assert "{{tema}}" in prompts["socratic_dialogue"]["prompt"]
+    for pid, p in prompts.items():
+        assert "public-service" not in p["prompt"] and "legislation" not in p["prompt"], pid
 
 
 def test_dev_pack_keeps_the_twelve_protocols_on_the_board_not_markdown_files():

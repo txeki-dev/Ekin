@@ -20,13 +20,26 @@ Txek Systems domain, not registered yet). #81 stays for another session._
   the ADR is approved.
 - [ ] **#133 Due date clipped on task cards — Wave 1** `[BUG]` — not reproduced yet (synthetic cards at 200 % with
   Figtree render it whole); needs a screenshot from the user.
-- [ ] **#136 Audit the DEV / SOCRATIC / GTD board types — Wave 2** `[ARCH]` — findings as `audit` cards; rename
-  templates, packs and strings (new boards only, template and pack ids kept); PM board as a proposal.
 - [ ] **#137 Landing tour shows the AI-agent workflow — Wave 2** `[UX]` — after #136; slide bullets are hard-coded
   Spanish today (no `t()`); add a workflow diagram reachable from the command palette.
 - [ ] **#134 Installer for non-technical users — Wave 3** `[FEAT]` — installer + SHA-256-verified updater already
   exist; add an unattended update (`/SILENT`, relaunch) and a signing step that only runs when its secrets exist.
 - [ ] **#135 Monetization plan — Wave 3** `[ARCH]` — decision doc from the local drafts + public landing page.
+- [ ] **#144 / #145 / #146 Findings of the #136 audit** `[AUDIT]` `P3-Low` — built-in templates hard-coded in Spanish
+  (#144, fits with #137), Socratic/GTD prompts always answer in Spanish (#145), Work and the local folder worded as a
+  code repo on every board type (#146).
+
+- [x] **DONE (2026-10-18) — #136 Board types audited and renamed: DEV, Socratic, GTD** `[ARCH]` · `templates.py`,
+  `column_roles.py`, `assets/prompt_packs/{opositor,gtd}.json`, `strings.py`. 8 tests added or updated
+  (`test_column_roles.py`, `test_start_working.py`, `test_templates.py`, `test_prompt_clipboard.py`).
+  - **Audit (report + PM board proposal in the card's journal):** DEV healthy. Opositor: 3 of 6 columns had no role
+    (`active_task` skipped the topics being studied) and every prompt handed out answers. GTD: no start prompt, so
+    ▶ Work opened *CAPTURA RÁPIDA* with an empty brain dump. Findings 5–7 → #144–#146.
+  - **Solution:** templates and packs renamed (ids kept); `vuelta` / `repaso` → in-progress role; the Opositor board
+    is a Socratic tutor for any subject (system prompt, new *DIÁLOGO SOCRÁTICO*, retry-before-reveal self-tests,
+    outlines from the student's draft, doubts answered after asking, no Spanish-law assumptions, generic tags and
+    seed tasks); GTD gets *INICIO* (`gtd_intro`), which reports Inbox / @Next / @Waiting / due dates and proposes
+    the next step.
 
 - [x] **DONE (2026-10-18) — #142 The Diary button shows every `.md` / `.txt` of the repo** `[FEAT]` ·
   `diary_viewer_dialog.py` (`doc_files`, `has_doc_files`), `board_view.py`, `strings.py`. `test_diary_viewer.py` 3 → 7.

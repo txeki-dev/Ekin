@@ -21,9 +21,11 @@ def test_gtd_template_roles():
     ]
 
 
-def test_opositor_template_roles():
+def test_socratic_template_roles():
+    """#136: las vueltas y el repaso espaciado no tenían rol, así que `active_task` se saltaba
+    los temas que se están estudiando y apuntaba a «Simulacro & Test»."""
     assert _roles_of(templates.TEMPLATE_OPOSITOR) == [
-        cr.BACKLOG, cr.OTHER, cr.OTHER, cr.OTHER, cr.REVIEW, cr.DONE,
+        cr.BACKLOG, cr.IN_PROGRESS, cr.IN_PROGRESS, cr.IN_PROGRESS, cr.REVIEW, cr.DONE,
     ]
 
 
@@ -39,6 +41,8 @@ def test_getting_started_template_roles():
     ("Revisión pendiente", cr.REVIEW),
     ("Pending Review", cr.REVIEW),
     ("En curso", cr.IN_PROGRESS),
+    ("1ª Vuelta", cr.IN_PROGRESS),
+    ("Repaso espaciado", cr.IN_PROGRESS),
     ("Proactivo", cr.OTHER),  # prefijo de palabra, no subcadena
     ("Aquarius", cr.OTHER),
     ("", cr.OTHER),

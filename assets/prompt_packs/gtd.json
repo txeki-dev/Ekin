@@ -1,5 +1,15 @@
 [
   {
+    "id": "gtd_intro",
+    "title": "INICIO",
+    "tag": "<gtd_session_start>",
+    "category": "Planificar",
+    "color": "#0284C7",
+    "role": "GTD Coach",
+    "description": "Arranca la sesión: estado de Inbox, @Next, @Waiting y vencimientos, y propone el siguiente paso GTD.",
+    "prompt": "Execute the `<gtd_session_start>` protocol.\nRole: GTD Coach (David Allen's Getting Things Done).\nBoard: \"{{board_name}}\" on the Ekin MCP server `{{mcp_server}}`.\nBoard flow (map the real IDs with `list_columns`): 📥 Bandeja de Entrada (Inbox) -> ⚡ Próximas Acciones (@Next) / ⏳ En Espera (@Waiting) / 💡 Algún Día / Quizás -> ✅ Terminado. Contexts are tags: @ordenador, @llamadas, @casa, @compras, @recados.\n\n<execution_steps>\n1. INGEST STATE: Call `get_board_executive_summary` with `mask_sensitive: true`: `columns_flow` gives the count and top cards of every column, `due_soon` what is overdue or due in the next 7 days, and `active_task` the top card of @Next.\n2. DIAGNOSE: Inbox items still to process, overdue or due-today cards, the size of @Next against its WIP limit, and what is waiting in @Waiting.\n3. PROPOSE which prompt of the board's Prompts button to run next: PROCESAR INBOX (`<gtd_inbox_processing>`) if the Inbox is not empty, otherwise PLAN DEL DÍA (`<gtd_daily_plan>`); suggest the REVISIÓN SEMANAL (`<gtd_weekly_review>`) if @Next or @Waiting look stale.\n</execution_steps>\n\n<output_format>\n1. A 1-sentence greeting.\n2. \"Inbox: [n] · @Next: [n] · @Waiting: [n] · Vencen pronto: [n]\".\n3. The overdue or due-today cards, if any (card #id — title — date).\n4. The proposed next step and why, in one sentence.\n5. Ask: \"¿Empezamos por aquí o prefieres otra cosa?\"\n</output_format>\n\n<strict_rules>\n- DO NOT modify any card yet.\n- LANGUAGE: Always reply to me in Spanish.\n- COLUMNS ARE HUMAN-ONLY: Never try to create, rename or delete board columns; map them once with `list_columns`.\n- TOKEN BUDGET: Prefer `get_board_executive_summary` and `get_task_condensed_context` (with `mask_sensitive: true`) over `list_tasks` / `get_task`.\n- CONFIRM BEFORE BULK CHANGES: Show the plan and wait for my OK before moving, updating or creating more than one card.\n</strict_rules>"
+  },
+  {
     "id": "gtd_capture",
     "title": "CAPTURA RÁPIDA",
     "tag": "<gtd_quick_capture>",

@@ -19,7 +19,7 @@ _KEYWORDS = (
     (DONE, ("done", "hecho", "shipped", "completad", "completed", "terminad", "cerrad", "closed",
             "resuelt", "resolved", "finaliz", "finished", "dominad")),
     (REVIEW, ("review", "revision", "qa", "test", "validac", "verificac")),
-    (IN_PROGRESS, ("progres", "curso", "doing", "haciendo", "wip", "activo", "desarrollo")),
+    (IN_PROGRESS, ("progres", "curso", "doing", "haciendo", "wip", "activo", "desarrollo", "vuelta", "repaso")),
     (READY, ("ready", "listo", "next", "proxim", "selected", "seleccionad")),
     (BACKLOG, ("backlog", "triage", "inbox", "bandeja", "pendiente", "todo", "to do", "por hacer")),
 )

@@ -99,6 +99,11 @@ def test_start_prompt_is_the_pack_intro_with_board_variables(db_path, tmp_path):
     opositor = {**board, "prompt_pack": "opositor"}
     assert "<study_session_start>" in sw.start_prompt(opositor)
 
+    # #136: el pack GTD no tenía prompt de inicio y Work arrancaba con CAPTURA RÁPIDA, que
+    # termina en un «BRAIN DUMP:» vacío
+    gtd = sw.start_prompt({**board, "prompt_pack": "gtd"})
+    assert "<gtd_session_start>" in gtd and "BRAIN DUMP" not in gtd
+
 
 @pytest.fixture
 def flow(monkeypatch, qapp):

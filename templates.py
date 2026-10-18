@@ -270,7 +270,7 @@ TEMPLATE_BLANK = BoardTemplate(
 
 TEMPLATE_SOFTWARE_AGILE = BoardTemplate(
     id="software_agile",
-    name="Desarrollo Software (Agile/Kanban)",
+    name="DEV — Desarrollo de software",
     description="Flujo completo de ingeniería: Triage, Especificación, En Desarrollo, Code Review y Producción con límites WIP.",
     category="Ingeniería & Software",
     color="#2563eb",
@@ -323,9 +323,9 @@ TEMPLATE_SOFTWARE_AGILE = BoardTemplate(
 
 TEMPLATE_OPOSITOR = BoardTemplate(
     id="opositor_study",
-    name="Opositor (Estudio Sistemático)",
-    description="Metodología basada en la curva del olvido y repetición espaciada: lecturas, esquemas, vueltas al temario y simulacros.",
-    category="Estudio & Oposiciones",
+    name="Socrático — Estudio guiado por preguntas",
+    description="Estudia cualquier materia (oposiciones, certificaciones, universidad) con un tutor socrático: te pregunta en vez de darte la respuesta, con vueltas al temario, repaso espaciado y simulacros.",
+    category="Estudio & Aprendizaje",
     color="#7c3aed",
     icon="list",
     columns=[
@@ -337,35 +337,35 @@ TEMPLATE_OPOSITOR = BoardTemplate(
         ColumnTemplate("🏆 Tema Dominado", "#059669", None),
     ],
     default_tags=[
-        TagTemplate("Bloque", "Constitucional", "#3b82f6"),
-        TagTemplate("Bloque", "Administrativo", "#8b5cf6"),
-        TagTemplate("Bloque", "Parte Específica", "#0ea5e9"),
-        TagTemplate("Bloque", "Ofimática / Informática", "#10b981"),
+        TagTemplate("Bloque", "Teoría", "#3b82f6"),
+        TagTemplate("Bloque", "Práctica", "#8b5cf6"),
+        TagTemplate("Bloque", "Casos / Problemas", "#0ea5e9"),
         TagTemplate("Fase", "Test Fallado", "#ef4444"),
         TagTemplate("Fase", "Duda a Consultar", "#f59e0b"),
         TagTemplate("Fase", "Tema Clave Examen", "#e11d48"),
     ],
     seed_tasks=[
         SeedTaskTemplate(
-            title="Tema 1: Constitución Española de 1978",
+            title="Tema 1: conceptos clave de la materia",
             column_index=1,
-            description="### Objetivos de la Vuelta\n- [ ] Título Preliminar y Título I (Derechos Fundamentales)\n- [ ] Artículos clave: 14, 24, 53, 86\n- [ ] Esquema de plazos y mayorías parlamentarias\n- [ ] Batería de 30 preguntas de test oficial",
-            tags=["Constitucional", "Tema Clave Examen"],
+            description="### Objetivos de la Vuelta\n- [ ] Leer y subrayar el tema\n- [ ] Explicar cada concepto clave con tus palabras (diálogo socrático con el agente)\n- [ ] Anotar las dudas con la etiqueta «Duda a Consultar»\n- [ ] Test de autoevaluación de 10 preguntas",
+            tags=["Teoría", "Tema Clave Examen"],
             due_days_offset=2,
         ),
         SeedTaskTemplate(
             title="Planificar calendario de simulacros cronometrados",
             column_index=0,
-            description="Reservar los sábados por la mañana para simulacros completos de examen en condiciones reales (sin apuntes ni pausas).",
-            tags=["Administrativo"],
+            description="Reservar un hueco fijo a la semana para simulacros completos en condiciones reales (sin apuntes ni pausas).",
+            tags=["Práctica"],
             due_days_offset=5,
         ),
     ],
     ai_system_prompt=(
-        "Actúas como un preparador de oposiciones y tutor de estudio sistemático. "
-        "Ayuda al opositor a planificar intervalos de repaso según la curva del olvido (1-7-30 días), "
-        "genera preguntas tipo test de autoevaluación con 4 opciones sobre los artículos o normas "
-        "asociadas al tema, y detecta trampas de examen habituales de la legislación aplicable."
+        "Actúas como tutor socrático para cualquier materia (oposiciones, certificaciones, universidad...). "
+        "No des la respuesta de entrada: pide al estudiante que explique el tema con sus palabras, guíale "
+        "con preguntas de una en una y pistas graduales, y explica solo cuando lo haya intentado; corrige "
+        "con precisión citando la fuente (norma, libro o apuntes) y di cuándo no estás seguro. Planifica "
+        "repasos espaciados (1-7-30 días) y registra en cada tarjeta lo que domina y lo que falla."
     ),
     is_builtin=True,
     prompt_pack="opositor",
@@ -373,7 +373,7 @@ TEMPLATE_OPOSITOR = BoardTemplate(
 
 TEMPLATE_GTD_PERSONAL = BoardTemplate(
     id="gtd_personal",
-    name="Personal / GTD (Getting Things Done)",
+    name="GTD — Getting Things Done",
     description="Metodología GTD para despejar la mente: capturar, procesar, organizar y actuar con enfoque.",
     category="Productividad Personal",
     color="#059669",

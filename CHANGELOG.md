@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **Board types renamed and tuned for working with AI agents: DEV, Socratic and GTD (`templates.py`, `assets/prompt_packs/opositor.json`, `assets/prompt_packs/gtd.json`, `column_roles.py`, `strings.py`, #136)**: The built-in templates and their prompt packs are now **DEV — Desarrollo de software**, **Socrático — Estudio guiado por preguntas** and **GTD — Getting Things Done**; template and pack ids are unchanged, so existing boards keep their pack. The Opositor board becomes a Socratic tutor for any subject (oposiciones, certifications, university): its AI system prompt and pack no longer hand out answers. A new *DIÁLOGO SOCRÁTICO* prompt makes you explain a topic and guides you one question and one hint at a time; self-tests let you retry a wrong answer after a guiding question; outlines start from your own draft; doubts are answered after asking what you think; and nothing assumes Spanish legislation (a mock exam's penalty rule is asked, not assumed). Its default tags and seed tasks are generic. Columns named *Vuelta* or *Repaso* (the Socratic board's study rounds and spaced review, also on boards created before) now have the in-progress role, so the MCP `active_task` and the start prompt see the topics being studied instead of skipping to *Simulacro & Test*. The GTD pack gets a start prompt, *INICIO*: **▶ Work** used to open the agent with *CAPTURA RÁPIDA* and an empty brain dump, and now it reports Inbox, @Next, @Waiting and due dates and proposes the next GTD step.
+
 ## [1.6.0] - 2026-10-18
 
 ### Changed
