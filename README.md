@@ -257,3 +257,7 @@ Ekin turns every task that has a due date into an **all-day event** in a standar
 * The calendar **appears within a minute or two** if the URL is valid. If it shows up empty or errors out, it's the URL/permissions — **not** a matter of waiting.
 * **Refresh cadence:** subscribed calendars are re-fetched by the *provider*, not by Ekin. **Google refreshes external URLs slowly — every several hours, up to ~24 h — and this can't be forced.** **Apple Calendar** lets you pick the refresh interval (as fast as every few minutes) against the *same* URL if you want quicker updates.
 * **Sanity check without waiting a day:** add a dated task in Ekin, confirm the local `.ics` updated, and confirm the direct URL (in incognito) shows the new event. If both do, the Ekin → cloud half works instantly; only the provider's refresh is slow.
+
+## 📜 License
+
+Ekin Kanban is free for personal and other noncommercial use under the [PolyForm Noncommercial License 1.0.0](LICENSE). Commercial use needs a separate license from Txek Systems. Ekin also ships third-party software under its own licenses (Qt and PySide6 under the LGPL, Python, Pygments, Lucide icons and the Figtree and Caprasimo fonts): see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

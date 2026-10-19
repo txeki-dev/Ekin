@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Third-party notices ship with Ekin (`THIRD_PARTY_NOTICES.md`, `licenses/`, `ekin.spec`, `installer.iss`)**: The installer carried neither Ekin's license nor those of the software it bundles. `LICENSE` and `THIRD_PARTY_NOTICES.md` now go to the Ekin folder, and the license texts to `_internal\licenses`: the GNU LGPL 3.0 and GPL 3.0 for Qt and PySide6, Pygments' BSD license and Python's license, copied from the Python that builds the installer so it also covers the libraries in that build (OpenSSL, libffi, SQLite…). The fonts' and icons' licenses were already in `_internal\assets`.
+
+### Changed
+- **The license is the official PolyForm Noncommercial 1.0.0 text (`LICENSE`, `README.md`)**: The repository's copy had 10 of the license's 15 sections: *Personal Uses*, *Noncommercial Organizations*, *No Other Rights*, *Patent Defense* and *Definitions* were missing, a 30-day termination clause stood in for *Violations* (32 days) and an MIT-style disclaimer for *No Liability*. It is now the official text, headed by the `Required Notice:` copyright line that anyone redistributing Ekin must keep. It is still the same license: Ekin stays free for personal and other noncommercial use. The README gains a License section.
+
 ## [1.8.0] - 2026-10-19
 
 ### Changed

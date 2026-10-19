@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
+import sys
 from PyInstaller.utils.hooks import collect_submodules
 
 block_cipher = None
@@ -21,6 +22,7 @@ hidden_imports = [
 
 datas = [
     ("assets", "assets"),
+    ("licenses", "licenses"),
     ("ekin_icon.png", "."),
     ("ekin_icon.ico", "."),
 ]
@@ -40,6 +42,10 @@ a = Analysis(
     cipher=block_cipher,
     noarchive=False,
 )
+
+# Python's license comes from the interpreter that builds the installer: it also covers the libraries
+# bundled with that exact build (OpenSSL, libffi, SQLite…). See THIRD_PARTY_NOTICES.md.
+a.datas += [("licenses/Python-LICENSE.txt", os.path.join(sys.base_prefix, "LICENSE.txt"), "DATA")]
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
