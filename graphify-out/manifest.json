@@ -1,7 +1,7 @@
 {
   ".claude/settings.local.json": {
     "mtime": 1785338761.0323222,
-    "ast_hash": "",
+    "ast_hash": "6e617c27d42818e94811485c0ad4d667",
     "semantic_hash": ""
   },
   ".github/scripts/extract_release_notes.py": {
@@ -255,8 +255,8 @@
     "semantic_hash": "3eaeaf5d929f761f1b4c54b18c207592"
   },
   "version.py": {
-    "mtime": 1792355073.3747015,
-    "ast_hash": "c895238514fe096c94bd9bd6275216eb",
+    "mtime": 1792428626.2646594,
+    "ast_hash": "ac7161eb12f8e33f2a3e011797700d82",
     "semantic_hash": ""
   },
   "widgets.py": {
@@ -355,8 +355,8 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1792356992.1495996,
-    "ast_hash": "e58641d942e18cb9645d80eaf8657845",
+    "mtime": 1792428626.287983,
+    "ast_hash": "bf7dbc8f4872552b38ca8fb3b4440402",
     "semantic_hash": ""
   },
   "README.md": {
@@ -365,8 +365,8 @@
     "semantic_hash": ""
   },
   "backlog.md": {
-    "mtime": 1792355051.9659534,
-    "ast_hash": "d44bb4101a07d8b7f6e4088d9376ca4b",
+    "mtime": 1792357021.102275,
+    "ast_hash": "abaccaa5efde5d3dbd0bb0ec8624b1db",
     "semantic_hash": ""
   },
   "ekin_icon.png": {
@@ -876,17 +876,17 @@
   },
   "assets/prompt_packs/dev.json": {
     "mtime": 1792079332.3303568,
-    "ast_hash": "",
+    "ast_hash": "9059333ee44ef23b3329ff33708762e9",
     "semantic_hash": ""
   },
   "assets/prompt_packs/gtd.json": {
     "mtime": 1792352906.5393481,
-    "ast_hash": "",
+    "ast_hash": "dec5d376ece6a86c2238801e1a063a75",
     "semantic_hash": ""
   },
   "assets/prompt_packs/opositor.json": {
     "mtime": 1792352906.5393481,
-    "ast_hash": "",
+    "ast_hash": "d6be7f08d4baf1f7c5144fa98ca1e69d",
     "semantic_hash": ""
   },
   ".agents/docs/instruction_1.md": {
