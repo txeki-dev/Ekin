@@ -355,13 +355,13 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1792428626.287983,
-    "ast_hash": "bf7dbc8f4872552b38ca8fb3b4440402",
+    "mtime": 1792439087.1928935,
+    "ast_hash": "ce98720d77fc97cd03f403e9d4f13a48",
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1792356992.1495996,
-    "ast_hash": "4c2eed5c3fc79ed227512e915397ffdb",
+    "mtime": 1792439087.1090164,
+    "ast_hash": "17b19bb5e2a7cc6e4fb3fc66139cb2ac",
     "semantic_hash": ""
   },
   "backlog.md": {
@@ -997,6 +997,36 @@
   "workflow_dialog.py": {
     "mtime": 1792353642.5209572,
     "ast_hash": "63a94bdca274795ab4b518a76fbb047a",
+    "semantic_hash": ""
+  },
+  "tests/test_licensing.py": {
+    "mtime": 1792439070.025064,
+    "ast_hash": "8d35a810c5530a44a099eb42a178d401",
+    "semantic_hash": ""
+  },
+  "THIRD_PARTY_NOTICES.md": {
+    "mtime": 1792439041.1841054,
+    "ast_hash": "b2539bc9203dbbe6d96ebe4b315c2bf8",
+    "semantic_hash": ""
+  },
+  "licenses/GPL-3.0.txt": {
+    "mtime": 1792439016.975391,
+    "ast_hash": "1ebbd3e34237af26da5dc08a4e440464",
+    "semantic_hash": ""
+  },
+  "licenses/LGPL-3.0.txt": {
+    "mtime": 1792439016.959745,
+    "ast_hash": "3000208d539ec061b899bce1d9ce9404",
+    "semantic_hash": ""
+  },
+  "licenses/Pygments-AUTHORS.txt": {
+    "mtime": 1792439017.0261846,
+    "ast_hash": "8d6c157f019a8b41482571f126b8832f",
+    "semantic_hash": ""
+  },
+  "licenses/Pygments-LICENSE.txt": {
+    "mtime": 1792439016.9966466,
+    "ast_hash": "36a13c90514e2899f1eba7f41c3ee592",
     "semantic_hash": ""
   }
 }
