@@ -3,7 +3,7 @@
 
 #define MyAppName "Ekin Kanban"
 #ifndef MyAppVersion
-  #define MyAppVersion "1.7.0"
+  #define MyAppVersion "1.8.0"
 #endif
 #define MyAppPublisher "Txek Systems"
 #define MyAppURL "https://github.com/txeki-dev/Ekin"

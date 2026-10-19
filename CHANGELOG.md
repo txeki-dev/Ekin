@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-10-19
+
 ### Changed
 - **Updates install unattended and reopen Ekin (`main.py`, `installer.iss`, #134)**: Installed copies used to open the full setup wizard after downloading an update and close Ekin, leaving the user to click through it and start the app again. The verified installer now runs silently (only Inno Setup's progress bar, no questions or reboot, closing whatever uses its files) and Ekin reopens when it finishes, as the user who started the update (not elevated).
 
