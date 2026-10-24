@@ -22,9 +22,11 @@ Txek Systems domain, not registered yet). #81 stays for another session._
   provider is chosen (public-cert keys live in HSM/cloud since 2023, so no `.pfx` secret); sign `Ekin.exe` before
   ISCC and the installer after it, **then** compute the SHA-256.
 - [ ] **#135 Monetization plan — Wave 3** `[ARCH]` — decision doc from the local drafts + public landing page.
-- [ ] **#155 Free / Pro split of the current features** `[ARCH]` — **blocks the v1.8.1 release** (official PolyForm
-  LICENSE + third-party notices, ready on branch `chore/v1.8.1-license`). Which current features move to the private
-  `Txek-Systems/ekin-pro` repo in v2.0.0, what a Free user sees, and whether the Pro license covers business use.
+- [ ] **#155 Free / Pro split of the current features** `[ARCH]` — **blocks v2.0.0 and any new Pro-candidate
+  feature** (#81, #159, #160, #163): the public repo publishes whatever reaches `main` under PolyForm, so that code
+  waits for this decision. 1.8.x releases go on (decided 2026-10-24: v1.8.0 already ships every Pro candidate). Which
+  current features move to the private `Txek-Systems/ekin-pro` repo in v2.0.0, what a Free user sees, and whether
+  the Pro license covers business use.
 - [ ] **#144 / #145 / #146 Findings of the #136 audit** `[AUDIT]` `P3-Low` — built-in templates hard-coded in Spanish
   (#144, fits with #137), Socratic/GTD prompts always answer in Spanish (#145), Work and the local folder worded as a
   code repo on every board type (#146).
