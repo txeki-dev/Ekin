@@ -276,6 +276,67 @@ def test_release_check_thread_detects_newer_version(monkeypatch):
     assert emitted[0][2] == "Release 99 notes"
 
 
+def test_release_check_thread_queries_the_new_public_repo(monkeypatch):
+    """La v1.9.0 es el puente (#228): las copias instaladas buscan releases en Txek-Systems/ekin."""
+    from main import ReleaseCheckThread
+
+    requested = []
+
+    def fake_urlopen(req, timeout=6):
+        requested.append(req.full_url)
+        raise OSError("offline")
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    ReleaseCheckThread().run()
+
+    assert requested == ["https://api.github.com/repos/Txek-Systems/ekin/releases/latest"]
+
+
+def test_release_check_thread_reports_404_as_error_not_update(monkeypatch):
+    """Mientras el repo nuevo no tenga releases, la API responde 404: error, nunca una actualización."""
+    import urllib.error
+    from main import ReleaseCheckThread
+
+    def fake_urlopen(req, timeout=6):
+        raise urllib.error.HTTPError(req.full_url, 404, "Not Found", {}, None)
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    updates, errors = [], []
+    thread = ReleaseCheckThread()
+    thread.update_available.connect(lambda *args: updates.append(args))
+    thread.error.connect(errors.append)
+    thread.run()
+
+    assert updates == []
+    assert len(errors) == 1 and "404" in errors[0]
+
+
+def test_automatic_release_check_stays_silent_on_404(qapp, db_path, monkeypatch):
+    """#228: hasta que el repo nuevo publique la v2.0.0 la API responde 404. La comprobación
+    automática no debe molestar; la manual sí explica el error."""
+    import urllib.error
+
+    monkeypatch.setattr(database, "DB_NAME", db_path)
+    window = _make_window(monkeypatch)
+
+    def fake_urlopen(req, timeout=6):
+        raise urllib.error.HTTPError(req.full_url, 404, "Not Found", {}, None)
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr(main_module.ReleaseCheckThread, "start", lambda self: self.run())
+    warned = []
+    monkeypatch.setattr(main_module.QMessageBox, "warning", lambda *a, **k: warned.append(a))
+
+    window._check_release_updates(manual=False)
+    assert warned == []
+
+    window._check_release_updates(manual=True)
+    assert len(warned) == 1
+    _close_window(qapp, window)
+
+
 def test_release_check_thread_ignores_older_or_same_version(monkeypatch):
     import json
     from main import ReleaseCheckThread

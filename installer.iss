@@ -6,7 +6,7 @@
   #define MyAppVersion "1.8.0"
 #endif
 #define MyAppPublisher "Txek Systems"
-#define MyAppURL "https://github.com/txeki-dev/Ekin"
+#define MyAppURL "https://github.com/Txek-Systems/ekin"
 #define MyAppExeName "Ekin.exe"
 
 [Setup]

@@ -95,7 +95,8 @@ class ReleaseCheckThread(QThread):
             import urllib.request
             import json
 
-            url = "https://api.github.com/repos/txeki-dev/Ekin/releases/latest"
+            # Desde la v1.9.0 las releases salen del repo público nuevo (#228); el antiguo pasa a privado.
+            url = "https://api.github.com/repos/Txek-Systems/ekin/releases/latest"
             req = urllib.request.Request(
                 url,
                 headers={
