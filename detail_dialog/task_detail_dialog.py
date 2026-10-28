@@ -360,14 +360,41 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         left_layout.addWidget(RichTextToolbar(self.desc_input))
         left_layout.addWidget(self.desc_input, 1)
 
-        # Adjuntos
+        # Adjuntos: una fila de alto fijo con el recuento. La lista y el alta van en una ventana
+        # aparte, para que muchos enlaces no le quiten alto a la descripción (#205).
+        links_row = QHBoxLayout()
+        links_row.setSpacing(6)
         links_kicker = QLabel(t("task_detail.links_label"))
-        left_layout.addWidget(links_kicker)
+        links_row.addWidget(links_kicker)
+        self.links_summary_label = QLabel()
+        self.links_summary_label.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 12px;")
+        links_row.addWidget(self.links_summary_label)
+        links_row.addStretch()
+        self.manage_links_btn = QPushButton(t("task_detail.links_manage"))
+        self.manage_links_btn.setCursor(Qt.PointingHandCursor)
+        self.manage_links_btn.setIcon(lucide_icon("paperclip", styles.COLORS['text_soft'], 15))
+        self.manage_links_btn.setIconSize(QSize(15, 15))
+        self.manage_links_btn.setToolTip(t("task_detail.links_manage_tooltip"))
+        self.manage_links_btn.clicked.connect(self.open_links_dialog)
+        links_row.addWidget(self.manage_links_btn)
+        left_layout.addLayout(links_row)
+
+        self.links_dialog = QDialog(self)
+        self.links_dialog.setWindowTitle(t("task_detail.links_dialog_title"))
+        self.links_dialog.setMinimumSize(560, 360)
+        links_dialog_layout = QVBoxLayout(self.links_dialog)
+        links_dialog_layout.setSpacing(10)
         self.links_container = QWidget()
         self.links_layout = QVBoxLayout(self.links_container)
         self.links_layout.setContentsMargins(0, 0, 0, 0)
         self.links_layout.setSpacing(2)
-        left_layout.addWidget(self.links_container)
+        self.links_layout.setAlignment(Qt.AlignTop)
+        links_scroll = QScrollArea()
+        links_scroll.setWidgetResizable(True)
+        links_scroll.setFrameShape(QFrame.NoFrame)
+        links_scroll.setStyleSheet("background: transparent;")
+        links_scroll.setWidget(self.links_container)
+        links_dialog_layout.addWidget(links_scroll, 1)
 
         add_link_row = QHBoxLayout()
         add_link_row.setSpacing(6)
@@ -394,7 +421,7 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
         add_link_btn.setToolTip(t("task_detail.add_link_tooltip"))
         add_link_btn.clicked.connect(self.add_link)
         add_link_row.addWidget(add_link_btn)
-        left_layout.addLayout(add_link_row)
+        links_dialog_layout.addLayout(add_link_row)
 
         body_l.addWidget(left_panel, 6)
 
@@ -911,6 +938,7 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
             if w:
                 w.deleteLater()
         links = database.get_task_links(self.task_id, self.db_path)
+        self._update_links_summary(len(links))
         if not links:
             hint = QLabel(t("task_detail.no_links_hint"))
             hint.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 11px; font-style: italic;")
@@ -918,6 +946,18 @@ class TaskDetailDialog(TaskTimerMixin, TaskAiMixin, QDialog):
             return
         for link in links:
             self.links_layout.addWidget(self._build_link_row(link))
+
+    def _update_links_summary(self, n_links):
+        if n_links == 0:
+            text = t("task_detail.no_links_hint")
+        elif n_links == 1:
+            text = t("task_detail.links_count_one")
+        else:
+            text = t("task_detail.links_count", n=n_links)
+        self.links_summary_label.setText(text)
+
+    def open_links_dialog(self):
+        self.links_dialog.exec()
 
     def _build_link_row(self, link):
         row = QWidget()

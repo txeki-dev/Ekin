@@ -245,6 +245,18 @@ def _card_with_timer(started_at, alert_hours=24):
     return card
 
 
+@pytest.mark.parametrize("n_links, shown", [(0, False), (1, False), (2, True), (7, True)])
+def test_task_card_shows_link_count_only_from_two_links(qapp, n_links, shown):
+    """#205: la tarjeta muestra el clip con el número de enlaces y adjuntos solo si hay más de 1,
+    tenga o no fecha de vencimiento."""
+    links = [{"id": i, "url": f"https://example.com/{i}", "label": None} for i in range(n_links)]
+    card = TaskCard({"id": 1, "title": "Tarea", "links": links})
+    assert card.links_badge.isHidden() is not shown
+    if shown:
+        assert card.links_badge_label.text() == str(n_links)
+    assert "link(s)" not in card.due_label.text()
+
+
 def test_task_card_shows_its_id_next_to_the_title(qapp):
     """#109: los agentes citan las tarjetas por su id (#108...); la tarjeta lo muestra.
     #132: va en línea al principio del propio título, sin robarle ancho a cada línea."""
@@ -532,6 +544,48 @@ def test_browse_local_file_does_not_overwrite_existing_label(qapp, db_path):
     dlg._apply_browsed_file("C:/docs/report.pdf")
 
     assert dlg.link_label_input.text() == "Mi informe"
+
+
+def test_links_live_in_their_own_window_and_the_detail_shows_a_count(qapp, db_path):
+    """#205: la lista de enlaces y el alta van en una ventana aparte; el detalle solo muestra
+    una fila con el recuento, que se actualiza al añadir y al quitar."""
+    task_id = _make_task(db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+    assert dlg.links_container.window() is dlg.links_dialog
+    assert dlg.link_url_input.window() is dlg.links_dialog
+    assert dlg.links_summary_label.text() == t("task_detail.no_links_hint")
+
+    dlg.link_url_input.setText("https://example.com/a")
+    dlg.add_link()
+    assert dlg.links_summary_label.text() == t("task_detail.links_count_one")
+
+    dlg.link_url_input.setText("https://example.com/b")
+    dlg.add_link()
+    assert dlg.links_summary_label.text() == t("task_detail.links_count", n=2)
+
+    first = database.get_task_links(task_id, db_path)[0]
+    dlg.remove_link(first["id"])
+    assert dlg.links_summary_label.text() == t("task_detail.links_count_one")
+    dlg.reject()
+
+
+def test_description_keeps_its_height_with_many_links(qapp, db_path):
+    """#205: con 20 enlaces la descripción conservaba poco alto; ahora mide lo mismo que sin enlaces."""
+    task_id = _make_task(db_path)
+    dlg = TaskDetailDialog(task_id, db_path)
+    dlg.resize(1400, 900)
+    dlg.show()
+    qapp.processEvents()
+    height_without_links = dlg.desc_input.height()
+
+    for i in range(20):
+        database.add_task_link(task_id, f"https://example.com/{i}", f"Enlace {i}", db_path=db_path)
+    dlg.reload_links()
+    qapp.processEvents()
+
+    assert dlg.desc_input.height() == height_without_links
+    assert dlg.links_summary_label.text() == t("task_detail.links_count", n=20)
+    dlg.reject()
 
 
 def test_add_link_with_local_path_renders_with_attachment_icon(qapp, db_path, tmp_path):

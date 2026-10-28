@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QDrag, QPixmap, QCursor, QPainter, QColor, QBrush, QPen, QFont, QFontMetrics
 import styles
 from strings import t
-from icons import lucide_icon
+from icons import lucide_icon, lucide_pixmap
 
 
 class FlowLayout(QLayout):
@@ -272,6 +272,20 @@ class TaskCard(QFrame):
         self.due_layout.addWidget(self.due_label)
         row3_layout.addWidget(self.due_container)
 
+        # Clip + recuento de enlaces y adjuntos, solo a partir de 2 (#205)
+        self.links_badge = QWidget()
+        self.links_badge.setStyleSheet("background: transparent; border: none;")
+        links_badge_layout = QHBoxLayout(self.links_badge)
+        links_badge_layout.setContentsMargins(0, 0, 0, 0)
+        links_badge_layout.setSpacing(3)
+        links_badge_icon = QLabel()
+        links_badge_icon.setPixmap(lucide_pixmap("paperclip", styles.COLORS['text_muted'], 12))
+        links_badge_layout.addWidget(links_badge_icon)
+        self.links_badge_label = QLabel()
+        self.links_badge_label.setStyleSheet(f"color: {styles.COLORS['text_muted']}; font-size: 11px; padding: 3px 0px;")
+        links_badge_layout.addWidget(self.links_badge_label)
+        row3_layout.addWidget(self.links_badge)
+
         self.timer_container = QWidget()
         self.timer_container.setStyleSheet("background: transparent; border: none;")
         timer_row_layout = QHBoxLayout(self.timer_container)
@@ -299,6 +313,7 @@ class TaskCard(QFrame):
         # Actualizar las etiquetas y vencimiento
         self.update_tags_and_due(self.task_data.get("tags", []), self.task_data.get("due_date"))
         self._update_board_link()
+        self._update_links_badge()
         self.update_timer_badge()
 
     def _title_html(self):
@@ -313,6 +328,16 @@ class TaskCard(QFrame):
             f"<span style='font-size: 12px; color: {styles.COLORS['text_muted']};'>#{self.task_id}</span>"
             f"&nbsp; {title}"
         )
+
+    def _update_links_badge(self):
+        """Muestra cuántos enlaces y adjuntos tiene la tarea, solo cuando son más de 1 (#205)."""
+        n_links = len(self.task_data.get("links", []))
+        if n_links < 2:
+            self.links_badge.hide()
+            return
+        self.links_badge_label.setText(str(n_links))
+        self.links_badge.setToolTip(t("widgets.card.links_badge_tooltip", n=n_links))
+        self.links_badge.show()
 
     def _emit_board_link_clicked(self):
         board_id = self.task_data.get("linked_board_id")
@@ -440,11 +465,10 @@ class TaskCard(QFrame):
 
                 recurring = self.task_data.get("recurrence", "none") not in (None, "", "none")
                 time_txt = f" {self.task_data['due_time']}" if self.task_data.get("due_time") else ""
-                n_links = len(self.task_data.get("links", []))
                 rec_word = {"daily": "Daily", "weekly": "Weekly", "monthly": "Monthly"}.get(
                     str(self.task_data.get("recurrence", "")).lower(), ""
                 )
-                extra = (f" · {rec_word}" if recurring and rec_word else "") + (f" · {n_links} link(s)" if n_links else "")
+                extra = f" · {rec_word}" if recurring and rec_word else ""
                 self.due_label.setText(f"{formatted}{time_txt}{extra}")
                 if is_overdue:
                     self.due_label.setStyleSheet(
