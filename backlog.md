@@ -21,8 +21,10 @@ Txek Systems domain, not registered yet). #81 stays for another session._
 - [ ] **#147 Code signing for the installer (once there is a certificate)** `[FEAT]` — no signing step until a
   provider is chosen (public-cert keys live in HSM/cloud since 2023, so no `.pfx` secret); sign `Ekin.exe` before
   ISCC and the installer after it, **then** compute the SHA-256.
-- [ ] **#135 Monetization plan — Wave 3** `[ARCH]` — decision doc from the local drafts + public landing page.
-- [ ] **#155 Free / Pro split of the current features** `[ARCH]` — **blocks v2.0.0 and any new Pro-candidate
+- [x] **DONE (2026-10-28) — #135 Monetization plan** and **#155 Free / Pro split**: the commercial plan was approved.
+  The work goes on in board cards #217–#226 (phase 2: split Free and Pro into two repos) and #207–#216 (phase 3:
+  licences, store, landing #215). Phase 1 (Free improvements such as #157 and #205) keeps going in this repo.
+- [x] **#155 Free / Pro split of the current features** `[ARCH]` — **blocks v2.0.0 and any new Pro-candidate
   feature** (#81, #159, #160, #163, #202, #203, #204, #206): the public repo publishes whatever reaches `main` under
   PolyForm, so that code waits for this decision. 1.8.x releases go on (decided 2026-10-24: v1.8.0 already ships
   every Pro candidate). Which current features move to the private `Txek-Systems/ekin-pro` repo in v2.0.0, what a
