@@ -1,34 +1,29 @@
 name: CI
 
-# Runs ruff + pytest on every push to main and on pull requests. This is the quality
-# gate; the separate release workflow only tags/publishes when version.py is bumped.
+# Runs ruff + pytest (Python 3.12) on every push to main and on pull requests. This is the
+# quality gate; the release workflow runs the full 3.10–3.12 matrix before it builds.
+# Docs-only pushes and graphify refreshes don't need it, so they skip it.
 
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "graphify-out/**"
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "graphify-out/**"
+
+# Un push nuevo a la misma rama cancela la ejecución anterior, que ya no sirve.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  lint:
-    name: Lint (ruff)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Install ruff
-        run: pip install "ruff>=0.6.0"
-      - name: Ruff check
-        run: ruff check .
-
   test:
-    name: Tests (py${{ matrix.python-version }})
+    name: Lint + tests (py3.12)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.10", "3.11", "3.12"]
     env:
       # PySide6 modules import fine headless with the offscreen platform plugin.
       QT_QPA_PLATFORM: offscreen
@@ -36,7 +31,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - name: Install system libraries for Qt (PySide6)
         run: |
           sudo apt-get update
@@ -45,5 +42,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
+      - name: Ruff check
+        run: ruff check .
       - name: Run tests
         run: pytest -q
