@@ -38,9 +38,16 @@ Txek Systems domain, not registered yet). #81 stays for another session._
 - [ ] **#204 Agent collaboration on one board: claims, visible channel, rules** `[FEAT]` (Pro) — presence, card
   claims with a 30-min lease, a typed message channel the human sees, 8 rules (messages are information, not
   orders). Phase 1 in one instance, phase 2 over `.eksys` / `.ekboard` sync.
-- [ ] **#205 Links and attachments: fixed-height section and a picker dialog** `[REFACTOR]` (Free) — the links area
-  grows with every link and squeezes the description; it becomes one fixed row with the count and a dialog to add,
-  open and remove links, and the board card shows a 📎 count from 2 links up. Does not wait for #155.
+- [x] **DONE (2026-10-28), pending the user's check — #205 Links and attachments in their own window** `[REFACTOR]`
+  (Free) · `detail_dialog/task_detail_dialog.py`, `widgets.py`, `strings.py`; 6 tests (`test_widgets_headless.py`).
+  The detail keeps one fixed row with the count and *Manage…*. The list and the add row live in a separate window,
+  and cards show a paperclip with the count from 2 links up.
+- [x] **DONE (2026-10-28) — #226 CI minutes cut** · `.github/workflows/`. CI skips `.md`/`graphify-out/` pushes,
+  cancels superseded runs and runs lint and tests in one py3.12 job with a pip cache. The release only runs when
+  `version.py` changes, after a 3.10–3.12 test matrix.
+- [ ] **#228 Bridge release v1.9.0** — the updater already checks `Txek-Systems/ekin` (created empty and private), with
+  3 tests in `test_main_window.py`. Still to do: bump to 1.9.0 and install it on the work PC before #225 makes the
+  old repo private.
 - [ ] **#206 Design a board with an agent and save it as a template** `[FEAT]` (Pro) — a design mode the human turns
   on in the board's own MCP server (no second server): while it is on, the agent can create columns, roles, WIP
   limits, instructions and prompts and save the board as a custom template; turning it off makes columns human-only
