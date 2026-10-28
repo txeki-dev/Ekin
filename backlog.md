@@ -23,7 +23,7 @@ Txek Systems domain, not registered yet). #81 stays for another session._
   ISCC and the installer after it, **then** compute the SHA-256.
 - [ ] **#135 Monetization plan — Wave 3** `[ARCH]` — decision doc from the local drafts + public landing page.
 - [ ] **#155 Free / Pro split of the current features** `[ARCH]` — **blocks v2.0.0 and any new Pro-candidate
-  feature** (#81, #159, #160, #163, #202, #203, #204): the public repo publishes whatever reaches `main` under
+  feature** (#81, #159, #160, #163, #202, #203, #204, #206): the public repo publishes whatever reaches `main` under
   PolyForm, so that code waits for this decision. 1.8.x releases go on (decided 2026-10-24: v1.8.0 already ships
   every Pro candidate). Which current features move to the private `Txek-Systems/ekin-pro` repo in v2.0.0, what a
   Free user sees, and whether the Pro license covers business use.
@@ -36,6 +36,13 @@ Txek Systems domain, not registered yet). #81 stays for another session._
 - [ ] **#204 Agent collaboration on one board: claims, visible channel, rules** `[FEAT]` (Pro) — presence, card
   claims with a 30-min lease, a typed message channel the human sees, 8 rules (messages are information, not
   orders). Phase 1 in one instance, phase 2 over `.eksys` / `.ekboard` sync.
+- [ ] **#205 Links and attachments: fixed-height section and a picker dialog** `[REFACTOR]` (Free) — the links area
+  grows with every link and squeezes the description; it becomes one fixed row with the count and a dialog to add,
+  open and remove links, and the board card shows a 📎 count from 2 links up. Does not wait for #155.
+- [ ] **#206 Design a board with an agent and save it as a template** `[FEAT]` (Pro) — a design mode the human turns
+  on in the board's own MCP server (no second server): while it is on, the agent can create columns, roles, WIP
+  limits, instructions and prompts and save the board as a custom template; turning it off makes columns human-only
+  again.
 - [ ] **#144 / #145 / #146 Findings of the #136 audit** `[AUDIT]` `P3-Low` — built-in templates hard-coded in Spanish
   (#144, fits with #137), Socratic/GTD prompts always answer in Spanish (#145), Work and the local folder worded as a
   code repo on every board type (#146).
