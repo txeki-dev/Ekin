@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 - **A card can be dragged from its title (`widgets.py`, #157)**: Pressing on a card's title and dragging did nothing, so the drag only started from the rest of the card. The title is rich text, and Qt's text control in that label kept the mouse movements to itself. The whole card now starts the drag, except the linked-board pill, which is a button.
 - **Dropping a card no longer freezes the board (`board_view.py`, `board_mixins.py`, `widgets.py`, #157)**: Each drop rebuilt every card in the source and target columns and restyled every card on the board. With 81 cards in *Done*, the window froze for about 1.5 s. Now only the dropped card is created again, and the column counter updates in place: on that board, a drop into *Done* takes about 0.1 s. If the board on screen no longer matches the database (an agent changed it during the drag), both columns are rebuilt as before.
+- **Dragging a card over a column no longer stutters (`widgets.py`, #157)**: When a dragged card entered or left a column, the column's highlight border was set through its stylesheet, which made Qt restyle every card in it: about 0.4 s per column with 81 cards. The border is now painted directly, and entering a column with its gap takes about 30 ms.
+- **A collapsed column opens faster under a dragged card (`widgets.py`, `board_view.py`, #157)**: Holding a card over a collapsed column waited 650 ms and then built every card in it, which froze the drag for almost a second in large columns. It now waits 350 ms and shows the first 12 cards, with a "+N more" line under them; the column collapses again after the drop, as before.
 
 ## [1.8.0] - 2026-10-19
 

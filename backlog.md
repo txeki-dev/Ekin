@@ -43,12 +43,16 @@ Txek Systems domain, not registered yet). #81 stays for another session._
   (`test_widgets_headless.py`). The detail keeps one fixed row with the count and *Manage…*. The list and the add row
   live in a separate window, and cards show a paperclip with the count from 2 links up.
 - [x] **DONE (2026-10-29), pending the user's check — #157 Smoother card drag and drop** `[BUG]` (Free) ·
-  `widgets.py`, `board_view.py`, `board_mixins.py`; 4 tests (`test_batch_drag_drop.py`, `test_incremental_rendering.py`).
+  `widgets.py`, `board_view.py`, `board_mixins.py`; 7 tests (`test_batch_drag_drop.py`, `test_incremental_rendering.py`,
+  `test_hover_expand.py`).
   - **Drag:** the rich-text title label swallowed mouse moves, so a drag only started outside the title. It now has
     `Qt.NoTextInteraction`.
   - **Drop:** a drop rebuilt the source and target columns and restyled every card. On the user's board (81 cards in
     Done) that froze the window ~1.5 s; now only the dropped card is rebuilt, ~0.1 s. Stale columns still rebuild.
-  - **Still open:** hovering a collapsed column waits 650 ms and then rebuilds it mid-drag (the card's second symptom).
+  - **Drag over a column:** the highlight ring went through the column's stylesheet and restyled all its cards
+    (~0.4 s on enter and on leave in Done); it is now painted, ~30 ms.
+  - **Collapsed column under a drag:** waited 650 ms and built all its cards (~0.9 s in Done); now 350 ms and the
+    first 12 cards plus "+N more", ~0.16 s.
 - [x] **DONE (2026-10-28) — #226 CI minutes cut** · `.github/workflows/`. CI skips `.md`/`graphify-out/` pushes,
   cancels superseded runs and runs lint and tests in one py3.12 job with a pip cache. The release only runs when
   `version.py` changes, after a 3.10–3.12 test matrix.

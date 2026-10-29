@@ -28,6 +28,9 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
     toggle_sidebar_requested = Signal()
     data_changed = Signal()  # Emitida tras (re)cargar el tablero, para refrescar campana/calendario
     board_link_activated = Signal(int)  # board_id: pulsada la pastilla de tablero enlazado de una tarjeta
+
+    # Tarjetas que muestra una columna desplegada por hover durante un arrastre (las que caben en pantalla)
+    HOVER_EXPAND_CARDS = 12
     command_palette_requested = Signal()
     settings_requested = Signal()
 
@@ -435,13 +438,13 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         self._last_board_fingerprint = database.get_board_mutation_fingerprint(self.board_id, self.db_path)
         self._last_db_data_version = database.get_db_data_version(self.db_path)
 
-    def _build_column_widget(self, col_data, tasks, board_info, timer_alert_hours):
+    def _build_column_widget(self, col_data, tasks, board_info, timer_alert_hours, max_cards=None):
         """Construye un ColumnWidget completo (señales conectadas y, si está desplegada,
         sus TaskCard) para una columna dada. No lo añade a ningún layout ni a
         self.column_widgets -- eso lo decide el llamante: load_board() para reconstruir
         el tablero entero, _rebuild_single_column() para sustituir solo una columna sin
         tocar el resto (necesario para no destruir la columna de ORIGEN de un drag en
-        curso -- ver _rebuild_single_column)."""
+        curso -- ver _rebuild_single_column). Con `max_cards`, solo las primeras y un «+N»."""
         col_widget = ColumnWidget(col_data, self)
 
         col_widget.task_dropped.connect(self.handle_task_drop)
@@ -457,8 +460,10 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         col_widget.column_activated.connect(self._set_last_active_column)
 
         if not col_data.get("collapsed"):
-            for task_data in tasks:
+            for task_data in tasks[:max_cards]:
                 col_widget.add_task_card(self._build_task_card(task_data, col_data["id"], board_info, timer_alert_hours))
+            if max_cards is not None and len(tasks) > max_cards:
+                col_widget.set_more_cards(len(tasks) - max_cards)
 
         return col_widget
 
@@ -481,7 +486,7 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         card.drag_ended.connect(self.finalize_hover_expand)
         return card
 
-    def _rebuild_single_column(self, column_id):
+    def _rebuild_single_column(self, column_id, max_cards=None):
         """Reconstruye el ColumnWidget de UNA sola columna (datos/tareas frescos de la
         BD) y lo sustituye en su misma posición dentro de columns_layout, sin tocar
         ninguna otra columna. A diferencia de load_board(), esto SÍ es seguro de llamar
@@ -507,7 +512,7 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         board_info = database.get_board(self.board_id, self.db_path)
         timer_alert_hours = int(database.get_setting("timer_alert_hours", "24", self.db_path))
 
-        new_widget = self._build_column_widget(col_data, tasks, board_info, timer_alert_hours)
+        new_widget = self._build_column_widget(col_data, tasks, board_info, timer_alert_hours, max_cards)
 
         self.columns_layout.removeWidget(old_widget)
         old_widget.deleteLater()
@@ -848,7 +853,9 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         self._collapse_hover_expanded_column()
         database.set_column_collapsed(column_id, False, self.db_path)
         self._hover_expanded_column_id = column_id
-        self._rebuild_single_column(column_id)
+        # Solo las primeras tarjetas: la columna se repliega al terminar el arrastre, y construir las
+        # 81 de Done congelaba el arrastre ~1 s (#157)
+        self._rebuild_single_column(column_id, max_cards=self.HOVER_EXPAND_CARDS)
 
     def _collapse_hover_expanded_column(self):
         """Repliega (BD + widget) la columna actualmente expandida por hover, si la
@@ -1051,9 +1058,12 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         y destino (81 tarjetas en Done) congelaba la GUI ~1 s en cada drop. Solo se crean de nuevo
         las tarjetas movidas, con sus datos de la BD. Exige que cada columna afectada esté
         desplegada y muestre lo que había en la BD antes del drop; si no, devuelve False y el
-        llamante reconstruye esas columnas."""
+        llamante reconstruye esas columnas. La columna desplegada por hover no se toca: solo tiene
+        sus primeras tarjetas y finalize_hover_expand la reconstruye plegada al terminar."""
         layouts = {}
         for cid, tasks in current_col_tasks.items():
+            if cid == self._hover_expanded_column_id:
+                continue
             col_widget = self.column_widgets.get(cid)
             if col_widget is None or col_widget.collapsed:
                 return False
@@ -1074,14 +1084,15 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
 
         board_info = database.get_board(self.board_id, self.db_path)
         timer_alert_hours = int(database.get_setting("timer_alert_hours", "24", self.db_path))
-        target_layout = layouts[target_column_id][0]
-        for idx, task_item in enumerate(remaining_col_tasks[target_column_id]):
-            if task_item["id"] in moved_ids:
-                task_data = database.get_task(task_item["id"], self.db_path)
-                target_layout.insertWidget(idx, self._build_task_card(task_data, target_column_id, board_info, timer_alert_hours))
+        if target_column_id in layouts:
+            target_layout = layouts[target_column_id][0]
+            for idx, task_item in enumerate(remaining_col_tasks[target_column_id]):
+                if task_item["id"] in moved_ids:
+                    task_data = database.get_task(task_item["id"], self.db_path)
+                    target_layout.insertWidget(idx, self._build_task_card(task_data, target_column_id, board_info, timer_alert_hours))
 
-        for cid, tasks in remaining_col_tasks.items():
-            self.column_widgets[cid].set_task_count(len(tasks))
+        for cid in layouts:
+            self.column_widgets[cid].set_task_count(len(remaining_col_tasks[cid]))
         return True
 
     def handle_task_drop(self, task_id, target_column_id, target_position):

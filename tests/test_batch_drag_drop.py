@@ -10,9 +10,10 @@ Cubre:
 
 import json
 from PySide6.QtCore import Qt, QEvent, QMimeData, QPointF
-from PySide6.QtGui import QDropEvent, QDragEnterEvent, QMouseEvent
+from PySide6.QtGui import QColor, QDropEvent, QDragEnterEvent, QMouseEvent
 from PySide6.QtWidgets import QApplication
 import database
+import styles
 from undo import UndoManager
 from board_view import BoardViewWidget
 import widgets
@@ -273,3 +274,32 @@ def test_drag_starts_from_the_card_title(qapp, monkeypatch):
 
     assert started == [7]
     card.close()
+
+
+def test_column_drag_ring_is_painted_without_restyling_the_cards(qapp, db_path):
+    """#157: el anillo de acento al arrastrar sobre una columna cambiaba la hoja de estilo de la
+    columna, y Qt volvía a dar estilo a todas sus tarjetas (~0,35 s con 81) al entrar, al salir y
+    al soltar. Ahora se pinta encima y la hoja de estilo no cambia."""
+    board_id = database.create_board("Tablero Anillo", "#3b82f6", db_path)
+    col = database.create_column(board_id, "Col", "#3b82f6", db_path)
+    database.create_task(col, "T1", db_path=db_path)
+    bv = BoardViewWidget(db_path=db_path)
+    bv.load_board(board_id)
+    cw = bv.column_widgets[col]
+    qss = cw.styleSheet()
+    accent = QColor(styles.COLORS["accent"])
+
+    def edge_color():
+        image = cw.grab().toImage()
+        return image.pixelColor(1, image.height() // 2)
+
+    idle = edge_color()
+    cw.set_column_style(dragging=True)
+    ring = edge_color()
+    qss_while_dragging = cw.styleSheet()
+    cw.set_column_style(dragging=False)
+
+    assert qss_while_dragging == qss
+    assert max(abs(ring.red() - accent.red()), abs(ring.green() - accent.green()), abs(ring.blue() - accent.blue())) < 30
+    assert idle != ring
+    assert edge_color() == idle

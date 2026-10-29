@@ -201,3 +201,49 @@ def test_hover_expand_column_widget_swapped_at_same_layout_position(qapp, db_pat
     assert board_view.columns_layout.indexOf(new_col_b_widget) == index_before
     # La columna A no se movió ni se recreó.
     assert board_view.columns_layout.indexOf(board_view.column_widgets[col_a]) != -1
+
+
+def _layout_card_ids(board_view, column_id):
+    layout = board_view.column_widgets[column_id].list_area.list_layout
+    widgets_in_order = [layout.itemAt(i).widget() for i in range(layout.count())]
+    return [w.task_id for w in widgets_in_order if isinstance(w, TaskCard)]
+
+
+def test_hover_expand_builds_only_the_first_cards(qapp, db_path):
+    """#157 (síntoma 2): desplegar por hover una columna plegada construía todas sus tarjetas a
+    mitad del arrastre (~1 s con las 81 de Done). Esa columna solo vive durante el arrastre (se
+    repliega al terminar), así que basta con las primeras y un «+N» debajo."""
+    board_id, (col_a, col_b) = _make_board_with_columns(db_path)
+    database.set_column_collapsed(col_a, True, db_path)
+    task_ids = [database.create_task(col_a, f"T{i}", db_path=db_path) for i in range(30)]
+
+    board_view = BoardViewWidget(db_path=db_path)
+    board_view.load_board(board_id)
+    board_view.handle_hover_expand_requested(col_a)
+
+    shown = BoardViewWidget.HOVER_EXPAND_CARDS
+    assert _layout_card_ids(board_view, col_a) == task_ids[:shown]
+    assert str(30 - shown) in board_view.column_widgets[col_a].more_cards_label.text()
+
+
+def test_drop_into_a_hover_expanded_column_does_not_rebuild_it(qapp, db_path):
+    """#157: la columna desplegada por hover solo tiene sus primeras tarjetas. Al soltar en ella no
+    se reconstruye entera: finalize_hover_expand la vuelve a construir plegada al terminar."""
+    board_id, (col_a, col_b) = _make_board_with_columns(db_path)
+    database.set_column_collapsed(col_a, True, db_path)
+    existing = [database.create_task(col_a, f"T{i}", db_path=db_path) for i in range(20)]
+    moved = database.create_task(col_b, "Tarjeta arrastrada", db_path=db_path)
+
+    board_view = BoardViewWidget(db_path=db_path)
+    board_view.load_board(board_id)
+    board_view.handle_hover_expand_requested(col_a)
+    hover_widget = board_view.column_widgets[col_a]
+
+    board_view.handle_task_drop(moved, col_a, 0)
+
+    assert board_view.column_widgets[col_a] is hover_widget
+    assert _layout_card_ids(board_view, col_b) == []
+    assert [t["id"] for t in database.get_tasks(col_a, db_path)] == [moved] + existing
+
+    board_view.finalize_hover_expand()
+    assert board_view.column_widgets[col_a].collapsed

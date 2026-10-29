@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QWidget, QMenu, QApplication, QLayout, QGraphicsDropShadowEffect
 )
-from PySide6.QtGui import QDrag, QPixmap, QCursor, QPainter, QColor, QBrush, QPen, QFont, QFontMetrics
+from PySide6.QtGui import QDrag, QPixmap, QCursor, QPainter, QColor, QBrush, QPen, QFont, QFontMetrics, QRegion
 import styles
 from strings import t
 from icons import lucide_icon, lucide_pixmap
@@ -879,13 +879,14 @@ class ColumnWidget(QFrame):
 
     COLLAPSED_WIDTH = 56
     EXPANDED_WIDTH = 288
-    HOVER_EXPAND_MS = 650
+    HOVER_EXPAND_MS = 350
 
     def __init__(self, column_data, parent=None):
         super().__init__(parent)
         self.column_data = column_data
         self.column_id = column_data["id"]
         self.collapsed = bool(column_data.get("collapsed", 0))
+        self._drag_ring = False
 
         self.setObjectName("ColumnContainer")
         self.setAttribute(Qt.WA_StyledBackground, True)
@@ -1130,16 +1131,10 @@ class ColumnWidget(QFrame):
     def set_column_style(self, dragging=False):
         """La columna es una tarjeta crema plana (estilo inline: Qt solo pinta el fondo de
         estos QFrame vía stylesheet propio); al arrastrar una tarjeta encima muestra un anillo
-        de acento. Se re-aplica en cada load_board, reactivo al conmutador de tema."""
-        if dragging:
-            self.setStyleSheet(f"""
-                #ColumnContainer {{
-                    background-color: {styles.COLORS['bg_column']};
-                    border: 2px solid {styles.COLORS['accent']};
-                    border-radius: 28px;
-                }}
-            """)
-        else:
+        de acento. Se re-aplica en cada load_board, reactivo al conmutador de tema.
+        El anillo se pinta en paintEvent: cambiar la hoja de estilo de la columna volvía a dar
+        estilo a todas sus tarjetas (~0,35 s con 81) al entrar, al salir y al soltar (#157)."""
+        if not self.styleSheet():
             self.setStyleSheet(f"""
                 #ColumnContainer {{
                     background-color: {styles.COLORS['bg_column']};
@@ -1147,6 +1142,31 @@ class ColumnWidget(QFrame):
                     border-radius: 28px;
                 }}
             """)
+        if dragging != self._drag_ring:
+            self._drag_ring = dragging
+            # Solo el borde: repintar la columna entera rehacía la sombra de cada tarjeta visible
+            ring = QRegion(self.rect()).subtracted(QRegion(self.rect().adjusted(3, 3, -3, -3)))
+            self.update(ring)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if self._drag_ring:
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.Antialiasing)
+            painter.setPen(QPen(QColor(styles.COLORS['accent']), 2))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRoundedRect(QRectF(self.rect()).adjusted(1, 1, -1, -1), 27, 27)
+            painter.end()
+
+    def set_more_cards(self, count):
+        """Indica, bajo la última tarjeta, cuántas más tiene la columna sin mostrar (#157)."""
+        self.more_cards_label = QLabel(t("widgets.column.more_cards", count=count))
+        self.more_cards_label.setAlignment(Qt.AlignHCenter)
+        self.more_cards_label.setStyleSheet(
+            f"color: {styles.COLORS['text_muted']}; font-size: 12px; background: transparent;"
+        )
+        layout = self.list_area.list_layout
+        layout.insertWidget(layout.count() - 1, self.more_cards_label)  # antes del stretch final
 
     def show_column_menu(self):
         """Muestra el menú contextual de la columna para editarla, moverla, copiarla o borrarla."""
