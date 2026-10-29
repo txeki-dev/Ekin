@@ -77,7 +77,7 @@ def test_find_and_fill_variables():
 
 def test_board_variables_use_the_claude_code_server_name():
     assert prompt_packs.board_variables({"name": "SW - Ekin"}) == {
-        "board_name": "SW - Ekin", "mcp_server": "ekin-sw_-_ekin",
+        "board_name": "SW - Ekin", "mcp_server": "ekin-sw_-_ekin", "language": "English",
     }
 
 
@@ -255,3 +255,24 @@ def test_builtin_pack_variables_are_board_variables_or_asked(pack_id):
     board_vars = set(prompt_packs.board_variables({"name": "X"}))
     for p in prompt_packs.load_pack(pack_id):
         assert set(prompt_packs.find_variables(p["prompt"])) <= board_vars | asked, p["id"]
+
+
+@pytest.mark.parametrize("lang, language", [("en", "English"), ("es", "Spanish")])
+def test_socratic_and_gtd_prompts_reply_in_the_app_language(qapp, db_path, monkeypatch, lang, language):
+    """#145: los packs socrático y GTD respondían siempre en español; ahora siguen a la interfaz,
+    tanto al copiar del Clipboard como en el prompt de ▶ Trabajar."""
+    import start_working
+    try:
+        strings.set_language(lang)
+        rule = f"LANGUAGE: Always reply to me in {language},"
+        for pack in ("opositor", "gtd"):
+            assert rule in start_working.start_prompt({"name": "Estudio", "prompt_pack": pack})
+        monkeypatch.setattr("prompt_clipboard_dialog.ask_variable_values",
+                            lambda parent, names: {n: "x" for n in names})
+        _, dlg = _dialog(qapp, db_path, pack="opositor")
+        dlg.prompt_list.setCurrentRow(0)
+        dlg.copy_btn.click()
+        assert rule in QApplication.clipboard().text()
+        dlg.close()
+    finally:
+        strings.set_language("en")

@@ -163,7 +163,7 @@ class CreateBoardDialog(QDialog):
         self.templates_dir = templates_dir
         self.db_path = db_path
         self.connect_requested = False
-        self.selected_template: BoardTemplate = templates.TEMPLATE_SOFTWARE_AGILE
+        self.selected_template: BoardTemplate = templates.localized(templates.TEMPLATE_SOFTWARE_AGILE)
         self.card_widgets: List[TemplateCardWidget] = []
 
         self.setWindowTitle(t("templates.create_dialog.title"))

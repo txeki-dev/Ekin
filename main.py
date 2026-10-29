@@ -329,6 +329,9 @@ class MainWindow(QMainWindow):
         # Ctrl+D: panel de Analíticas
         QShortcut(QKeySequence("Ctrl+D"), self).activated.connect(self.show_dashboard_view)
 
+        # Ctrl+B: mostrar u ocultar la barra lateral, igual que su botón de la cabecera (#161)
+        QShortcut(QKeySequence("Ctrl+B"), self).activated.connect(self.board_view.toggle_sidebar_btn.click)
+
         # Comprobar actualizaciones tras 1 segundo
         QTimer.singleShot(1000, self.check_for_updates)
 

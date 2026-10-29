@@ -7,9 +7,10 @@ Los controles visibles (segmentado / interruptor / stepper) son la cara del dise
 lógica de estado y persistencia sigue viviendo en tres widgets de respaldo ocultos
 (`theme_combo`, `notif_chk`, `timer_alert_spin`) que los controles visuales manejan.
 """
-from PySide6.QtCore import Qt, Signal, QRectF, QSize
-from PySide6.QtGui import QPainter, QColor
+from PySide6.QtCore import Qt, Signal, QRectF, QSize, QUrl
+from PySide6.QtGui import QPainter, QColor, QDesktopServices
 import os
+import sys
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox, QPushButton,
@@ -18,10 +19,30 @@ from PySide6.QtWidgets import (
 )
 
 import database
+import prompt_packs
 import styles
 import strings
+import templates
+from logging_setup import get_log_dir
 from strings import t
 from icons import lucide_icon
+
+
+def ekin_folders(db_path=None):
+    """Carpetas de este equipo donde Ekin guarda cada cosa (#153): [(clave, icono, ruta)]."""
+    if getattr(sys, "frozen", False):
+        program = os.path.dirname(os.path.abspath(sys.executable))
+    else:
+        program = os.path.dirname(os.path.abspath(__file__))
+    data = os.path.dirname(os.path.abspath(db_path or database.DB_NAME))
+    return [
+        ("program", "download", program),
+        ("data", "table", data),
+        ("backups", "archive", os.path.join(data, "backups")),
+        ("logs", "align-left", get_log_dir()),
+        ("templates", "clipboard-list", templates.get_templates_dir()),
+        ("prompt_packs", "sparkles", prompt_packs.USER_PACKS_DIR),
+    ]
 
 
 class ToggleSwitch(QCheckBox):
@@ -304,6 +325,7 @@ class SettingsDialog(QDialog):
         self.tabs = QTabWidget()
         self.tabs.addTab(general_scroll, t("settings.tab_general"))
         self.tabs.addTab(self._build_local_dirs_page(), t("settings.tab_local_dirs"))
+        self.tabs.addTab(self._build_folders_page(), t("settings.tab_folders"))
         layout.addWidget(self.tabs, 1)
 
         info = QLabel(t("settings.geometry_hint"))
@@ -358,6 +380,74 @@ class SettingsDialog(QDialog):
             row.addWidget(clear)
             rows.addLayout(row)
             self.local_dir_rows[board["id"]] = (field, clear)
+        rows.addStretch()
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setWidget(holder)
+        # Un QScrollArea con hijos no muestra el relleno del contenedor: el fondo va en línea
+        scroll.viewport().setStyleSheet(f"background-color: {styles.COLORS['bg_card']};")
+        holder.setStyleSheet(f"background-color: {styles.COLORS['bg_card']};")
+        outer.addWidget(scroll, 1)
+        return page
+
+    def _build_folders_page(self):
+        """Pestaña Carpetas: dónde guarda Ekin cada cosa en este equipo, con un botón para abrirla."""
+        page = QWidget()
+        outer = QVBoxLayout(page)
+        outer.setContentsMargins(18, 18, 18, 18)
+        outer.setSpacing(10)
+        hint = QLabel(t("settings.folders_hint"))
+        hint.setWordWrap(True)
+        hint.setStyleSheet(f"font-size: 12px; color: {styles.COLORS['text_muted']}; background: transparent;")
+        outer.addWidget(hint)
+
+        holder = QWidget()
+        rows = QVBoxLayout(holder)
+        rows.setContentsMargins(0, 0, 0, 0)
+        rows.setSpacing(8)
+        db_file = os.path.basename(self.db_path or database.DB_NAME)
+        self.folder_open_buttons = {}
+        for key, icon, path in ekin_folders(self.db_path):
+            card = QFrame()
+            card.setObjectName("FolderRow")
+            card.setStyleSheet(
+                f"#FolderRow {{ background-color: {styles.COLORS['bg_card']}; border: 1px solid {styles.COLORS['border']};"
+                f" border-radius: 12px; }}"
+            )
+            h = QHBoxLayout(card)
+            h.setContentsMargins(14, 10, 14, 10)
+            h.setSpacing(12)
+            icon_lbl = QLabel()
+            icon_lbl.setPixmap(lucide_icon(icon, styles.COLORS["accent"], 20).pixmap(20, 20))
+            icon_lbl.setStyleSheet("background: transparent;")
+            h.addWidget(icon_lbl, 0, Qt.AlignTop)
+            text_col = QVBoxLayout()
+            text_col.setSpacing(2)
+            title = QLabel(t(f"settings.folder_{key}"))
+            title.setStyleSheet(f"font-size: 14px; font-weight: 600; color: {styles.COLORS['text_main']}; background: transparent;")
+            text_col.addWidget(title)
+            desc = QLabel(t(f"settings.folder_{key}_desc", file=db_file))
+            desc.setWordWrap(True)
+            desc.setStyleSheet(f"font-size: 12px; color: {styles.COLORS['text_muted']}; background: transparent;")
+            text_col.addWidget(desc)
+            path_lbl = QLabel(path)
+            path_lbl.setWordWrap(True)
+            path_lbl.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            path_lbl.setStyleSheet(f"font-size: 11px; color: {styles.COLORS['text_soft']}; background: transparent;")
+            text_col.addWidget(path_lbl)
+            h.addLayout(text_col, 1)
+            open_btn = QPushButton(t("settings.folder_open"))
+            open_btn.setCursor(Qt.PointingHandCursor)
+            exists = os.path.isdir(path)
+            open_btn.setEnabled(exists)
+            if not exists:
+                open_btn.setToolTip(t("settings.folder_missing"))
+            open_btn.clicked.connect(lambda _=False, p=path: QDesktopServices.openUrl(QUrl.fromLocalFile(p)))
+            h.addWidget(open_btn, 0, Qt.AlignVCenter)
+            rows.addWidget(card)
+            self.folder_open_buttons[key] = open_btn
         rows.addStretch()
 
         scroll = QScrollArea()

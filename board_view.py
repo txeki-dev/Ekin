@@ -5,13 +5,14 @@ from PySide6.QtWidgets import (
     QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QInputDialog, QMessageBox, QDialog, QApplication, QFileDialog
 )
+import column_roles
 import database
 import board_sync  # noqa: F401 - keeps import order to prevent circular import with controller
 from board_sync_controller import BoardSyncController, format_sync_summary  # noqa: F401
 import styles
 from styles import hex_to_rgb
 from strings import t
-from widgets import ColumnWidget, TaskCard
+from widgets import ColumnWidget, PhaseBar, TaskCard
 from icons import lucide_icon, lucide_pixmap
 from detail_dialog import TaskDetailDialog
 from undo import UndoAction
@@ -221,6 +222,8 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         self.board_counts_chip = QLabel("")
         self.board_counts_chip.setObjectName("BoardCountsChip")
         footer_layout.addWidget(self.board_counts_chip, 0, Qt.AlignVCenter)
+        self.phase_bar = PhaseBar()
+        footer_layout.addWidget(self.phase_bar, 0, Qt.AlignVCenter)
         footer_layout.addStretch()
 
         # Botón MCP (Agente IA)
@@ -669,6 +672,7 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         """Actualiza el chip de recuento de tareas y vencimientos de la semana sin recargar columnas."""
         if not self.board_id or self.board_id == -1:
             self.board_counts_chip.setText("")
+            self.phase_bar.set_segments([])
             return
 
         columns = database.get_columns(self.board_id, self.db_path)
@@ -678,9 +682,13 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         week_end = date.today() + timedelta(days=7)
         today = date.today()
 
+        roles = column_roles.column_roles(columns)
+        segments = []
         for col_data in columns:
             tasks = database.get_tasks(col_data["id"], self.db_path)
             total_tasks += len(tasks)
+            if roles[col_data["id"]] != column_roles.DONE:
+                segments.append((col_data["name"], col_data["color"], len(tasks)))
             for tk in tasks:
                 due = tk.get("due_date")
                 if due:
@@ -693,6 +701,7 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
         self.board_counts_chip.setText(
             t("board_view.header.counts", tasks=total_tasks, due=due_this_week)
         )
+        self.phase_bar.set_segments(segments)
 
     def closeEvent(self, event):
         """Espera a que termine cualquier hilo de sincronización activo antes de destruir el widget."""

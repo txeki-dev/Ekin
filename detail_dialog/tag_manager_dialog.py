@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSize
 from PySide6.QtWidgets import (
     QDialog, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QScrollArea, QWidget,
@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QColor
 import database
 import styles
+from icons import lucide_icon
 from strings import t
 
 
@@ -47,12 +48,17 @@ class TagManagerDialog(QDialog):
         add_cat_btn = QPushButton(t("tag_manager.add_category_btn"))
         add_cat_btn.setCursor(Qt.PointingHandCursor)
         add_cat_btn.clicked.connect(self.add_category)
-        rename_cat_btn = QPushButton("✎")
+        # Iconos en vez de «✎» y «🗑», que no se distinguían bien con la fuente de la app (#158)
+        rename_cat_btn = QPushButton()
+        rename_cat_btn.setIcon(lucide_icon("pencil", styles.COLORS['text_soft'], 15))
+        rename_cat_btn.setIconSize(QSize(15, 15))
         rename_cat_btn.setToolTip(t("tag_manager.category_action_label"))
         rename_cat_btn.setFixedWidth(34)
         rename_cat_btn.setCursor(Qt.PointingHandCursor)
         rename_cat_btn.clicked.connect(self.rename_category)
-        del_cat_btn = QPushButton("🗑")
+        del_cat_btn = QPushButton()
+        del_cat_btn.setIcon(lucide_icon("trash-2", styles.COLORS['on_accent'], 15))
+        del_cat_btn.setIconSize(QSize(15, 15))
         del_cat_btn.setObjectName("DangerButton")
         del_cat_btn.setToolTip(t("tag_manager.delete_category_tooltip"))
         del_cat_btn.setFixedWidth(34)
@@ -232,14 +238,18 @@ class TagManagerDialog(QDialog):
         h.addWidget(name)
         h.addStretch()
 
-        edit_btn = QPushButton("✎")
+        edit_btn = QPushButton()
+        edit_btn.setIcon(lucide_icon("pencil", styles.COLORS['text_soft'], 14))
+        edit_btn.setIconSize(QSize(14, 14))
         edit_btn.setFixedSize(26, 24)
         edit_btn.setCursor(Qt.PointingHandCursor)
         edit_btn.setToolTip(t("tag_manager.rename_value_tooltip"))
         edit_btn.clicked.connect(lambda _=False, v=dict(value): self.rename_value(v))
         h.addWidget(edit_btn)
 
-        del_btn = QPushButton("×")
+        del_btn = QPushButton()
+        del_btn.setIcon(lucide_icon("trash-2", styles.COLORS['on_accent'], 14))
+        del_btn.setIconSize(QSize(14, 14))
         del_btn.setObjectName("DangerButton")
         del_btn.setFixedSize(26, 24)
         del_btn.setCursor(Qt.PointingHandCursor)

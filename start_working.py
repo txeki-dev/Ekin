@@ -1,7 +1,8 @@
 """
 START WORKING (#87): desde un tablero con directorio local, arranca el servidor MCP de Ekin,
 actualiza la CLI del agente de IA, registra en ella el MCP del tablero y la abre en una consola
-externa, en el repo, con el prompt de inicio (INTRO) del pack del tablero.
+externa, en el repo, con el prompt de inicio (INTRO) del pack del tablero; INITIAL si la carpeta
+aún no tiene código.
 """
 import os
 
@@ -12,17 +13,36 @@ import cli_quota
 import cli_tools
 import database
 import prompt_packs
+from detail_dialog.repo_files import list_repo_files
 from mcp_server import get_mcp_manager
 from prompt_clipboard_dialog import ask_variable_values
 from quota_popup import quota_lines
 from strings import t
 
 
+# Archivos que cuentan como código: si la carpeta no tiene ninguno, el proyecto está por empezar
+_CODE_EXTENSIONS = {
+    ".py", ".js", ".jsx", ".mjs", ".ts", ".tsx", ".java", ".kt", ".go", ".rs", ".c", ".h", ".cpp",
+    ".hpp", ".cs", ".rb", ".php", ".swift", ".dart", ".lua", ".r", ".scala", ".sh", ".ps1", ".bat",
+    ".sql", ".html", ".css", ".scss", ".vue", ".svelte",
+}
+
+
+def has_code(folder):
+    """True si `folder` tiene algún archivo de código (sin contar dependencias ni lo ignorado)."""
+    return any(os.path.splitext(f)[1].lower() in _CODE_EXTENSIONS for f in list_repo_files(folder, limit=2000))
+
+
 def start_prompt(board):
     """Prompt de inicio del pack del tablero ('intro', si no '*_intro', si no el primero), con
-    las variables del tablero ya rellenas."""
+    las variables del tablero ya rellenas. Si el pack tiene INITIAL y el directorio local aún no
+    tiene código, arranca con INITIAL, que prepara el proyecto (#152)."""
     prompts = prompt_packs.load_pack(prompt_packs.resolve_pack_id(board.get("prompt_pack")))
-    chosen = (next((p for p in prompts if p["id"] == "intro"), None)
+    local_dir = board.get("local_dir")
+    initial = next((p for p in prompts if p["id"] == "initial"), None)
+    new_project = bool(initial and local_dir and os.path.isdir(local_dir) and not has_code(local_dir))
+    chosen = ((initial if new_project else None)
+              or next((p for p in prompts if p["id"] == "intro"), None)
               or next((p for p in prompts if p["id"].endswith("_intro")), prompts[0]))
     return prompt_packs.fill_variables(chosen["prompt"], prompt_packs.board_variables(board))
 
@@ -40,7 +60,8 @@ class StartWorkingWorker(QThread):
         tool, exe_path, board, sse_url, rpc_url, cwd = self.args
         warnings = []
         self.step.emit(t("start_working.step_update", tool=tool.name))
-        ok, msg = cli_tools.update_cli(tool, exe_path)
+        ok, msg = cli_tools.update_cli(tool, exe_path, on_retry=lambda attempt: self.step.emit(
+            t("start_working.step_update_retry", tool=tool.name, attempt=attempt, total=cli_tools.UPDATE_ATTEMPTS)))
         if not ok:
             warnings.append(t("start_working.warn_update", tool=tool.name, msg=msg))
         self.step.emit(t("start_working.step_mcp", tool=tool.name))

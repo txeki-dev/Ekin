@@ -2,26 +2,35 @@
 import pytest
 
 import column_roles as cr
+import strings
 import templates
 
 
+@pytest.fixture(params=["en", "es"])
+def lang(request):
+    """#149: los nombres cortos de las columnas conservan su rol en los dos idiomas."""
+    strings.set_language(request.param)
+    yield request.param
+    strings.set_language("en")
+
+
 def _roles_of(template):
-    return [cr.classify_column(c.name) for c in template.columns]
+    return [cr.classify_column(c.name) for c in templates.localized(template).columns]
 
 
-def test_software_agile_template_roles():
+def test_software_agile_template_roles(lang):
     assert _roles_of(templates.TEMPLATE_SOFTWARE_AGILE) == [
         cr.BACKLOG, cr.READY, cr.IN_PROGRESS, cr.REVIEW, cr.DONE,
     ]
 
 
-def test_gtd_template_roles():
+def test_gtd_template_roles(lang):
     assert _roles_of(templates.TEMPLATE_GTD_PERSONAL) == [
         cr.BACKLOG, cr.READY, cr.OTHER, cr.OTHER, cr.DONE,
     ]
 
 
-def test_socratic_template_roles():
+def test_socratic_template_roles(lang):
     """#136: las vueltas y el repaso espaciado no tenían rol, así que `active_task` se saltaba
     los temas que se están estudiando y apuntaba a «Simulacro & Test»."""
     assert _roles_of(templates.TEMPLATE_OPOSITOR) == [

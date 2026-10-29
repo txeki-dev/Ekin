@@ -99,3 +99,19 @@ def test_task_detail_dialog_priority_separated_from_tags(qapp, db_path):
     # Verificar que el combo de prioridad tiene seleccionada High
     assert dlg.priority_combo.currentText() == "High"
     dlg.reject()
+
+
+def test_tag_manager_edit_and_delete_buttons_are_icons(qapp, db_path):
+    """#158: «✎», «🗑» y «×» no dejaban claro qué hacía cada botón; ahora son iconos con su tooltip."""
+    from PySide6.QtWidgets import QPushButton
+    from strings import t
+
+    cat_id = database.create_tag_category("Frontend", db_path)
+    database.create_tag_value(cat_id, "React", "#0ea5e9", db_path)
+    dlg = TagManagerDialog(db_path)
+    by_tip = {b.toolTip(): b for b in dlg.findChildren(QPushButton) if b.toolTip()}
+    for key in ("tag_manager.category_action_label", "tag_manager.delete_category_tooltip",
+                "tag_manager.rename_value_tooltip", "tag_manager.delete_value_tooltip"):
+        btn = by_tip[t(key)]
+        assert btn.text() == "" and not btn.icon().isNull(), key
+    dlg.reject()

@@ -17,9 +17,10 @@ OTHER = "other"
 # de una palabra del nombre (sin acentos); las de varias palabras deben aparecer seguidas.
 _KEYWORDS = (
     (DONE, ("done", "hecho", "shipped", "completad", "completed", "terminad", "cerrad", "closed",
-            "resuelt", "resolved", "finaliz", "finished", "dominad")),
+            "resuelt", "resolved", "finaliz", "finished", "dominad", "mastered")),
     (REVIEW, ("review", "revision", "qa", "test", "validac", "verificac")),
-    (IN_PROGRESS, ("progres", "curso", "doing", "haciendo", "wip", "activo", "desarrollo", "vuelta", "repaso")),
+    (IN_PROGRESS, ("progres", "curso", "doing", "haciendo", "wip", "activo", "desarrollo", "vuelta", "repaso",
+                   "round", "repetit")),
     (READY, ("ready", "listo", "next", "proxim", "selected", "seleccionad")),
     (BACKLOG, ("backlog", "triage", "inbox", "bandeja", "pendiente", "todo", "to do", "por hacer")),
 )

@@ -191,3 +191,26 @@ def test_drop_within_the_same_column_reorders_the_cards_on_screen(qapp, db_path)
 
     assert bv.column_widgets[col] is widget
     assert _card_ids(bv, col) == [t2, t3, t1] == [t["id"] for t in database.get_tasks(col, db_path)]
+
+
+def test_phase_bar_counts_open_cards_per_column_without_done(qapp, db_path):
+    """#184: la barra del pie reparte las tarjetas abiertas por columna, con su color, y no cuenta
+    las terminadas (si no, solo crecería con el tiempo)."""
+    board_id = database.create_board("Board Fases", "#3b82f6", db_path)
+    backlog = database.create_column(board_id, "📥 BACKLOG", "#64748b", db_path)
+    doing = database.create_column(board_id, "⚡ IN PROGRESS", "#0ea5e9", db_path)
+    done = database.create_column(board_id, "🚀 DONE", "#10b981", db_path)
+    for col, n in ((backlog, 3), (doing, 1), (done, 5)):
+        for i in range(n):
+            database.create_task(col, f"T{i}", db_path=db_path)
+
+    bv = BoardViewWidget(db_path=db_path)
+    bv.load_board(board_id)
+    assert bv.phase_bar.segments == [("📥 BACKLOG", "#64748b", 3), ("⚡ IN PROGRESS", "#0ea5e9", 1)]
+    assert "📥 BACKLOG: 3" in bv.phase_bar.toolTip() and "DONE" not in bv.phase_bar.toolTip()
+    assert not bv.phase_bar.isHidden()
+
+    for tk in database.get_tasks(backlog, db_path) + database.get_tasks(doing, db_path):
+        database.delete_task(tk["id"], db_path)
+    bv.load_board(board_id)
+    assert bv.phase_bar.isHidden()  # todo terminado: no hay nada que repartir

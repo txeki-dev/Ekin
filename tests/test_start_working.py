@@ -8,6 +8,7 @@ import pytest
 
 import cli_tools
 import database
+import prompt_packs
 import start_working as sw
 import templates
 from board_view import BoardViewWidget
@@ -91,6 +92,7 @@ def test_update_failure_is_reported_not_raised(monkeypatch):
 # --- start_working (flujo) ---------------------------------------------------
 
 def test_start_prompt_is_the_pack_intro_with_board_variables(db_path, tmp_path):
+    (tmp_path / "main.py").write_text("print('hola')")
     board = database.get_board(_sw_board(db_path, str(tmp_path)), db_path=db_path)
     prompt = sw.start_prompt(board)
     assert prompt.startswith("Execute the `<session_start_hybrid>` protocol.")
@@ -110,7 +112,7 @@ def flow(monkeypatch, qapp):
     """Simula todo lo externo y registra lo que haría START WORKING."""
     rec = SimpleNamespace(launched=None, messages=[], started=0, mcp_dialog=0, clipboard=None)
     monkeypatch.setattr(sw.cli_tools, "detect_installed", lambda: [(cli_tools.KNOWN_CLIS[0], r"C:\npm\claude.CMD")])
-    monkeypatch.setattr(sw.cli_tools, "update_cli", lambda tool, exe: (False, "EBUSY"))
+    monkeypatch.setattr(sw.cli_tools, "update_cli", lambda tool, exe, on_retry=None: (False, "EBUSY"))
     monkeypatch.setattr(sw.cli_tools, "ensure_mcp_registered", lambda *a: (True, ""))
     monkeypatch.setattr(sw.cli_tools, "launch", lambda argv, cwd: setattr(rec, "launched", (argv, cwd)))
     manager = SimpleNamespace(port=8765, start=lambda: setattr(rec, "started", rec.started + 1) or True,
@@ -123,6 +125,7 @@ def flow(monkeypatch, qapp):
 
 
 def test_start_working_opens_the_cli_in_the_repo(db_path, tmp_path, flow):
+    (tmp_path / "main.py").write_text("print('hola')")
     board_id = _sw_board(db_path, str(tmp_path))
     assert sw.start_working(None, board_id, db_path=db_path) == "claude"
 
@@ -209,7 +212,7 @@ def test_settings_local_folders_tab(qapp, db_path, tmp_path, monkeypatch):
     linked = _sw_board(db_path, str(tmp_path))
     unlinked = _sw_board(db_path, None)
     dlg = settings_dialog.SettingsDialog(db_path)
-    assert dlg.tabs.count() == 2
+    assert dlg.tabs.count() == 3  # General, Directorios locales y Carpetas de Ekin (#153)
     assert set(dlg.local_dir_rows) >= {linked, unlinked}
     assert dlg.local_dir_rows[linked][0].text() == str(tmp_path)
     changes = []
@@ -225,3 +228,39 @@ def test_settings_local_folders_tab(qapp, db_path, tmp_path, monkeypatch):
     assert database.get_board(linked, db_path=db_path)["local_dir"] is None
     assert not dlg.local_dir_rows[linked][1].isEnabled() and changes == [1, 1]
     dlg.close()
+
+
+def test_update_is_retried_before_warning(monkeypatch):
+    """#151: un update que falla a la primera se reintenta (hasta 3 veces) antes de avisar."""
+    claude = cli_tools.KNOWN_CLIS[0]
+    monkeypatch.setattr(cli_tools, "UPDATE_RETRY_DELAY", 0)
+    results = iter([(1, "EBUSY"), (1, "EBUSY"), (0, "updated")])
+    calls, retries = [], []
+
+    def flaky(argv, **kwargs):
+        calls.append(argv)
+        code, out = next(results)
+        return SimpleNamespace(returncode=code, stdout=out, stderr="")
+
+    monkeypatch.setattr(cli_tools.subprocess, "run", flaky)
+    assert cli_tools.update_cli(claude, "claude", on_retry=retries.append) == (True, "updated")
+    assert len(calls) == 3 and retries == [2, 3]
+
+    monkeypatch.setattr(cli_tools.subprocess, "run", _Runs({"update": (1, "offline")}))
+    assert cli_tools.update_cli(claude, "claude") == (False, "offline")
+
+
+def test_a_folder_without_code_starts_with_initial(db_path, tmp_path):
+    """#152: si la carpeta del tablero aún no tiene código, ▶ Trabajar arranca con INITIAL (prepara
+    graphify y siembra el backlog) en vez de INTRO. Los packs sin INITIAL no cambian."""
+    (tmp_path / "README.md").write_text("# Idea")
+    (tmp_path / "node_modules").mkdir()
+    (tmp_path / "node_modules" / "dep.js").write_text("")
+    board = database.get_board(_sw_board(db_path, str(tmp_path)), db_path=db_path)
+    initial = next(p for p in prompt_packs.load_pack("dev") if p["id"] == "initial")
+    assert sw.start_prompt(board) == prompt_packs.fill_variables(initial["prompt"], prompt_packs.board_variables(board))
+    assert "<gtd_session_start>" in sw.start_prompt({**board, "prompt_pack": "gtd"})
+
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "app.ts").write_text("export {}")
+    assert sw.start_prompt(board).startswith("Execute the `<session_start_hybrid>` protocol.")

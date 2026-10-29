@@ -225,7 +225,7 @@ def test_mcp_prompts_synergy(db_path, mcp_board):
     # 2. prompts/get
     p_get = handler.handle({"jsonrpc": "2.0", "id": 2, "method": "prompts/get", "params": {"name": "kanban_board_context"}})
     text_content = p_get["result"]["messages"][0]["content"]["text"]
-    assert "Tech Lead y Scrum Master" in text_content
+    assert "Tech Lead and assistant Scrum Master" in text_content  # instrucciones del tablero, en el idioma de la app (#144)
     assert "Columns are human-only" in text_content
 
 

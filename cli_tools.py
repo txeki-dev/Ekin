@@ -6,12 +6,15 @@ Sin Qt: lo usa start_working.py desde un hilo de trabajo.
 import os
 import shutil
 import subprocess
+import time
 from dataclasses import dataclass
 from typing import Callable, List, Optional
 
 from mcp_server import claude_code_server_name
 
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+UPDATE_ATTEMPTS = 3
+UPDATE_RETRY_DELAY = 2  # segundos entre intentos
 
 
 @dataclass(frozen=True)
@@ -56,15 +59,28 @@ def _run(argv, cwd=None, timeout=60):
     )
 
 
-def update_cli(tool, exe_path):
-    """Actualiza la CLI. Devuelve (ok, mensaje). Nunca lanza: un fallo no debe bloquear el inicio."""
+def update_cli(tool, exe_path, on_retry=None):
+    """Actualiza la CLI. Devuelve (ok, mensaje). Nunca lanza: un fallo no debe bloquear el inicio.
+    A veces el update falla a la primera, así que se intenta hasta UPDATE_ATTEMPTS veces (#151);
+    `on_retry(intento)` avisa antes de cada reintento. Un timeout no se repite: ya esperó 2 min."""
     if tool.update_args is None:
         return True, ""
-    try:
-        res = _run([exe_path, *tool.update_args], timeout=120)
-    except (OSError, subprocess.SubprocessError) as exc:
-        return False, str(exc)
-    return res.returncode == 0, (res.stdout or res.stderr).strip()[-300:]
+    for attempt in range(1, UPDATE_ATTEMPTS + 1):
+        if attempt > 1:
+            if on_retry:
+                on_retry(attempt)
+            time.sleep(UPDATE_RETRY_DELAY)
+        try:
+            res = _run([exe_path, *tool.update_args], timeout=120)
+        except subprocess.TimeoutExpired as exc:
+            return False, str(exc)
+        except (OSError, subprocess.SubprocessError) as exc:
+            ok, msg = False, str(exc)
+        else:
+            ok, msg = res.returncode == 0, (res.stdout or res.stderr).strip()[-300:]
+        if ok:
+            break
+    return ok, msg
 
 
 def ensure_mcp_registered(tool, exe_path, board, sse_url, rpc_url, cwd):

@@ -1,12 +1,12 @@
 import os
 import sys
-from PySide6.QtCore import Qt, Signal, QTimer, QPoint, QSize, QMimeData
+from PySide6.QtCore import Qt, Signal, QTimer, QPoint, QSize, QMimeData, QRectF
 from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QWidget, QMessageBox, QDialog, QLineEdit,
-    QMenu, QFileDialog, QApplication
+    QMenu, QFileDialog, QApplication, QGraphicsOpacityEffect
 )
-from PySide6.QtGui import QColor, QPixmap, QIcon, QDrag
+from PySide6.QtGui import QColor, QPixmap, QIcon, QDrag, QPainter, QPen
 from datetime import date, datetime, timedelta
 import database
 import board_sync
@@ -126,7 +126,6 @@ class BoardButton(QFrame):
     archive_toggle_requested = Signal(int, bool)  # board_id, nuevo estado archivado
     sync_action_requested = Signal(int, str)  # board_id, acción ("sync", "link", "unlink")
     config_requested = Signal(int)  # board_id (abrir el modal de opciones del tablero)
-    board_reorder_requested = Signal(int, int, bool)  # board_id arrastrado, board_id destino, soltar después
 
     BOARD_MIME = "application/x-ekin-board-id"
 
@@ -255,11 +254,19 @@ class BoardButton(QFrame):
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             self._drag_start = event.position().toPoint()
-            self.clicked.emit(self.board_id)
         super().mousePressEvent(event)
 
+    def mouseReleaseEvent(self, event):
+        # Se selecciona al soltar: al pulsar para arrastrar, el tablero ya no se abría antes de
+        # que empezara el arrastre (#150)
+        if event.button() == Qt.LeftButton and getattr(self, "_drag_start", None) is not None:
+            self._drag_start = None
+            if self.rect().contains(event.position().toPoint()):
+                self.clicked.emit(self.board_id)
+        super().mouseReleaseEvent(event)
+
     def mouseMoveEvent(self, event):
-        """Arrastrar el tablero por la barra lateral para cambiar su orden."""
+        """Arrastrar el tablero por la barra lateral para cambiar su orden (lo recibe BoardList)."""
         start = getattr(self, "_drag_start", None)
         if not (event.buttons() & Qt.LeftButton) or start is None:
             return
@@ -270,33 +277,34 @@ class BoardButton(QFrame):
         mime = QMimeData()
         mime.setData(self.BOARD_MIME, str(self.board_id).encode("utf-8"))
         drag.setMimeData(mime)
-        drag.setPixmap(self.grab())
+        drag.setPixmap(self._drag_pixmap())
         drag.setHotSpot(start)
+        # El tablero se queda atenuado en su sitio mientras se arrastra
+        dim = QGraphicsOpacityEffect(self)
+        dim.setOpacity(0.35)
+        self.setGraphicsEffect(dim)
         drag.exec(Qt.MoveAction)
+        self.setGraphicsEffect(None)
 
-    def _dragged_board_id(self, mime):
-        if not mime.hasFormat(self.BOARD_MIME):
-            return None
-        board_id = int(mime.data(self.BOARD_MIME).data().decode("utf-8"))
-        return None if board_id == self.board_id else board_id
-
-    def _show_reorder_indicator(self, after):
-        """Línea de acento en el borde (superior o inferior) donde caerá el tablero."""
-        edge = "bottom" if after else "top"
-        self.setStyleSheet(f"""
-            QFrame {{
-                background-color: {styles.COLORS['accent_tint']};
-                border: none;
-                border-{edge}: 3px solid {styles.COLORS['accent']};
-                border-radius: 0px;
-            }}
-        """)
+    def _drag_pixmap(self):
+        """La píldora que acompaña al cursor, con fondo y borde propios: el botón de un tablero
+        que no es el activo es transparente y solo se veía el texto flotando."""
+        snap = self.grab()
+        pm = QPixmap(snap.size())
+        pm.setDevicePixelRatio(snap.devicePixelRatio())
+        pm.fill(Qt.transparent)
+        painter = QPainter(pm)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setPen(QPen(QColor(styles.COLORS['accent']), 1))
+        painter.setBrush(QColor(styles.COLORS['bg_card']))
+        painter.drawRoundedRect(QRectF(0.5, 0.5, self.width() - 1, self.height() - 1), 16, 16)
+        painter.drawPixmap(0, 0, snap)
+        painter.end()
+        return pm
 
     def dragEnterEvent(self, event):
-        if self._dragged_board_id(event.mimeData()) is not None:
-            event.acceptProposedAction()
-            self._show_reorder_indicator(event.position().y() > self.height() / 2)
-        elif event.mimeData().hasFormat("application/x-ekin-column-id"):
+        # Un tablero arrastrado se ignora aquí y sube a BoardList, que marca el hueco
+        if event.mimeData().hasFormat("application/x-ekin-column-id"):
             event.acceptProposedAction()
             self.setStyleSheet(f"""
                 QFrame {{
@@ -308,31 +316,111 @@ class BoardButton(QFrame):
         else:
             event.ignore()
 
-    def dragMoveEvent(self, event):
-        if self._dragged_board_id(event.mimeData()) is not None:
-            event.acceptProposedAction()
-            self._show_reorder_indicator(event.position().y() > self.height() / 2)
-        else:
-            super().dragMoveEvent(event)
-
     def dragLeaveEvent(self, event):
         self.update_style()
         super().dragLeaveEvent(event)
 
     def dropEvent(self, event):
         mime = event.mimeData()
-        dragged_id = self._dragged_board_id(mime)
-        if dragged_id is not None:
-            event.acceptProposedAction()
-            self.update_style()
-            self.board_reorder_requested.emit(dragged_id, self.board_id, event.position().y() > self.height() / 2)
-        elif mime.hasFormat("application/x-ekin-column-id"):
+        if mime.hasFormat("application/x-ekin-column-id"):
             column_id = int(mime.data("application/x-ekin-column-id").data().decode("utf-8"))
             event.acceptProposedAction()
             self.update_style()
             self.column_dropped.emit(column_id, self.board_id)
         else:
             event.ignore()
+
+
+class BoardList(QWidget):
+    """Lista de tableros de la barra lateral y destino del arrastre que cambia su orden (#150).
+    Una sola línea de acento marca el hueco donde caerá el tablero, también entre dos tableros y
+    bajo el último, y la lista se desplaza sola cuando el cursor se acerca a sus bordes."""
+    board_reorder_requested = Signal(int, int, bool)  # board_id arrastrado, board_id destino, soltar después
+
+    AUTOSCROLL_MARGIN = 28  # px del borde de la zona visible donde empieza a desplazarse
+    AUTOSCROLL_STEP = 12
+
+    def __init__(self, scroll_area=None, parent=None):
+        super().__init__(parent)
+        self.scroll_area = scroll_area
+        self.setAcceptDrops(True)
+        self.drop_line = QFrame(self)
+        self.drop_line.setFixedHeight(3)
+        self.drop_line.hide()
+
+    def _buttons(self):
+        layout = self.layout()
+        widgets = (layout.itemAt(i).widget() for i in range(layout.count()))
+        return [w for w in widgets if isinstance(w, BoardButton)]
+
+    def _drop_slot(self, mime, y):
+        """(tablero arrastrado, hueco de 0 a n donde caería, botones). El hueco es None si soltarlo
+        ahí lo dejaría donde está; todo es None si lo arrastrado no es un tablero de la lista."""
+        if not mime.hasFormat(BoardButton.BOARD_MIME):
+            return None, None, []
+        dragged = int(mime.data(BoardButton.BOARD_MIME).data().decode("utf-8"))
+        buttons = self._buttons()
+        ids = [b.board_id for b in buttons]
+        if dragged not in ids:
+            return None, None, buttons
+        slot = next((i for i, b in enumerate(buttons) if y < b.geometry().center().y()), len(buttons))
+        current = ids.index(dragged)
+        return dragged, (None if slot in (current, current + 1) else slot), buttons
+
+    def _show_line(self, slot, buttons):
+        if slot is None:
+            self.drop_line.hide()
+            return
+        gap = self.layout().spacing() / 2
+        y = buttons[slot].geometry().top() - gap if slot < len(buttons) else buttons[-1].geometry().bottom() + gap
+        left = buttons[0].geometry().left() + 8
+        self.drop_line.setStyleSheet(f"background-color: {styles.COLORS['accent']}; border-radius: 1px;")
+        self.drop_line.setGeometry(left, round(y) - 1, buttons[0].width() - 16, 3)
+        self.drop_line.raise_()
+        self.drop_line.show()
+
+    def _autoscroll(self, pos):
+        if not self.scroll_area:
+            return
+        viewport = self.scroll_area.viewport()
+        y = self.mapTo(viewport, pos).y()
+        bar = self.scroll_area.verticalScrollBar()
+        if y < self.AUTOSCROLL_MARGIN:
+            bar.setValue(bar.value() - self.AUTOSCROLL_STEP)
+        elif y > viewport.height() - self.AUTOSCROLL_MARGIN:
+            bar.setValue(bar.value() + self.AUTOSCROLL_STEP)
+
+    def dragEnterEvent(self, event):
+        self.dragMoveEvent(event)
+
+    def dragMoveEvent(self, event):
+        pos = event.position().toPoint()
+        dragged, slot, buttons = self._drop_slot(event.mimeData(), pos.y())
+        if dragged is None:
+            self.drop_line.hide()
+            event.ignore()
+            return
+        event.acceptProposedAction()
+        self._autoscroll(pos)
+        self._show_line(slot, buttons)
+
+    def dragLeaveEvent(self, event):
+        self.drop_line.hide()
+        super().dragLeaveEvent(event)
+
+    def dropEvent(self, event):
+        self.drop_line.hide()
+        dragged, slot, buttons = self._drop_slot(event.mimeData(), event.position().toPoint().y())
+        if dragged is None:
+            event.ignore()
+            return
+        event.acceptProposedAction()
+        if slot is None:
+            return
+        if slot < len(buttons):
+            self.board_reorder_requested.emit(dragged, buttons[slot].board_id, False)
+        else:
+            self.board_reorder_requested.emit(dragged, buttons[-1].board_id, True)
 
 
 class BoardEditDialog(QDialog):
@@ -588,8 +676,9 @@ class SidebarWidget(QFrame):
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setStyleSheet("background: transparent; border: none;")
         
-        self.scroll_content = QWidget()
+        self.scroll_content = BoardList(self.scroll_area)
         self.scroll_content.setStyleSheet("background: transparent;")
+        self.scroll_content.board_reorder_requested.connect(self.handle_board_reorder)
         self.boards_layout = QVBoxLayout(self.scroll_content)
         self.boards_layout.setContentsMargins(4, 4, 4, 4)
         self.boards_layout.setSpacing(8)
@@ -842,7 +931,6 @@ class SidebarWidget(QFrame):
             btn.archive_toggle_requested.connect(self.handle_archive_toggle)
             btn.sync_action_requested.connect(self.handle_sync_action)
             btn.config_requested.connect(self.open_board_config)
-            btn.board_reorder_requested.connect(self.handle_board_reorder)
             self.boards_layout.addWidget(btn)
             self.board_buttons[board_id] = btn
 

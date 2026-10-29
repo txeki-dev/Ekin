@@ -13,7 +13,7 @@ import os
 import re
 
 from mcp_server import claude_code_server_name
-from strings import t
+from strings import get_language, t
 
 _BUILTIN_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "prompt_packs")
 USER_PACKS_DIR = os.path.join(os.path.expanduser("~/.ekin"), "prompt_packs")
@@ -98,8 +98,10 @@ def fill_variables(text, values):
 
 
 def board_variables(board):
-    """Variables que se rellenan solas a partir del tablero."""
-    variables = {"board_name": board["name"], "mcp_server": claude_code_server_name(board["name"])}
+    """Variables que se rellenan solas a partir del tablero (y del idioma de la app)."""
+    variables = {"board_name": board["name"], "mcp_server": claude_code_server_name(board["name"]),
+                 # Los packs socrático y GTD responden en el idioma de la interfaz (#145)
+                 "language": "Spanish" if get_language() == "es" else "English"}
     if board.get("local_dir"):
         variables["repo_path"] = board["local_dir"]
     return variables

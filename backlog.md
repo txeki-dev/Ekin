@@ -53,6 +53,22 @@ Txek Systems domain, not registered yet). #81 stays for another session._
     (~0.4 s on enter and on leave in Done); it is now painted, ~30 ms.
   - **Collapsed column under a drag:** waited 650 ms and built all its cards (~0.9 s in Done); now 350 ms and the
     first 12 cards plus "+N more", ~0.16 s.
+- [x] **DONE (2026-10-29), pending the user's check — v1.9.0 scope (Free, no installer changes)**:
+  - **#158** tag manager buttons are Lucide icons (`tag_manager_dialog.py`).
+  - **#146** the local folder is not called a repo (`strings.py`, README).
+  - **#145** Socratic / GTD prompts reply in the app language (`{{language}}` board variable) and name columns by emoji.
+  - **#161** Ctrl+B toggles the sidebar (clicks the header button).
+  - **#151** the CLI update is retried up to 3 times (not after a timeout).
+  - **#152** ▶ Work starts with INITIAL when the folder has no code files (`start_working.has_code`).
+  - **#149 + #144** built-in templates follow the UI language (`template_builtin.*` keys, `templates.localized`); short
+    capital column names keep their role keyword (`round`, `repetit`, `mastered` added to `column_roles.py`). Still
+    open: the Getting Started tutorial cards are Spanish.
+  - **#153** Settings → Ekin folders (`settings_dialog.ekin_folders`).
+  - **#184** phase bar of open cards per column in the board footer (`widgets.PhaseBar`). The «✓ N this week» part
+    is not possible yet: there is no completion date (`update_task_positions` touches `updated_at` of every card it
+    renumbers).
+  - **#150** sidebar board drag & drop: `BoardList` handles the drop with one gap line, no-op detection, autoscroll;
+    boards are selected on release.
 - [x] **DONE (2026-10-28) — #226 CI minutes cut** · `.github/workflows/`. CI skips `.md`/`graphify-out/` pushes,
   cancels superseded runs and runs lint and tests in one py3.12 job with a pip cache. The release only runs when
   `version.py` changes, after a 3.10–3.12 test matrix.

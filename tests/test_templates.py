@@ -1,7 +1,10 @@
 """Pruebas unitarias para el motor de plantillas de tablero (Board Templates)."""
 import os
 import tempfile
+import pytest
+
 import database
+import strings
 import templates
 from templates import (
     create_board_from_template, export_board_to_template,
@@ -32,13 +35,12 @@ def test_create_board_from_software_template(db_path):
     columns = database.get_columns(board_id, db_path=db_path)
     assert len(columns) == 5
     col_names = [c["name"] for c in columns]
-    assert "📥 Backlog & Triage" in col_names
-    assert "⚡ In Progress" in col_names
+    assert col_names == ["📥 BACKLOG", "📋 READY", "⚡ IN PROGRESS", "🔍 REVIEW", "🚀 DONE"]
 
     # Verificar límites WIP
     wips = {c["name"]: c["wip_limit"] for c in columns}
-    assert wips["📋 Ready to Code"] == 5
-    assert wips["⚡ In Progress"] == 3
+    assert wips["📋 READY"] == 5
+    assert wips["⚡ IN PROGRESS"] == 3
 
     # Verificar tareas semilla
     all_tasks = []
@@ -48,19 +50,87 @@ def test_create_board_from_software_template(db_path):
 
     # Verificar tags creados
     categories = [cat["name"] for cat in database.get_tag_categories(db_path=db_path)]
-    assert "Tipo" in categories
+    assert "Type" in categories
 
 
-def test_builtin_board_types_are_dev_socratic_and_gtd():
+@pytest.fixture
+def spanish():
+    strings.set_language("es")
+    yield
+    strings.set_language("en")
+
+
+def test_builtin_board_types_are_dev_socratic_and_gtd(spanish):
     """#136: SW → DEV, Opositor → Socrático (cualquier estudio), Personal/GTD → GTD. Los ids no
     cambian, para no romper nada que ya los use."""
     names = {t.id: t.name for t in templates.get_builtin_templates()}
     assert names["software_agile"] == "DEV — Desarrollo de software"
     assert names["opositor_study"] == "Socrático — Estudio guiado por preguntas"
     assert names["gtd_personal"] == "GTD — Getting Things Done"
-    socratic = templates.TEMPLATE_OPOSITOR
+    socratic = templates.get_template_by_id("opositor_study")
     assert "socrátic" in socratic.ai_system_prompt.lower()
     assert "oposiciones" not in socratic.category.lower()
+
+
+EXPECTED_BUILTIN_TEXTS = {
+    "en": {
+        "getting_started": ("🚀 Getting Started", "Tutorial & Onboarding"),
+        "blank": ("Blank Board", "Basic"),
+        "software_agile": ("DEV — Software development", "Engineering & Software"),
+        "opositor_study": ("Socratic — Question-guided study", "Study & Learning"),
+        "gtd_personal": ("GTD — Getting Things Done", "Personal Productivity"),
+    },
+    "es": {
+        "getting_started": ("🚀 Primeros Pasos", "Tutorial & Onboarding"),
+        "blank": ("Tablero en Blanco", "Básico"),
+        "software_agile": ("DEV — Desarrollo de software", "Ingeniería & Software"),
+        "opositor_study": ("Socrático — Estudio guiado por preguntas", "Estudio & Aprendizaje"),
+        "gtd_personal": ("GTD — Getting Things Done", "Productividad Personal"),
+    },
+}
+
+
+@pytest.mark.parametrize("lang", ["en", "es"])
+def test_template_browser_shows_the_builtins_in_the_app_language(qapp, lang):
+    """#144: con la app en inglés, el navegador de plantillas mostraba las de fábrica en español."""
+    from board_template_dialogs import CreateBoardDialog
+    try:
+        strings.set_language(lang)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            custom = templates.BoardTemplate(id="mia", name="Mi plantilla", description="Mía",
+                                             category="Mis Plantillas", color="#10b981", icon="table")
+            save_custom_template(custom, templates_dir=tmp_dir)
+            dlg = CreateBoardDialog(templates_dir=tmp_dir)
+            shown = {w.template.id: (w.template.name, w.template.category, w.template.description)
+                     for w in dlg.card_widgets}
+            for tid, (name, category) in EXPECTED_BUILTIN_TEXTS[lang].items():
+                assert shown[tid][:2] == (name, category)
+                assert shown[tid][2] and not shown[tid][2].startswith("template_builtin.")
+            assert shown["mia"] == ("Mi plantilla", "Mis Plantillas", "Mía")  # las propias, tal cual
+            assert dlg.name_input.text() == EXPECTED_BUILTIN_TEXTS[lang]["software_agile"][0]
+            dlg.reject()
+    finally:
+        strings.set_language("en")
+
+
+@pytest.mark.parametrize("lang, columns, tag, seed", [
+    ("en", ["📥 INBOX", "⚡ NEXT ACTIONS", "⏳ WAITING", "💡 SOMEDAY", "✅ DONE"], ("Context", "@computer"),
+     "Weekly review of commitments and inboxes"),
+    ("es", ["📥 BANDEJA", "⚡ PRÓXIMAS ACCIONES", "⏳ EN ESPERA", "💡 ALGÚN DÍA", "✅ HECHO"], ("Contexto", "@ordenador"),
+     "Revisión Semanal de compromisos y bandejas"),
+])
+def test_boards_are_created_in_the_app_language(db_path, lang, columns, tag, seed):
+    """#144 y #149: columnas cortas, etiquetas y tareas semilla en el idioma de la interfaz."""
+    try:
+        strings.set_language(lang)
+        board_id = create_board_from_template("GTD", "#059669", templates.TEMPLATE_GTD_PERSONAL, db_path=db_path)
+    finally:
+        strings.set_language("en")
+    cols = database.get_columns(board_id, db_path=db_path)
+    assert [c["name"] for c in cols] == columns
+    task = database.get_tasks(cols[1]["id"], db_path=db_path)[0]
+    assert task["title"] == seed
+    assert [(tg["category"], tg["value"]) for tg in database.get_task_tags(task["id"], db_path=db_path)] == [tag]
 
 
 def test_create_board_from_opositor_template(db_path):
@@ -69,12 +139,11 @@ def test_create_board_from_opositor_template(db_path):
     columns = database.get_columns(board_id, db_path=db_path)
     assert len(columns) == 6
     col_names = [c["name"] for c in columns]
-    assert "📚 Temas Pendientes" in col_names
-    assert "🏆 Tema Dominado" in col_names
+    assert col_names == ["📚 TO DO", "📖 ROUND 1", "✍️ ROUND 2", "🔄 REPETITION", "🎯 MOCK TEST", "🏆 MASTERED"]
 
     categories = [cat["name"] for cat in database.get_tag_categories(db_path=db_path)]
-    assert "Bloque" in categories
-    assert "Fase" in categories
+    assert "Content" in categories
+    assert "Status" in categories
 
 
 def test_create_board_from_blank_template(db_path):
@@ -152,7 +221,7 @@ def test_create_board_dialog_headless(qapp, db_path):
         # Seleccionar plantilla opositor
         dlg._on_template_selected("opositor_study")
         assert dlg.selected_template.id == "opositor_study"
-        assert dlg.name_input.text() == "Socrático — Estudio guiado por preguntas"
+        assert dlg.name_input.text() == "Socratic — Question-guided study"
 
         # Comprobar filtro
         dlg._on_category_filter_changed(1)  # builtin

@@ -795,3 +795,23 @@ def test_release_workflow_runs_one_release_at_a_time():
     import pathlib
     workflow = (pathlib.Path(__file__).resolve().parent.parent / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
     assert "concurrency:" in workflow and "cancel-in-progress: false" in workflow
+
+
+def test_ctrl_b_shows_and_hides_the_sidebar_like_its_button(qapp, db_path, monkeypatch):
+    """#161: Ctrl+B pulsa el botón de mostrar/ocultar la barra lateral (y su icono cambia con ella)."""
+    from PySide6.QtGui import QShortcut
+
+    monkeypatch.setattr(database, "DB_NAME", db_path)
+    window = _make_window(monkeypatch)
+    window.show()
+    qapp.processEvents()
+    ctrl_b = next(s for s in window.findChildren(QShortcut) if s.key().toString() == "Ctrl+B")
+    btn = window.board_view.toggle_sidebar_btn
+    icon_before = btn.icon().cacheKey()
+
+    ctrl_b.activated.emit()
+    assert not window.sidebar.isVisible() and btn.icon().cacheKey() != icon_before
+    ctrl_b.activated.emit()
+    assert window.sidebar.isVisible()
+
+    _close_window(qapp, window)

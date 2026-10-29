@@ -6,7 +6,9 @@ from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QWidget, QMenu, QApplication, QLayout, QGraphicsDropShadowEffect
 )
-from PySide6.QtGui import QDrag, QPixmap, QCursor, QPainter, QColor, QBrush, QPen, QFont, QFontMetrics, QRegion
+from PySide6.QtGui import (
+    QDrag, QPixmap, QCursor, QPainter, QPainterPath, QColor, QBrush, QPen, QFont, QFontMetrics, QRegion
+)
 import styles
 from strings import t
 from icons import lucide_icon, lucide_pixmap
@@ -1210,3 +1212,38 @@ class ColumnWidget(QFrame):
             return
         layout = self.list_area.list_layout
         layout.insertWidget(layout.count() - 1, card_widget)  # antes del stretch final
+
+
+class PhaseBar(QWidget):
+    """Barra del pie del tablero (#184): las tarjetas abiertas de cada columna, sin las terminadas,
+    con el color de su columna. Muestra dónde se acumula el trabajo y no crece con el histórico."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(140, 8)
+        self.segments = []  # [(nombre de la columna, color, tarjetas)]
+        self.hide()
+
+    def set_segments(self, segments):
+        self.segments = [seg for seg in segments if seg[2] > 0]
+        self.setToolTip("\n".join([t("board_view.phase_bar_tooltip")] + [f"{name}: {n}" for name, _, n in self.segments]))
+        self.setVisible(bool(self.segments))
+        self.update()
+
+    def paintEvent(self, event):
+        total = sum(n for _, _, n in self.segments)
+        if not total:
+            return
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        clip = QPainterPath()
+        clip.addRoundedRect(QRectF(self.rect()), 4, 4)
+        painter.setClipPath(clip)
+        # Cada tramo con al menos 4 px: una columna con 1 tarjeta junto a otra con 40 no se veía
+        min_width = 4
+        extra = max(0, self.width() - min_width * len(self.segments))
+        x = 0.0
+        for _, color, n in self.segments:
+            width = min_width + extra * n / total
+            painter.fillRect(QRectF(x, 0, width, self.height()), QColor(color))
+            x += width
+        painter.end()

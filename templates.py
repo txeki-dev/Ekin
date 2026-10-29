@@ -90,13 +90,37 @@ class BoardTemplate:
         )
 
 
+# Las plantillas de fábrica guardan en sus textos claves de strings.py, que se traducen al idioma
+# de la interfaz al mostrarlas y al crear el tablero (#144). El tutorial solo traduce su ficha.
+_TEXT_KEY = "template_builtin."
+
+
+def _tr(text):
+    return t(text) if isinstance(text, str) and text.startswith(_TEXT_KEY) else text
+
+
+def localized(template: BoardTemplate) -> BoardTemplate:
+    """Copia de la plantilla con sus textos en el idioma de la interfaz."""
+    tmpl = BoardTemplate.from_dict(template.to_dict())
+    tmpl.name, tmpl.description, tmpl.category = _tr(tmpl.name), _tr(tmpl.description), _tr(tmpl.category)
+    tmpl.ai_system_prompt = _tr(tmpl.ai_system_prompt)
+    for col in tmpl.columns:
+        col.name = _tr(col.name)
+    for tag in tmpl.default_tags:
+        tag.category, tag.value = _tr(tag.category), _tr(tag.value)
+    for st in tmpl.seed_tasks:
+        st.title, st.description = _tr(st.title), _tr(st.description)
+        st.tags = [_tr(value) for value in st.tags]
+    return tmpl
+
+
 # --- PLANTILLAS DE FÁBRICA (BUILT-IN) ---
 
 TEMPLATE_GETTING_STARTED = BoardTemplate(
     id="getting_started",
-    name="🚀 Primeros Pasos",
-    description="Tablero interactivo tutorial in-situ con misiones guiadas para dominar las tarjetas, columnas, atajos e integraciones.",
-    category="Tutorial & Onboarding",
+    name="template_builtin.getting_started.name",
+    description="template_builtin.getting_started.description",
+    category="template_builtin.getting_started.category",
     color="#2563eb",
     icon="sparkles",
     columns=[
@@ -258,38 +282,41 @@ TEMPLATE_GETTING_STARTED = BoardTemplate(
 
 TEMPLATE_BLANK = BoardTemplate(
     id="blank",
-    name="Tablero en Blanco",
-    description="Lienzo vacío para diseñar tu propio flujo de trabajo desde cero.",
-    category="Básico",
+    name="template_builtin.blank.name",
+    description="template_builtin.blank.description",
+    category="template_builtin.blank.category",
     color="#3b82f6",
     icon="table",
     columns=[],
     default_tags=[],
     seed_tasks=[],
-    ai_system_prompt="Asistente general de productividad para gestión de tareas Kanban en Ekin.",
+    ai_system_prompt="template_builtin.blank.ai_prompt",
     is_builtin=True,
 )
 
+# Columnas cortas, con emoji y en mayúsculas (#149). Cada nombre conserva una palabra clave de
+# column_roles.py en los dos idiomas, porque el rol de la columna se deduce de su nombre.
+_SW = "template_builtin.software_agile."
 TEMPLATE_SOFTWARE_AGILE = BoardTemplate(
     id="software_agile",
-    name="DEV — Desarrollo de software",
-    description="Flujo completo de ingeniería: Triage, Especificación, En Desarrollo, Code Review y Producción con límites WIP.",
-    category="Ingeniería & Software",
+    name=_SW + "name",
+    description=_SW + "description",
+    category=_SW + "category",
     color="#2563eb",
     icon="code",
     columns=[
-        ColumnTemplate("📥 Backlog & Triage", "#64748b", None),
-        ColumnTemplate("📋 Ready to Code", "#8b5cf6", 5),
-        ColumnTemplate("⚡ In Progress", "#0ea5e9", 3),
-        ColumnTemplate("🔍 Code Review & QA", "#f59e0b", 3),
-        ColumnTemplate("🚀 Shipped / Done", "#10b981", None),
+        ColumnTemplate(_SW + "col_backlog", "#64748b", None),
+        ColumnTemplate(_SW + "col_ready", "#8b5cf6", 5),
+        ColumnTemplate(_SW + "col_in_progress", "#0ea5e9", 3),
+        ColumnTemplate(_SW + "col_review", "#f59e0b", 3),
+        ColumnTemplate(_SW + "col_done", "#10b981", None),
     ],
     default_tags=[
-        TagTemplate("Tipo", "bug", "#ef4444"),
-        TagTemplate("Tipo", "feature", "#3b82f6"),
-        TagTemplate("Tipo", "refactor", "#8b5cf6"),
-        TagTemplate("Tipo", "tech-debt", "#f97316"),
-        TagTemplate("Tipo", "security", "#dc2626"),
+        TagTemplate(_SW + "tag_type", "bug", "#ef4444"),
+        TagTemplate(_SW + "tag_type", "feature", "#3b82f6"),
+        TagTemplate(_SW + "tag_type", "refactor", "#8b5cf6"),
+        TagTemplate(_SW + "tag_type", "tech-debt", "#f97316"),
+        TagTemplate(_SW + "tag_type", "security", "#dc2626"),
         TagTemplate("Priority", "P0-Critical", "#ef4444"),
         TagTemplate("Priority", "P1-High", "#f59e0b"),
         TagTemplate("Priority", "P2-Medium", "#3b82f6"),
@@ -297,118 +324,104 @@ TEMPLATE_SOFTWARE_AGILE = BoardTemplate(
     ],
     seed_tasks=[
         SeedTaskTemplate(
-            title="Configurar pipeline CI/CD y tests",
+            title=_SW + "seed1_title",
             column_index=1,
-            description="### Criterios de Aceptación (DoD)\n- [ ] Linter ruff sin advertencias (0 errores)\n- [ ] Cobertura de tests unitarios completa\n- [ ] Verificación de regresión en cada commit",
+            description=_SW + "seed1_description",
             priority="P1-High",
             tags=["feature", "tech-debt"],
             due_days_offset=3,
         ),
         SeedTaskTemplate(
-            title="Documentar arquitectura y dependencias",
+            title=_SW + "seed2_title",
             column_index=0,
-            description="Mantener actualizado el grafo de componentes, esquemas de base de datos y manual técnico de la arquitectura.",
+            description=_SW + "seed2_description",
             priority="P2-Medium",
             tags=["tech-debt"],
             due_days_offset=7,
         ),
     ],
-    ai_system_prompt=(
-        "Actúas como Tech Lead y Scrum Master asistente para este tablero de desarrollo software. "
-        "Cuando el usuario o tú creéis o actualicéis tareas, verifica que tengan una especificación "
-        "técnica clara, criterios de aceptación (Definition of Done) y cobertura de pruebas. "
-        "Ayuda a desglosar tareas complejas y a mantener los límites WIP de desarrollo respetados."
-    ),
+    ai_system_prompt=_SW + "ai_prompt",
     is_builtin=True,
     prompt_pack="dev",
 )
 
+_OP = "template_builtin.opositor_study."
 TEMPLATE_OPOSITOR = BoardTemplate(
     id="opositor_study",
-    name="Socrático — Estudio guiado por preguntas",
-    description="Estudia cualquier materia (oposiciones, certificaciones, universidad) con un tutor socrático: te pregunta en vez de darte la respuesta, con vueltas al temario, repaso espaciado y simulacros.",
-    category="Estudio & Aprendizaje",
+    name=_OP + "name",
+    description=_OP + "description",
+    category=_OP + "category",
     color="#7c3aed",
     icon="list",
     columns=[
-        ColumnTemplate("📚 Temas Pendientes", "#64748b", None),
-        ColumnTemplate("📖 1ª Vuelta: Lectura & Subrayado", "#0284c7", 4),
-        ColumnTemplate("✍️ 2ª Vuelta: Esquemas & Resumen", "#8b5cf6", 3),
-        ColumnTemplate("🔄 Repaso Espaciado (Vueltas 3+)", "#d97706", 5),
-        ColumnTemplate("🎯 Simulacro & Test", "#dc2626", 4),
-        ColumnTemplate("🏆 Tema Dominado", "#059669", None),
+        ColumnTemplate(_OP + "col_todo", "#64748b", None),
+        ColumnTemplate(_OP + "col_round1", "#0284c7", 4),
+        ColumnTemplate(_OP + "col_round2", "#8b5cf6", 3),
+        ColumnTemplate(_OP + "col_repetition", "#d97706", 5),
+        ColumnTemplate(_OP + "col_test", "#dc2626", 4),
+        ColumnTemplate(_OP + "col_mastered", "#059669", None),
     ],
     default_tags=[
-        TagTemplate("Bloque", "Teoría", "#3b82f6"),
-        TagTemplate("Bloque", "Práctica", "#8b5cf6"),
-        TagTemplate("Bloque", "Casos / Problemas", "#0ea5e9"),
-        TagTemplate("Fase", "Test Fallado", "#ef4444"),
-        TagTemplate("Fase", "Duda a Consultar", "#f59e0b"),
-        TagTemplate("Fase", "Tema Clave Examen", "#e11d48"),
+        TagTemplate(_OP + "tag_content", _OP + "tag_theory", "#3b82f6"),
+        TagTemplate(_OP + "tag_content", _OP + "tag_practice", "#8b5cf6"),
+        TagTemplate(_OP + "tag_content", _OP + "tag_cases", "#0ea5e9"),
+        TagTemplate(_OP + "tag_status", _OP + "tag_failed", "#ef4444"),
+        TagTemplate(_OP + "tag_status", _OP + "tag_question", "#f59e0b"),
+        TagTemplate(_OP + "tag_status", _OP + "tag_key", "#e11d48"),
     ],
     seed_tasks=[
         SeedTaskTemplate(
-            title="Tema 1: conceptos clave de la materia",
+            title=_OP + "seed1_title",
             column_index=1,
-            description="### Objetivos de la Vuelta\n- [ ] Leer y subrayar el tema\n- [ ] Explicar cada concepto clave con tus palabras (diálogo socrático con el agente)\n- [ ] Anotar las dudas con la etiqueta «Duda a Consultar»\n- [ ] Test de autoevaluación de 10 preguntas",
-            tags=["Teoría", "Tema Clave Examen"],
+            description=_OP + "seed1_description",
+            tags=[_OP + "tag_theory", _OP + "tag_key"],
             due_days_offset=2,
         ),
         SeedTaskTemplate(
-            title="Planificar calendario de simulacros cronometrados",
+            title=_OP + "seed2_title",
             column_index=0,
-            description="Reservar un hueco fijo a la semana para simulacros completos en condiciones reales (sin apuntes ni pausas).",
-            tags=["Práctica"],
+            description=_OP + "seed2_description",
+            tags=[_OP + "tag_practice"],
             due_days_offset=5,
         ),
     ],
-    ai_system_prompt=(
-        "Actúas como tutor socrático para cualquier materia (oposiciones, certificaciones, universidad...). "
-        "No des la respuesta de entrada: pide al estudiante que explique el tema con sus palabras, guíale "
-        "con preguntas de una en una y pistas graduales, y explica solo cuando lo haya intentado; corrige "
-        "con precisión citando la fuente (norma, libro o apuntes) y di cuándo no estás seguro. Planifica "
-        "repasos espaciados (1-7-30 días) y registra en cada tarjeta lo que domina y lo que falla."
-    ),
+    ai_system_prompt=_OP + "ai_prompt",
     is_builtin=True,
     prompt_pack="opositor",
 )
 
+_GTD = "template_builtin.gtd_personal."
 TEMPLATE_GTD_PERSONAL = BoardTemplate(
     id="gtd_personal",
-    name="GTD — Getting Things Done",
-    description="Metodología GTD para despejar la mente: capturar, procesar, organizar y actuar con enfoque.",
-    category="Productividad Personal",
+    name=_GTD + "name",
+    description=_GTD + "description",
+    category=_GTD + "category",
     color="#059669",
     icon="check",
     columns=[
-        ColumnTemplate("📥 Bandeja de Entrada (Inbox)", "#64748b", None),
-        ColumnTemplate("⚡ Próximas Acciones (@Next)", "#0284c7", 7),
-        ColumnTemplate("⏳ En Espera (@Waiting)", "#d97706", None),
-        ColumnTemplate("💡 Algún Día / Quizás", "#8b5cf6", None),
-        ColumnTemplate("✅ Terminado", "#059669", None),
+        ColumnTemplate(_GTD + "col_inbox", "#64748b", None),
+        ColumnTemplate(_GTD + "col_next", "#0284c7", 7),
+        ColumnTemplate(_GTD + "col_waiting", "#d97706", None),
+        ColumnTemplate(_GTD + "col_someday", "#8b5cf6", None),
+        ColumnTemplate(_GTD + "col_done", "#059669", None),
     ],
     default_tags=[
-        TagTemplate("Contexto", "@ordenador", "#3b82f6"),
-        TagTemplate("Contexto", "@llamadas", "#10b981"),
-        TagTemplate("Contexto", "@casa", "#f59e0b"),
-        TagTemplate("Contexto", "@compras", "#ec4899"),
-        TagTemplate("Contexto", "@recados", "#8b5cf6"),
+        TagTemplate(_GTD + "tag_context", _GTD + "tag_computer", "#3b82f6"),
+        TagTemplate(_GTD + "tag_context", _GTD + "tag_calls", "#10b981"),
+        TagTemplate(_GTD + "tag_context", _GTD + "tag_home", "#f59e0b"),
+        TagTemplate(_GTD + "tag_context", _GTD + "tag_shopping", "#ec4899"),
+        TagTemplate(_GTD + "tag_context", _GTD + "tag_errands", "#8b5cf6"),
     ],
     seed_tasks=[
         SeedTaskTemplate(
-            title="Revisión Semanal de compromisos y bandejas",
+            title=_GTD + "seed1_title",
             column_index=1,
-            description="Vaciar la bandeja de entrada, revisar listas de @Next y @Waiting, actualizar proyectos y calendarizar la próxima semana.",
-            tags=["@ordenador"],
+            description=_GTD + "seed1_description",
+            tags=[_GTD + "tag_computer"],
             due_days_offset=3,
         ),
     ],
-    ai_system_prompt=(
-        "Actúas como un asistente de productividad GTD (Getting Things Done). "
-        "Cuando el usuario registre pensamientos o notas en Inbox, ayúdale a procesarlos preguntando: "
-        "¿Es accionable? ¿Cuál es la siguiente acción física inmediata? Si lleva menos de 2 minutos, "
-        "hazla ya; si no, clasifícala en @Next con su contexto (@ordenador, @llamadas, etc.) o en @Waiting."
-    ),
+    ai_system_prompt=_GTD + "ai_prompt",
     is_builtin=True,
     prompt_pack="gtd",
 )
@@ -437,8 +450,8 @@ def get_templates_dir() -> str:
 
 
 def get_builtin_templates() -> List[BoardTemplate]:
-    """Retorna una lista de copias de las plantillas predefinidas de fábrica."""
-    return [BoardTemplate.from_dict(t.to_dict()) for t in BUILTIN_TEMPLATES]
+    """Retorna una lista de copias de las plantillas predefinidas de fábrica, en el idioma de la interfaz."""
+    return [localized(tmpl) for tmpl in BUILTIN_TEMPLATES]
 
 
 def get_custom_templates(templates_dir: Optional[str] = None) -> List[BoardTemplate]:
@@ -529,6 +542,7 @@ def delete_custom_template(template_id: str, templates_dir: Optional[str] = None
 
 def apply_template_to_board(board_id: int, template: BoardTemplate, db_path: Optional[str] = None) -> None:
     """Aplica las columnas, etiquetas y tareas semilla de una plantilla a un tablero recién creado."""
+    template = localized(template)
     # 1. Crear columnas y mapear índices a nuevos column_ids
     col_id_by_index = {}
     for idx, col in enumerate(template.columns):
@@ -595,6 +609,7 @@ def create_board_from_template(
     db_path: Optional[str] = None,
 ) -> int:
     """Crea un nuevo tablero en la base de datos a partir de una plantilla dada."""
+    template = localized(template)
     board_id = database.create_board(
         name=name,
         color=color,

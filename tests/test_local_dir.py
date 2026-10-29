@@ -160,3 +160,16 @@ def test_edit_board_persists_the_local_dir(qapp, db_path, monkeypatch, tmp_path)
 
     assert database.get_board(board_id, db_path=db_path)["local_dir"] == str(tmp_path)
     bar.close()
+
+
+def test_local_folder_wording_is_not_only_a_repo():
+    """#146: los tableros socráticos y GTD también enlazan una carpeta de apuntes; la interfaz ya no
+    la llama «(repo)» y pone el repo solo como ejemplo."""
+    import strings
+    keys = ("sidebar.board_edit.local_dir_label", "settings.local_dirs_hint", "board_view.work_link_tooltip",
+            "landing.slide2_b2")
+    for table in (strings.STRINGS_EN, strings.STRINGS_ES):
+        for key in keys:
+            assert "(repo)" not in table[key] and "repo files" not in table[key], key
+    assert "notes folder" in strings.STRINGS_EN["settings.local_dirs_hint"]
+    assert "carpeta de apuntes" in strings.STRINGS_ES["settings.local_dirs_hint"]
