@@ -15,8 +15,8 @@
     "semantic_hash": "c9858a77903b6601d5f0e842983865bf"
   },
   "board_view.py": {
-    "mtime": 1792351716.1459744,
-    "ast_hash": "352da7cf4650c9d6e421c62c19a5bb98",
+    "mtime": 1793303982.751151,
+    "ast_hash": "c7c8956e2cf197dd474f08081f473d35",
     "semantic_hash": ""
   },
   "calendar_view.py": {
@@ -260,8 +260,8 @@
     "semantic_hash": ""
   },
   "widgets.py": {
-    "mtime": 1793220656.471294,
-    "ast_hash": "79d1880c4b37aa400958ca024dbeddd7",
+    "mtime": 1793303962.9178047,
+    "ast_hash": "4ffc0d2326299107190fd71b03cb6c60",
     "semantic_hash": ""
   },
   ".agents/docs/archive/2026-07-22_v0.4.0.md": {
@@ -355,8 +355,8 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1793220738.9596808,
-    "ast_hash": "3e6181c59fd7f3296ebc23ffc35a56c9",
+    "mtime": 1793304171.8115284,
+    "ast_hash": "84b3e9ec9d41a22e9aa74e82a15ffb9d",
     "semantic_hash": ""
   },
   "README.md": {
@@ -365,8 +365,8 @@
     "semantic_hash": ""
   },
   "backlog.md": {
-    "mtime": 1793217943.0336504,
-    "ast_hash": "d61860eaf438d1674cfed3adaf47b73d",
+    "mtime": 1793304187.7183778,
+    "ast_hash": "f9506ccaba5def0578fb374826090593",
     "semantic_hash": ""
   },
   "ekin_icon.png": {
@@ -730,9 +730,9 @@
     "semantic_hash": ""
   },
   "tests/test_incremental_rendering.py": {
-    "mtime": 1789322316.5336833,
-    "ast_hash": "ddb29e2250b158a577bdd01472445043",
-    "semantic_hash": "ddb29e2250b158a577bdd01472445043"
+    "mtime": 1793304077.789807,
+    "ast_hash": "85915351fbe17ec33dfce6c34daeed7b",
+    "semantic_hash": ""
   },
   "tests/test_logging_setup.py": {
     "mtime": 1789312231.410038,
@@ -765,8 +765,8 @@
     "semantic_hash": "2518e718a15587e94042d2f10bb98b03"
   },
   "board_mixins.py": {
-    "mtime": 1792081477.127118,
-    "ast_hash": "f52e869fe6497665fb5cbb11a28a0146",
+    "mtime": 1793303994.7908623,
+    "ast_hash": "6b5985b39066e07c62e80dd320b543da",
     "semantic_hash": ""
   },
   "board_template_dialogs.py": {
@@ -835,8 +835,8 @@
     "semantic_hash": ""
   },
   "tests/test_batch_drag_drop.py": {
-    "mtime": 1790443177.887931,
-    "ast_hash": "03e4a0e2bf512b3e3fa73f02309beda9",
+    "mtime": 1793304045.1764474,
+    "ast_hash": "8dba49d1977ad49ebd1ae3e1c42bfe65",
     "semantic_hash": ""
   },
   "tests/test_local_ai_rdi.py": {
