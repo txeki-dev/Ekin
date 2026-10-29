@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - The release workflow starts only when `version.py` changes, and runs the tests on Python 3.10–3.12 before it builds the installer.
 - **The license is the official PolyForm Noncommercial 1.0.0 text (`LICENSE`, `README.md`)**: The repository's copy had 10 of the license's 15 sections: *Personal Uses*, *Noncommercial Organizations*, *No Other Rights*, *Patent Defense* and *Definitions* were missing, a 30-day termination clause stood in for *Violations* (32 days) and an MIT-style disclaimer for *No Liability*. It is now the official text, headed by the `Required Notice:` copyright line that anyone redistributing Ekin must keep. It is still the same license: Ekin stays free for personal and other noncommercial use. The README gains a License section.
 
+### Fixed
+- **A card can be dragged from its title (`widgets.py`, #157)**: Pressing on a card's title and dragging did nothing, so the drag only started from the rest of the card. The title is rich text, and Qt's text control in that label kept the mouse movements to itself. The whole card now starts the drag, except the linked-board pill, which is a button.
+- **Dropping a card no longer freezes the board (`board_view.py`, `board_mixins.py`, `widgets.py`, #157)**: Each drop rebuilt every card in the source and target columns and restyled every card on the board. With 81 cards in *Done*, the window froze for about 1.5 s. Now only the dropped card is created again, and the column counter updates in place: on that board, a drop into *Done* takes about 0.1 s. If the board on screen no longer matches the database (an agent changed it during the drag), both columns are rebuilt as before.
+
 ## [1.8.0] - 2026-10-19
 
 ### Changed

@@ -203,9 +203,12 @@ class BoardSelectionMixin:
 
     def _update_cards_selection_ui(self):
         """Actualiza el estado visual de selección en todas las tarjetas y la barra inferior."""
+        # Solo las que cambian: re-aplicar la hoja de estilo a todas costaba ~0,2 s por drop (#157)
         for col_widget in self.column_widgets.values():
             for card in col_widget.findChildren(TaskCard):
-                card.set_selected(card.task_id in self.selected_task_ids)
+                selected = card.task_id in self.selected_task_ids
+                if card.is_selected != selected:
+                    card.set_selected(selected)
 
         count = len(self.selected_task_ids)
         if count > 0:

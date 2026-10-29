@@ -458,24 +458,28 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
 
         if not col_data.get("collapsed"):
             for task_data in tasks:
-                card = TaskCard(task_data, self)
-                if board_info:
-                    card.set_card_style(board_info["color"])
-                card.set_timer_alert_hours(timer_alert_hours)
-                if card.task_id in self.selected_task_ids:
-                    card.set_selected(True)
-                # Diferido: el detalle abre un bucle anidado y, si se abriera dentro del clic,
-                # una recarga en vivo (p. ej. por MCP) destruiría esta tarjeta con su evento aún
-                # en la pila → cierre nativo de Qt al cerrar el detalle (0xc0000005)
-                card.clicked.connect(
-                    lambda tid, cid=col_data["id"]: self._handle_task_card_clicked(tid, cid), Qt.QueuedConnection
-                )
-                card.ctrl_clicked.connect(lambda tid, cid=col_data["id"]: self._handle_task_ctrl_clicked(tid, cid))
-                card.board_link_clicked.connect(self.board_link_activated.emit)
-                card.drag_ended.connect(self.finalize_hover_expand)
-                col_widget.add_task_card(card)
+                col_widget.add_task_card(self._build_task_card(task_data, col_data["id"], board_info, timer_alert_hours))
 
         return col_widget
+
+    def _build_task_card(self, task_data, column_id, board_info, timer_alert_hours):
+        """Construye una TaskCard con sus señales conectadas, sin añadirla a ninguna columna."""
+        card = TaskCard(task_data, self)
+        if board_info:
+            card.set_card_style(board_info["color"])
+        card.set_timer_alert_hours(timer_alert_hours)
+        if card.task_id in self.selected_task_ids:
+            card.set_selected(True)
+        # Diferido: el detalle abre un bucle anidado y, si se abriera dentro del clic,
+        # una recarga en vivo (p. ej. por MCP) destruiría esta tarjeta con su evento aún
+        # en la pila → cierre nativo de Qt al cerrar el detalle (0xc0000005)
+        card.clicked.connect(
+            lambda tid, cid=column_id: self._handle_task_card_clicked(tid, cid), Qt.QueuedConnection
+        )
+        card.ctrl_clicked.connect(lambda tid, cid=column_id: self._handle_task_ctrl_clicked(tid, cid))
+        card.board_link_clicked.connect(self.board_link_activated.emit)
+        card.drag_ended.connect(self.finalize_hover_expand)
+        return card
 
     def _rebuild_single_column(self, column_id):
         """Reconstruye el ColumnWidget de UNA sola columna (datos/tareas frescos de la
@@ -1042,6 +1046,44 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
 
         self.undo_manager.push(UndoAction(label, do_undo, do_redo))
 
+    def _move_dropped_cards(self, moved_ids, current_col_tasks, remaining_col_tasks, target_column_id):
+        """Lleva las tarjetas soltadas a su sitio sin reconstruir columnas (#157): reconstruir origen
+        y destino (81 tarjetas en Done) congelaba la GUI ~1 s en cada drop. Solo se crean de nuevo
+        las tarjetas movidas, con sus datos de la BD. Exige que cada columna afectada esté
+        desplegada y muestre lo que había en la BD antes del drop; si no, devuelve False y el
+        llamante reconstruye esas columnas."""
+        layouts = {}
+        for cid, tasks in current_col_tasks.items():
+            col_widget = self.column_widgets.get(cid)
+            if col_widget is None or col_widget.collapsed:
+                return False
+            layout = col_widget.list_area.list_layout
+            cards = [layout.itemAt(i).widget() for i in range(layout.count())]
+            cards = [w for w in cards if isinstance(w, TaskCard)]
+            if [c.task_id for c in cards] != [task_item["id"] for task_item in tasks]:
+                return False
+            layouts[cid] = (layout, cards)
+
+        # La tarjeta arrastrada sigue en la pila de su QDrag.exec(): deleteLater, nunca un borrado inmediato
+        for layout, cards in layouts.values():
+            for card in cards:
+                if card.task_id in moved_ids:
+                    layout.removeWidget(card)
+                    card.hide()
+                    card.deleteLater()
+
+        board_info = database.get_board(self.board_id, self.db_path)
+        timer_alert_hours = int(database.get_setting("timer_alert_hours", "24", self.db_path))
+        target_layout = layouts[target_column_id][0]
+        for idx, task_item in enumerate(remaining_col_tasks[target_column_id]):
+            if task_item["id"] in moved_ids:
+                task_data = database.get_task(task_item["id"], self.db_path)
+                target_layout.insertWidget(idx, self._build_task_card(task_data, target_column_id, board_info, timer_alert_hours))
+
+        for cid, tasks in remaining_col_tasks.items():
+            self.column_widgets[cid].set_task_count(len(tasks))
+        return True
+
     def handle_task_drop(self, task_id, target_column_id, target_position):
         """Maneja la lógica de recolocación de tareas (individual o por lote) tras arrastrarlas."""
         if isinstance(task_id, (list, tuple, set)):
@@ -1104,9 +1146,11 @@ class BoardViewWidget(BoardSyncUiMixin, BoardMcpUiMixin, BoardSelectionMixin, QF
                 label = t("board_view.move_task.undo_label")
             self._push_move_undo(label, old_positions, new_positions, affected_cols)
 
-        # 9. Actualización incremental: reconstruir únicamente las columnas afectadas
-        for cid in affected_cols:
-            self._rebuild_single_column(cid)
+        # 9. Actualización incremental: mover solo las tarjetas soltadas o, si no se puede,
+        # reconstruir únicamente las columnas afectadas
+        if not self._move_dropped_cards(task_id_set, current_col_tasks, remaining_col_tasks, target_column_id):
+            for cid in affected_cols:
+                self._rebuild_single_column(cid)
 
         self._update_board_counts()
         self.data_changed.emit()

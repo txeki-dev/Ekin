@@ -9,11 +9,13 @@ Cubre:
 """
 
 import json
-from PySide6.QtCore import Qt, QMimeData, QPointF
-from PySide6.QtGui import QDropEvent, QDragEnterEvent
+from PySide6.QtCore import Qt, QEvent, QMimeData, QPointF
+from PySide6.QtGui import QDropEvent, QDragEnterEvent, QMouseEvent
+from PySide6.QtWidgets import QApplication
 import database
 from undo import UndoManager
 from board_view import BoardViewWidget
+import widgets
 from widgets import TaskCard, TaskListArea, compute_drop_index
 
 
@@ -119,11 +121,12 @@ def test_board_view_batch_task_drop_across_columns_and_incremental(qapp, db_path
     # Mover [t1, t2] de Col A a Col B en la posición 0
     bv.handle_task_drop([t1, t2], col_b, 0)
 
-    # Col C no debe haber sido tocada
+    # Ninguna columna se reconstruye (#157): las tarjetas del lote pasan de A a B en su orden
     assert bv.column_widgets[col_c] is widget_c_before
-    # Col A y B deben haberse reconstruido
-    assert bv.column_widgets[col_a] is not widget_a_before
-    assert bv.column_widgets[col_b] is not widget_b_before
+    assert bv.column_widgets[col_a] is widget_a_before
+    assert bv.column_widgets[col_b] is widget_b_before
+    layout_b = widget_b_before.list_area.list_layout
+    assert [layout_b.itemAt(i).widget().task_id for i in range(layout_b.count() - 1)] == [t1, t2, tb1]
 
     # Verificar posiciones en DB
     tasks_a = database.get_tasks(col_a, db_path)
@@ -233,3 +236,40 @@ def test_collapsed_column_batch_drop(qapp, db_path):
     tasks_b = database.get_tasks(col_b, db_path)
     assert len(tasks_b) == 3
     assert [t["id"] for t in tasks_b] == [existing_b, t1, t2]
+
+
+def test_drag_starts_from_the_card_title(qapp, monkeypatch):
+    """#157: el título es un QLabel con texto enriquecido, cuyo control de texto se quedaba los
+    movimientos del ratón: pulsar en el título y arrastrar no movía la tarjeta."""
+    started = []
+
+    class _FakeDrag:
+        def __init__(self, source):
+            started.append(source.task_id)
+
+        def setMimeData(self, mime):
+            pass
+
+        def setPixmap(self, pixmap):
+            pass
+
+        def setHotSpot(self, point):
+            pass
+
+        def exec(self, action):
+            return Qt.IgnoreAction
+
+    monkeypatch.setattr(widgets, "QDrag", _FakeDrag)
+    card = TaskCard({"id": 7, "title": "Arrastrar desde el título", "column_id": 1, "tags": []})
+    card.resize(260, 120)
+    card.show()
+    qapp.processEvents()
+
+    label = card.title_label
+    start = QPointF(label.rect().center())
+    end = start + QPointF(0, 40)
+    for ev_type, pos, button in ((QEvent.MouseButtonPress, start, Qt.LeftButton), (QEvent.MouseMove, end, Qt.NoButton)):
+        QApplication.sendEvent(label, QMouseEvent(ev_type, pos, label.mapToGlobal(pos), button, Qt.LeftButton, Qt.NoModifier))
+
+    assert started == [7]
+    card.close()

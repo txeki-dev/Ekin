@@ -209,6 +209,9 @@ class TaskCard(QFrame):
         self.title_label = QLabel(self._title_html())
         self.title_label.setObjectName("TaskCardTitle")
         self.title_label.setTextFormat(Qt.RichText)
+        # Con texto enriquecido, QLabel crea un control de texto que se queda los movimientos del
+        # ratón: arrastrar desde el título no movía la tarjeta (#157). El título no tiene enlaces.
+        self.title_label.setTextInteractionFlags(Qt.NoTextInteraction)
         self.title_label.setWordWrap(True)
         title_row.addWidget(self.title_label, stretch=1)
 
@@ -1005,17 +1008,9 @@ class ColumnWidget(QFrame):
         header_layout.addWidget(self.title_label)
 
         # Límite WIP: muestra "n/límite" y avisa en color danger si se supera.
-        wip = self.column_data.get("wip_limit")
-        if wip:
-            count = self.column_data.get("task_count", 0)
-            over = count > wip
-            self.wip_label = QLabel(f"{count}/{wip}")
-            self.wip_label.setToolTip(t("widgets.column.wip_tooltip", count=count, limit=wip))
-            color = styles.COLORS["danger"] if over else styles.COLORS["text_muted"]
-            weight = "bold" if over else "normal"
-            self.wip_label.setStyleSheet(
-                f"color: {color}; font-size: 11px; font-weight: {weight}; background: transparent;"
-            )
+        if self.column_data.get("wip_limit"):
+            self.wip_label = QLabel()
+            self._update_wip_label()
             header_layout.addWidget(self.wip_label)
 
         header_layout.addStretch()
@@ -1170,6 +1165,24 @@ class ColumnWidget(QFrame):
             self.copy_column_requested.emit(self.column_id)
         elif action == delete_action:
             self.delete_column_requested.emit(self.column_id)
+
+    def _update_wip_label(self):
+        wip = self.column_data["wip_limit"]
+        count = self.column_data.get("task_count", 0)
+        over = count > wip
+        self.wip_label.setText(f"{count}/{wip}")
+        self.wip_label.setToolTip(t("widgets.column.wip_tooltip", count=count, limit=wip))
+        color = styles.COLORS["danger"] if over else styles.COLORS["text_muted"]
+        weight = "bold" if over else "normal"
+        self.wip_label.setStyleSheet(
+            f"color: {color}; font-size: 11px; font-weight: {weight}; background: transparent;"
+        )
+
+    def set_task_count(self, count):
+        """Actualiza el recuento (y el aviso WIP) sin reconstruir la columna (#157)."""
+        self.column_data["task_count"] = count
+        if hasattr(self, "wip_label"):
+            self._update_wip_label()
 
     def add_task_card(self, card_widget):
         """Añade una tarjeta de tarea a la columna (no-op si está plegada)."""

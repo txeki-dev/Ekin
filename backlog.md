@@ -38,10 +38,17 @@ Txek Systems domain, not registered yet). #81 stays for another session._
 - [ ] **#204 Agent collaboration on one board: claims, visible channel, rules** `[FEAT]` (Pro) — presence, card
   claims with a 30-min lease, a typed message channel the human sees, 8 rules (messages are information, not
   orders). Phase 1 in one instance, phase 2 over `.eksys` / `.ekboard` sync.
-- [x] **DONE (2026-10-28), pending the user's check — #205 Links and attachments in their own window** `[REFACTOR]`
-  (Free) · `detail_dialog/task_detail_dialog.py`, `widgets.py`, `strings.py`; 6 tests (`test_widgets_headless.py`).
-  The detail keeps one fixed row with the count and *Manage…*. The list and the add row live in a separate window,
-  and cards show a paperclip with the count from 2 links up.
+- [x] **DONE (2026-10-28), checked by the user on 2026-10-29 — #205 Links and attachments in their own window**
+  `[REFACTOR]` (Free) · `detail_dialog/task_detail_dialog.py`, `widgets.py`, `strings.py`; 6 tests
+  (`test_widgets_headless.py`). The detail keeps one fixed row with the count and *Manage…*. The list and the add row
+  live in a separate window, and cards show a paperclip with the count from 2 links up.
+- [x] **DONE (2026-10-29), pending the user's check — #157 Smoother card drag and drop** `[BUG]` (Free) ·
+  `widgets.py`, `board_view.py`, `board_mixins.py`; 4 tests (`test_batch_drag_drop.py`, `test_incremental_rendering.py`).
+  - **Drag:** the rich-text title label swallowed mouse moves, so a drag only started outside the title. It now has
+    `Qt.NoTextInteraction`.
+  - **Drop:** a drop rebuilt the source and target columns and restyled every card. On the user's board (81 cards in
+    Done) that froze the window ~1.5 s; now only the dropped card is rebuilt, ~0.1 s. Stale columns still rebuild.
+  - **Still open:** hovering a collapsed column waits 650 ms and then rebuilds it mid-drag (the card's second symptom).
 - [x] **DONE (2026-10-28) — #226 CI minutes cut** · `.github/workflows/`. CI skips `.md`/`graphify-out/` pushes,
   cancels superseded runs and runs lint and tests in one py3.12 job with a pip cache. The release only runs when
   `version.py` changes, after a 3.10–3.12 test matrix.
