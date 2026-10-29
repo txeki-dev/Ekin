@@ -42,7 +42,7 @@ Txek Systems domain, not registered yet). #81 stays for another session._
   `[REFACTOR]` (Free) · `detail_dialog/task_detail_dialog.py`, `widgets.py`, `strings.py`; 6 tests
   (`test_widgets_headless.py`). The detail keeps one fixed row with the count and *Manage…*. The list and the add row
   live in a separate window, and cards show a paperclip with the count from 2 links up.
-- [x] **DONE (2026-10-29), pending the user's check — #157 Smoother card drag and drop** `[BUG]` (Free) ·
+- [x] **DONE (2026-10-29), checked by the user on 2026-10-29 — #157 Smoother card drag and drop** `[BUG]` (Free) ·
   `widgets.py`, `board_view.py`, `board_mixins.py`; 7 tests (`test_batch_drag_drop.py`, `test_incremental_rendering.py`,
   `test_hover_expand.py`).
   - **Drag:** the rich-text title label swallowed mouse moves, so a drag only started outside the title. It now has
