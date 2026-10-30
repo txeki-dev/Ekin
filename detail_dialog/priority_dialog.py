@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSize
 from PySide6.QtWidgets import (
     QDialog, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QScrollArea, QWidget, QColorDialog, QMessageBox, QInputDialog
@@ -7,6 +7,7 @@ from PySide6.QtGui import QColor
 
 import database
 import styles
+from icons import lucide_icon
 from strings import t
 
 
@@ -142,14 +143,19 @@ class PriorityManagerDialog(QDialog):
         h.addWidget(name)
         h.addStretch()
 
-        edit_btn = QPushButton("✎")
+        # Iconos como en el gestor de etiquetas: «✎» y «×» no cabían con el padding de los botones (#158)
+        edit_btn = QPushButton()
+        edit_btn.setIcon(lucide_icon("pencil", styles.COLORS['text_soft'], 14))
+        edit_btn.setIconSize(QSize(14, 14))
         edit_btn.setFixedSize(26, 24)
         edit_btn.setCursor(Qt.PointingHandCursor)
         edit_btn.setToolTip(t("tag_manager.rename_value_tooltip"))
         edit_btn.clicked.connect(lambda _=False, v=dict(value): self.rename_value(v))
         h.addWidget(edit_btn)
 
-        del_btn = QPushButton("×")
+        del_btn = QPushButton()
+        del_btn.setIcon(lucide_icon("trash-2", styles.COLORS['on_accent'], 14))
+        del_btn.setIconSize(QSize(14, 14))
         del_btn.setObjectName("DangerButton")
         del_btn.setFixedSize(26, 24)
         del_btn.setCursor(Qt.PointingHandCursor)

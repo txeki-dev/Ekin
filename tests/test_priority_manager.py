@@ -115,3 +115,17 @@ def test_tag_manager_edit_and_delete_buttons_are_icons(qapp, db_path):
         btn = by_tip[t(key)]
         assert btn.text() == "" and not btn.icon().isNull(), key
     dlg.reject()
+
+
+def test_priority_manager_edit_and_delete_buttons_are_icons(qapp, db_path):
+    """#158: en Gestionar prioridades, «✎» y «×» no cabían con el padding y los botones salían vacíos."""
+    from PySide6.QtWidgets import QPushButton
+    from strings import t
+
+    ensure_priority_category(db_path)
+    dlg = PriorityManagerDialog(db_path)
+    for key in ("tag_manager.rename_value_tooltip", "tag_manager.delete_value_tooltip"):
+        buttons = [b for b in dlg.findChildren(QPushButton) if b.toolTip() == t(key)]
+        assert len(buttons) == 3, key  # uno por nivel: Baja, Media, Alta
+        assert all(b.text() == "" and not b.icon().isNull() for b in buttons), key
+    dlg.reject()

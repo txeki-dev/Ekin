@@ -4,7 +4,7 @@ from datetime import datetime
 from PySide6.QtCore import Qt, QMimeData, QPoint, Signal, QRect, QRectF, QSize, QTimer
 from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QWidget, QMenu, QApplication, QLayout, QGraphicsDropShadowEffect
+    QScrollArea, QWidget, QMenu, QApplication, QLayout, QGraphicsDropShadowEffect, QToolTip
 )
 from PySide6.QtGui import (
     QDrag, QPixmap, QCursor, QPainter, QPainterPath, QColor, QBrush, QPen, QFont, QFontMetrics, QRegion
@@ -1216,34 +1216,54 @@ class ColumnWidget(QFrame):
 
 class PhaseBar(QWidget):
     """Barra del pie del tablero (#184): las tarjetas abiertas de cada columna, sin las terminadas,
-    con el color de su columna. Muestra dónde se acumula el trabajo y no crece con el histórico."""
+    con el color de su columna. Muestra dónde se acumula el trabajo y no crece con el histórico.
+    Al pasar el ratón por un tramo, una etiqueta dice su columna y cuántas tarjetas tiene."""
+    BAR_HEIGHT = 8
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(140, 8)
+        self.setFixedSize(140, 16)  # la barra va centrada: con solo 8 px de alto costaba acertar con el ratón
+        self.setMouseTracking(True)
         self.segments = []  # [(nombre de la columna, color, tarjetas)]
         self.hide()
 
     def set_segments(self, segments):
         self.segments = [seg for seg in segments if seg[2] > 0]
-        self.setToolTip("\n".join([t("board_view.phase_bar_tooltip")] + [f"{name}: {n}" for name, _, n in self.segments]))
         self.setVisible(bool(self.segments))
         self.update()
 
-    def paintEvent(self, event):
+    def _segment_rects(self):
         total = sum(n for _, _, n in self.segments)
-        if not total:
-            return
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        clip = QPainterPath()
-        clip.addRoundedRect(QRectF(self.rect()), 4, 4)
-        painter.setClipPath(clip)
         # Cada tramo con al menos 4 px: una columna con 1 tarjeta junto a otra con 40 no se veía
         min_width = 4
         extra = max(0, self.width() - min_width * len(self.segments))
-        x = 0.0
-        for _, color, n in self.segments:
+        top = (self.height() - self.BAR_HEIGHT) / 2
+        rects, x = [], 0.0
+        for _, _, n in self.segments:
             width = min_width + extra * n / total
-            painter.fillRect(QRectF(x, 0, width, self.height()), QColor(color))
+            rects.append(QRectF(x, top, width, self.BAR_HEIGHT))
             x += width
+        return rects
+
+    def mouseMoveEvent(self, event):
+        x = event.position().x()
+        for (name, _, n), rect in zip(self.segments, self._segment_rects()):
+            if rect.left() <= x < rect.right():
+                # Con el rect del tramo, la etiqueta se cierra al pasar al siguiente y sale la suya
+                QToolTip.showText(event.globalPosition().toPoint(), f"{name}: {n}", self,
+                                  QRect(int(rect.left()), 0, max(1, int(rect.width())), self.height()))
+                break
+        super().mouseMoveEvent(event)
+
+    def paintEvent(self, event):
+        if not self.segments:
+            return
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        rects = self._segment_rects()
+        clip = QPainterPath()
+        clip.addRoundedRect(QRectF(0, rects[0].top(), self.width(), self.BAR_HEIGHT), 4, 4)
+        painter.setClipPath(clip)
+        for (_, color, _), rect in zip(self.segments, rects):
+            painter.fillRect(rect, QColor(color))
         painter.end()

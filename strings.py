@@ -70,7 +70,6 @@ STRINGS_EN = {
     'board_view.board_selection.cancel': 'Cancel',
     'board_view.board_selection.no_other_boards': 'No other boards',
     'board_view.header.toggle_sidebar_tooltip': 'Show/hide sidebar (Ctrl+B)',
-    'board_view.phase_bar_tooltip': 'Open cards by column (finished ones are not counted):',
     'board_view.header.default_title': 'My Board',
     'board_view.header.counts': '{tasks} tasks · {due} due this week',
     'board_view.welcome': (
@@ -1069,7 +1068,6 @@ STRINGS_ES = {
     'board_view.board_selection.cancel': 'Cancelar',
     'board_view.board_selection.no_other_boards': 'No hay otros tableros',
     'board_view.header.toggle_sidebar_tooltip': 'Mostrar/Ocultar barra lateral (Ctrl+B)',
-    'board_view.phase_bar_tooltip': 'Tarjetas abiertas por columna (no cuentan las terminadas):',
     'board_view.header.default_title': 'Mi Tablero',
     'board_view.header.counts': '{tasks} tareas · {due} vencen esta semana',
     'board_view.welcome': (

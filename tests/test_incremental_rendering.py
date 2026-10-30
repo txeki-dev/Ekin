@@ -1,7 +1,10 @@
 """Pruebas unitarias para el renderizado incremental del tablero (mutaciones de elementos únicos)."""
 
+from PySide6.QtCore import QEvent, QPointF, Qt
+from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QInputDialog
 import database
+import widgets
 from board_view import BoardViewWidget
 from widgets import TaskCard
 
@@ -207,10 +210,25 @@ def test_phase_bar_counts_open_cards_per_column_without_done(qapp, db_path):
     bv = BoardViewWidget(db_path=db_path)
     bv.load_board(board_id)
     assert bv.phase_bar.segments == [("📥 BACKLOG", "#64748b", 3), ("⚡ IN PROGRESS", "#0ea5e9", 1)]
-    assert "📥 BACKLOG: 3" in bv.phase_bar.toolTip() and "DONE" not in bv.phase_bar.toolTip()
     assert not bv.phase_bar.isHidden()
 
     for tk in database.get_tasks(backlog, db_path) + database.get_tasks(doing, db_path):
         database.delete_task(tk["id"], db_path)
     bv.load_board(board_id)
     assert bv.phase_bar.isHidden()  # todo terminado: no hay nada que repartir
+
+
+def test_phase_bar_hover_names_the_column_and_its_cards(qapp, monkeypatch):
+    """#184: al pasar el ratón por un tramo de la barra, una etiqueta dice su columna y sus tarjetas."""
+    shown = []
+    monkeypatch.setattr(widgets.QToolTip, "showText", lambda pos, text, *args: shown.append(text))
+    bar = widgets.PhaseBar()
+    bar.set_segments([("📥 BACKLOG", "#64748b", 3), ("⚡ IN PROGRESS", "#0ea5e9", 1), ("🔍 REVIEW", "#f59e0b", 0)])
+
+    def hover(x):
+        pos = QPointF(x, bar.height() / 2)
+        bar.mouseMoveEvent(QMouseEvent(QEvent.MouseMove, pos, pos, Qt.NoButton, Qt.NoButton, Qt.NoModifier))
+
+    hover(5)
+    hover(bar.width() - 5)
+    assert shown == ["📥 BACKLOG: 3", "⚡ IN PROGRESS: 1"]  # la columna vacía no tiene tramo
