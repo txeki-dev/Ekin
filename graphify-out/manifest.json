@@ -175,8 +175,8 @@
     "semantic_hash": ""
   },
   "strings.py": {
-    "mtime": 1793310099.681568,
-    "ast_hash": "69f826822a99285a6185b5472434331c",
+    "mtime": 1793381197.3969033,
+    "ast_hash": "8ef7625f25bf7f54d7828043f86448f3",
     "semantic_hash": ""
   },
   "styles.py": {
@@ -260,8 +260,8 @@
     "semantic_hash": ""
   },
   "widgets.py": {
-    "mtime": 1793310364.9980223,
-    "ast_hash": "75a3c8bfb13ff9de4dec9712e8ffad42",
+    "mtime": 1793381197.3953722,
+    "ast_hash": "973d42ea22647dadcaba6a12677b1198",
     "semantic_hash": ""
   },
   ".agents/docs/archive/2026-07-22_v0.4.0.md": {
@@ -355,8 +355,8 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1793310489.181231,
-    "ast_hash": "43cdb90c00d6a562fd6b90bf1f16a0c2",
+    "mtime": 1793381261.3646326,
+    "ast_hash": "675b945456f3587394b7510e813db44d",
     "semantic_hash": ""
   },
   "README.md": {
@@ -365,8 +365,8 @@
     "semantic_hash": ""
   },
   "backlog.md": {
-    "mtime": 1793310489.181231,
-    "ast_hash": "d1fa7012baa55cb48b4e4f590552286c",
+    "mtime": 1793381261.3851638,
+    "ast_hash": "475d09f96087aee059f889c40e29d8ce",
     "semantic_hash": ""
   },
   "ekin_icon.png": {
@@ -730,8 +730,8 @@
     "semantic_hash": ""
   },
   "tests/test_incremental_rendering.py": {
-    "mtime": 1793310002.1284585,
-    "ast_hash": "b2ce6d1fa3b4657073431c9b2c5e4367",
+    "mtime": 1793381217.785661,
+    "ast_hash": "c14bbd3f32bd0257b5afc411efe6bdeb",
     "semantic_hash": ""
   },
   "tests/test_logging_setup.py": {
@@ -755,13 +755,13 @@
     "semantic_hash": "5b9594ec166721f9480a5b6b28f35e6b"
   },
   "detail_dialog/priority_dialog.py": {
-    "mtime": 1790357341.535547,
-    "ast_hash": "ecf68e545b3c26b1e929cfb66ceb9d53",
-    "semantic_hash": "ecf68e545b3c26b1e929cfb66ceb9d53"
+    "mtime": 1793381115.118452,
+    "ast_hash": "4571fbed14d97168f9bdc17c379c73ec",
+    "semantic_hash": ""
   },
   "tests/test_priority_manager.py": {
-    "mtime": 1793308936.7526953,
-    "ast_hash": "a2483f38888344ee3873adf9bec9bdd6",
+    "mtime": 1793381217.785661,
+    "ast_hash": "c2dfcfab96effbf2e493c9cd454e4f2c",
     "semantic_hash": ""
   },
   "board_mixins.py": {
@@ -880,13 +880,13 @@
     "semantic_hash": ""
   },
   "assets/prompt_packs/gtd.json": {
-    "mtime": 1792352906.5393481,
-    "ast_hash": "",
+    "mtime": 1793309872.6885784,
+    "ast_hash": "2f9a0472f95b84149aaf3f7496deb643",
     "semantic_hash": ""
   },
   "assets/prompt_packs/opositor.json": {
-    "mtime": 1792352906.5393481,
-    "ast_hash": "",
+    "mtime": 1793309883.024508,
+    "ast_hash": "33d89de9a456cf653fd219bcdf5ea5f5",
     "semantic_hash": ""
   },
   ".agents/docs/instruction_1.md": {
