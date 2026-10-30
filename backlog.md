@@ -53,7 +53,8 @@ Txek Systems domain, not registered yet). #81 stays for another session._
     (~0.4 s on enter and on leave in Done); it is now painted, ~30 ms.
   - **Collapsed column under a drag:** waited 650 ms and built all its cards (~0.9 s in Done); now 350 ms and the
     first 12 cards plus "+N more", ~0.16 s.
-- [x] **DONE (2026-10-29), pending the user's check — v1.9.0 scope (Free, no installer changes)**:
+- [x] **DONE (2026-10-29), checked by the user on 2026-10-30 except #152 (needs a folder without our logic) — v1.9.0
+  scope (Free, no installer changes)**:
   - **#158** tag and priority manager buttons are Lucide icons (`tag_manager_dialog.py`, `priority_dialog.py`; in
     the priority manager the text glyphs did not fit and the buttons looked empty).
   - **#146** the local folder is not called a repo (`strings.py`, README).
